@@ -14,13 +14,15 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!  // server o
 
 // Browser client — respects RLS, safe to use client-side
 export function createBrowserSupabase() {
-  return createBrowserClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY)
+  // `Database` types are currently a stub in `lib/supabase/types.ts`.
+  // Keep runtime behavior correct while avoiding `never`-typed query errors.
+  return createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 }
 
 // Server client for Next.js Server Components and API Routes
 export async function createServerSupabase() {
   const cookieStore = await cookies()
-  return createServerClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  return createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     cookies: {
       get(name) { return cookieStore.get(name)?.value },
       set(name, value, options) { cookieStore.set({ name, value, ...options }) },
@@ -30,11 +32,11 @@ export async function createServerSupabase() {
 }
 
 // Admin client — bypasses RLS, use only in workers and trusted server code
-export const adminSupabase = createClient<Database>(
+export const adminSupabase = createClient(
   SUPABASE_URL,
   SUPABASE_SERVICE_KEY,
   { auth: { persistSession: false } }
-)
+) as unknown as ReturnType<typeof createClient<Database>> as any
 
 // ─── TYPED QUERY HELPERS ──────────────────────────────────────
 // Replace Firestore collection helpers with typed Supabase queries
@@ -193,7 +195,7 @@ export const db = {
     if (type) query = query.eq('type', type)
     const { data, error } = await query
     if (error) throw error
-    return [...new Set(data.map(v => v.make))]
+    return [...new Set(data.map((v: any) => v.make))]
   },
 
   async getVehicleModels(year: number, make: string) {
@@ -323,7 +325,7 @@ export const db = {
       .eq('compliance_status', 'violation')
 
     return {
-      ...data,
+      ...(data as Record<string, unknown>),
       active_carts: activeCarts,
       abandoned_carts: abandonedCarts,
       map_violations: mapViolations,
