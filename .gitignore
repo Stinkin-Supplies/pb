@@ -33,6 +33,11 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# local-only secrets and SSH config
+env.local
+.ssh/
+lib/supabase/pooler-url
+
 # vercel
 .vercel
 
