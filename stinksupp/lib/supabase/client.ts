@@ -66,6 +66,42 @@ export const db = {
     return data
   },
 
+  async getProducts(options: {
+    category?: string
+    brand?: string
+    limit?: number
+    orderBy?: 'price_asc' | 'price_desc' | 'newest'
+    inStockOnly?: boolean
+  } = {}) {
+    let query = adminSupabase
+      .from('products')
+      .select(`
+        *,
+        brands (name, slug),
+        categories (name, slug),
+        product_images (url, is_primary)
+      `, { count: 'exact' })
+      .eq('status', 'active')
+
+    if (options.category) query = query.eq('categories.slug', options.category)
+    if (options.brand) query = query.eq('brands.slug', options.brand)
+    if (options.inStockOnly) query = query.eq('in_stock', true)
+
+    const orderMap = {
+      price_asc:  { column: 'our_price',   ascending: true },
+      price_desc: { column: 'our_price',   ascending: false },
+      newest:     { column: 'created_at',  ascending: false },
+    }
+    const order = orderMap[options.orderBy ?? 'newest']
+    query = query.order(order.column, { ascending: order.ascending })
+
+    if (options.limit) query = query.limit(options.limit)
+
+    const { data, error } = await query
+    if (error) throw error
+    return data ?? []
+  },
+
   async getProductsByVehicle(vehicleId: string, options: {
     category?: string
     limit?: number
