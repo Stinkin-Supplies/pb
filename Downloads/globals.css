@@ -1,0 +1,62 @@
+/* app/globals.css */
+/* Base resets, CSS variables, and scrollbar styles.
+   Imported once in layout.jsx — available on every page. */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --black:   #0a0909;
+  --coal:    #111010;
+  --iron:    #1a1919;
+  --steel:   #2a2828;
+  --steel2:  #3a3838;
+  --chrome:  #8a8784;
+  --silver:  #c4c0bc;
+  --cream:   #f0ebe3;
+  --orange:  #e8621a;
+  --orange2: #c94f0f;
+  --gold:    #c9a84c;
+  --red:     #b91c1c;
+  --green:   #22c55e;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--black);
+  color: var(--cream);
+  font-family: 'Barlow Condensed', sans-serif;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Grain texture overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.35;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar       { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: var(--iron); }
+::-webkit-scrollbar-thumb { background: var(--orange); border-radius: 2px; }
+
+/* Utility font classes — used by all pages */
+.font-mono    { font-family: 'Share Tech Mono', monospace; }
+.font-display { font-family: 'Bebas Neue', sans-serif; }
+.font-body    { font-family: 'Barlow Condensed', sans-serif; }
+
+/* Shared button resets */
+button { cursor: pointer; }
+a      { text-decoration: none; color: inherit; }
