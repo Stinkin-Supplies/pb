@@ -116,7 +116,11 @@ const MOCK_PRODUCTS = {
       { label:"SKU",           value:"SE-92800020" },
       { label:"Weight",        value:"8.4 lbs" },
     ],
-    images:[], ships_free:true,
+    images:[
+  "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1609630875171-b1321377ee65?w=800&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1591637333184-19aa84b3e01f?w=800&auto=format&fit=crop",
+], ships_free:true,
   },
   "vance-hines-pro-pipe-chrome": {
     id:2, slug:"vance-hines-pro-pipe-chrome",
