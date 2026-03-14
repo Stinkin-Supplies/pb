@@ -1,6 +1,5 @@
-cat > "/Users/home/Desktop/Stinkin-Supplies/app/shop/[category]/page.jsx" << 'EOF'
 import { notFound } from "next/navigation";
-import ShopClient from "../ShopClient";
+import ShopClient from "../../ShopClient";
 
 const CATEGORY_MAP = {
   "engine-performance":  "Engine & Performance",
@@ -42,4 +41,3 @@ export async function generateMetadata({ params }) {
 export async function generateStaticParams() {
   return Object.keys(CATEGORY_MAP).map(slug => ({ category: slug }));
 }
-EOF
