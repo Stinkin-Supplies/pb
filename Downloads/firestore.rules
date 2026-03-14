@@ -1,0 +1,244 @@
+// firestore/firestore.rules
+// ─── FIRESTORE SECURITY RULES ────────────────────────────────
+// These rules are the ONLY thing standing between your data
+// and the public internet. Review carefully before deploying.
+//
+// Deploy with: firebase deploy --only firestore:rules
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── HELPER FUNCTIONS ──────────────────────────────────────
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        request.auth.token.role in ['admin'];
+    }
+
+    function isSalesRep() {
+      return isAuthenticated() &&
+        request.auth.token.role in ['admin', 'sales_rep'];
+    }
+
+    function isStaff() {
+      return isAuthenticated() &&
+        request.auth.token.role in ['admin', 'sales_rep', 'viewer'];
+    }
+
+    function isValidEmail(email) {
+      return email.matches('.*@.*\\..*');
+    }
+
+    function notChanging(field) {
+      return !(field in request.resource.data) ||
+        request.resource.data[field] == resource.data[field];
+    }
+
+    function hasRequiredUserFields() {
+      let data = request.resource.data;
+      return data.keys().hasAll(['email', 'firstName', 'lastName']) &&
+        data.email is string &&
+        data.firstName is string &&
+        data.lastName is string;
+    }
+
+    // ─── USERS ─────────────────────────────────────────────────
+
+    match /users/{uid} {
+      // Users can read their own profile
+      allow read: if isOwner(uid) || isStaff();
+
+      // New user creation (on signup)
+      allow create: if isOwner(uid) && hasRequiredUserFields();
+
+      // Users can update their own profile (but not privileged fields)
+      allow update: if isOwner(uid) &&
+        // Cannot change these fields
+        notChanging('role') &&
+        notChanging('pointsBalance') &&
+        notChanging('lifetimePointsEarned') &&
+        notChanging('lifetimeSpend') &&
+        notChanging('orderCount') &&
+        notChanging('referralCode');
+
+      // Admins can update anything
+      allow update: if isAdmin();
+
+      // Never allow client-side deletes
+      allow delete: if false;
+
+      // Points ledger - append-only, no updates or deletes
+      match /pointsLedger/{transactionId} {
+        allow read: if isOwner(uid) || isStaff();
+        // Only Cloud Functions can write to the ledger
+        allow create: if false;  // Cloud Functions use Admin SDK (bypasses rules)
+        allow update: if false;
+        allow delete: if false;
+      }
+    }
+
+    // ─── PRODUCTS ──────────────────────────────────────────────
+
+    match /products/{sku} {
+      // Anyone can read active products
+      allow read: if resource.data.status == 'active' || isStaff();
+
+      // Only admins can modify products (Cloud Functions use Admin SDK)
+      allow create, update: if isAdmin();
+      allow delete: if false;
+    }
+
+    // ─── VEHICLES ──────────────────────────────────────────────
+
+    match /vehicles/{vehicleId} {
+      // Anyone can read vehicle data (needed for fitment filter)
+      allow read: if true;
+      // Only admins manage the vehicle database
+      allow write: if isAdmin();
+    }
+
+    // ─── FITMENT ───────────────────────────────────────────────
+
+    match /fitment/{sku} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ─── CARTS ─────────────────────────────────────────────────
+
+    match /carts/{cartId} {
+      // Logged-in users own their cart (cartId = uid)
+      allow read, write: if isOwner(cartId);
+
+      // Guest carts use sessionId - allow read/write without auth
+      // (sessionId is opaque random string, hard to guess)
+      allow read, write: if !isAuthenticated() &&
+        resource.data.uid == null;
+
+      // Staff can read all carts (for abandoned cart management)
+      allow read: if isStaff();
+
+      // Only Cloud Functions can mark as abandoned
+      allow update: if isOwner(cartId) &&
+        !('abandonmentEmailsSent' in request.resource.data);
+    }
+
+    // ─── ORDERS ────────────────────────────────────────────────
+
+    match /orders/{orderId} {
+      // Customers can read their own orders
+      allow read: if isAuthenticated() &&
+        (resource.data.uid == request.auth.uid || isStaff());
+
+      // Guest order read by email verification (handled in Cloud Function)
+      // No client-side creation — orders are created by Cloud Functions only
+      allow create: if false;
+
+      // Customers can add notes to their orders (limited)
+      allow update: if isAuthenticated() &&
+        resource.data.uid == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['customerNote']);
+
+      // Staff can update orders
+      allow update: if isSalesRep();
+      allow delete: if false;
+
+      // Vendor orders (subcollection)
+      match /vendorOrders/{vendorOrderId} {
+        allow read: if isStaff() ||
+          (isAuthenticated() && get(/databases/$(database)/documents/orders/$(orderId)).data.uid == request.auth.uid);
+        allow write: if false;  // Cloud Functions only
+      }
+
+      // Order timeline
+      match /orderTimeline/{eventId} {
+        allow read: if isStaff() ||
+          (isAuthenticated() && get(/databases/$(database)/documents/orders/$(orderId)).data.uid == request.auth.uid);
+        allow write: if false;  // Cloud Functions only
+      }
+    }
+
+    // ─── VENDORS ───────────────────────────────────────────────
+
+    match /vendors/{vendorId} {
+      // Staff can view vendor data (no credentials stored here)
+      allow read: if isStaff();
+      // Only admins manage vendors
+      allow write: if isAdmin();
+    }
+
+    // ─── MAP PRICING ───────────────────────────────────────────
+
+    match /mapPricing/{docId} {
+      allow read: if isStaff();
+      allow write: if false;  // Cloud Functions only
+    }
+
+    match /mapAlerts/{alertId} {
+      allow read: if isStaff();
+      allow update: if isAdmin() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['resolvedAt', 'autoFixed']);
+      allow create, delete: if false;
+    }
+
+    // ─── COMPETITOR PRICING ────────────────────────────────────
+
+    match /competitorPricing/{sku} {
+      allow read: if isStaff();
+      allow write: if false;  // Cloud Functions only
+    }
+
+    // ─── VENDOR INVENTORY ──────────────────────────────────────
+
+    match /vendorInventory/{docId} {
+      allow read: if isStaff();
+      allow write: if false;  // Cloud Functions only
+    }
+
+    // ─── EMAIL QUEUE ───────────────────────────────────────────
+
+    match /emailQueue/{emailId} {
+      allow read: if isAdmin();
+      allow write: if false;  // Cloud Functions only
+    }
+
+    // ─── BACK IN STOCK ALERTS ──────────────────────────────────
+
+    match /backInStockAlerts/{alertId} {
+      allow read: if isAuthenticated() &&
+        (resource.data.uid == request.auth.uid || isStaff());
+
+      // Users can subscribe to back-in-stock alerts
+      allow create: if isAuthenticated() &&
+        request.resource.data.uid == request.auth.uid;
+
+      // Users can delete their own alerts
+      allow delete: if isAuthenticated() &&
+        resource.data.uid == request.auth.uid;
+    }
+
+    // ─── SITE CONFIG ───────────────────────────────────────────
+
+    match /siteConfig/{configId} {
+      // Points rules are public (used in UI calculations)
+      allow read: if configId == 'pointsRules' || isStaff();
+      // Only admins modify config
+      allow write: if isAdmin();
+    }
+
+    // ─── DEFAULT DENY ──────────────────────────────────────────
+    // Anything not explicitly matched is denied
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
