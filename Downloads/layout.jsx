@@ -1,9 +1,10 @@
 // app/layout.jsx
-// Root layout — runs on every page.
-// Fonts loaded here via <link> so they're available globally.
-// globals.css sets base resets and CSS variables.
+// Root layout — server component.
+// CartProvider and CartDrawer are client components loaded here
+// so cart state is available on every page.
 
 import "./globals.css";
+import CartRoot from "@/components/CartRoot";
 
 export const metadata = {
   title:       "Stinkin' Supplies | Powersports Parts & Accessories",
@@ -14,7 +15,6 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <head>
-        {/* Google Fonts — must be in <head>, not in a <style> tag */}
         <link rel="preconnect" href="https://fonts.googleapis.com"/>
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous"/>
         <link
@@ -22,7 +22,9 @@ export default function RootLayout({ children }) {
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <CartRoot>{children}</CartRoot>
+      </body>
     </html>
   );
 }
