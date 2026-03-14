@@ -409,9 +409,14 @@ const [bike,setBike]   = useState<Bike>(null);
       <nav>
         <div className="nav-logo display">STINKIN<span>'</span> SUPPLIES</div>
         <ul className="nav-links">
-          {["Shop","Brands","Garage","Deals","About"].map(l=>(
-            <li key={l}><a href="#">{l}</a></li>
-          ))}
+          {["Shop","Brands","Garage","Deals","About"].map(l => {
+            const path = l === "Shop" ? "/shop" : "#";
+            return (
+              <li key={l}>
+                <a href={path}>{l}</a>
+              </li>
+            );
+          })}
         </ul>
         <div className="nav-actions">
           <button className="nav-btn">Sign In</button>
