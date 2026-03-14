@@ -29,17 +29,17 @@ const phases: RoadmapPhase[] = [
     ]
   },
   {
-    id: 2, label: "PHASE 2", title: "Storefront Core", status: "current", color: "#e8621a",
+    id: 2, label: "PHASE 2", title: "Storefront Core", status: "complete", color: "#e8621a",
     items: [
-      { name: "Product listing page /shop", done: false, note: "Grid, filters, fitment toggle", file: "app/shop/page.jsx" },
-      { name: "Product detail page /shop/[slug]", done: false, note: "Images, fitment check, add to cart", file: "app/shop/[slug]/page.jsx" },
-      { name: "Cart drawer", done: false, note: "Slide-in, line items, points preview, MAP floor", file: "components/CartDrawer.jsx" },
-      { name: "Category pages /shop/[category]", done: false, note: "Filtered grid from Supabase", file: "app/shop/[category]/page.jsx" },
-      { name: "Search page /search", done: false, note: "Typesense powered, faceted filters", file: "app/search/page.jsx" },
+      { name: "Product listing page /shop", done: true, note: "Grid, filters, fitment toggle", file: "app/shop/page.jsx" },
+      { name: "Product detail page /shop/[slug]", done: true, note: "Images, fitment check, add to cart", file: "app/shop/[slug]/page.jsx" },
+      { name: "Cart drawer", done: true, note: "Slide-in, line items, points preview, MAP floor", file: "components/CartDrawer.jsx" },
+      { name: "Category pages /shop/[category]", done: true, note: "Filtered grid from Supabase", file: "app/shop/[category]/page.jsx" },
+      { name: "Search page /search", done: true, note: "Typesense powered, faceted filters", file: "app/search/page.jsx" },
     ]
   },
   {
-    id: 3, label: "PHASE 3", title: "Auth & Garage", status: "upcoming", color: "#c9a84c",
+    id: 3, label: "PHASE 3", title: "Auth & Garage", status: "current", color: "#c9a84c",
     items: [
       { name: "Sign in / Sign up /auth", done: false, note: "Supabase Auth, magic link + email", file: "app/auth/page.jsx" },
       { name: "My Garage page /garage", done: false, note: "YMM selector, saved bikes, blueprint SVGs", file: "app/garage/page.jsx" },
