@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
 const PROTECTED = ["/garage", "/account", "/checkout", "/order"];
 
-export function proxy(request: Request) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (pathname.startsWith("/auth/callback")) return NextResponse.next();
