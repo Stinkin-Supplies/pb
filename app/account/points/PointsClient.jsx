@@ -5,13 +5,14 @@ const POINTS_TO_DOLLAR = 0.01; // 100 pts = $1
 const POINTS_PER_DOLLAR = 10;  // earn 10 pts per $1 spent
 const EXPIRY_DAYS = 365;
 
+import NavBar from "@/components/NavBar";
+
 const css = `
   *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
   ::-webkit-scrollbar { width:4px; } ::-webkit-scrollbar-thumb { background:#e8621a; }
   @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
   @keyframes fillBar { from{width:0} to{width:var(--w)} }
   .pts-wrap { background:#0a0909; min-height:100vh; color:#f0ebe3; font-family:'Barlow Condensed',sans-serif; }
-  .pts-nav { position:sticky;top:0;z-index:50;background:rgba(10,9,9,0.96);border-bottom:1px solid #2a2828;height:54px;display:flex;align-items:center;padding:0 24px;gap:14px;backdrop-filter:blur(10px); }
   .pts-hero { background:#111010;border-bottom:1px solid #2a2828;padding:32px 24px; }
   .pts-hero-inner { max-width:900px;margin:0 auto; }
   .pts-balance-row { display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-top:24px; }
@@ -84,15 +85,7 @@ export default function PointsClient({ user, points, lifetimeSpend, orderCount, 
     <div className="pts-wrap">
       <style>{css}</style>
 
-      {/* NAV */}
-      <div className="pts-nav">
-        <a href="/" style={{...B({fontSize:22, letterSpacing:"0.08em"}), textDecoration:"none", color:"#f0ebe3", flex:1}}>
-          STINKIN<span style={{color:"#e8621a"}}>'</span> SUPPLIES
-        </a>
-        {[["Account","/account"],["Garage","/garage"],["Shop","/shop"]].map(([l,h]) => (
-          <a key={l} href={h} style={{...M({fontSize:10, letterSpacing:"0.12em"}), color:"#8a8784", textDecoration:"none"}}>{l}</a>
-        ))}
-      </div>
+      <NavBar activePage="account" />
 
       {/* HERO */}
       <div className="pts-hero">

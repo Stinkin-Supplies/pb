@@ -13,6 +13,7 @@
 // ============================================================
 
 import { useState } from "react";
+import NavBar from "@/components/NavBar";
 import { createBrowserClient } from "@supabase/ssr";
 
 const supabase = createBrowserClient(
@@ -51,8 +52,6 @@ const css = `
   .garage-wrap { background:#0a0909; min-height:100vh; color:#f0ebe3; font-family:'Barlow Condensed',sans-serif; }
 
   /* NAV */
-  .g-nav { position:sticky;top:0;z-index:50;background:rgba(10,9,9,0.96);border-bottom:1px solid #2a2828;height:54px;display:flex;align-items:center;padding:0 24px;gap:14px;backdrop-filter:blur(10px); }
-
   /* HEADER */
   .garage-header { background:#111010;border-bottom:1px solid #2a2828;padding:28px 24px; }
   .garage-header-inner { max-width:1100px;margin:0 auto;display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:16px; }
@@ -203,7 +202,6 @@ export default function GarageClient({ user, initialVehicles }) {
   const [bikeStyle,  setBikeStyle]  = useState("cruiser");
   const [saving,     setSaving]     = useState(false);
   const [toast,      setToast]      = useState(null);
-  const [cartCount,  setCartCount]  = useState(0);
   const [codeCopied, setCodeCopied] = useState(false);
 
   const models = make ? (MODELS[make] ?? []) : [];
@@ -326,19 +324,7 @@ export default function GarageClient({ user, initialVehicles }) {
     <div className="garage-wrap">
       <style>{css}</style>
 
-      {/* NAV */}
-      <div className="g-nav">
-        <a href="/" style={{ ...B({fontSize:22, letterSpacing:"0.08em"}), textDecoration:"none", color:"#f0ebe3", flex:1 }}>
-          STINKIN<span style={{color:"#e8621a"}}>'</span> SUPPLIES
-        </a>
-        {[["Shop","/shop"],["Search","/search"],["Garage","/garage"]].map(([l,h]) => (
-          <a key={l} href={h} style={{ ...M({fontSize:10, letterSpacing:"0.12em"}), color: l==="Garage"?"#e8621a":"#8a8784", textDecoration:"none" }}>{l}</a>
-        ))}
-        <a href="/account" style={{ ...M({fontSize:10, letterSpacing:"0.12em"}), color:"#8a8784", textDecoration:"none" }}>ACCOUNT</a>
-        <div style={{position:"relative", fontSize:17, cursor:"pointer"}} onClick={() => {}}>
-          🛒{cartCount > 0 && <span style={{position:"absolute",top:-4,right:-6,background:"#e8621a",color:"#0a0909",...M({fontSize:7,width:13,height:13,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center"})}}>{cartCount}</span>}
-        </div>
-      </div>
+      <NavBar activePage="garage" />
 
       {/* HEADER */}
       <div className="garage-header">

@@ -8,6 +8,8 @@
 // ============================================================
 
 import { useState, useMemo, useEffect, useRef } from "react";
+import NavBar from "@/components/NavBar";
+import { useCartSafe } from "@/components/CartContext";
 
 // ── Full mock catalog (same data as shop page) ────────────────
 const ALL_PRODUCTS = [
@@ -40,9 +42,6 @@ const css = `
   body { background:#0a0909; color:#f0ebe3; font-family:'Barlow Condensed',sans-serif; }
   ::-webkit-scrollbar { width:4px; } ::-webkit-scrollbar-thumb { background:#e8621a; }
   @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
-
-  /* NAV */
-  .s-nav { position:sticky;top:0;z-index:50;background:rgba(10,9,9,0.96);border-bottom:1px solid #2a2828;height:54px;display:flex;align-items:center;padding:0 24px;gap:14px;backdrop-filter:blur(10px); }
 
   /* SEARCH HERO */
   .search-hero { background:#111010;border-bottom:1px solid #2a2828;padding:32px 24px 28px; }
@@ -156,8 +155,8 @@ export default function SearchClient({ initialQuery = "" }) {
   const [query,  setQuery]  = useState(initialQuery);
   const [input,  setInput]  = useState(initialQuery);
   const [sort,   setSort]   = useState("relevance");
-  const [cart,   setCart]   = useState(0);
   const inputRef = useRef(null);
+  const { itemCount, setIsOpen } = useCartSafe();
 
   // Focus input on mount
   useEffect(() => { inputRef.current?.focus(); }, []);
@@ -201,21 +200,7 @@ export default function SearchClient({ initialQuery = "" }) {
     <div style={{ background:"#0a0909", minHeight:"100vh", color:"#f0ebe3", fontFamily:"'Barlow Condensed',sans-serif" }}>
       <style>{css}</style>
 
-      {/* NAV */}
-      <div className="s-nav">
-        <a href="/" style={{ ...B({fontSize:22, letterSpacing:"0.08em"}), textDecoration:"none", color:"#f0ebe3", flex:1 }}>
-          STINKIN<span style={{color:"#e8621a"}}>'</span> SUPPLIES
-        </a>
-        {[["Shop","/shop"],["Brands","#"],["Garage","#"],["Deals","#"]].map(([l,h]) => (
-          <a key={l} href={h} style={{ ...M({fontSize:10, letterSpacing:"0.12em"}), color:"#8a8784", textDecoration:"none" }}>{l}</a>
-        ))}
-        <button style={{ background:"#e8621a", border:"none", color:"#0a0909", ...B({fontSize:13, letterSpacing:"0.1em", padding:"5px 12px", borderRadius:2, cursor:"pointer"}) }}>
-          MY GARAGE
-        </button>
-        <div style={{ position:"relative", fontSize:17, cursor:"pointer" }}>
-          🛒{cart > 0 && <span style={{ position:"absolute", top:-4, right:-6, background:"#e8621a", color:"#0a0909", ...M({fontSize:7, width:13, height:13, borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center"}) }}>{cart}</span>}
-        </div>
-      </div>
+      <NavBar activePage="search" cartCount={itemCount} onCartClick={() => setIsOpen(true)} />
 
       {/* SEARCH HERO */}
       <div className="search-hero">

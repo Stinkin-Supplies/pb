@@ -4,6 +4,7 @@
 // globals.css sets base resets and CSS variables.
 
 import "./globals.css";
+import { CartProvider } from "@/components/CartContext";
 
 export const metadata = {
   title:       "Stinkin' Supplies | Powersports Parts & Accessories",
@@ -22,7 +23,9 @@ export default function RootLayout({ children }) {
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <CartProvider>{children}</CartProvider>
+      </body>
     </html>
   );
 }

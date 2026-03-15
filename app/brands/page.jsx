@@ -7,6 +7,7 @@
 // ============================================================
 
 import { useState, useMemo } from "react";
+import NavBar from "@/components/NavBar";
 
 const BRANDS = [
   { name:"Screamin Eagle",   slug:"screamin-eagle",   category:"Performance",  featured:true,  desc:"Harley-Davidson's performance division" },
@@ -43,8 +44,6 @@ const css = `
   @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
 
   .brands-wrap { background:#0a0909; min-height:100vh; color:#f0ebe3; font-family:'Barlow Condensed',sans-serif; }
-
-  .b-nav { position:sticky;top:0;z-index:50;background:rgba(10,9,9,0.96);border-bottom:1px solid #2a2828;height:54px;display:flex;align-items:center;padding:0 24px;gap:14px;backdrop-filter:blur(10px); }
 
   .brands-hero { background:#111010;border-bottom:1px solid #2a2828;padding:36px 24px; }
   .brands-hero-inner { max-width:1100px;margin:0 auto; }
@@ -125,18 +124,7 @@ export default function BrandsPage() {
     <div className="brands-wrap">
       <style>{css}</style>
 
-      {/* NAV */}
-      <div className="b-nav">
-        <a href="/" style={{...B({fontSize:22, letterSpacing:"0.08em"}), textDecoration:"none", color:"#f0ebe3", flex:1}}>
-          STINKIN<span style={{color:"#e8621a"}}>'</span> SUPPLIES
-        </a>
-        {[["Shop","/shop"],["Brands","/brands"],["Garage","/garage"],["Search","/search"]].map(([l,h]) => (
-          <a key={l} href={h} style={{...M({fontSize:10, letterSpacing:"0.12em"}), color: l==="Brands"?"#e8621a":"#8a8784", textDecoration:"none"}}>{l}</a>
-        ))}
-        <button style={{background:"#e8621a", border:"none", color:"#0a0909", ...B({fontSize:13, letterSpacing:"0.1em", padding:"5px 12px", borderRadius:2, cursor:"pointer"})}}>
-          MY GARAGE
-        </button>
-      </div>
+      <NavBar activePage="brands" />
 
       {/* HERO */}
       <div className="brands-hero">
