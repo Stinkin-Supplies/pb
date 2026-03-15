@@ -46,6 +46,46 @@ const css = `
   .address-name { font-size:14px;font-weight:700;color:#f0ebe3;margin-bottom:3px; }
   .address-text { font-size:13px;color:#8a8784;line-height:1.5; }
   .address-actions { display:flex;gap:8px;margin-top:10px; }
+  .address-form-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10,9,9,0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 210;
+  }
+  .address-form-panel {
+    background: #111010;
+    border: 1px solid #2a2828;
+    border-radius: 4px;
+    padding: 22px;
+    width: min(420px, 90vw);
+    animation: fadeUp 0.25s ease;
+  }
+  .address-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .address-form-grid input {
+    background: #1a1919;
+    border: 1px solid #2a2828;
+    color: #f0ebe3;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 13px;
+    padding: 8px 10px;
+    border-radius: 2px;
+    outline: none;
+  }
+  .address-form-footer {
+    margin-top: 18px;
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
   .quick-links { display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px; }
   .quick-link { background:#1a1919;border:1px solid #2a2828;border-radius:2px;padding:16px;cursor:pointer;transition:all 0.2s;text-decoration:none;display:block; }
   .quick-link:hover { border-color:rgba(232,98,26,0.3);background:#151414; }
@@ -66,9 +106,42 @@ export default function AccountClient({ user, initialAddresses }) {
   const [phone,     setPhone]     = useState(user.phone);
   const [saving,    setSaving]    = useState(false);
   const [addresses, setAddresses] = useState(initialAddresses);
+  const [showAddressForm, setShowAddressForm] = useState(false);
+  const createDraft = () => ({
+    first_name: user.firstName ?? "",
+    last_name: user.lastName ?? "",
+    address_line1: "",
+    address_line2: "",
+    city: "",
+    state: "",
+    zip: "",
+    country: "United States",
+    is_default: addresses.length === 0,
+  });
+  const [draftAddress, setDraftAddress] = useState(createDraft);
   const [toast,     setToast]     = useState(null);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 2500); };
+  const handleAddAddressClick = () => {
+    setDraftAddress(createDraft());
+    setShowAddressForm(true);
+  };
+  const handleDraftChange = (field, value) =>
+    setDraftAddress(prev => ({ ...prev, [field]: value }));
+  const handleSaveAddress = () => {
+    const nextDefault = addresses.length === 0 || draftAddress.is_default;
+    const saved = {
+      ...draftAddress,
+      id: `new-${Date.now()}`,
+      is_default: nextDefault,
+    };
+    setAddresses(prev => {
+      const updated = prev.map(addr => nextDefault ? { ...addr, is_default: false } : addr);
+      return [saved, ...updated];
+    });
+    setShowAddressForm(false);
+    showToast("Address saved locally");
+  };
 
   const handleSaveProfile = async () => {
     setSaving(true);
@@ -204,7 +277,7 @@ export default function AccountClient({ user, initialAddresses }) {
           <div className="acc-section">
             <div className="acc-section-head">
               <div className="acc-section-title">SAVED <span>ADDRESSES</span></div>
-              <button className="edit-btn">+ ADD ADDRESS</button>
+              <button className="edit-btn" onClick={handleAddAddressClick}>+ ADD ADDRESS</button>
             </div>
             <div className="acc-section-body">
               {addresses.length === 0 ? (
@@ -263,6 +336,72 @@ export default function AccountClient({ user, initialAddresses }) {
 
       </div>
 
+      {showAddressForm && (
+        <div className="address-form-overlay">
+          <div className="address-form-panel">
+            <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:20, letterSpacing:"0.06em" }}>
+              ADD NEW ADDRESS
+            </div>
+            <div style={{ fontFamily:"'Share Tech Mono',monospace", fontSize:8, letterSpacing:"0.2em", marginTop:3 }}>
+              FILL IN THE MINIMUM FIELDS TO SAVE A SHIPPING ADDRESS
+            </div>
+            <div className="address-form-grid">
+              <input
+                placeholder="First name"
+                value={draftAddress.first_name}
+                onChange={e => handleDraftChange("first_name", e.target.value)}
+              />
+              <input
+                placeholder="Last name"
+                value={draftAddress.last_name}
+                onChange={e => handleDraftChange("last_name", e.target.value)}
+              />
+              <input
+                placeholder="Address line 1"
+                value={draftAddress.address_line1}
+                onChange={e => handleDraftChange("address_line1", e.target.value)}
+              />
+              <input
+                placeholder="Address line 2"
+                value={draftAddress.address_line2}
+                onChange={e => handleDraftChange("address_line2", e.target.value)}
+              />
+              <input
+                placeholder="City"
+                value={draftAddress.city}
+                onChange={e => handleDraftChange("city", e.target.value)}
+              />
+              <input
+                placeholder="State / Province"
+                value={draftAddress.state}
+                onChange={e => handleDraftChange("state", e.target.value)}
+              />
+              <input
+                placeholder="ZIP / Postal"
+                value={draftAddress.zip}
+                onChange={e => handleDraftChange("zip", e.target.value)}
+              />
+              <input
+                placeholder="Country"
+                value={draftAddress.country}
+                onChange={e => handleDraftChange("country", e.target.value)}
+              />
+            </div>
+            <label style={{ display:"flex", alignItems:"center", gap:6, marginTop:12, fontSize:11, color:"#8a8784" }}>
+              <input
+                type="checkbox"
+                checked={draftAddress.is_default}
+                onChange={e => handleDraftChange("is_default", e.target.checked)}
+              />
+              Set as default address
+            </label>
+            <div className="address-form-footer">
+              <button className="save-btn" onClick={handleSaveAddress}>SAVE ADDRESS</button>
+              <button className="edit-btn" onClick={() => setShowAddressForm(false)}>CANCEL</button>
+            </div>
+          </div>
+        </div>
+      )}
       {toast && <div className="toast">✓ {toast.toUpperCase()}</div>}
     </div>
   );
