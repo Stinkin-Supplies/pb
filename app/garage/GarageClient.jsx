@@ -472,19 +472,18 @@ export default function GarageClient({ user, initialVehicles }) {
               return (
                 <div key={v.id} className={`vehicle-card ${v.is_primary?"primary":""}`} style={{animationDelay:`${i*0.06}s`}}>
                   {v.is_primary && <div className="primary-badge">★ PRIMARY</div>}
-                  <div className="vehicle-card-bg">
+                  <div className="vehicle-card-bg" style={{ background: "#111010" }}>
                     <img
                       src={`/bikes/${BIKE_SVG[v.type] ?? "cruiser"}.svg`}
                       alt={v.make}
                       onError={e => { e.currentTarget.src = "/bikes/cruiser.svg"; }}
-                      className="bike-icon"
                       style={{
-                        width: 160,
-                        height: 96,
+                        width: 180,
+                        height: 110,
                         objectFit: "contain",
                         filter: v.is_primary
-                          ? "brightness(0) invert(1) sepia(1) saturate(8) hue-rotate(335deg) brightness(1.1)"
-                          : "brightness(0) invert(1) opacity(0.45)",
+                          ? "invert(1) sepia(1) saturate(8) hue-rotate(335deg) brightness(1.1)"
+                          : "invert(1) opacity(0.5)",
                       }}
                     />
                   </div>
