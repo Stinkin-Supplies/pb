@@ -246,6 +246,14 @@ const style = `
   }
 `;
 
+const NAV_LINKS = [
+  { label: "Shop", href: "/shop" },
+  { label: "Brands", href: "/shop?brand=" },
+  { label: "Garage", href: "/garage" },
+  { label: "Deals", href: "/shop?badge=sale" },
+  { label: "About", href: "/roadmap" },
+];
+
 // ── CATEGORY CONFIG ──────────────────────────────────────────
 // icon: path relative to /public/ in your Next.js project
 // For the 2 you haven't made yet (exhaust, seats), we fall back
@@ -364,8 +372,8 @@ export default function HomePage() {
       <nav>
         <div className="nav-logo display">STINKIN<span>'</span> SUPPLIES</div>
         <ul className="nav-links">
-          {["Shop","Brands","Garage","Deals","About"].map(l=>(
-            <li key={l}><a href="#">{l}</a></li>
+          {NAV_LINKS.map(({ label, href }) => (
+            <li key={label}><a href={href}>{label}</a></li>
           ))}
         </ul>
         <div className="nav-actions">
