@@ -42,8 +42,18 @@ const MODELS = {
 
 // ── Blueprint SVG bike illustrations ─────────────────────────
 // Simplified cruiser silhouette — thin stroke, blueprint aesthetic
+const BIKE_SVG = {
+  motorcycle: "cruiser",
+  atv:        "dirtbike",
+  utv:        "dirtbike",
+  scooter:    "scooter",
+  snowmobile: "adventure",
+  pwc:        "adventure",
+  moped:      "scooter",
+};
+
 const getBikeIcon = (type) => {
-  const slug = String(type ?? "cruiser").toLowerCase().replace(/\s+/g, "-");
+  const slug = BIKE_SVG[(String(type ?? "cruiser")).toLowerCase()] ?? "cruiser";
   return `/bikes/${slug}.svg`;
 };
 
@@ -187,6 +197,7 @@ export default function GarageClient({ user, initialVehicles }) {
   const [make,       setMake]       = useState("");
   const [model,      setModel]      = useState("");
   const [nickname,   setNickname]   = useState("");
+  const [bikeStyle,  setBikeStyle]  = useState("cruiser");
   const [saving,     setSaving]     = useState(false);
   const [toast,      setToast]      = useState(null);
   const [cartCount,  setCartCount]  = useState(0);
@@ -246,11 +257,12 @@ export default function GarageClient({ user, initialVehicles }) {
 
     const { data: garageRow, error } = await supabase
       .from("user_garage")
-        .insert({
-          user_id:    userId,
+      .insert({
+        user_id:    userId,
         vehicle_id: vehicleRow.id,
         nickname:   nickname || null,
         is_primary: isPrimary,
+        color:      bikeStyle,
       })
       .select("id, nickname, is_primary, mileage, color, added_at")
       .single();
@@ -270,12 +282,13 @@ export default function GarageClient({ user, initialVehicles }) {
       model:      vehicleRow.model,
       submodel:   vehicleRow.submodel,
       nickname:   garageRow.nickname,
+      color:      bikeStyle,
       is_primary: garageRow.is_primary,
     };
 
     setVehicles(v => isPrimary ? [newEntry, ...v] : [...v, newEntry]);
     setShowAdd(false);
-    setYear(""); setMake(""); setModel(""); setNickname("");
+    setYear(""); setMake(""); setModel(""); setNickname(""); setBikeStyle("cruiser");
     showToast(`${year} ${make} ${model} added to your garage`, "success");
   };
 
@@ -407,6 +420,16 @@ export default function GarageClient({ user, initialVehicles }) {
                 </select>
               </div>
             </div>
+            <div style={{ marginBottom: 12 }}>
+              <label className="g-label">BIKE STYLE</label>
+              <select className="g-select" value={bikeStyle} onChange={e => setBikeStyle(e.target.value)}>
+                <option value="cruiser">Cruiser</option>
+                <option value="chopper">Chopper</option>
+                <option value="sportbike">Sportbike</option>
+                <option value="adventure">Adventure</option>
+                <option value="dirtbike">Dirtbike</option>
+              </select>
+            </div>
             <div className="nickname-row">
               <div>
                 <label className="g-label">NICKNAME (OPTIONAL)</label>
@@ -417,7 +440,7 @@ export default function GarageClient({ user, initialVehicles }) {
               </button>
             </div>
             {vehicles.length > 0 && (
-              <button className="cancel-btn" onClick={() => setShowAdd(false)}>CANCEL</button>
+              <button className="cancel-btn" onClick={() => { setShowAdd(false); setBikeStyle("cruiser"); }}>CANCEL</button>
             )}
           </div>
         )}
@@ -445,36 +468,39 @@ export default function GarageClient({ user, initialVehicles }) {
           </div>
         ) : (
           <div className="vehicles-grid">
-            {vehicles.map((v, i) => (
-              <div key={v.id} className={`vehicle-card ${v.is_primary?"primary":""}`} style={{animationDelay:`${i*0.06}s`}}>
-                {v.is_primary && <div className="primary-badge">★ PRIMARY</div>}
-                <div className="vehicle-card-bg">
-                  <img
-                    src={getBikeIcon(v.type)}
-                    alt={`${v.make} ${v.model}`}
-                    className="bike-icon"
-                  />
-                </div>
-                <div className="vehicle-info">
-                  <div className="vehicle-year">{v.year}</div>
-                  <div className="vehicle-name">{v.make} {v.model}</div>
-                  {v.nickname && <div className="vehicle-nickname">"{v.nickname}"</div>}
-                  <div className="vehicle-actions">
-                    <button className="veh-btn shop" onClick={() => window.location.href = `/shop?fitment=${v.id}`}>
-                      SHOP PARTS →
-                    </button>
-                    {!v.is_primary && (
-                      <button className="veh-btn primary-btn" onClick={() => handleSetPrimary(v.id)}>
-                        SET PRIMARY
+            {vehicles.map((v, i) => {
+              const svgName = BIKE_SVG[String(v.type ?? "").toLowerCase()] ?? "cruiser";
+              return (
+                <div key={v.id} className={`vehicle-card ${v.is_primary?"primary":""}`} style={{animationDelay:`${i*0.06}s`}}>
+                  {v.is_primary && <div className="primary-badge">★ PRIMARY</div>}
+                  <div className="vehicle-card-bg">
+                    <img
+                      src={`/bikes/${svgName}.svg`}
+                      alt={`${v.make} ${v.model}`}
+                      className="bike-icon"
+                    />
+                  </div>
+                  <div className="vehicle-info">
+                    <div className="vehicle-year">{v.year}</div>
+                    <div className="vehicle-name">{v.make} {v.model}</div>
+                    {v.nickname && <div className="vehicle-nickname">"{v.nickname}"</div>}
+                    <div className="vehicle-actions">
+                      <button className="veh-btn shop" onClick={() => window.location.href = `/shop?fitment=${v.id}`}>
+                        SHOP PARTS →
                       </button>
-                    )}
-                    <button className="veh-btn remove" onClick={() => handleRemove(v.id)}>
-                      REMOVE
-                    </button>
+                      {!v.is_primary && (
+                        <button className="veh-btn primary-btn" onClick={() => handleSetPrimary(v.id)}>
+                          SET PRIMARY
+                        </button>
+                      )}
+                      <button className="veh-btn remove" onClick={() => handleRemove(v.id)}>
+                        REMOVE
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
