@@ -17,6 +17,8 @@
 // ============================================================
 
 import { useState } from "react";
+import NavBar from "@/components/NavBar";
+import { useCartSafe } from "@/components/CartContext";
 
 // Saved garage vehicle — hardcoded until Phase 3 auth
 const SAVED_VEHICLE = { id:1, year:2022, make:"Harley-Davidson", model:"Road King" };
@@ -29,48 +31,6 @@ const css = `
     min-height: 100vh;
     color: #f0ebe3;
     font-family: 'Barlow Condensed', sans-serif;
-  }
-
-  /* ── NAV ── */
-  .pdp-nav {
-    position: sticky; top: 0; z-index: 50;
-    background: rgba(10,9,9,0.96);
-    border-bottom: 1px solid #2a2828;
-    height: 54px;
-    display: flex; align-items: center;
-    padding: 0 24px; gap: 14px;
-    backdrop-filter: blur(10px);
-  }
-  .nav-logo {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 22px; letter-spacing: 0.08em;
-    color: #f0ebe3; text-decoration: none; flex: 1;
-  }
-  .nav-logo span { color: #e8621a; }
-  .nav-link {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 10px; letter-spacing: 0.12em;
-    color: #8a8784; text-decoration: none; transition: color 0.2s;
-  }
-  .nav-link:hover { color: #e8621a; }
-  .nav-garage-btn {
-    background: #e8621a; border: none; color: #0a0909;
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 13px; letter-spacing: 0.1em;
-    padding: 5px 12px; border-radius: 2px; cursor: pointer;
-  }
-  .cart-btn {
-    position: relative; cursor: pointer;
-    font-size: 18px; background: none; border: none;
-    color: #f0ebe3; padding: 0;
-  }
-  .cart-badge {
-    position: absolute; top: -4px; right: -6px;
-    background: #e8621a; color: #0a0909;
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 7px; width: 13px; height: 13px;
-    border-radius: 50%; display: flex;
-    align-items: center; justify-content: center;
   }
 
   /* ── BREADCRUMB ── */
@@ -459,9 +419,9 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
   const [activeImg,  setActiveImg]  = useState(0);
   const [qty,        setQty]        = useState(1);
   const [wishlisted, setWishlisted] = useState(false);
-  const [cartCount,  setCartCount]  = useState(0);
   const [added,      setAdded]      = useState(false);
   const [toast,      setToast]      = useState(false);
+  const { addItem, itemCount, setIsOpen } = useCartSafe();
 
   // ── Fitment check ──────────────────────────────────────────
   // Phase 5: fitmentIds will be an array of vehicle IDs from ACES data.
@@ -480,7 +440,8 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
   const handleAdd = () => {
     if (!product.inStock) return;
     setAdded(true);
-    setCartCount(c => c + qty);
+    addItem(product, qty);
+    setIsOpen(true);
     setToast(true);
     // TODO Phase 2 (cart drawer):
     //   await db.getOrCreateCart()
@@ -503,18 +464,7 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
     <div className="pdp-wrap">
       <style>{css}</style>
 
-      {/* ── NAV ── */}
-      <nav className="pdp-nav">
-        <a href="/" className="nav-logo">STINKIN<span>'</span> SUPPLIES</a>
-        {["Shop","Brands","Garage","Deals"].map(l => (
-          <a key={l} href={l==="Shop"?"/shop":"#"} className="nav-link">{l}</a>
-        ))}
-        <button className="nav-garage-btn">MY GARAGE</button>
-        <button className="cart-btn">
-          🛒
-          {cartCount > 0 && <span className="cart-badge">{cartCount}</span>}
-        </button>
-      </nav>
+      <NavBar cartCount={itemCount} onCartClick={() => setIsOpen(true)} />
 
       {/* ── BREADCRUMB ── */}
       <div className="pdp-breadcrumb">

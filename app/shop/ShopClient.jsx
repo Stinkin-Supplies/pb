@@ -18,6 +18,8 @@
 // ============================================================
 
 import { useState, useMemo } from "react";
+import NavBar from "@/components/NavBar";
+import { useCartSafe } from "@/components/CartContext";
 
 // ── MOCK FALLBACK ─────────────────────────────────────────────
 // Used when Supabase fetch fails or returns empty (e.g. before
@@ -105,7 +107,7 @@ export default function ShopClient({
   const [fitOn,     setFitOn]     = useState(false);
   const [sort,      setSort]      = useState("featured");
   const [view,      setView]      = useState("grid");
-  const [cart,      setCart]      = useState(0);
+  const { addItem, itemCount, setIsOpen } = useCartSafe();
 
   const toggleCat   = c => setSelCats(p   => p.includes(c) ? p.filter(x=>x!==c) : [...p,c]);
   const toggleBrand = b => setSelBrands(p => p.includes(b) ? p.filter(x=>x!==b) : [...p,b]);
@@ -198,46 +200,7 @@ export default function ShopClient({
                   fontFamily:"'Barlow Condensed',sans-serif" }}>
       <style>{css}</style>
 
-      {/* ── NAV ── */}
-      <div style={{ position:"sticky", top:0, zIndex:50, background:"rgba(10,9,9,0.96)",
-                    borderBottom:"1px solid #2a2828", height:54, display:"flex",
-                    alignItems:"center", padding:"0 20px", gap:12, backdropFilter:"blur(10px)" }}>
-        <a href="/" style={{ ...B({fontSize:22, letterSpacing:"0.08em"}), textDecoration:"none", color:"#f0ebe3", flex:1 }}>
-          STINKIN<span style={{ color:"#e8621a" }}>'</span> SUPPLIES
-        </a>
-        <div style={{ display:"flex", gap:18, marginRight:12 }}>
-          {[["Shop","/shop"],["Brands","/brands"],["Garage","/garage"],["Deals","/shop?badge=sale"]].map(([l,h])=>(
-            <a key={l} href={h} style={{ ...S({fontSize:10, letterSpacing:"0.12em"}),
-              color: l==="Shop" ? "#e8621a" : "#8a8784", textDecoration:"none" }}>{l}</a>
-          ))}
-        </div>
-        <button style={{ background:"transparent", border:"1px solid rgba(232,98,26,0.3)",
-                         color:"#f0ebe3", ...S({fontSize:10, letterSpacing:"0.1em",
-                         padding:"5px 12px", borderRadius:2, cursor:"pointer"}) }}>
-          SIGN IN
-        </button>
-        <button
-          style={{
-            background:"#e8621a", border:"none", color:"#0a0909",
-            ...B({ fontSize:13, letterSpacing:"0.1em", padding:"5px 12px", borderRadius:2 }),
-            cursor:"pointer"
-          }}
-          type="button"
-          onClick={() => { window.location.href = "/garage"; }}
-        >
-          MY GARAGE
-        </button>
-        <div style={{ position:"relative", cursor:"pointer", fontSize:17, userSelect:"none" }}
-             onClick={() => {}}>
-          🛒
-          {cart > 0 && (
-            <span style={{ position:"absolute", top:-4, right:-6, background:"#e8621a",
-                           color:"#0a0909", ...S({fontSize:7, width:13, height:13,
-                           borderRadius:"50%", display:"flex", alignItems:"center",
-                           justifyContent:"center"}) }}>{cart}</span>
-          )}
-        </div>
-      </div>
+      <NavBar activePage="shop" cartCount={itemCount} onCartClick={() => setIsOpen(true)} />
 
       {/* ── DATA SOURCE INDICATOR (dev only — remove in prod) ── */}
       {process.env.NODE_ENV === "development" && (
@@ -515,7 +478,7 @@ export default function ShopClient({
                         onClick={e => {
                           e.stopPropagation();
                           if (p.inStock) {
-                            setCart(c => c+1);
+                            addItem(p);
                             // TODO Phase 2: db.getOrCreateCart() → upsert cart_item
                           }
                         }}

@@ -1,6 +1,8 @@
 "use client";
 // app/account/wishlist/WishlistClient.jsx
 import { useState } from "react";
+import NavBar from "@/components/NavBar";
+import { useCartSafe } from "@/components/CartContext";
 import { createBrowserClient } from "@supabase/ssr";
 
 const supabase = createBrowserClient(
@@ -13,7 +15,6 @@ const css = `
   ::-webkit-scrollbar { width:4px; } ::-webkit-scrollbar-thumb { background:#e8621a; }
   @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
   .wl-wrap { background:#0a0909; min-height:100vh; color:#f0ebe3; font-family:'Barlow Condensed',sans-serif; }
-  .wl-nav { position:sticky;top:0;z-index:50;background:rgba(10,9,9,0.96);border-bottom:1px solid #2a2828;height:54px;display:flex;align-items:center;padding:0 24px;gap:14px;backdrop-filter:blur(10px); }
   .wl-header { background:#111010;border-bottom:1px solid #2a2828;padding:28px 24px; }
   .wl-header-inner { max-width:1000px;margin:0 auto;display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px; }
   .wl-body { max-width:1000px;margin:0 auto;padding:28px 24px; }
@@ -51,8 +52,8 @@ const css = `
 
 export default function WishlistClient({ userId, initialItems }) {
   const [items,  setItems]  = useState(initialItems);
-  const [cart,   setCart]   = useState(0);
   const [toast,  setToast]  = useState(null);
+  const { addItem, itemCount, setIsOpen } = useCartSafe();
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 2500); };
 
@@ -69,7 +70,8 @@ export default function WishlistClient({ userId, initialItems }) {
 
   const handleAddToCart = (item) => {
     if (!item.inStock) return;
-    setCart(c => c + 1);
+    addItem(item);
+    setIsOpen(true);
     showToast(`${item.name.split(" ").slice(0,3).join(" ")} added to cart`);
     // TODO Phase 4: write to Supabase cart_items
   };
@@ -81,18 +83,11 @@ export default function WishlistClient({ userId, initialItems }) {
     <div className="wl-wrap">
       <style>{css}</style>
 
-      {/* NAV */}
-      <div className="wl-nav">
-        <a href="/" style={{...B({fontSize:22, letterSpacing:"0.08em"}), textDecoration:"none", color:"#f0ebe3", flex:1}}>
-          STINKIN<span style={{color:"#e8621a"}}>'</span> SUPPLIES
-        </a>
-        {[["Shop","/shop"],["Account","/account"],["Garage","/garage"]].map(([l,h]) => (
-          <a key={l} href={h} style={{...M({fontSize:10, letterSpacing:"0.12em"}), color:"#8a8784", textDecoration:"none"}}>{l}</a>
-        ))}
-        <div style={{position:"relative", fontSize:17, cursor:"pointer"}}>
-          🛒{cart > 0 && <span style={{position:"absolute", top:-4, right:-6, background:"#e8621a", color:"#0a0909", ...M({fontSize:7, width:13, height:13, borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center"})}}>{cart}</span>}
-        </div>
-      </div>
+      <NavBar
+        activePage="account"
+        cartCount={itemCount}
+        onCartClick={() => setIsOpen(true)}
+      />
 
       {/* HEADER */}
       <div className="wl-header">

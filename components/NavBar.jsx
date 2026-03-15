@@ -1,0 +1,157 @@
+"use client";
+// ============================================================
+// components/NavBar.jsx  —  SHARED NAV
+// ============================================================
+// Import this in every page instead of repeating nav markup.
+// Usage:
+//   import NavBar from "@/components/NavBar";
+//   <NavBar activePage="shop" cartCount={cartCount} />
+//
+// activePage options: "home" | "shop" | "brands" | "garage" |
+//                     "search" | "account" | "deals"
+// ============================================================
+
+import { useState, useEffect } from "react";
+import { createBrowserClient } from "@supabase/ssr";
+
+const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
+
+const NAV_LINKS = [
+  { label: "Shop",   href: "/shop"    },
+  { label: "Brands", href: "/brands"  },
+  { label: "Garage", href: "/garage"  },
+  { label: "Deals",  href: "/shop?badge=sale" },
+  { label: "Search", href: "/search"  },
+];
+
+const css = `
+  .ss-nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(10,9,9,0.96);
+    border-bottom: 1px solid #2a2828;
+    height: 54px;
+    display: flex; align-items: center;
+    padding: 0 24px; gap: 14px;
+    backdrop-filter: blur(10px);
+    font-family: 'Barlow Condensed', sans-serif;
+  }
+  .ss-nav-logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px; letter-spacing: 0.08em;
+    color: #f0ebe3; text-decoration: none; flex: 1;
+    white-space: nowrap;
+  }
+  .ss-nav-logo span { color: #e8621a; }
+  .ss-nav-links { display: flex; gap: 20px; margin-right: 8px; }
+  .ss-nav-link {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px; letter-spacing: 0.12em;
+    color: #8a8784; text-decoration: none;
+    transition: color 0.2s; white-space: nowrap;
+  }
+  .ss-nav-link:hover { color: #f0ebe3; }
+  .ss-nav-link.active { color: #e8621a; }
+  .ss-nav-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .ss-nav-signin {
+    background: transparent;
+    border: 1px solid rgba(232,98,26,0.3);
+    color: #f0ebe3;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px; letter-spacing: 0.1em;
+    padding: 5px 12px; border-radius: 2px;
+    cursor: pointer; transition: all 0.2s;
+    text-decoration: none; white-space: nowrap;
+  }
+  .ss-nav-signin:hover { border-color: #e8621a; color: #e8621a; }
+  .ss-nav-garage {
+    background: #e8621a; border: none;
+    color: #0a0909;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 14px; letter-spacing: 0.1em;
+    padding: 5px 14px; border-radius: 2px;
+    cursor: pointer; transition: background 0.2s;
+    text-decoration: none; white-space: nowrap;
+  }
+  .ss-nav-garage:hover { background: #c94f0f; }
+  .ss-nav-cart {
+    position: relative; cursor: pointer;
+    font-size: 18px; background: none;
+    border: none; color: #f0ebe3; padding: 0;
+    transition: color 0.2s; flex-shrink: 0;
+  }
+  .ss-nav-cart:hover { color: #e8621a; }
+  .ss-cart-badge {
+    position: absolute; top: -5px; right: -7px;
+    background: #e8621a; color: #0a0909;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 7px; width: 14px; height: 14px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    pointer-events: none;
+  }
+  @media (max-width: 700px) {
+    .ss-nav-links { display: none; }
+    .ss-nav-signin { display: none; }
+  }
+`;
+
+export default function NavBar({ activePage = "", cartCount = 0, onCartClick }) {
+  const [user,        setUser]        = useState(null);
+  const [userChecked, setUserChecked] = useState(false);
+
+  // Check auth state once on mount
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setUserChecked(true);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  return (
+    <>
+      <style>{css}</style>
+      <nav className="ss-nav">
+        {/* Logo */}
+        <a href="/" className="ss-nav-logo">
+          STINKIN<span>'</span> SUPPLIES
+        </a>
+
+        {/* Links */}
+        <div className="ss-nav-links">
+          {NAV_LINKS.map(({ label, href }) => (
+            <a
+              key={label}
+              href={href}
+              className={`ss-nav-link ${activePage === label.toLowerCase() ? "active" : ""}`}
+            >
+              {label.toUpperCase()}
+            </a>
+          ))}
+        </div>
+
+        {/* Actions */}
+        <div className="ss-nav-actions">
+          {userChecked && (
+            user
+              ? <a href="/account" className="ss-nav-signin">{user.email?.split("@")[0].toUpperCase()}</a>
+              : <a href="/auth" className="ss-nav-signin">SIGN IN</a>
+          )}
+          <a href="/garage" className="ss-nav-garage">MY GARAGE</a>
+          <button className="ss-nav-cart" onClick={onCartClick} aria-label="Cart">
+            🛒
+            {cartCount > 0 && <span className="ss-cart-badge">{cartCount}</span>}
+          </button>
+        </div>
+      </nav>
+    </>
+  );
+}

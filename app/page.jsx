@@ -31,6 +31,7 @@
 // ============================================================
 
 import { useState } from "react";
+import NavBar from "@/components/NavBar";
 
 const style = `
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -48,20 +49,6 @@ const style = `
   }
   .mono { font-family:'Share Tech Mono',monospace; }
   .display { font-family:'Bebas Neue',sans-serif; }
-
-  /* NAV */
-  nav { position:fixed; top:0; left:0; right:0; z-index:100; background:rgba(10,9,9,0.94); backdrop-filter:blur(12px); border-bottom:1px solid rgba(232,98,26,0.15); height:64px; display:flex; align-items:center; padding:0 32px; }
-  .nav-logo { font-family:'Bebas Neue',sans-serif; font-size:26px; color:var(--cream); letter-spacing:0.08em; flex:1; }
-  .nav-logo span { color:var(--orange); }
-  .nav-links { display:flex; gap:28px; list-style:none; margin-right:32px; }
-  .nav-links a { font-size:13px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:var(--chrome); text-decoration:none; transition:color 0.2s; }
-  .nav-links a:hover { color:var(--orange); }
-  .nav-actions { display:flex; gap:12px; align-items:center; }
-  .nav-btn { background:transparent; border:1px solid rgba(232,98,26,0.3); color:var(--cream); font-family:'Barlow Condensed',sans-serif; font-size:12px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; padding:7px 16px; border-radius:2px; cursor:pointer; transition:all 0.2s; }
-  .nav-btn:hover { background:rgba(232,98,26,0.1); border-color:var(--orange); }
-  .nav-btn.primary { background:var(--orange); border-color:var(--orange); color:var(--black); }
-  .cart-icon { position:relative; cursor:pointer; color:var(--cream); font-size:20px; }
-  .cart-badge { position:absolute; top:-6px; right:-8px; background:var(--orange); color:var(--black); font-family:'Share Tech Mono',monospace; font-size:9px; width:16px; height:16px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
 
   /* PROMO */
   .promo-banner { background:linear-gradient(90deg,var(--orange2),var(--orange),var(--gold),var(--orange)); background-size:300% 100%; animation:shimmerBg 6s ease infinite; padding:12px 32px; text-align:center; }
@@ -246,14 +233,6 @@ const style = `
   }
 `;
 
-const NAV_LINKS = [
-  { label: "Shop", href: "/shop" },
-  { label: "Brands", href: "/brands" },
-  { label: "Garage", href: "/garage" },
-  { label: "Deals", href: "/shop?badge=sale" },
-  { label: "About", href: "/roadmap" },
-];
-
 // ── CATEGORY CONFIG ──────────────────────────────────────────
 // icon: path relative to /public/ in your Next.js project
 // For the 2 you haven't made yet (exhaust, seats), we fall back
@@ -368,20 +347,7 @@ export default function HomePage() {
     <>
       <style>{style}</style>
 
-      {/* NAV */}
-      <nav>
-        <div className="nav-logo display">STINKIN<span>'</span> SUPPLIES</div>
-        <ul className="nav-links">
-          {NAV_LINKS.map(({ label, href }) => (
-            <li key={label}><a href={href}>{label}</a></li>
-          ))}
-        </ul>
-        <div className="nav-actions">
-          <a className="nav-btn" href="/auth">Sign In</a>
-          <a className="nav-btn primary" href="/garage">My Garage</a>
-          <div className="cart-icon">🛒<span className="cart-badge">2</span></div>
-        </div>
-      </nav>
+      <NavBar activePage="home" />
 
       {/* PROMO BANNER */}
       <div className="promo-banner" style={{marginTop:64}}>
