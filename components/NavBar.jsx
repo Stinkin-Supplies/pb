@@ -12,6 +12,7 @@
 // ============================================================
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
 
 const supabase = createBrowserClient(
@@ -121,31 +122,37 @@ export default function NavBar({ activePage = "", cartCount = 0, onCartClick }) 
       <style>{css}</style>
       <nav className="ss-nav">
         {/* Logo */}
-        <a href="/" className="ss-nav-logo">
+        <Link href="/" className="ss-nav-logo">
           STINKIN<span>'</span> SUPPLIES
-        </a>
+        </Link>
 
         {/* Links */}
         <div className="ss-nav-links">
           {NAV_LINKS.map(({ label, href }) => (
-            <a
+            <Link
               key={label}
               href={href}
               className={`ss-nav-link ${activePage === label.toLowerCase() ? "active" : ""}`}
             >
               {label.toUpperCase()}
-            </a>
+            </Link>
           ))}
         </div>
 
         {/* Actions */}
         <div className="ss-nav-actions">
           {userChecked && (
-            user
-              ? <a href="/account" className="ss-nav-signin">{user.email?.split("@")[0].toUpperCase()}</a>
-              : <a href="/auth" className="ss-nav-signin">SIGN IN</a>
+            user ? (
+              <Link href="/account" className="ss-nav-signin">
+                {user.email?.split("@")[0].toUpperCase()}
+              </Link>
+            ) : (
+              <Link href="/auth" className="ss-nav-signin">
+                SIGN IN
+              </Link>
+            )
           )}
-          <a href="/garage" className="ss-nav-garage">MY GARAGE</a>
+          <Link href="/garage" className="ss-nav-garage">MY GARAGE</Link>
           <button className="ss-nav-cart" onClick={onCartClick} aria-label="Cart">
             🛒
             {cartCount > 0 && <span className="ss-cart-badge">{cartCount}</span>}
