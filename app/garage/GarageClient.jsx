@@ -469,15 +469,23 @@ export default function GarageClient({ user, initialVehicles }) {
         ) : (
           <div className="vehicles-grid">
             {vehicles.map((v, i) => {
-              const svgName = BIKE_SVG[String(v.type ?? "").toLowerCase()] ?? "cruiser";
               return (
                 <div key={v.id} className={`vehicle-card ${v.is_primary?"primary":""}`} style={{animationDelay:`${i*0.06}s`}}>
                   {v.is_primary && <div className="primary-badge">★ PRIMARY</div>}
                   <div className="vehicle-card-bg">
                     <img
-                      src={`/bikes/${svgName}.svg`}
-                      alt={`${v.make} ${v.model}`}
+                      src={`/bikes/${BIKE_SVG[v.type] ?? "cruiser"}.svg`}
+                      alt={v.make}
+                      onError={e => { e.currentTarget.src = "/bikes/cruiser.svg"; }}
                       className="bike-icon"
+                      style={{
+                        width: 160,
+                        height: 96,
+                        objectFit: "contain",
+                        filter: v.is_primary
+                          ? "brightness(0) invert(1) sepia(1) saturate(8) hue-rotate(335deg) brightness(1.1)"
+                          : "brightness(0) invert(1) opacity(0.45)",
+                      }}
                     />
                   </div>
                   <div className="vehicle-info">
