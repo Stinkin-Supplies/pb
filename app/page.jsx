@@ -401,7 +401,9 @@ export default function HomePage() {
               MAP-compliant pricing. Ships from multiple warehouses.
             </p>
             <div className="hero-actions">
-              <button className="btn-primary display">SHOP ALL PARTS</button>
+              <a className="btn-primary display" href="/shop">
+                SHOP ALL PARTS
+              </a>
               <button className="btn-outline display">VIEW DEALS</button>
             </div>
           </div>
