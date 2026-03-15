@@ -15,7 +15,7 @@ export default async function GaragePage() {
     {
       cookies: {
         getAll()      { return cookieStore.getAll(); },
-        setAll(toSet) { toSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options)); },
+        setAll() {},
       },
     }
   );
