@@ -1,4 +1,5 @@
 import SpeedInsights from "@/lib/stubs/speed-insights-next";
+import { CartProvider } from "@/components/CartContext";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
@@ -30,8 +31,10 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <SpeedInsights />
-        {children}
+        <CartProvider>
+          <SpeedInsights />
+          {children}
+        </CartProvider>
       </body>
     </html>
   );
