@@ -159,7 +159,25 @@ const css = `
   .orders-placeholder-sub { font-family:'Share Tech Mono',monospace;font-size:9px;color:#8a8784;letter-spacing:0.12em; }
 
   /* TOAST */
-  .g-toast { position:fixed;bottom:24px;right:24px;z-index:200;background:#22c55e;color:#0a0909;font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:0.1em;padding:11px 22px;border-radius:2px;box-shadow:0 8px 32px rgba(0,0,0,0.4);animation:fadeUp 0.25s ease; }
+  .g-toast {
+    position:fixed;
+    bottom:24px;
+    right:24px;
+    z-index:200;
+    background:#22c55e;
+    color:#0a0909;
+    font-family:'Bebas Neue',sans-serif;
+    font-size:15px;
+    letter-spacing:0.1em;
+    padding:11px 22px;
+    border-radius:2px;
+    box-shadow:0 8px 32px rgba(0,0,0,0.4);
+    animation:fadeUp 0.25s ease;
+  }
+  .g-toast.error {
+    background:#b91c1c;
+    color:#fff;
+  }
 `;
 
 export default function GarageClient({ user, initialVehicles }) {
@@ -176,8 +194,8 @@ export default function GarageClient({ user, initialVehicles }) {
 
   const models = make ? (MODELS[make] ?? []) : [];
 
-  const showToast = (msg) => {
-    setToast(msg);
+  const showToast = (msg, realm = "success") => {
+    setToast({ msg, realm });
     setTimeout(() => setToast(null), 2500);
   };
 
@@ -209,7 +227,7 @@ export default function GarageClient({ user, initialVehicles }) {
         .insert({ year: parseInt(year), make, model })
         .select("id, year, make, model, submodel")
         .single();
-      if (cErr) { setSaving(false); showToast("Error saving vehicle"); return; }
+      if (cErr) { setSaving(false); showToast("Error saving vehicle", "error"); return; }
       vehicleRow = created;
     }
 
@@ -225,7 +243,7 @@ export default function GarageClient({ user, initialVehicles }) {
       .single();
 
     setSaving(false);
-    if (error) { showToast("Error saving vehicle"); return; }
+    if (error) { showToast("Error saving vehicle", "error"); return; }
 
     const newEntry = {
       id:         garageRow.id,
@@ -241,7 +259,7 @@ export default function GarageClient({ user, initialVehicles }) {
     setVehicles(v => isPrimary ? [newEntry, ...v] : [...v, newEntry]);
     setShowAdd(false);
     setYear(""); setMake(""); setModel(""); setNickname("");
-    showToast(`${year} ${make} ${model} added to your garage`);
+    showToast(`${year} ${make} ${model} added to your garage`, "success");
   };
 
   // ── Set primary ───────────────────────────────────────────
@@ -250,14 +268,14 @@ export default function GarageClient({ user, initialVehicles }) {
     await supabase.from("user_garage").update({ is_primary: false }).eq("user_id", user.id);
     await supabase.from("user_garage").update({ is_primary: true  }).eq("id", id);
     setVehicles(v => v.map(veh => ({ ...veh, is_primary: veh.id === id })));
-    showToast("Primary vehicle updated");
+    showToast("Primary vehicle updated", "success");
   };
 
   // ── Remove vehicle ────────────────────────────────────────
   const handleRemove = async (id) => {
     await supabase.from("user_garage").delete().eq("id", id);
     setVehicles(v => v.filter(veh => veh.id !== id));
-    showToast("Vehicle removed");
+    showToast("Vehicle removed", "success");
   };
 
   const copyReferral = () => {
@@ -455,7 +473,12 @@ export default function GarageClient({ user, initialVehicles }) {
 
       </div>
 
-      {toast && <div className="g-toast">✓ {toast.toUpperCase()}</div>}
+      {toast && (
+        <div className={`g-toast ${toast.realm === "error" ? "error" : ""}`}>
+          {toast.realm === "success" ? "✓ " : "⚠ "}
+          {toast.msg}
+        </div>
+      )}
     </div>
   );
 }
