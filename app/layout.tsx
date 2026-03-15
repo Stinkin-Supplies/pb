@@ -1,4 +1,4 @@
-import { SpeedInsights } from "@vercel/speed-insights/next";
+import SpeedInsights from "@/lib/stubs/speed-insights-next";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
