@@ -206,7 +206,7 @@ export default function ShopClient({
           STINKIN<span style={{ color:"#e8621a" }}>'</span> SUPPLIES
         </a>
         <div style={{ display:"flex", gap:18, marginRight:12 }}>
-          {[["Shop","/shop"],["Brands","/shop?brand="],["Garage","/garage"],["Deals","/shop?badge=sale"]].map(([l,h])=>(
+          {[["Shop","/shop"],["Brands","/brands"],["Garage","/garage"],["Deals","/shop?badge=sale"]].map(([l,h])=>(
             <a key={l} href={h} style={{ ...S({fontSize:10, letterSpacing:"0.12em"}),
               color: l==="Shop" ? "#e8621a" : "#8a8784", textDecoration:"none" }}>{l}</a>
           ))}
