@@ -205,6 +205,14 @@ export default function GarageClient({ user, initialVehicles }) {
   const handleAddVehicle = async () => {
     if (!year || !make || !model) return;
     setSaving(true);
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      setSaving(false);
+      showToast("Not logged in", "error");
+      return;
+    }
+    const userId = session.user.id;
     const isPrimary = vehicles.length === 0;
 
     // Look up vehicle record — create it if not yet in catalog
@@ -238,8 +246,8 @@ export default function GarageClient({ user, initialVehicles }) {
 
     const { data: garageRow, error } = await supabase
       .from("user_garage")
-      .insert({
-        user_id:    user.id,
+        .insert({
+          user_id:    userId,
         vehicle_id: vehicleRow.id,
         nickname:   nickname || null,
         is_primary: isPrimary,
