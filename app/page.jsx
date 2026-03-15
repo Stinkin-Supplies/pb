@@ -248,7 +248,7 @@ const style = `
 
 const NAV_LINKS = [
   { label: "Shop", href: "/shop" },
-  { label: "Brands", href: "/shop?brand=" },
+  { label: "Brands", href: "/brands" },
   { label: "Garage", href: "/garage" },
   { label: "Deals", href: "/shop?badge=sale" },
   { label: "About", href: "/roadmap" },
