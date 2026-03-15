@@ -42,6 +42,60 @@ const MODELS = {
 
 // ── Blueprint SVG bike illustrations ─────────────────────────
 // Simplified cruiser silhouette — thin stroke, blueprint aesthetic
+const BikeSVG = ({ color = "#8a8784", size = 120 }) => (
+  <svg width={size} height={size * 0.6} viewBox="0 0 200 120" fill="none"
+    xmlns="http://www.w3.org/2000/svg" strokeLinecap="round" strokeLinejoin="round">
+    {/* Rear wheel */}
+    <circle cx="48" cy="82" r="30" stroke={color} strokeWidth="1.5"/>
+    <circle cx="48" cy="82" r="22" stroke={color} strokeWidth="0.8"/>
+    <circle cx="48" cy="82" r="6"  stroke={color} strokeWidth="1.2"/>
+    {[0,45,90,135,180,225,270,315].map(a => {
+      const rad = a * Math.PI / 180;
+      return <line key={a}
+        x1={48 + 7*Math.sin(rad)} y1={82 - 7*Math.cos(rad)}
+        x2={48 + 21*Math.sin(rad)} y2={82 - 21*Math.cos(rad)}
+        stroke={color} strokeWidth="0.8"/>;
+    })}
+    {/* Front wheel */}
+    <circle cx="158" cy="82" r="26" stroke={color} strokeWidth="1.5"/>
+    <circle cx="158" cy="82" r="18" stroke={color} strokeWidth="0.8"/>
+    <circle cx="158" cy="82" r="5"  stroke={color} strokeWidth="1.2"/>
+    {[0,60,120,180,240,300].map(a => {
+      const rad = a * Math.PI / 180;
+      return <line key={a}
+        x1={158 + 6*Math.sin(rad)} y1={82 - 6*Math.cos(rad)}
+        x2={158 + 17*Math.sin(rad)} y2={82 - 17*Math.cos(rad)}
+        stroke={color} strokeWidth="0.8"/>;
+    })}
+    {/* Frame */}
+    <path d="M78 52 L95 30 L120 28 L138 38 L142 56" stroke={color} strokeWidth="1.5"/>
+    <path d="M78 52 L68 82" stroke={color} strokeWidth="1.5"/>
+    <line x1="78" y1="52" x2="132" y2="56" stroke={color} strokeWidth="1.2"/>
+    <line x1="132" y1="56" x2="142" y2="56" stroke={color} strokeWidth="1.2"/>
+    <line x1="142" y1="56" x2="158" y2="56" stroke={color} strokeWidth="1.2"/>
+    {/* Fork */}
+    <line x1="142" y1="56" x2="134" y2="82" stroke={color} strokeWidth="1.5"/>
+    <line x1="138" y1="56" x2="130" y2="82" stroke={color} strokeWidth="1.2"/>
+    {/* Engine */}
+    <rect x="88" y="52" width="34" height="26" rx="2" stroke={color} strokeWidth="1.2"/>
+    <line x1="96" y1="52" x2="96" y2="36" stroke={color} strokeWidth="1.5"/>
+    <line x1="114" y1="52" x2="114" y2="36" stroke={color} strokeWidth="1.5"/>
+    <rect x="92" y="32" width="8" height="6" stroke={color} strokeWidth="1"/>
+    <rect x="110" y="32" width="8" height="6" stroke={color} strokeWidth="1"/>
+    {/* Tank */}
+    <path d="M95 30 Q110 18 130 22 L138 38 L120 28 Z" stroke={color} strokeWidth="1.2"/>
+    {/* Seat */}
+    <path d="M78 52 Q85 44 105 44 Q118 44 132 50 L132 56 L78 52 Z" stroke={color} strokeWidth="1"/>
+    {/* Fender rear */}
+    <path d="M68 82 Q60 56 78 52" stroke={color} strokeWidth="1"/>
+    {/* Exhaust */}
+    <path d="M88 70 Q72 72 62 80" stroke={color} strokeWidth="2.5" strokeLinecap="round"/>
+    {/* Handlebar */}
+    <line x1="134" y1="30" x2="146" y2="24" stroke={color} strokeWidth="1.5"/>
+    <line x1="143" y1="22" x2="149" y2="26" stroke={color} strokeWidth="1.2"/>
+  </svg>
+);
+
 const css = `
   *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
   ::-webkit-scrollbar { width:4px; } ::-webkit-scrollbar-thumb { background:#e8621a; }
@@ -84,56 +138,28 @@ const css = `
   /* VEHICLE CARDS */
   .vehicles-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-bottom:36px; }
 
-  .vehicle-card {
-    background:#111010;
-    border:1px solid #2a2828;
-    border-left:4px solid #3a3838;
-    border-radius:3px;
-    overflow:hidden;
-    position:relative;
-    transition:border-color 0.2s, box-shadow 0.2s, border-left-color 0.2s;
-    animation:fadeUp 0.3s ease both;
-  }
-  .vehicle-card.primary {
-    border-left-color:#e8621a;
-    border-color:rgba(232,98,26,0.3);
-  }
-  .vehicle-card:hover {
-    border-left-color:#e8621a;
-    border-color:rgba(232,98,26,0.35);
-    box-shadow:0 20px 32px rgba(232,98,26,0.2);
-  }
+  .vehicle-card { background:#111010;border:1px solid #2a2828;border-radius:3px;overflow:hidden;position:relative;transition:border-color 0.2s;animation:fadeUp 0.3s ease both; }
+  .vehicle-card.primary { border-color:rgba(232,98,26,0.4); }
+  .vehicle-card:hover { border-color:rgba(232,98,26,0.3); }
 
-  .vehicle-card-content {
-    padding:24px;
+  .vehicle-card-bg {
+    padding:24px 20px 16px;
+    background:#111010;
+    position:relative;overflow:hidden;
+    display:flex;align-items:center;justify-content:center;
   }
-  .vehicle-card-year {
-    font-family:'Bebas Neue',sans-serif;
-    font-size:44px;
-    letter-spacing:0.1em;
-    margin-bottom:8px;
-    color:#e8621a;
+  .vehicle-card-bg::before {
+    content:'';position:absolute;inset:0;
+    background-image:linear-gradient(rgba(232,98,26,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(232,98,26,0.03) 1px,transparent 1px);
+    background-size:20px 20px;
   }
-  .vehicle-card-year.secondary {
-    color:#3a3838;
-  }
-  .vehicle-card-name {
-    font-family:'Bebas Neue',sans-serif;
-    font-size:28px;
-    letter-spacing:0.05em;
-    margin-bottom:6px;
-  }
-  .vehicle-card-meta {
-    font-family:'Share Tech Mono',monospace;
-    font-size:10px;
-    letter-spacing:0.25em;
-    color:#8a8784;
-    text-transform:uppercase;
-  }
-  .vehicle-card-footer {
-    border-top:1px solid #1a1919;
-    padding:16px 24px 20px;
-  }
+  .primary-badge { position:absolute;top:10px;left:10px;background:#e8621a;color:#0a0909;font-family:'Share Tech Mono',monospace;font-size:8px;font-weight:700;letter-spacing:0.15em;padding:2px 8px;border-radius:1px; }
+
+  .vehicle-info { padding:14px 16px;border-top:1px solid #1a1919; }
+  .vehicle-year { font-family:'Share Tech Mono',monospace;font-size:9px;color:#e8621a;letter-spacing:0.18em;margin-bottom:2px; }
+  .vehicle-name { font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:0.04em;line-height:1.1;margin-bottom:4px; }
+  .vehicle-nickname { font-size:12px;color:#8a8784;font-style:italic;margin-bottom:12px; }
+
   .vehicle-actions { display:flex;gap:8px;flex-wrap:wrap; }
   .veh-btn { font-family:'Share Tech Mono',monospace;font-size:8px;letter-spacing:0.12em;padding:5px 10px;border-radius:2px;cursor:pointer;transition:all 0.2s;border:1px solid; }
   .veh-btn.shop  { background:#e8621a;border-color:#e8621a;color:#0a0909; }
@@ -172,25 +198,7 @@ const css = `
   .orders-placeholder-sub { font-family:'Share Tech Mono',monospace;font-size:9px;color:#8a8784;letter-spacing:0.12em; }
 
   /* TOAST */
-  .g-toast {
-    position:fixed;
-    bottom:24px;
-    right:24px;
-    z-index:200;
-    background:#22c55e;
-    color:#0a0909;
-    font-family:'Bebas Neue',sans-serif;
-    font-size:15px;
-    letter-spacing:0.1em;
-    padding:11px 22px;
-    border-radius:2px;
-    box-shadow:0 8px 32px rgba(0,0,0,0.4);
-    animation:fadeUp 0.25s ease;
-  }
-  .g-toast.error {
-    background:#b91c1c;
-    color:#fff;
-  }
+  .g-toast { position:fixed;bottom:24px;right:24px;z-index:200;background:#22c55e;color:#0a0909;font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:0.1em;padding:11px 22px;border-radius:2px;box-shadow:0 8px 32px rgba(0,0,0,0.4);animation:fadeUp 0.25s ease; }
 `;
 
 export default function GarageClient({ user, initialVehicles }) {
@@ -200,7 +208,6 @@ export default function GarageClient({ user, initialVehicles }) {
   const [make,       setMake]       = useState("");
   const [model,      setModel]      = useState("");
   const [nickname,   setNickname]   = useState("");
-  const [bikeStyle,  setBikeStyle]  = useState("cruiser");
   const [saving,     setSaving]     = useState(false);
   const [toast,      setToast]      = useState(null);
   const [cartCount,  setCartCount]  = useState(0);
@@ -208,8 +215,8 @@ export default function GarageClient({ user, initialVehicles }) {
 
   const models = make ? (MODELS[make] ?? []) : [];
 
-  const showToast = (msg, realm = "success") => {
-    setToast({ msg, realm });
+  const showToast = (msg) => {
+    setToast(msg);
     setTimeout(() => setToast(null), 2500);
   };
 
@@ -219,14 +226,6 @@ export default function GarageClient({ user, initialVehicles }) {
   const handleAddVehicle = async () => {
     if (!year || !make || !model) return;
     setSaving(true);
-
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      setSaving(false);
-      showToast("Not logged in", "error");
-      return;
-    }
-    const userId = session.user.id;
     const isPrimary = vehicles.length === 0;
 
     // Look up vehicle record — create it if not yet in catalog
@@ -249,33 +248,23 @@ export default function GarageClient({ user, initialVehicles }) {
         .insert({ year: parseInt(year), make, model })
         .select("id, year, make, model, submodel")
         .single();
-      if (cErr) { 
-        console.log("FULL ERROR:", cErr);
-        setSaving(false);
-        showToast(JSON.stringify(cErr), "error");
-        return; 
-      }
+      if (cErr) { setSaving(false); showToast("Error saving vehicle"); return; }
       vehicleRow = created;
     }
 
     const { data: garageRow, error } = await supabase
       .from("user_garage")
       .insert({
-        user_id:    userId,
+        user_id:    user.id,
         vehicle_id: vehicleRow.id,
         nickname:   nickname || null,
         is_primary: isPrimary,
-        color:      bikeStyle,
       })
       .select("id, nickname, is_primary, mileage, color, added_at")
       .single();
 
     setSaving(false);
-    if (error) { 
-      console.log("GARAGE INSERT ERROR:", JSON.stringify(error));
-      showToast(error.message ?? error.code ?? "garage insert failed", "error");
-      return; 
-    }
+    if (error) { showToast("Error saving vehicle"); return; }
 
     const newEntry = {
       id:         garageRow.id,
@@ -285,14 +274,13 @@ export default function GarageClient({ user, initialVehicles }) {
       model:      vehicleRow.model,
       submodel:   vehicleRow.submodel,
       nickname:   garageRow.nickname,
-      color:      bikeStyle,
       is_primary: garageRow.is_primary,
     };
 
     setVehicles(v => isPrimary ? [newEntry, ...v] : [...v, newEntry]);
     setShowAdd(false);
-    setYear(""); setMake(""); setModel(""); setNickname(""); setBikeStyle("cruiser");
-    showToast(`${year} ${make} ${model} added to your garage`, "success");
+    setYear(""); setMake(""); setModel(""); setNickname("");
+    showToast(`${year} ${make} ${model} added to your garage`);
   };
 
   // ── Set primary ───────────────────────────────────────────
@@ -301,14 +289,14 @@ export default function GarageClient({ user, initialVehicles }) {
     await supabase.from("user_garage").update({ is_primary: false }).eq("user_id", user.id);
     await supabase.from("user_garage").update({ is_primary: true  }).eq("id", id);
     setVehicles(v => v.map(veh => ({ ...veh, is_primary: veh.id === id })));
-    showToast("Primary vehicle updated", "success");
+    showToast("Primary vehicle updated");
   };
 
   // ── Remove vehicle ────────────────────────────────────────
   const handleRemove = async (id) => {
     await supabase.from("user_garage").delete().eq("id", id);
     setVehicles(v => v.filter(veh => veh.id !== id));
-    showToast("Vehicle removed", "success");
+    showToast("Vehicle removed");
   };
 
   const copyReferral = () => {
@@ -423,16 +411,6 @@ export default function GarageClient({ user, initialVehicles }) {
                 </select>
               </div>
             </div>
-            <div style={{ marginBottom: 12 }}>
-              <label className="g-label">BIKE STYLE</label>
-              <select className="g-select" value={bikeStyle} onChange={e => setBikeStyle(e.target.value)}>
-                <option value="cruiser">Cruiser</option>
-                <option value="chopper">Chopper</option>
-                <option value="sportbike">Sportbike</option>
-                <option value="adventure">Adventure</option>
-                <option value="dirtbike">Dirtbike</option>
-              </select>
-            </div>
             <div className="nickname-row">
               <div>
                 <label className="g-label">NICKNAME (OPTIONAL)</label>
@@ -443,7 +421,7 @@ export default function GarageClient({ user, initialVehicles }) {
               </button>
             </div>
             {vehicles.length > 0 && (
-              <button className="cancel-btn" onClick={() => { setShowAdd(false); setBikeStyle("cruiser"); }}>CANCEL</button>
+              <button className="cancel-btn" onClick={() => setShowAdd(false)}>CANCEL</button>
             )}
           </div>
         )}
@@ -456,9 +434,7 @@ export default function GarageClient({ user, initialVehicles }) {
         {vehicles.length === 0 ? (
           <div className="garage-empty">
             <div style={{marginBottom:20, opacity:0.2}}>
-              <div style={{ width:140, height:140, borderRadius:70, border:"1px solid #2a2828", display:"inline-flex", alignItems:"center", justifyContent:"center" }}>
-                <span style={{ fontFamily:"'Share Tech Mono',monospace", fontSize:24, letterSpacing:"0.2em", color:"#8a8784" }}>GARAGE</span>
-              </div>
+              <BikeSVG color="#f0ebe3" size={140}/>
             </div>
             <div className="garage-empty-title">NO VEHICLES YET</div>
             <div className="garage-empty-sub">ADD YOUR FIRST BIKE TO GET FITMENT-SPECIFIC RESULTS</div>
@@ -468,37 +444,32 @@ export default function GarageClient({ user, initialVehicles }) {
           </div>
         ) : (
           <div className="vehicles-grid">
-            {vehicles.map((v, i) => {
-              const metaParts = [];
-              if (v.type) metaParts.push(v.type);
-              if (v.submodel) metaParts.push(v.submodel);
-              if (v.color && !metaParts.includes(v.color)) metaParts.push(v.color);
-              const metaText = metaParts.length ? metaParts.join(" · ") : "Motorcycle";
-              return (
-                <div key={v.id} className={`vehicle-card ${v.is_primary?"primary":""}`} style={{animationDelay:`${i*0.06}s`}}>
-                  <div className="vehicle-card-content">
-                    <div className={`vehicle-card-year ${v.is_primary ? "" : "secondary"}`}>{v.year || "—"}</div>
-                    <div className="vehicle-card-name">{v.make} {v.model}</div>
-                    <div className="vehicle-card-meta">{metaText}</div>
-                  </div>
-                  <div className="vehicle-card-footer">
-                    <div className="vehicle-actions">
-                      <button className="veh-btn shop" onClick={() => window.location.href = `/shop?fitment=${v.id}`}>
-                        SHOP PARTS →
-                      </button>
-                      {!v.is_primary && (
-                        <button className="veh-btn primary-btn" onClick={() => handleSetPrimary(v.id)}>
-                          SET PRIMARY
-                        </button>
-                      )}
-                      <button className="veh-btn remove" onClick={() => handleRemove(v.id)}>
-                        REMOVE
-                      </button>
-                    </div>
-                  </div>
+            {vehicles.map((v, i) => (
+              <div key={v.id} className={`vehicle-card ${v.is_primary?"primary":""}`} style={{animationDelay:`${i*0.06}s`}}>
+                <div className="vehicle-card-top">
+                  <div className="vehicle-year-big">{v.year}</div>
+                  {v.is_primary && (
+                    <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,background:"rgba(232,98,26,0.12)",border:"1px solid rgba(232,98,26,0.3)",color:"#e8621a",padding:"2px 8px",borderRadius:2,letterSpacing:"0.12em"}}>★ PRIMARY</span>
+                  )}
                 </div>
-              );
-            })}
+                <div className="vehicle-name">{v.make} {v.model}</div>
+                <div className="vehicle-meta">{v.year} · {v.type ?? "MOTORCYCLE"}{v.submodel ? ` · ${v.submodel}` : ""}</div>
+                {v.nickname && <div className="vehicle-nickname">"{v.nickname}"</div>}
+                <div className="vehicle-actions">
+                    <button className="veh-btn shop" onClick={() => window.location.href = `/shop?fitment=${v.id}`}>
+                      SHOP PARTS →
+                    </button>
+                    {!v.is_primary && (
+                      <button className="veh-btn primary-btn" onClick={() => handleSetPrimary(v.id)}>
+                        SET PRIMARY
+                      </button>
+                    )}
+                    <button className="veh-btn remove" onClick={() => handleRemove(v.id)}>
+                      REMOVE
+                    </button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
@@ -514,12 +485,7 @@ export default function GarageClient({ user, initialVehicles }) {
 
       </div>
 
-      {toast && (
-        <div className={`g-toast ${toast.realm === "error" ? "error" : ""}`}>
-          {toast.realm === "success" ? "✓ " : "⚠ "}
-          {toast.msg}
-        </div>
-      )}
+      {toast && <div className="g-toast">✓ {toast.toUpperCase()}</div>}
     </div>
   );
 }
