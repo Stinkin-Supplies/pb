@@ -228,8 +228,10 @@ export default function GarageClient({ user, initialVehicles }) {
         .select("id, year, make, model, submodel")
         .single();
       if (cErr) { 
-        console.log("VEHICLES INSERT ERROR:", JSON.stringify(cErr));
-        setSaving(false); showToast("Error saving vehicle", "error"); return; 
+        console.log("FULL ERROR:", cErr);
+        setSaving(false);
+        showToast(JSON.stringify(cErr), "error");
+        return; 
       }
       vehicleRow = created;
     }
@@ -248,7 +250,8 @@ export default function GarageClient({ user, initialVehicles }) {
     setSaving(false);
     if (error) { 
       console.log("GARAGE INSERT ERROR:", JSON.stringify(error));
-      showToast("Error saving vehicle", "error"); return; 
+      showToast(error.message ?? error.code ?? "garage insert failed", "error");
+      return; 
     }
 
     const newEntry = {
