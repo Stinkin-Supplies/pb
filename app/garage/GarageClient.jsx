@@ -42,59 +42,10 @@ const MODELS = {
 
 // ── Blueprint SVG bike illustrations ─────────────────────────
 // Simplified cruiser silhouette — thin stroke, blueprint aesthetic
-const BikeSVG = ({ color = "#8a8784", size = 120 }) => (
-  <svg width={size} height={size * 0.6} viewBox="0 0 200 120" fill="none"
-    xmlns="http://www.w3.org/2000/svg" strokeLinecap="round" strokeLinejoin="round">
-    {/* Rear wheel */}
-    <circle cx="48" cy="82" r="30" stroke={color} strokeWidth="1.5"/>
-    <circle cx="48" cy="82" r="22" stroke={color} strokeWidth="0.8"/>
-    <circle cx="48" cy="82" r="6"  stroke={color} strokeWidth="1.2"/>
-    {[0,45,90,135,180,225,270,315].map(a => {
-      const rad = a * Math.PI / 180;
-      return <line key={a}
-        x1={48 + 7*Math.sin(rad)} y1={82 - 7*Math.cos(rad)}
-        x2={48 + 21*Math.sin(rad)} y2={82 - 21*Math.cos(rad)}
-        stroke={color} strokeWidth="0.8"/>;
-    })}
-    {/* Front wheel */}
-    <circle cx="158" cy="82" r="26" stroke={color} strokeWidth="1.5"/>
-    <circle cx="158" cy="82" r="18" stroke={color} strokeWidth="0.8"/>
-    <circle cx="158" cy="82" r="5"  stroke={color} strokeWidth="1.2"/>
-    {[0,60,120,180,240,300].map(a => {
-      const rad = a * Math.PI / 180;
-      return <line key={a}
-        x1={158 + 6*Math.sin(rad)} y1={82 - 6*Math.cos(rad)}
-        x2={158 + 17*Math.sin(rad)} y2={82 - 17*Math.cos(rad)}
-        stroke={color} strokeWidth="0.8"/>;
-    })}
-    {/* Frame */}
-    <path d="M78 52 L95 30 L120 28 L138 38 L142 56" stroke={color} strokeWidth="1.5"/>
-    <path d="M78 52 L68 82" stroke={color} strokeWidth="1.5"/>
-    <line x1="78" y1="52" x2="132" y2="56" stroke={color} strokeWidth="1.2"/>
-    <line x1="132" y1="56" x2="142" y2="56" stroke={color} strokeWidth="1.2"/>
-    <line x1="142" y1="56" x2="158" y2="56" stroke={color} strokeWidth="1.2"/>
-    {/* Fork */}
-    <line x1="142" y1="56" x2="134" y2="82" stroke={color} strokeWidth="1.5"/>
-    <line x1="138" y1="56" x2="130" y2="82" stroke={color} strokeWidth="1.2"/>
-    {/* Engine */}
-    <rect x="88" y="52" width="34" height="26" rx="2" stroke={color} strokeWidth="1.2"/>
-    <line x1="96" y1="52" x2="96" y2="36" stroke={color} strokeWidth="1.5"/>
-    <line x1="114" y1="52" x2="114" y2="36" stroke={color} strokeWidth="1.5"/>
-    <rect x="92" y="32" width="8" height="6" stroke={color} strokeWidth="1"/>
-    <rect x="110" y="32" width="8" height="6" stroke={color} strokeWidth="1"/>
-    {/* Tank */}
-    <path d="M95 30 Q110 18 130 22 L138 38 L120 28 Z" stroke={color} strokeWidth="1.2"/>
-    {/* Seat */}
-    <path d="M78 52 Q85 44 105 44 Q118 44 132 50 L132 56 L78 52 Z" stroke={color} strokeWidth="1"/>
-    {/* Fender rear */}
-    <path d="M68 82 Q60 56 78 52" stroke={color} strokeWidth="1"/>
-    {/* Exhaust */}
-    <path d="M88 70 Q72 72 62 80" stroke={color} strokeWidth="2.5" strokeLinecap="round"/>
-    {/* Handlebar */}
-    <line x1="134" y1="30" x2="146" y2="24" stroke={color} strokeWidth="1.5"/>
-    <line x1="143" y1="22" x2="149" y2="26" stroke={color} strokeWidth="1.2"/>
-  </svg>
-);
+const getBikeIcon = (type) => {
+  const slug = String(type ?? "cruiser").toLowerCase().replace(/\s+/g, "-");
+  return `/bikes/${slug}.svg`;
+};
 
 const css = `
   *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
@@ -152,6 +103,16 @@ const css = `
     content:'';position:absolute;inset:0;
     background-image:linear-gradient(rgba(232,98,26,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(232,98,26,0.03) 1px,transparent 1px);
     background-size:20px 20px;
+  }
+  .vehicle-card-bg .bike-icon {
+    width:120px;
+    height:84px;
+    object-fit:contain;
+    filter:brightness(0) invert(1) opacity(0.6);
+    transition:filter 0.3s ease;
+  }
+  .vehicle-card:hover .bike-icon {
+    filter:brightness(0) invert(1) sepia(1) saturate(8) hue-rotate(335deg) brightness(1.1);
   }
   .primary-badge { position:absolute;top:10px;left:10px;background:#e8621a;color:#0a0909;font-family:'Share Tech Mono',monospace;font-size:8px;font-weight:700;letter-spacing:0.15em;padding:2px 8px;border-radius:1px; }
 
@@ -434,7 +395,12 @@ export default function GarageClient({ user, initialVehicles }) {
         {vehicles.length === 0 ? (
           <div className="garage-empty">
             <div style={{marginBottom:20, opacity:0.2}}>
-              <BikeSVG color="#f0ebe3" size={140}/>
+              <img
+                src={getBikeIcon(null)}
+                alt="Garage placeholder bike"
+                className="bike-icon"
+                style={{ filter: "brightness(0) invert(1) opacity(0.4)" }}
+              />
             </div>
             <div className="garage-empty-title">NO VEHICLES YET</div>
             <div className="garage-empty-sub">ADD YOUR FIRST BIKE TO GET FITMENT-SPECIFIC RESULTS</div>
@@ -448,7 +414,11 @@ export default function GarageClient({ user, initialVehicles }) {
               <div key={v.id} className={`vehicle-card ${v.is_primary?"primary":""}`} style={{animationDelay:`${i*0.06}s`}}>
                 {v.is_primary && <div className="primary-badge">★ PRIMARY</div>}
                 <div className="vehicle-card-bg">
-                  <BikeSVG color={v.is_primary ? "#e8621a" : "#3a3838"} size={160}/>
+                  <img
+                    src={getBikeIcon(v.type)}
+                    alt={`${v.make} ${v.model}`}
+                    className="bike-icon"
+                  />
                 </div>
                 <div className="vehicle-info">
                   <div className="vehicle-year">{v.year}</div>

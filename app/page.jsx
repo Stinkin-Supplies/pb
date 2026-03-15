@@ -370,7 +370,7 @@ export default function HomePage() {
         </ul>
         <div className="nav-actions">
           <a className="nav-btn" href="/auth">Sign In</a>
-          <button className="nav-btn primary">My Garage</button>
+          <a className="nav-btn primary" href="/garage">My Garage</a>
           <div className="cart-icon">🛒<span className="cart-badge">2</span></div>
         </div>
       </nav>
