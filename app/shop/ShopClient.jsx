@@ -206,7 +206,7 @@ export default function ShopClient({
           STINKIN<span style={{ color:"#e8621a" }}>'</span> SUPPLIES
         </a>
         <div style={{ display:"flex", gap:18, marginRight:12 }}>
-          {[["Shop","/shop"],["Brands","#"],["Garage","/garage"],["Deals","#"]].map(([l,h])=>(
+          {[["Shop","/shop"],["Brands","/shop?brand="],["Garage","/garage"],["Deals","/shop?badge=sale"]].map(([l,h])=>(
             <a key={l} href={h} style={{ ...S({fontSize:10, letterSpacing:"0.12em"}),
               color: l==="Shop" ? "#e8621a" : "#8a8784", textDecoration:"none" }}>{l}</a>
           ))}
@@ -216,9 +216,15 @@ export default function ShopClient({
                          padding:"5px 12px", borderRadius:2, cursor:"pointer"}) }}>
           SIGN IN
         </button>
-        <button style={{ background:"#e8621a", border:"none", color:"#0a0909",
-                         ...B({fontSize:13, letterSpacing:"0.1em",
-                         padding:"5px 12px", borderRadius:2, cursor:"pointer"}) }}>
+        <button
+          style={{
+            background:"#e8621a", border:"none", color:"#0a0909",
+            ...B({ fontSize:13, letterSpacing:"0.1em", padding:"5px 12px", borderRadius:2 }),
+            cursor:"pointer"
+          }}
+          type="button"
+          onClick={() => { window.location.href = "/garage"; }}
+        >
           MY GARAGE
         </button>
         <div style={{ position:"relative", cursor:"pointer", fontSize:17, userSelect:"none" }}
