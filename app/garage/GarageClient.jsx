@@ -221,28 +221,63 @@ export default function GarageClient({ user, initialVehicles }) {
   };
 
   // ── Add vehicle ───────────────────────────────────────────
+  // Step 1: find matching vehicle in vehicles table
+  // Step 2: insert into user_garage with vehicle_id FK
   const handleAddVehicle = async () => {
     if (!year || !make || !model) return;
     setSaving(true);
     const isPrimary = vehicles.length === 0;
 
-    const { data, error } = await supabase
+    // Look up vehicle record — create it if not yet in catalog
+    let vehicleRow = null;
+    const { data: existing } = await supabase
+      .from("vehicles")
+      .select("id, year, make, model, submodel")
+      .eq("year",  parseInt(year))
+      .eq("make",  make)
+      .eq("model", model)
+      .limit(1)
+      .maybeSingle();
+
+    if (existing) {
+      vehicleRow = existing;
+    } else {
+      // Vehicle not in catalog yet — insert it (pre-vendor-sync fallback)
+      const { data: created, error: cErr } = await supabase
+        .from("vehicles")
+        .insert({ year: parseInt(year), make, model })
+        .select("id, year, make, model, submodel")
+        .single();
+      if (cErr) { setSaving(false); showToast("Error saving vehicle"); return; }
+      vehicleRow = created;
+    }
+
+    const { data: garageRow, error } = await supabase
       .from("user_garage")
       .insert({
         user_id:    user.id,
-        year:       parseInt(year),
-        make,
-        model,
+        vehicle_id: vehicleRow.id,
         nickname:   nickname || null,
         is_primary: isPrimary,
       })
-      .select()
+      .select("id, nickname, is_primary, mileage, color, added_at")
       .single();
 
     setSaving(false);
     if (error) { showToast("Error saving vehicle"); return; }
 
-    setVehicles(v => isPrimary ? [{ ...data, is_primary: true }, ...v] : [...v, data]);
+    const newEntry = {
+      id:         garageRow.id,
+      vehicleId:  vehicleRow.id,
+      year:       vehicleRow.year,
+      make:       vehicleRow.make,
+      model:      vehicleRow.model,
+      submodel:   vehicleRow.submodel,
+      nickname:   garageRow.nickname,
+      is_primary: garageRow.is_primary,
+    };
+
+    setVehicles(v => isPrimary ? [newEntry, ...v] : [...v, newEntry]);
     setShowAdd(false);
     setYear(""); setMake(""); setModel(""); setNickname("");
     showToast(`${year} ${make} ${model} added to your garage`);
