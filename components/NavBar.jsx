@@ -93,12 +93,6 @@ const css = `
     display: flex; align-items: center; justify-content: center;
     pointer-events: none;
   }
-  @media (max-width: 700px) {
-    .ss-nav-links { display: none; }
-    .ss-nav-actions { gap: 6px; }
-    .ss-mobile-toggle { display: flex; }
-    .ss-nav-garage { display: none; }
-  }
   .ss-mobile-toggle {
     display: none;
     align-items: center;
@@ -110,6 +104,12 @@ const css = `
     border-radius: 2px;
     color: #f0ebe3;
     cursor: pointer;
+  }
+  @media (max-width: 700px) {
+    .ss-nav-links { display: none; }
+    .ss-nav-actions { gap: 6px; }
+    .ss-mobile-toggle { display: flex; }
+    .ss-nav-garage { display: none; }
   }
   .ss-mobile-menu {
     position: fixed;
