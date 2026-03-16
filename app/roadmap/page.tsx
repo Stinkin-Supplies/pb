@@ -29,7 +29,7 @@ const phases: RoadmapPhase[] = [
     ]
   },
   {
-    id: 2, label: "PHASE 2", title: "Storefront Core", status: "complete", color: "#e8621a",
+    id: 2, label: "PHASE 2", title: "Storefront Core", status: "complete", color: "#22c55e",
     items: [
       { name: "Product listing page /shop", done: true, note: "Grid, filters, fitment toggle", file: "app/shop/page.jsx" },
       { name: "Product detail page /shop/[slug]", done: true, note: "Images, fitment check, add to cart", file: "app/shop/[slug]/page.jsx" },
@@ -39,7 +39,7 @@ const phases: RoadmapPhase[] = [
     ]
   },
   {
-    id: 3, label: "PHASE 3", title: "Auth & Garage", status: "current", color: "#c9a84c",
+    id: 3, label: "PHASE 3", title: "Auth & Garage", status: "complete", color: "#22c55e",
     items: [
       { name: "Sign in / Sign up /auth", done: true, note: "Supabase Auth, magic link + email", file: "app/auth/page.jsx" },
       { name: "My Garage page /garage", done: true, note: "YMM selector, saved bikes, blueprint SVGs", file: "app/garage/page.jsx" },
