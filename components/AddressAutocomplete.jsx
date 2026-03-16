@@ -64,7 +64,7 @@ function parseAddressComponents(components) {
   };
 }
 
-export default function AddressAutocomplete({ onSelect, placeholder = "Start typing your address..." }) {
+export default function AddressAutocomplete({ onSelect, onChange, placeholder = "Start typing your address..." }) {
   const [input,       setInput]       = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [loading,     setLoading]     = useState(false);
@@ -113,6 +113,8 @@ export default function AddressAutocomplete({ onSelect, placeholder = "Start typ
     setInput(val);
     clearTimeout(debounceTimer.current);
 
+    if (onChange) onChange(val);
+
     if (val.length < 3) { setSuggestions([]); setOpen(false); return; }
 
     debounceTimer.current = setTimeout(() => {
@@ -152,6 +154,7 @@ export default function AddressAutocomplete({ onSelect, placeholder = "Start typ
         const parsed = parseAddressComponents(place.address_components);
         setInput(parsed.address_line1); // show just street in the input
         onSelect?.(parsed);
+        if (onChange) onChange(parsed.address_line1);
       }
     );
   };

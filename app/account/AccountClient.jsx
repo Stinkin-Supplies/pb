@@ -337,6 +337,7 @@ export default function AccountClient({ user, initialAddresses }) {
                           zip:           parsed.zip,
                           country:       parsed.country || "US",
                         }))}
+                        onChange={val => setNewAddr(a => ({...a, address_line1: val}))}
                       />
                     </div>
 
