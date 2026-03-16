@@ -39,10 +39,15 @@ const css = `
 
 // Parse Google Maps address_components into structured fields
 function parseAddressComponents(components = []) {
-  const get = (type) =>
-    components.find(c => c.types.includes(type))?.long_name ?? "";
-  const getShort = (type) =>
-    components.find(c => c.types.includes(type))?.short_name ?? "";
+  const find = (type) => components.find(c => c.types?.includes(type));
+  const get = (type) => {
+    const c = find(type);
+    return c?.long_name ?? c?.longText ?? "";
+  };
+  const getShort = (type) => {
+    const c = find(type);
+    return c?.short_name ?? c?.shortText ?? "";
+  };
 
   return {
     address_line1: `${get("street_number")} ${get("route")}`.trim(),
@@ -102,15 +107,15 @@ export default function AddressAutocomplete({ onSelect, onChange, placeholder = 
         onChange?.(val);
       };
 
-      const handlePlaceChange = () => {
-        const place = picker.value;
+      const handlePlaceChange = (event) => {
+        const place = event?.detail?.place ?? event?.detail?.value ?? picker.value;
         if (!place) {
           onChange?.("");
           return;
         }
-        const parsed = parseAddressComponents(place.address_components);
+        const components = place.address_components ?? place.addressComponents ?? [];
+        const parsed = parseAddressComponents(components);
         onSelect?.(parsed);
-        onChange?.(parsed.address_line1 || place.formatted_address || place.name || "");
       };
 
       picker.addEventListener("input", handleInput);

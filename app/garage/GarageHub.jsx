@@ -259,13 +259,23 @@ export default function GarageHub({ user, initialAddresses, initialVehicles, led
     return fallback;
   };
   const handleStreetInputChange = (value) => {
-    const manual = parseCommaAddress(value);
+    const parts = value.split(",").map(s => s.trim()).filter(Boolean);
+    const addr1 = parts[0] ?? "";
+    const city = parts[1] ?? "";
+    let state = "";
+    let zip = "";
+    if (parts.length >= 3) {
+      const penultimate = parts[parts.length - 2].replace(/USA$/i, "").trim();
+      const [s, ...rest] = penultimate.split(/\s+/).filter(Boolean);
+      state = s ?? "";
+      zip = rest.join(" ") ?? "";
+    }
     setNewAddr(a => ({
       ...a,
-      address1: value,
-      city:      manual.city || a.city,
-      state:     manual.state || a.state,
-      zip:       manual.zip || a.zip,
+      address1: addr1,
+      city:     city || a.city,
+      state:    state || a.state,
+      zip:      zip || a.zip,
     }));
   };
   const [savingAddr,   setSavingAddr]   = useState(false);
