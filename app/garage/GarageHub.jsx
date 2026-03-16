@@ -9,6 +9,7 @@
 import { useState } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import AddressAutocomplete from "@/components/AddressAutocomplete";
+import NavBar from "@/components/NavBar";
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -55,14 +56,6 @@ const css = `
   @keyframes spin { to{transform:rotate(360deg)} }
 
   .gh-wrap { background:#0a0909; min-height:100vh; color:#f0ebe3; font-family:'Barlow Condensed',sans-serif; }
-
-  /* NAV */
-  .gh-nav { position:sticky;top:0;z-index:100;background:rgba(10,9,9,0.96);border-bottom:1px solid #2a2828;height:54px;display:flex;align-items:center;padding:0 24px;gap:14px;backdrop-filter:blur(10px); }
-  .gh-logo { font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:0.08em;color:#f0ebe3;text-decoration:none;flex:1; }
-  .gh-logo span { color:#e8621a; }
-  .gh-nav-link { font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:0.12em;color:#8a8784;text-decoration:none;transition:color 0.2s; }
-  .gh-nav-link:hover,.gh-nav-link.active { color:#e8621a; }
-  .gh-nav-btn { background:#e8621a;border:none;color:#0a0909;font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:0.1em;padding:5px 14px;border-radius:2px;cursor:pointer;text-decoration:none; }
 
   /* HERO HEADER */
   .gh-header { background:#111010;border-bottom:1px solid #2a2828;padding:24px 24px 0;position:relative;overflow:hidden; }
@@ -418,15 +411,7 @@ export default function GarageHub({ user, initialAddresses, initialVehicles, led
     <div className="gh-wrap">
       <style>{css}</style>
 
-      {/* NAV */}
-      <nav className="gh-nav">
-        <a href="/" className="gh-logo">STINKIN<span>'</span> SUPPLIES</a>
-        {[["Shop","/shop"],["Brands","/brands"],["Deals","/shop?badge=sale"],["Search","/search"]].map(([l,h]) => (
-          <a key={l} href={h} className="gh-nav-link">{l}</a>
-        ))}
-        <a href="/garage" className="gh-nav-link active">MY GARAGE</a>
-        <a href="/garage" className="gh-nav-btn">MY GARAGE</a>
-      </nav>
+      <NavBar activePage="garage" />
 
       {/* HEADER */}
       <div className="gh-header">
