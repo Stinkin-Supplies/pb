@@ -259,7 +259,7 @@ export default function AccountClient({ user, initialAddresses }) {
                   + ADD ADDRESS
                 </button>
               </div>
-            <div className="acc-section-body">
+            <div className="acc-section-body" style={{maxWidth:1080, margin:"0 auto"}}>
               {addresses.length === 0 ? (
                 <div style={{padding:"32px 0", textAlign:"center"}}>
                   <div style={B({fontSize:22, letterSpacing:"0.05em", color:"#3a3838", marginBottom:6})}>NO ADDRESSES SAVED</div>
