@@ -294,7 +294,7 @@ export default function AccountClient({ user, initialAddresses }) {
                   <div style={{
                     background:"#111010", border:"1px solid #2a2828",
                     borderRadius:6, padding:32, width:"min(100%,760px)",
-                    maxWidth:760, minHeight:480, maxHeight:"calc(100vh - 80px)",
+                    maxWidth:760, minHeight:960, maxHeight:"calc(100vh - 80px)",
                     position:"relative",
                     marginTop:"auto",
                     marginBottom:"auto",
