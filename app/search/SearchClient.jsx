@@ -9,7 +9,6 @@
 
 import { useState, useMemo, useEffect, useRef } from "react";
 import NavBar from "@/components/NavBar";
-import { useCartSafe } from "@/components/CartContext";
 
 // ── Full mock catalog (same data as shop page) ────────────────
 const ALL_PRODUCTS = [
@@ -156,8 +155,6 @@ export default function SearchClient({ initialQuery = "" }) {
   const [input,  setInput]  = useState(initialQuery);
   const [sort,   setSort]   = useState("relevance");
   const inputRef = useRef(null);
-  const { itemCount, setIsOpen } = useCartSafe();
-
   // Focus input on mount
   useEffect(() => { inputRef.current?.focus(); }, []);
 
@@ -200,7 +197,7 @@ export default function SearchClient({ initialQuery = "" }) {
     <div style={{ background:"#0a0909", minHeight:"100vh", color:"#f0ebe3", fontFamily:"'Barlow Condensed',sans-serif" }}>
       <style>{css}</style>
 
-      <NavBar activePage="search" cartCount={itemCount} onCartClick={() => setIsOpen(true)} />
+      <NavBar activePage="search" />
 
       {/* SEARCH HERO */}
       <div className="search-hero">

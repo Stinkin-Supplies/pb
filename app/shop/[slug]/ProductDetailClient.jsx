@@ -421,7 +421,7 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
   const [wishlisted, setWishlisted] = useState(false);
   const [added,      setAdded]      = useState(false);
   const [toast,      setToast]      = useState(false);
-  const { addItem, itemCount, setIsOpen } = useCartSafe();
+  const { addItem } = useCartSafe();
 
   // ── Fitment check ──────────────────────────────────────────
   // Phase 5: fitmentIds will be an array of vehicle IDs from ACES data.
@@ -441,7 +441,6 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
     if (!product.inStock) return;
     setAdded(true);
     addItem(product, qty);
-    setIsOpen(true);
     setToast(true);
     // TODO Phase 2 (cart drawer):
     //   await db.getOrCreateCart()
@@ -464,7 +463,7 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
     <div className="pdp-wrap">
       <style>{css}</style>
 
-      <NavBar cartCount={itemCount} onCartClick={() => setIsOpen(true)} />
+      <NavBar activePage="shop" />
 
       {/* ── BREADCRUMB ── */}
       <div className="pdp-breadcrumb">
