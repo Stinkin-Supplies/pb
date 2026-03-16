@@ -95,13 +95,55 @@ const css = `
   }
   @media (max-width: 700px) {
     .ss-nav-links { display: none; }
-    .ss-nav-signin { display: none; }
+    .ss-nav-actions { gap: 6px; }
+    .ss-mobile-toggle { display: flex; }
+    .ss-nav-garage { display: none; }
+  }
+  .ss-mobile-toggle {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: #1a1919;
+    border: 1px solid #2a2828;
+    border-radius: 2px;
+    color: #f0ebe3;
+    cursor: pointer;
+  }
+  .ss-mobile-menu {
+    position: fixed;
+    inset: 54px 0 0;
+    background: rgba(10,9,9,0.95);
+    display: flex;
+    flex-direction: column;
+    padding: 20px 28px;
+    gap: 14px;
+    z-index: 101;
+  }
+  .ss-mobile-menu a {
+    font-family: 'Share Tech Mono', monospace;
+    letter-spacing: 0.12em;
+    color: #f0ebe3;
+    text-transform: uppercase;
+  }
+  .ss-mobile-menu a.active {
+    color: #e8621a;
+  }
+  .ss-mobile-menu-close {
+    align-self: flex-end;
+    background: none;
+    border: none;
+    color: #8a8784;
+    font-size: 20px;
+    cursor: pointer;
   }
 `;
 
 export default function NavBar({ activePage = "", cartCount = 0, onCartClick }) {
   const [user,        setUser]        = useState(null);
   const [userChecked, setUserChecked] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Check auth state once on mount
   useEffect(() => {
@@ -133,11 +175,19 @@ export default function NavBar({ activePage = "", cartCount = 0, onCartClick }) 
               key={label}
               href={href}
               className={`ss-nav-link ${activePage === label.toLowerCase() ? "active" : ""}`}
+              onClick={() => setMobileMenuOpen(false)}
             >
               {label.toUpperCase()}
             </Link>
           ))}
         </div>
+        <button
+          className="ss-mobile-toggle"
+          aria-label="Toggle navigation"
+          onClick={() => setMobileMenuOpen(v => !v)}
+        >
+          ☰
+        </button>
 
         {/* Actions */}
         <div className="ss-nav-actions">
@@ -159,6 +209,33 @@ export default function NavBar({ activePage = "", cartCount = 0, onCartClick }) 
           </button>
         </div>
       </nav>
+      {mobileMenuOpen && (
+        <div className="ss-mobile-menu">
+          <button className="ss-mobile-menu-close" onClick={() => setMobileMenuOpen(false)}>✕</button>
+          {NAV_LINKS.map(({ label, href }) => (
+            <Link
+              key={label}
+              href={href}
+              className={`ss-nav-link ${activePage === label.toLowerCase() ? "active" : ""}`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              {label.toUpperCase()}
+            </Link>
+          ))}
+          {userChecked && (
+            user ? (
+              <Link href="/account" className="ss-nav-signin" onClick={() => setMobileMenuOpen(false)}>
+                {user.email?.split("@")[0].toUpperCase()}
+              </Link>
+            ) : (
+              <Link href="/auth" className="ss-nav-signin" onClick={() => setMobileMenuOpen(false)}>
+                SIGN IN
+              </Link>
+            )
+          )}
+          <Link href="/garage" className="ss-nav-garage" onClick={() => setMobileMenuOpen(false)}>MY GARAGE</Link>
+        </div>
+      )}
     </>
   );
 }
