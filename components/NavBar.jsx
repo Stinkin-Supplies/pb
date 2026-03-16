@@ -24,7 +24,6 @@ const supabase = createBrowserClient(
 const NAV_LINKS = [
   { label: "Shop",   href: "/shop"    },
   { label: "Brands", href: "/brands"  },
-  { label: "Garage", href: "/garage"  },
   { label: "Deals",  href: "/shop?badge=sale" },
   { label: "Search", href: "/search"  },
 ];
