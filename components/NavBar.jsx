@@ -13,6 +13,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useCartSafe } from "@/components/CartContext";
 import { createBrowserClient } from "@supabase/ssr";
 
 const supabase = createBrowserClient(
@@ -140,10 +141,19 @@ const css = `
   }
 `;
 
-export default function NavBar({ activePage = "", cartCount = 0, onCartClick }) {
+export default function NavBar({ activePage = "", cartCount, onCartClick }) {
   const [user,        setUser]        = useState(null);
   const [userChecked, setUserChecked] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { itemCount, setIsOpen } = useCartSafe();
+  const displayCount = cartCount ?? itemCount;
+  const handleCartClick = () => {
+    if (onCartClick) {
+      onCartClick();
+      return;
+    }
+    setIsOpen(true);
+  };
 
   // Check auth state once on mount
   useEffect(() => {
@@ -203,9 +213,9 @@ export default function NavBar({ activePage = "", cartCount = 0, onCartClick }) 
             )
           )}
           <Link href="/garage" className="ss-nav-garage">MY GARAGE</Link>
-          <button className="ss-nav-cart" onClick={onCartClick} aria-label="Cart">
+          <button className="ss-nav-cart" onClick={handleCartClick} aria-label="Cart">
             🛒
-            {cartCount > 0 && <span className="ss-cart-badge">{cartCount}</span>}
+            {displayCount > 0 && <span className="ss-cart-badge">{displayCount}</span>}
           </button>
         </div>
       </nav>

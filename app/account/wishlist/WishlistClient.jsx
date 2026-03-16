@@ -53,7 +53,7 @@ const css = `
 export default function WishlistClient({ userId, initialItems }) {
   const [items,  setItems]  = useState(initialItems);
   const [toast,  setToast]  = useState(null);
-  const { addItem, itemCount, setIsOpen } = useCartSafe();
+  const { addItem } = useCartSafe();
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 2500); };
 
@@ -71,7 +71,6 @@ export default function WishlistClient({ userId, initialItems }) {
   const handleAddToCart = (item) => {
     if (!item.inStock) return;
     addItem(item);
-    setIsOpen(true);
     showToast(`${item.name.split(" ").slice(0,3).join(" ")} added to cart`);
     // TODO Phase 4: write to Supabase cart_items
   };
@@ -83,11 +82,7 @@ export default function WishlistClient({ userId, initialItems }) {
     <div className="wl-wrap">
       <style>{css}</style>
 
-      <NavBar
-        activePage="account"
-        cartCount={itemCount}
-        onCartClick={() => setIsOpen(true)}
-      />
+      <NavBar activePage="account" />
 
       {/* HEADER */}
       <div className="wl-header">

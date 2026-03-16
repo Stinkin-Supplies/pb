@@ -107,7 +107,7 @@ export default function ShopClient({
   const [fitOn,     setFitOn]     = useState(false);
   const [sort,      setSort]      = useState("featured");
   const [view,      setView]      = useState("grid");
-  const { addItem, itemCount, setIsOpen } = useCartSafe();
+  const { addItem } = useCartSafe();
 
   const toggleCat   = c => setSelCats(p   => p.includes(c) ? p.filter(x=>x!==c) : [...p,c]);
   const toggleBrand = b => setSelBrands(p => p.includes(b) ? p.filter(x=>x!==b) : [...p,b]);
@@ -200,7 +200,7 @@ export default function ShopClient({
                   fontFamily:"'Barlow Condensed',sans-serif" }}>
       <style>{css}</style>
 
-      <NavBar activePage="shop" cartCount={itemCount} onCartClick={() => setIsOpen(true)} />
+      <NavBar activePage="shop" />
 
       {/* ── DATA SOURCE INDICATOR (dev only — remove in prod) ── */}
       {process.env.NODE_ENV === "development" && (
