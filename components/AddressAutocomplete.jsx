@@ -12,7 +12,7 @@
 //   onChange(value) → called whenever the text value changes (typing or select).
 // ============================================================
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const css = `
   .addr-wrap { position:relative; }
@@ -57,6 +57,7 @@ function parseAddressComponents(components = []) {
 export default function AddressAutocomplete({ onSelect, onChange, placeholder = "Start typing your address..." }) {
   const pickerRef = useRef(null);
   const loaderRef = useRef(null);
+  const [, setLoaded] = useState(false);
   const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
 
   useEffect(() => {
@@ -64,6 +65,29 @@ export default function AddressAutocomplete({ onSelect, onChange, placeholder = 
     if (key) loaderRef.current.setAttribute("key", key);
     loaderRef.current.setAttribute("solution-channel", "GMP_GE_placepicker_v2");
   }, [key]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.customElements?.get("gmpx-place-picker")) {
+      setLoaded(true);
+      return;
+    }
+    const existing = document.querySelector('script[data-gmpx-loader]');
+    const handleLoad = () => setLoaded(true);
+    if (existing) {
+      existing.addEventListener("load", handleLoad);
+      return () => existing.removeEventListener("load", handleLoad);
+    }
+    const script = document.createElement("script");
+    script.type = "module";
+    script.src = "https://ajax.googleapis.com/ajax/libs/@googlemaps/extended-component-library/0.6.11/index.min.js";
+    script.setAttribute("data-gmpx-loader", "1");
+    script.addEventListener("load", handleLoad);
+    document.head.appendChild(script);
+    return () => {
+      script.removeEventListener("load", handleLoad);
+    };
+  }, []);
 
   useEffect(() => {
     let mounted = true;
