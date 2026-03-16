@@ -243,6 +243,31 @@ export default function GarageHub({ user, initialAddresses, initialVehicles, led
   const [addresses,    setAddresses]    = useState(initialAddresses);
   const [showAddrForm, setShowAddrForm] = useState(false);
   const [newAddr,      setNewAddr]      = useState({ first_name:"", last_name:"", address1:"", address2:"", city:"", state:"", zip:"", country:"US", is_default:false });
+  const parseCommaAddress = (value) => {
+    if (!value) return { city:"", state:"", zip:"" };
+    const segments = value.split(",").map(s => s.trim()).filter(Boolean);
+    const fallback = { city:"", state:"", zip:"" };
+    if (segments.length >= 2) {
+      fallback.city = segments[1];
+    }
+    const stateZipSegment = segments.length >= 3 ? segments[2] : segments.length === 2 ? segments[1] : "";
+    if (stateZipSegment) {
+      const parts = stateZipSegment.split(/\s+/).filter(Boolean);
+      if (parts.length >= 1) fallback.state = parts[0].toUpperCase();
+      if (parts.length >= 2) fallback.zip = parts.slice(1).join(" ");
+    }
+    return fallback;
+  };
+  const handleStreetInputChange = (value) => {
+    const manual = parseCommaAddress(value);
+    setNewAddr(a => ({
+      ...a,
+      address1: value,
+      city:      manual.city || a.city,
+      state:     manual.state || a.state,
+      zip:       manual.zip || a.zip,
+    }));
+  };
   const [savingAddr,   setSavingAddr]   = useState(false);
 
   // Bikes state
@@ -749,7 +774,18 @@ export default function GarageHub({ user, initialAddresses, initialVehicles, led
             </div>
             <div className="gh-field" style={{marginBottom:12}}>
               <label className="gh-label">STREET ADDRESS</label>
-              <AddressAutocomplete placeholder="Start typing your address..." onSelect={parsed => setNewAddr(a => ({...a, address1: parsed.address_line1, city: parsed.city, state: parsed.state, zip: parsed.zip, country: parsed.country || "US"}))}/>
+              <AddressAutocomplete
+                placeholder="Start typing your address..."
+                onSelect={parsed => setNewAddr(a => ({
+                  ...a,
+                  address1: parsed.address_line1,
+                  city:      parsed.city,
+                  state:     parsed.state,
+                  zip:       parsed.zip,
+                  country:   parsed.country || "US",
+                }))}
+                onChange={handleStreetInputChange}
+              />
             </div>
             <div className="gh-field" style={{marginBottom:12}}>
               <label className="gh-label">APT / SUITE (OPTIONAL)</label>
