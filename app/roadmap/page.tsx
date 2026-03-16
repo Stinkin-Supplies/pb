@@ -49,7 +49,7 @@ const phases: RoadmapPhase[] = [
     ]
   },
   {
-    id: 4, label: "PHASE 4", title: "Checkout & Payments", status: "upcoming", color: "#c9a84c",
+    id: 4, label: "PHASE 4", title: "Checkout & Payments", status: "current", color: "#c9a84c",
     items: [
       { name: "Checkout flow /checkout", done: false, note: "Address, shipping, points redemption", file: "app/checkout/page.jsx" },
       { name: "Stripe integration", done: false, note: "Payment intent, webhook handler", file: "app/api/webhooks/stripe/route.ts" },
