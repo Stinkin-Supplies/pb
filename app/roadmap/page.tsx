@@ -41,11 +41,11 @@ const phases: RoadmapPhase[] = [
   {
     id: 3, label: "PHASE 3", title: "Auth & Garage", status: "current", color: "#c9a84c",
     items: [
-      { name: "Sign in / Sign up /auth", done: false, note: "Supabase Auth, magic link + email", file: "app/auth/page.jsx" },
-      { name: "My Garage page /garage", done: false, note: "YMM selector, saved bikes, blueprint SVGs", file: "app/garage/page.jsx" },
-      { name: "Account page /account", done: false, note: "Profile, addresses, preferences", file: "app/account/page.jsx" },
-      { name: "Points & Rewards /account/points", done: false, note: "Balance, ledger history, expiry", file: "app/account/points/page.jsx" },
-      { name: "Wishlist /account/wishlist", done: false, note: "Saved products, in-stock alerts", file: "app/account/wishlist/page.jsx" },
+      { name: "Sign in / Sign up /auth", done: true, note: "Supabase Auth, magic link + email", file: "app/auth/page.jsx" },
+      { name: "My Garage page /garage", done: true, note: "YMM selector, saved bikes, blueprint SVGs", file: "app/garage/page.jsx" },
+      { name: "Account page /account", done: true, note: "Profile, addresses, preferences", file: "app/account/page.jsx" },
+      { name: "Points & Rewards /account/points", done: true, note: "Balance, ledger history, expiry", file: "app/account/points/page.jsx" },
+      { name: "Wishlist /account/wishlist", done: true, note: "Saved products, in-stock alerts", file: "app/account/wishlist/page.jsx" },
     ]
   },
   {
