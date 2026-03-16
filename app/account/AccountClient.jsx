@@ -2,6 +2,7 @@
 // app/account/AccountClient.jsx
 import { useState } from "react";
 import NavBar from "@/components/NavBar";
+import AddressAutocomplete from "@/components/AddressAutocomplete";
 import { createBrowserClient } from "@supabase/ssr";
 
 const supabase = createBrowserClient(
@@ -46,46 +47,6 @@ const css = `
   .address-name { font-size:14px;font-weight:700;color:#f0ebe3;margin-bottom:3px; }
   .address-text { font-size:13px;color:#8a8784;line-height:1.5; }
   .address-actions { display:flex;gap:8px;margin-top:10px; }
-  .address-form-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(10,9,9,0.8);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 210;
-  }
-  .address-form-panel {
-    background: #111010;
-    border: 1px solid #2a2828;
-    border-radius: 4px;
-    padding: 22px;
-    width: min(420px, 90vw);
-    animation: fadeUp 0.25s ease;
-  }
-  .address-form-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-    margin-top: 12px;
-  }
-  .address-form-grid input {
-    background: #1a1919;
-    border: 1px solid #2a2828;
-    color: #f0ebe3;
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 13px;
-    padding: 8px 10px;
-    border-radius: 2px;
-    outline: none;
-  }
-  .address-form-footer {
-    margin-top: 18px;
-    display: flex;
-    justify-content: space-between;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
   .quick-links { display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px; }
   .quick-link { background:#1a1919;border:1px solid #2a2828;border-radius:2px;padding:16px;cursor:pointer;transition:all 0.2s;text-decoration:none;display:block; }
   .quick-link:hover { border-color:rgba(232,98,26,0.3);background:#151414; }
@@ -95,6 +56,18 @@ const css = `
   .signout-row { padding:20px;border-top:1px solid #2a2828;display:flex;justify-content:flex-end; }
   .toast { position:fixed;bottom:24px;right:24px;z-index:200;background:#22c55e;color:#0a0909;font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:0.1em;padding:11px 22px;border-radius:2px;box-shadow:0 8px 32px rgba(0,0,0,0.4);animation:fadeUp 0.25s ease; }
 `;
+
+const blankAddress = () => ({
+  first_name:"",
+  last_name:"",
+  address_line1:"",
+  address_line2:"",
+  city:"",
+  state:"",
+  zip:"",
+  country:"US",
+  is_default:false,
+});
 
 const TABS = ["PROFILE", "ADDRESSES", "QUICK LINKS"];
 
@@ -106,41 +79,30 @@ export default function AccountClient({ user, initialAddresses }) {
   const [phone,     setPhone]     = useState(user.phone);
   const [saving,    setSaving]    = useState(false);
   const [addresses, setAddresses] = useState(initialAddresses);
-  const [showAddressForm, setShowAddressForm] = useState(false);
-  const createDraft = () => ({
-    first_name: user.firstName ?? "",
-    last_name: user.lastName ?? "",
-    address_line1: "",
-    address_line2: "",
-    city: "",
-    state: "",
-    zip: "",
-    country: "United States",
-    is_default: addresses.length === 0,
+  const [showAddAddr, setShowAddAddr] = useState(false);
+  const [newAddr, setNewAddr] = useState({
+    first_name:"", last_name:"", address_line1:"",
+    address_line2:"", city:"", state:"", zip:"", country:"US",
+    is_default:false,
   });
-  const [draftAddress, setDraftAddress] = useState(createDraft);
+  const [savingAddr, setSavingAddr] = useState(false);
   const [toast,     setToast]     = useState(null);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 2500); };
-  const handleAddAddressClick = () => {
-    setDraftAddress(createDraft());
-    setShowAddressForm(true);
-  };
-  const handleDraftChange = (field, value) =>
-    setDraftAddress(prev => ({ ...prev, [field]: value }));
-  const handleSaveAddress = () => {
-    const nextDefault = addresses.length === 0 || draftAddress.is_default;
-    const saved = {
-      ...draftAddress,
-      id: `new-${Date.now()}`,
-      is_default: nextDefault,
-    };
-    setAddresses(prev => {
-      const updated = prev.map(addr => nextDefault ? { ...addr, is_default: false } : addr);
-      return [saved, ...updated];
-    });
-    setShowAddressForm(false);
-    showToast("Address saved locally");
+  const handleSaveAddress = async () => {
+    setSavingAddr(true);
+    const { data, error } = await supabase
+      .from("user_addresses")
+      .insert({ ...newAddr, user_id: user.id })
+      .select()
+      .single();
+    setSavingAddr(false);
+    if (!error && data) {
+      setAddresses(prev => [data, ...prev]);
+      setShowAddAddr(false);
+      setNewAddr(blankAddress());
+      showToast("Address saved");
+    }
   };
 
   const handleSaveProfile = async () => {
@@ -275,10 +237,18 @@ export default function AccountClient({ user, initialAddresses }) {
         {/* ── ADDRESSES TAB ── */}
         {tab === "ADDRESSES" && (
           <div className="acc-section">
-            <div className="acc-section-head">
-              <div className="acc-section-title">SAVED <span>ADDRESSES</span></div>
-              <button className="edit-btn" onClick={handleAddAddressClick}>+ ADD ADDRESS</button>
-            </div>
+              <div className="acc-section-head">
+                <div className="acc-section-title">SAVED <span>ADDRESSES</span></div>
+                    <button
+                      className="edit-btn"
+                      onClick={() => {
+                        setNewAddr(blankAddress());
+                        setShowAddAddr(true);
+                      }}
+                    >
+                  + ADD ADDRESS
+                </button>
+              </div>
             <div className="acc-section-body">
               {addresses.length === 0 ? (
                 <div style={{padding:"32px 0", textAlign:"center"}}>
@@ -302,6 +272,115 @@ export default function AccountClient({ user, initialAddresses }) {
                     </div>
                   </div>
                 ))
+              )}
+              {showAddAddr && (
+                <div style={{
+                  position:"fixed", inset:0, zIndex:300,
+                  background:"rgba(0,0,0,0.75)", backdropFilter:"blur(4px)",
+                  display:"flex", alignItems:"center", justifyContent:"center",
+                  padding:"20px",
+                }}>
+                  <div style={{
+                    background:"#111010", border:"1px solid #2a2828",
+                    borderRadius:4, padding:28, width:"100%", maxWidth:520,
+                    position:"relative",
+                  }}>
+                    {/* Header */}
+                    <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20}}>
+                      <div style={{fontFamily:"'Bebas Neue',sans-serif", fontSize:22, letterSpacing:"0.05em"}}>
+                        ADD <span style={{color:"#e8621a"}}>ADDRESS</span>
+                      </div>
+                      <button onClick={() => setShowAddAddr(false)} style={{background:"none", border:"none", color:"#8a8784", fontSize:18, cursor:"pointer"}}>✕</button>
+                    </div>
+
+                    {/* Name row */}
+                    <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:12}}>
+                      <div>
+                        <label className="field-label">FIRST NAME</label>
+                        <input className="field-input" value={newAddr.first_name}
+                          onChange={e => setNewAddr(a => ({...a, first_name: e.target.value}))}
+                          placeholder="John"/>
+                      </div>
+                      <div>
+                        <label className="field-label">LAST NAME</label>
+                        <input className="field-input" value={newAddr.last_name}
+                          onChange={e => setNewAddr(a => ({...a, last_name: e.target.value}))}
+                          placeholder="Doe"/>
+                      </div>
+                    </div>
+
+                    {/* Autocomplete street */}
+                    <div style={{marginBottom:12}}>
+                      <label className="field-label">STREET ADDRESS</label>
+                      <AddressAutocomplete
+                        placeholder="Start typing your address..."
+                        onSelect={(parsed) => setNewAddr(a => ({
+                          ...a,
+                          address_line1: parsed.address_line1,
+                          city:          parsed.city,
+                          state:         parsed.state,
+                          zip:           parsed.zip,
+                          country:       parsed.country || "US",
+                        }))}
+                      />
+                    </div>
+
+                    {/* Apt / Suite */}
+                    <div style={{marginBottom:12}}>
+                      <label className="field-label">APT / SUITE (OPTIONAL)</label>
+                      <input className="field-input" value={newAddr.address_line2}
+                        onChange={e => setNewAddr(a => ({...a, address_line2: e.target.value}))}
+                        placeholder="Apt 4B"/>
+                    </div>
+
+                    {/* City / State / Zip */}
+                    <div style={{display:"grid", gridTemplateColumns:"2fr 1fr 1fr", gap:12, marginBottom:12}}>
+                      <div>
+                        <label className="field-label">CITY</label>
+                        <input className="field-input" value={newAddr.city}
+                          onChange={e => setNewAddr(a => ({...a, city: e.target.value}))}
+                          placeholder="Palm Coast"/>
+                      </div>
+                      <div>
+                        <label className="field-label">STATE</label>
+                        <input className="field-input" value={newAddr.state}
+                          onChange={e => setNewAddr(a => ({...a, state: e.target.value}))}
+                          placeholder="FL" maxLength={2}/>
+                      </div>
+                      <div>
+                        <label className="field-label">ZIP</label>
+                        <input className="field-input" value={newAddr.zip}
+                          onChange={e => setNewAddr(a => ({...a, zip: e.target.value}))}
+                          placeholder="32137"/>
+                      </div>
+                    </div>
+
+                    {/* Default toggle */}
+                    <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 0", borderTop:"1px solid #1a1919", marginBottom:16}}>
+                      <span style={{fontFamily:"'Share Tech Mono',monospace", fontSize:9, color:"#8a8784", letterSpacing:"0.12em"}}>SET AS DEFAULT ADDRESS</span>
+                      <div
+                        onClick={() => setNewAddr(a => ({...a, is_default: !a.is_default}))}
+                        style={{width:32, height:18, borderRadius:9, background: newAddr.is_default?"#e8621a":"#2a2828", position:"relative", cursor:"pointer", transition:"background 0.2s"}}
+                      >
+                        <div style={{position:"absolute", top:2, left: newAddr.is_default?14:2, width:14, height:14, borderRadius:"50%", background:"#f0ebe3", transition:"left 0.2s"}}/>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div style={{display:"flex", gap:10}}>
+                      <button onClick={() => setShowAddAddr(false)} style={{flex:1, background:"transparent", border:"1px solid #2a2828", color:"#8a8784", fontFamily:"'Bebas Neue',sans-serif", fontSize:16, letterSpacing:"0.1em", padding:"10px", borderRadius:2, cursor:"pointer"}}>
+                        CANCEL
+                      </button>
+                      <button
+                        onClick={handleSaveAddress}
+                        disabled={savingAddr || !newAddr.address_line1 || !newAddr.city}
+                        style={{flex:2, background:"#e8621a", border:"none", color:"#0a0909", fontFamily:"'Bebas Neue',sans-serif", fontSize:16, letterSpacing:"0.1em", padding:"10px", borderRadius:2, cursor:"pointer", opacity: savingAddr?"0.5":1}}
+                      >
+                        {savingAddr ? "SAVING..." : "SAVE ADDRESS"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -336,72 +415,6 @@ export default function AccountClient({ user, initialAddresses }) {
 
       </div>
 
-      {showAddressForm && (
-        <div className="address-form-overlay">
-          <div className="address-form-panel">
-            <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:20, letterSpacing:"0.06em" }}>
-              ADD NEW ADDRESS
-            </div>
-            <div style={{ fontFamily:"'Share Tech Mono',monospace", fontSize:8, letterSpacing:"0.2em", marginTop:3 }}>
-              FILL IN THE MINIMUM FIELDS TO SAVE A SHIPPING ADDRESS
-            </div>
-            <div className="address-form-grid">
-              <input
-                placeholder="First name"
-                value={draftAddress.first_name}
-                onChange={e => handleDraftChange("first_name", e.target.value)}
-              />
-              <input
-                placeholder="Last name"
-                value={draftAddress.last_name}
-                onChange={e => handleDraftChange("last_name", e.target.value)}
-              />
-              <input
-                placeholder="Address line 1"
-                value={draftAddress.address_line1}
-                onChange={e => handleDraftChange("address_line1", e.target.value)}
-              />
-              <input
-                placeholder="Address line 2"
-                value={draftAddress.address_line2}
-                onChange={e => handleDraftChange("address_line2", e.target.value)}
-              />
-              <input
-                placeholder="City"
-                value={draftAddress.city}
-                onChange={e => handleDraftChange("city", e.target.value)}
-              />
-              <input
-                placeholder="State / Province"
-                value={draftAddress.state}
-                onChange={e => handleDraftChange("state", e.target.value)}
-              />
-              <input
-                placeholder="ZIP / Postal"
-                value={draftAddress.zip}
-                onChange={e => handleDraftChange("zip", e.target.value)}
-              />
-              <input
-                placeholder="Country"
-                value={draftAddress.country}
-                onChange={e => handleDraftChange("country", e.target.value)}
-              />
-            </div>
-            <label style={{ display:"flex", alignItems:"center", gap:6, marginTop:12, fontSize:11, color:"#8a8784" }}>
-              <input
-                type="checkbox"
-                checked={draftAddress.is_default}
-                onChange={e => handleDraftChange("is_default", e.target.checked)}
-              />
-              Set as default address
-            </label>
-            <div className="address-form-footer">
-              <button className="save-btn" onClick={handleSaveAddress}>SAVE ADDRESS</button>
-              <button className="edit-btn" onClick={() => setShowAddressForm(false)}>CANCEL</button>
-            </div>
-          </div>
-        </div>
-      )}
       {toast && <div className="toast">✓ {toast.toUpperCase()}</div>}
     </div>
   );
