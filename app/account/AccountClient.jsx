@@ -93,16 +93,26 @@ export default function AccountClient({ user, initialAddresses }) {
     setSavingAddr(true);
     const { data, error } = await supabase
       .from("user_addresses")
-      .insert({ ...newAddr, user_id: user.id })
+      .insert({
+        user_id:    user.id,
+        first_name: newAddr.first_name,
+        last_name:  newAddr.last_name,
+        address1:   newAddr.address_line1,
+        address2:   newAddr.address_line2,
+        city:       newAddr.city,
+        state:      newAddr.state,
+        zip:        newAddr.zip,
+        country:    newAddr.country || "US",
+        is_default: newAddr.is_default,
+      })
       .select()
       .single();
     setSavingAddr(false);
-    if (!error && data) {
-      setAddresses(prev => [data, ...prev]);
-      setShowAddAddr(false);
-      setNewAddr(blankAddress());
-      showToast("Address saved");
-    }
+    if (error) { showToast(error.message); return; }
+    setAddresses(prev => [data, ...prev]);
+    setShowAddAddr(false);
+    setNewAddr(blankAddress());
+    showToast("Address saved");
   };
 
   const handleSaveProfile = async () => {
@@ -261,7 +271,7 @@ export default function AccountClient({ user, initialAddresses }) {
                     {addr.is_default && <div className="address-default-badge">★ DEFAULT</div>}
                     <div className="address-name">{addr.first_name} {addr.last_name}</div>
                     <div className="address-text">
-                      {addr.address_line1}{addr.address_line2 ? `, ${addr.address_line2}` : ""}<br/>
+                      {addr.address1}{addr.address2 ? `, ${addr.address2}` : ""}<br/>
                       {addr.city}, {addr.state} {addr.zip}<br/>
                       {addr.country}
                     </div>
