@@ -200,17 +200,6 @@ export default function NavBar({ activePage = "", cartCount, onCartClick }) {
 
         {/* Actions */}
         <div className="ss-nav-actions">
-        {userChecked && (
-          user ? (
-            <Link href="/account" className="ss-nav-signin">
-              ACCOUNT
-            </Link>
-          ) : (
-            <Link href="/auth" className="ss-nav-signin">
-              SIGN IN
-            </Link>
-          )
-        )}
           <Link href="/garage" className="ss-nav-garage">MY GARAGE</Link>
           <button className="ss-nav-cart" onClick={handleCartClick} aria-label="Cart">
             🛒
@@ -231,17 +220,6 @@ export default function NavBar({ activePage = "", cartCount, onCartClick }) {
               {label.toUpperCase()}
             </Link>
           ))}
-          {userChecked && (
-            user ? (
-              <Link href="/account" className="ss-nav-signin" onClick={() => setMobileMenuOpen(false)}>
-                ACCOUNT
-              </Link>
-            ) : (
-              <Link href="/auth" className="ss-nav-signin" onClick={() => setMobileMenuOpen(false)}>
-                SIGN IN
-              </Link>
-            )
-          )}
           <Link href="/garage" className="ss-nav-garage" onClick={() => setMobileMenuOpen(false)}>MY GARAGE</Link>
         </div>
       )}
