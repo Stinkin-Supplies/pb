@@ -287,13 +287,16 @@ export default function AccountClient({ user, initialAddresses }) {
                 <div style={{
                   position:"fixed", inset:0, zIndex:300,
                   background:"rgba(0,0,0,0.75)", backdropFilter:"blur(4px)",
-                  display:"flex", alignItems:"center", justifyContent:"center",
+                  display:"flex", alignItems:"flex-start", justifyContent:"center",
                   padding:"20px",
+                  overflowY:"auto",
                 }}>
                   <div style={{
                     background:"#111010", border:"1px solid #2a2828",
                     borderRadius:4, padding:28, width:"100%", maxWidth:520,
                     position:"relative",
+                    marginTop:"auto",
+                    marginBottom:"auto",
                   }}>
                     {/* Header */}
                     <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20}}>
