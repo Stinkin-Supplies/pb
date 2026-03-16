@@ -498,7 +498,7 @@ export default function ShopClient({
                       </button>
                     </div>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           )}
