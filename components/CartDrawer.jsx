@@ -23,6 +23,7 @@
 // ============================================================
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 
 const FREE_SHIPPING_THRESHOLD = 99;
 
@@ -113,13 +114,23 @@ const css = `
 
   .cart-item {
     display: grid;
-    grid-template-columns: 72px 1fr;
+    grid-template-columns: 72px 1fr auto;
     gap: 12px;
     padding: 14px 20px;
     border-bottom: 1px solid #1a1919;
     transition: background 0.15s;
+    align-items: center;
   }
   .cart-item:hover { background: rgba(255,255,255,0.01); }
+
+  .item-main {
+    display: grid;
+    grid-template-columns: 72px 1fr;
+    gap: 12px;
+    align-items: center;
+    cursor: pointer;
+    min-width: 0;
+  }
 
   .item-img {
     width: 72px; height: 72px;
@@ -152,10 +163,7 @@ const css = `
     line-height: 1.3; letter-spacing: 0.01em;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .item-price-row {
-    display: flex; align-items: center;
-    justify-content: space-between; margin-top: 4px;
-  }
+  .item-price-row { margin-top: 4px; }
   .item-price {
     font-family: 'Bebas Neue', sans-serif;
     font-size: 18px; color: #f0ebe3; letter-spacing: 0.04em;
@@ -332,6 +340,7 @@ const POINTS_TO_DOLLAR    = 0.01; // 100 points = $1
 
 export default function CartDrawer({ isOpen, onClose, cartItems, onUpdateQty, onRemove }) {
   const [redeemPoints, setRedeemPoints] = useState(false);
+  const router = useRouter();
 
   // Lock body scroll when drawer is open
   useEffect(() => {
@@ -372,6 +381,12 @@ export default function CartDrawer({ isOpen, onClose, cartItems, onUpdateQty, on
 
   const M = s => ({ fontFamily:"'Share Tech Mono',monospace", ...s });
   const B = s => ({ fontFamily:"'Bebas Neue',sans-serif",     ...s });
+
+  const handleItemClick = useCallback((item) => {
+    if (!item?.slug) return;
+    onClose?.();
+    router.push(`/shop/${item.slug}`);
+  }, [onClose, router]);
 
   if (!isOpen) return null;
 
@@ -432,40 +447,54 @@ export default function CartDrawer({ isOpen, onClose, cartItems, onUpdateQty, on
             <div className="drawer-items">
               {cartItems.map(item => (
                 <div key={item.id} className="cart-item">
-                  {/* Image */}
-                  <div className="item-img">
-                    {item.image
-                      ? <img src={item.image} alt={item.name}/>
-                      : <span className="item-img-placeholder">NO IMG</span>
-                    }
-                  </div>
+                  <div
+                    className="item-main"
+                    role="link"
+                    tabIndex={0}
+                    onClick={() => handleItemClick(item)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        handleItemClick(item);
+                      }
+                    }}
+                  >
+                    {/* Image */}
+                    <div className="item-img">
+                      {item.image
+                        ? <img src={item.image} alt={item.name}/>
+                        : <span className="item-img-placeholder">NO IMG</span>
+                      }
+                    </div>
 
-                  {/* Body */}
-                  <div className="item-body">
-                    <div className="item-brand">{item.brand}</div>
-                    <div className="item-name" title={item.name}>{item.name}</div>
+                    {/* Body */}
+                    <div className="item-body">
+                      <div className="item-brand">{item.brand}</div>
+                      <div className="item-name" title={item.name}>{item.name}</div>
 
-                    {/* MAP note if price is at floor */}
-                    {item.mapPrice && item.price <= item.mapPrice && (
-                      <div className="item-map-note">MAP PRICE APPLIED</div>
-                    )}
+                      {/* MAP note if price is at floor */}
+                      {item.mapPrice && item.price <= item.mapPrice && (
+                        <div className="item-map-note">MAP PRICE APPLIED</div>
+                      )}
 
-                    <div className="item-price-row">
-                      <div className="item-price">
-                        ${(item.price * item.qty).toFixed(2)}
-                        {item.qty > 1 && (
-                          <span style={M({fontSize:8, color:"#8a8784", marginLeft:5})}>
-                            ${item.price.toFixed(2)} EA
-                          </span>
-                        )}
-                      </div>
-                      <div className="item-controls">
-                        <button className="item-qty-btn" onClick={() => onUpdateQty(item.id, item.qty - 1)} disabled={item.qty <= 1}>−</button>
-                        <span className="item-qty-val">{item.qty}</span>
-                        <button className="item-qty-btn" onClick={() => onUpdateQty(item.id, item.qty + 1)}>+</button>
-                        <button className="item-remove" onClick={() => onRemove(item.id)}>REMOVE</button>
+                      <div className="item-price-row">
+                        <div className="item-price">
+                          ${(item.price * item.qty).toFixed(2)}
+                          {item.qty > 1 && (
+                            <span style={M({fontSize:8, color:"#8a8784", marginLeft:5})}>
+                              ${item.price.toFixed(2)} EA
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
+                  </div>
+
+                  <div className="item-controls">
+                    <button className="item-qty-btn" onClick={() => onUpdateQty(item.id, item.qty - 1)} disabled={item.qty <= 1}>−</button>
+                    <span className="item-qty-val">{item.qty}</span>
+                    <button className="item-qty-btn" onClick={() => onUpdateQty(item.id, item.qty + 1)}>+</button>
+                    <button className="item-remove" onClick={() => onRemove(item.id)}>REMOVE</button>
                   </div>
                 </div>
               ))}
