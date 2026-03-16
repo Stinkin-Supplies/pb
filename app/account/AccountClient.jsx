@@ -287,14 +287,14 @@ export default function AccountClient({ user, initialAddresses }) {
                 <div style={{
                   position:"fixed", inset:0, zIndex:300,
                   background:"rgba(0,0,0,0.55)", backdropFilter:"blur(4px)",
-                  display:"flex", alignItems:"center", justifyContent:"center",
-                  padding:"40px 20px",
+                  display:"flex", alignItems:"flex-start", justifyContent:"center",
+                  padding:"80px 20px 40px",
                   overflowY:"auto",
                 }}>
                   <div style={{
                     background:"#111010", border:"1px solid #2a2828",
                     borderRadius:8, padding:32, width:"min(100%,780px)",
-                    maxWidth:780, minHeight:1200, maxHeight:"calc(100vh - 80px)", height:"min(1200px, calc(100vh - 80px))",
+                    maxWidth:780, maxHeight:"calc(100vh - 80px)",
                     position:"relative",
                     marginTop:"auto",
                     marginBottom:"auto",
