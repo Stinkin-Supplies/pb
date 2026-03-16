@@ -18,6 +18,7 @@
 // ============================================================
 
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import NavBar from "@/components/NavBar";
 import { useCartSafe } from "@/components/CartContext";
 
@@ -391,8 +392,10 @@ export default function ShopClient({
               gap:12,
             }}>
               {products.map((p, i) => (
-                <div key={p.id} className="pcard"
-                  onClick={() => window.location.href = `/shop/${p.slug}`}
+                <Link
+                  key={p.id}
+                  href={`/shop/${p.slug}`}
+                  className="pcard"
                   style={{
                     background:"#111010", border:"1px solid #2a2828", borderRadius:2,
                     overflow:"hidden", cursor:"pointer",
@@ -400,6 +403,8 @@ export default function ShopClient({
                     display: view==="list" ? "grid" : "block",
                     gridTemplateColumns: view==="list" ? "140px 1fr" : "unset",
                     animation: `fadeUp 0.3s ease ${i*0.03}s both`,
+                    textDecoration:"none",
+                    color:"inherit",
                   }}>
 
                   {/* Image */}
