@@ -201,17 +201,17 @@ export default function NavBar({ activePage = "", cartCount, onCartClick }) {
 
         {/* Actions */}
         <div className="ss-nav-actions">
-          {userChecked && (
-            user ? (
-              <Link href="/account" className="ss-nav-signin">
-                {user.email?.split("@")[0].toUpperCase()}
-              </Link>
-            ) : (
-              <Link href="/auth" className="ss-nav-signin">
-                SIGN IN
-              </Link>
-            )
-          )}
+        {userChecked && (
+          user ? (
+            <Link href="/account" className="ss-nav-signin">
+              ACCOUNT
+            </Link>
+          ) : (
+            <Link href="/auth" className="ss-nav-signin">
+              SIGN IN
+            </Link>
+          )
+        )}
           <Link href="/garage" className="ss-nav-garage">MY GARAGE</Link>
           <button className="ss-nav-cart" onClick={handleCartClick} aria-label="Cart">
             🛒
@@ -235,7 +235,7 @@ export default function NavBar({ activePage = "", cartCount, onCartClick }) {
           {userChecked && (
             user ? (
               <Link href="/account" className="ss-nav-signin" onClick={() => setMobileMenuOpen(false)}>
-                {user.email?.split("@")[0].toUpperCase()}
+                ACCOUNT
               </Link>
             ) : (
               <Link href="/auth" className="ss-nav-signin" onClick={() => setMobileMenuOpen(false)}>
