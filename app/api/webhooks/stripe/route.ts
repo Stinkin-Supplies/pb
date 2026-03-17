@@ -57,11 +57,6 @@ export async function POST(req: Request) {
         { product_id: null, name: "Test Product", price: 100, qty: 1 },
       ];
 
-      const subtotal = 100;
-      const shipping = 0;
-      const tax = 0;
-      const total = 100;
-
       if (!paymentIntent.latest_charge) {
         console.error("Missing latest_charge on payment intent");
         return new NextResponse("Missing latest_charge", { status: 500 });
@@ -89,17 +84,6 @@ export async function POST(req: Request) {
       };
 
       console.log("FINAL ORDER DATA:", orderData);
-
-      const test = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/`,
-        {
-          headers: {
-            apikey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
-            Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY!}`,
-          },
-        }
-      );
-      console.log("SUPABASE STATUS:", test.status);
 
       const { data: order, error } = await supabaseAdmin
         .from("orders")
