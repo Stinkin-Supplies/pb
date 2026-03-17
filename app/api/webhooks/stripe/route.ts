@@ -62,24 +62,33 @@ export async function POST(req: Request) {
       const tax = 0;
       const total = 100;
 
-      let customer_email = customerEmail;
-      let customer_name = customerName;
-      const shipping_address = paymentIntent.shipping?.address ?? null;
-      let billing_address: string | null = null;
-
-      if (paymentIntent.latest_charge) {
-        const charge = await stripe.charges.retrieve(
-          String(paymentIntent.latest_charge)
-        );
-        const billing = charge.billing_details;
-        if (billing?.address?.line1 && billing?.address?.city && billing?.address?.state) {
-          billing_address = `${billing.address.line1}, ${billing.address.city}, ${billing.address.state}`;
-        }
-        if (billing?.email) customer_email = billing.email;
-        if (billing?.name) customer_name = billing.name;
+      if (!paymentIntent.latest_charge) {
+        console.error("Missing latest_charge on payment intent");
+        return new NextResponse("Missing latest_charge", { status: 500 });
       }
 
-      const amount = paymentIntent.amount;
+      const charge = await stripe.charges.retrieve(
+        String(paymentIntent.latest_charge)
+      );
+      const billing = charge.billing_details;
+
+      const orderData = {
+        customer_email: billing?.email || "unknown@example.com",
+        customer_name: billing?.name || "Guest",
+
+        shipping_address: paymentIntent.shipping?.address || {},
+        billing_address: billing?.address || {},
+
+        status: "processing",
+
+        stripe_payment_intent_id: paymentIntent.id,
+        stripe_charge_id: charge.id,
+        payment_method_last4: charge.payment_method_details?.card?.last4 || null,
+
+        total: paymentIntent.amount / 100,
+      };
+
+      console.log("FINAL ORDER DATA:", orderData);
 
       const test = await fetch(
         `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/`,
@@ -92,30 +101,14 @@ export async function POST(req: Request) {
       );
       console.log("SUPABASE STATUS:", test.status);
 
-      console.log("INSERTING ORDER WITH:", {
-        customer_email,
-        customer_name,
-        shipping_address,
-        billing_address,
-        amount,
-      });
-
       const { data: order, error } = await supabaseAdmin
         .from("orders")
-        .insert({
-          stripe_payment_intent_id: paymentIntent.id,
-          subtotal,
-          shipping,
-          tax,
-          total,
-        })
+        .insert(orderData)
         .select()
         .single();
 
-      console.log("SUPABASE RESPONSE:", order, error);
-
       if (error) {
-        console.error("Order insert failed:", JSON.stringify(error, null, 2));
+        console.error("Order insert failed:", error);
         return new NextResponse("Order insert failed", { status: 500 });
       }
 
