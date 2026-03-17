@@ -423,6 +423,7 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
   const [qty,        setQty]        = useState(1);
   const [wishlisted, setWishlisted] = useState(false);
   const [wishlistBusy, setWishlistBusy] = useState(false);
+  const [wishlistToast, setWishlistToast] = useState(null);
   const [added,      setAdded]      = useState(false);
   const [toast,      setToast]      = useState(false);
   const { addItem } = useCartSafe();
@@ -456,6 +457,11 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
   };
 
   // ── Wishlist (Supabase) ────────────────────────────────────
+  const showWishlistToast = (msg) => {
+    setWishlistToast(msg);
+    setTimeout(() => setWishlistToast(null), 2000);
+  };
+
   useEffect(() => {
     let mounted = true;
     const load = async () => {
@@ -494,7 +500,13 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
           .delete()
           .eq("user_id", user.id)
           .eq("product_id", product.id);
-        if (!error) setWishlisted(false);
+        if (!error) {
+          setWishlisted(false);
+          showWishlistToast("Removed from wishlist");
+        } else {
+          console.warn("Wishlist remove failed:", error.message);
+          showWishlistToast("Could not remove");
+        }
       } else {
         const { error } = await supabase
           .from("wishlists")
@@ -503,7 +515,13 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
             product_id: product.id,
             notify_in_stock: !product.inStock,
           });
-        if (!error) setWishlisted(true);
+        if (!error) {
+          setWishlisted(true);
+          showWishlistToast("Saved to wishlist");
+        } else {
+          console.warn("Wishlist add failed:", error.message);
+          showWishlistToast("Could not save");
+        }
       }
     } finally {
       setWishlistBusy(false);
@@ -729,6 +747,11 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
       {toast && (
         <div className="toast">
           ✓ {qty > 1 ? `${qty}× ` : ""}{product.name.split(" ").slice(0,3).join(" ")} ADDED TO CART
+        </div>
+      )}
+      {wishlistToast && (
+        <div className="toast" style={{background:"#e8621a"}}>
+          {wishlistToast.toUpperCase()}
         </div>
       )}
     </div>
