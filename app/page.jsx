@@ -363,7 +363,7 @@ export default function HomePage() {
         <div className="hero-bg"/>
         <div className="hero-inner">
           <div>
-            <div className="hero-eyebrow mono">Est. Parts & Accessories</div>
+            <div className="hero-eyebrow mono">Parts & Accessories</div>
             <h1 className="hero-title display">
               BUILT<br/>
               <span className="accent">HARD.</span><br/>
