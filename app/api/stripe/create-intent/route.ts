@@ -2,19 +2,17 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { applyMapPricing } from "@/lib/map/engine";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2024-06-20",
+const stripeKey = process.env.STRIPE_SECRET_KEY;
+if (!stripeKey) {
+  throw new Error("Missing STRIPE_SECRET_KEY");
+}
+
+const stripe = new Stripe(stripeKey, {
+  apiVersion: "2026-02-25.clover",
 });
 
-export async function POST(req) {
+export async function POST(req: Request) {
   try {
-    if (!process.env.STRIPE_SECRET_KEY) {
-      return NextResponse.json(
-        { error: "Missing STRIPE_SECRET_KEY" },
-        { status: 500 }
-      );
-    }
-
     const body = await req.json();
     const items = Array.isArray(body?.items) ? body.items : [];
     const points = Number(body?.points ?? 0);
@@ -29,7 +27,7 @@ export async function POST(req) {
     const pointsValue = points * 0.01;
 
     const mapResult = applyMapPricing(
-      items.map((item) => ({
+      items.map((item: any) => ({
         id: String(item.id),
         price: Number(item.price) || 0,
         qty: Number(item.qty) || 0,
