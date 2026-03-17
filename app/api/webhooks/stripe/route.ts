@@ -57,11 +57,18 @@ export async function POST(req: Request) {
       console.log(JSON.stringify(event.data.object, null, 2));
       console.log("Payment success:", paymentIntent.id);
       console.log("USING ADMIN CLIENT");
-      const email =
+      const customerEmail =
         paymentIntent.receipt_email ||
         paymentIntent.metadata?.customer_email ||
         "unknown@example.com";
-      console.log("CUSTOMER EMAIL:", email);
+
+      const customerName =
+        paymentIntent.shipping?.name ||
+        paymentIntent.metadata?.customer_name ||
+        "Guest Customer";
+
+      console.log("CUSTOMER EMAIL:", customerEmail);
+      console.log("CUSTOMER NAME:", customerName);
 
       const items = [
         { product_id: null, name: "Test Product", price: 100, qty: 1 },
