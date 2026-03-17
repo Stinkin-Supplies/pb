@@ -439,7 +439,15 @@ export default function CartDrawer({ isOpen, onClose, cartItems, onUpdateQty, on
             <div className="drawer-empty-icon">🛒</div>
             <div className="drawer-empty-title">YOUR CART IS EMPTY</div>
             <div className="drawer-empty-sub">ADD SOME PARTS TO GET STARTED</div>
-            <button className="drawer-empty-btn" onClick={onClose}>BROWSE PARTS</button>
+            <button
+              className="drawer-empty-btn"
+              onClick={() => {
+                onClose();
+                window.location.href = "/shop";
+              }}
+            >
+              BROWSE PARTS
+            </button>
           </div>
         ) : (
           <>
