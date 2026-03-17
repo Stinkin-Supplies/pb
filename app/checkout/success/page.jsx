@@ -5,7 +5,9 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
-export default async function SuccessPage({ searchParams }) {
+export default async function SuccessPage(props) {
+  const orderId = props?.searchParams?.order_id;
+  console.log("SEARCH PARAMS:", props.searchParams);
   const orderId = searchParams?.order_id;
 
   if (!orderId) {
