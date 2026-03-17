@@ -45,6 +45,48 @@ export async function POST(req: Request) {
     if (event.type === "payment_intent.succeeded") {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
       console.log("Payment success:", paymentIntent.id);
+      const { supabase } = await import("@/lib/supabase/server");
+
+      const items = [
+        { product_id: null, name: "Test Product", price: 100, qty: 1 },
+      ];
+
+      const subtotal = 100;
+      const shipping = 0;
+      const tax = 0;
+      const total = 100;
+
+      const { data: order, error } = await supabase
+        .from("orders")
+        .insert({
+          stripe_payment_intent_id: paymentIntent.id,
+          subtotal,
+          shipping,
+          tax,
+          total,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Order insert failed:", error);
+        return;
+      }
+
+      console.log("Order created:", order.id);
+
+      const orderItems = items.map((item) => ({
+        order_id: order.id,
+        ...item,
+      }));
+
+      const { error: itemsError } = await supabase
+        .from("order_items")
+        .insert(orderItems);
+
+      if (itemsError) {
+        console.error("Order items insert failed:", itemsError);
+      }
     }
 
     return new NextResponse("OK", { status: 200 });
