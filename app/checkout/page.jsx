@@ -24,6 +24,8 @@ export default function CheckoutPage() {
     zip: "",
     country: "US",
   });
+  const [shipmentBusy, setShipmentBusy] = useState(false);
+  const [shipmentToast, setShipmentToast] = useState(null);
 
   useEffect(() => {
     let mounted = true;
@@ -55,6 +57,119 @@ export default function CheckoutPage() {
     load();
     return () => { mounted = false; };
   }, []);
+
+  const showShipmentToast = (msg) => {
+    setShipmentToast(msg);
+    setTimeout(() => setShipmentToast(null), 2200);
+  };
+
+  const splitName = (full) => {
+    const parts = String(full ?? "").trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return { first: "", last: "" };
+    if (parts.length === 1) return { first: parts[0], last: "" };
+    return { first: parts[0], last: parts.slice(1).join(" ") };
+  };
+
+  const refreshAddresses = async (userId) => {
+    const { data } = await supabase
+      .from("user_addresses")
+      .select("*")
+      .eq("user_id", userId)
+      .order("is_default", { ascending: false });
+    setAddresses(data ?? []);
+  };
+
+  const handleSaveAddress = async () => {
+    if (shipmentBusy) return;
+    setShipmentBusy(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        window.location.href = "/auth";
+        return;
+      }
+      const { first, last } = splitName(ship.full_name);
+      const payload = {
+        user_id: user.id,
+        first_name: first,
+        last_name: last,
+        address1: ship.address1,
+        address2: ship.address2,
+        city: ship.city,
+        state: ship.state,
+        zip: ship.zip,
+        country: ship.country || "US",
+      };
+      const { error } = await supabase.from("user_addresses").insert(payload);
+      if (error) {
+        console.warn("Save address failed:", error.message);
+        showShipmentToast("Could not save");
+        return;
+      }
+      await refreshAddresses(user.id);
+      showShipmentToast("Saved to account");
+    } finally {
+      setShipmentBusy(false);
+    }
+  };
+
+  const handleUseAddress = async () => {
+    if (shipmentBusy) return;
+    setShipmentBusy(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        window.location.href = "/auth";
+        return;
+      }
+
+      let addressId = selectedAddressId;
+      if (!addressId) {
+        const { first, last } = splitName(ship.full_name);
+        const { data: created, error: createErr } = await supabase
+          .from("user_addresses")
+          .insert({
+            user_id: user.id,
+            first_name: first,
+            last_name: last,
+            address1: ship.address1,
+            address2: ship.address2,
+            city: ship.city,
+            state: ship.state,
+            zip: ship.zip,
+            country: ship.country || "US",
+            is_default: true,
+          })
+          .select("id")
+          .single();
+        if (createErr || !created?.id) {
+          console.warn("Use address failed:", createErr?.message);
+          showShipmentToast("Could not apply");
+          return;
+        }
+        addressId = created.id;
+        setSelectedAddressId(addressId);
+      }
+
+      await supabase
+        .from("user_addresses")
+        .update({ is_default: false })
+        .eq("user_id", user.id);
+      const { error: defErr } = await supabase
+        .from("user_addresses")
+        .update({ is_default: true })
+        .eq("id", addressId);
+      if (defErr) {
+        console.warn("Set default failed:", defErr.message);
+        showShipmentToast("Could not apply");
+        return;
+      }
+      await refreshAddresses(user.id);
+      showShipmentToast("Applied to order");
+    } finally {
+      setShipmentBusy(false);
+    }
+  };
 
   // 🔹 Calculations
   const subtotal = useMemo(() => {
@@ -101,11 +216,19 @@ export default function CheckoutPage() {
       border-radius: 3px;
       padding: 20px;
     }
+    .card.summary {
+      border-color: rgba(232,98,26,0.35);
+      box-shadow: 0 18px 40px rgba(0,0,0,0.45);
+    }
     .card-title {
       font-family: 'Bebas Neue', sans-serif;
-      font-size: 20px;
+      font-size: 22px;
       letter-spacing: 0.05em;
       margin-bottom: 12px;
+    }
+    .summary-title {
+      font-size: 26px;
+      letter-spacing: 0.08em;
     }
     .label {
       font-family: 'Share Tech Mono', monospace;
@@ -152,9 +275,9 @@ export default function CheckoutPage() {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 8px;
+      margin-bottom: 10px;
       font-family: 'Share Tech Mono', monospace;
-      font-size: 10px;
+      font-size: 11px;
       letter-spacing: 0.1em;
       color: #f0ebe3;
     }
@@ -169,9 +292,13 @@ export default function CheckoutPage() {
       justify-content: space-between;
       align-items: baseline;
       font-family: 'Bebas Neue', sans-serif;
-      font-size: 24px;
+      font-size: 28px;
       letter-spacing: 0.05em;
       margin-top: 6px;
+    }
+    .order-total-val {
+      font-size: 32px;
+      color: #e8621a;
     }
     .checkout-btn {
       width: 100%;
@@ -189,6 +316,12 @@ export default function CheckoutPage() {
       transition: all 0.2s;
     }
     .checkout-btn:hover { background: #c94f0f; transform: translateY(-1px); }
+    .checkout-btn.ghost {
+      background: #1a1919;
+      color: #f0ebe3;
+      border: 1px solid #2a2828;
+      box-shadow: none;
+    }
     .empty {
       max-width: 900px;
       margin: 0 auto;
@@ -219,8 +352,8 @@ export default function CheckoutPage() {
         {/* LEFT — Order Summary */}
         <div>
           <div className="checkout-title">CHECKOUT</div>
-          <div className="card">
-            <div className="card-title">ORDER <span style={{color:"#e8621a"}}>SUMMARY</span></div>
+          <div className="card summary">
+            <div className="card-title summary-title">ORDER <span style={{color:"#e8621a"}}>SUMMARY</span></div>
             {cartItems.map((item) => (
               <div key={item.id} className="summary-row">
                 <span>{item.name} × {item.qty}</span>
@@ -251,7 +384,7 @@ export default function CheckoutPage() {
 
             <div className="summary-total">
               <span>ORDER TOTAL</span>
-              <span>${total.toFixed(2)}</span>
+              <span className="order-total-val">${total.toFixed(2)}</span>
             </div>
 
           <button
@@ -300,6 +433,22 @@ export default function CheckoutPage() {
                 <div style={{height:12}}/>
               </>
             )}
+            <div style={{display:"flex", gap:8, marginBottom:12}}>
+              <button
+                className="checkout-btn"
+                style={{height:42, fontSize:16, marginTop:0, flex:1}}
+                onClick={handleUseAddress}
+              >
+                {shipmentBusy ? "WORKING..." : "USE THIS ADDRESS →"}
+              </button>
+              <button
+                className="checkout-btn ghost"
+                style={{height:42, fontSize:14, marginTop:0, flex:1}}
+                onClick={handleSaveAddress}
+              >
+                {shipmentBusy ? "WORKING..." : "SAVE TO ACCOUNT"}
+              </button>
+            </div>
             <div className="label">FULL NAME</div>
             <input
               className="input"
@@ -379,6 +528,11 @@ export default function CheckoutPage() {
           </div>
         </div>
       </div>
+      {shipmentToast && (
+        <div className="toast" style={{background:"#e8621a"}}>
+          {shipmentToast.toUpperCase()}
+        </div>
+      )}
     </div>
   );
 }
