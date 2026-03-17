@@ -196,6 +196,18 @@ export default function CheckoutPage() {
       background: #0a0909;
       color: #f0ebe3;
       font-family: 'Barlow Condensed', sans-serif;
+      position: relative;
+      overflow: hidden;
+    }
+    .checkout-wrap::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(232,98,26,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(232,98,26,0.04) 1px, transparent 1px);
+      background-size: 32px 32px;
+      pointer-events: none;
     }
     .checkout-inner {
       max-width: 1240px;
@@ -204,18 +216,21 @@ export default function CheckoutPage() {
       display: grid;
       grid-template-columns: 480px 1fr;
       gap: 24px;
+      position: relative;
+      z-index: 1;
     }
     .checkout-title {
       font-family: 'Bebas Neue', sans-serif;
-      font-size: 34px;
-      letter-spacing: 0.05em;
+      font-size: 38px;
+      letter-spacing: 0.06em;
       margin-bottom: 16px;
     }
     .card {
       background: #111010;
       border: 1px solid #2a2828;
       border-radius: 3px;
-      padding: 20px;
+      padding: 22px;
+      box-shadow: 0 14px 32px rgba(0,0,0,0.35);
     }
     .card.summary {
       border-color: rgba(232,98,26,0.35);
