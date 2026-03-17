@@ -390,7 +390,7 @@ export default function CheckoutPage() {
 
           <button
             className="checkout-btn"
-            onClick={() => alert("Next: MAP enforcement")}
+            onClick={() => {}}
           >
             CONTINUE →
           </button>
