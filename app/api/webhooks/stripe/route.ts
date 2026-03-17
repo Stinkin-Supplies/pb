@@ -67,6 +67,17 @@ export async function POST(req: Request) {
       const tax = 0;
       const total = 100;
 
+      const test = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/`,
+        {
+          headers: {
+            apikey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
+            Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY!}`,
+          },
+        }
+      );
+      console.log("SUPABASE STATUS:", test.status);
+
       const { data: order, error } = await supabaseAdmin
         .from("orders")
         .insert({
