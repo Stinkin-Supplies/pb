@@ -33,7 +33,7 @@ export default async function SuccessPage({ searchParams }) {
 
       <p><strong>Order ID:</strong> {order.id}</p>
       <p><strong>Status:</strong> {order.status}</p>
-      <p><strong>Total:</strong> ${order.total_amount}</p>
+      <p><strong>Total:</strong> ${(order.total / 100).toFixed(2)}</p>
 
       <h3>Customer</h3>
       <p>{order.customer_name || "Guest"}</p>
@@ -70,7 +70,7 @@ export default async function SuccessPage({ searchParams }) {
           <p>{order.billing_address.country}</p>
         </div>
       ) : (
-        <p>No address provided</p>
+        <p>Same as shipping</p>
       )}
     </div>
   );
