@@ -70,7 +70,7 @@ export async function POST(req: Request) {
 
       if (error) {
         console.error("Order insert failed:", JSON.stringify(error, null, 2));
-        return;
+        return new NextResponse("Order insert failed", { status: 500 });
       }
 
       console.log("Order created:", order.id);
@@ -86,6 +86,7 @@ export async function POST(req: Request) {
 
       if (itemsError) {
         console.error("Order items insert failed:", itemsError);
+        return new NextResponse("Order items insert failed", { status: 500 });
       }
     }
 
