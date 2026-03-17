@@ -2,6 +2,12 @@ export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
+import { createClient } from "@supabase/supabase-js";
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function POST(req: Request) {
   try {
@@ -50,7 +56,7 @@ export async function POST(req: Request) {
       console.log("PAYMENT INTENT HIT");
       console.log(JSON.stringify(event.data.object, null, 2));
       console.log("Payment success:", paymentIntent.id);
-      const { supabase } = await import("@/lib/supabase/server");
+      console.log("USING ADMIN CLIENT");
 
       const items = [
         { product_id: null, name: "Test Product", price: 100, qty: 1 },
@@ -61,7 +67,7 @@ export async function POST(req: Request) {
       const tax = 0;
       const total = 100;
 
-      const { data: order, error } = await supabase
+      const { data: order, error } = await supabaseAdmin
         .from("orders")
         .insert({
           stripe_payment_intent_id: paymentIntent.id,
@@ -85,7 +91,7 @@ export async function POST(req: Request) {
         ...item,
       }));
 
-      const { error: itemsError } = await supabase
+      const { error: itemsError } = await supabaseAdmin
         .from("order_items")
         .insert(orderItems);
 
