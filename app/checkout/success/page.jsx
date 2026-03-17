@@ -5,10 +5,11 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
-export default async function SuccessPage(props) {
-  const orderId = props?.searchParams?.order_id;
-  console.log("SEARCH PARAMS:", props.searchParams);
-  const orderId = searchParams?.order_id;
+export default async function SuccessPage({ searchParams }) {
+  const params = await searchParams;
+  console.log("PARAMS:", params);
+  const orderId = params?.order_id;
+  console.log("ORDER ID:", orderId);
 
   if (!orderId) {
     return <div>No order ID provided.</div>;
@@ -19,6 +20,8 @@ export default async function SuccessPage(props) {
     .select("*")
     .eq("id", orderId)
     .single();
+  console.log("ORDER DATA:", order);
+  console.log("FETCH ERROR:", error);
 
   if (error || !order) {
     return <div>Order not found.</div>;
