@@ -1,6 +1,7 @@
 "use client";
 // ============================================================
 // app/shop/[slug]/ProductDetailClient.jsx
+// Wishlist and cart now persist to Supabase
 // ============================================================
 // Full product detail page UI:
 //   - Image gallery with thumbnail rail
@@ -16,7 +17,13 @@
 // TODO Phase 5: fitmentIds populated by ACES vendor sync
 // ============================================================
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createBrowserClient } from "@supabase/ssr";
+
+const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
 
 // Saved garage vehicle — hardcoded until Phase 3 auth
 const SAVED_VEHICLE = { id:1, year:2022, make:"Harley-Davidson", model:"Road King" };
@@ -459,6 +466,23 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
   const [activeImg,  setActiveImg]  = useState(0);
   const [qty,        setQty]        = useState(1);
   const [wishlisted, setWishlisted] = useState(false);
+  const [wishlistId, setWishlistId] = useState(null);
+
+  // Check if already wishlisted on mount
+  useEffect(() => {
+    const check = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session || !product.id) return;
+      const { data } = await supabase
+        .from("wishlists")
+        .select("id")
+        .eq("user_id", session.user.id)
+        .eq("product_id", product.id)
+        .maybeSingle();
+      if (data) { setWishlisted(true); setWishlistId(data.id); }
+    };
+    check();
+  }, [product.id]);
   const [cartCount,  setCartCount]  = useState(0);
   const [added,      setAdded]      = useState(false);
   const [toast,      setToast]      = useState(false);
@@ -635,7 +659,26 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
 
             <button
               className={`wishlist-btn ${wishlisted?"active":""}`}
-              onClick={() => setWishlisted(w => !w)}
+              onClick={async () => {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session) { window.location.href = "/auth"; return; }
+                if (wishlisted && wishlistId) {
+                  // Remove from wishlist
+                  await supabase.from("wishlists").delete().eq("id", wishlistId);
+                  setWishlisted(false); setWishlistId(null);
+                } else {
+                  // Add to wishlist
+                  const { data, error } = await supabase
+                    .from("wishlists")
+                    .insert({ user_id: session.user.id, product_id: product.id, notify_in_stock: false })
+                    .select("id").single();
+                  if (!error) { setWishlisted(true); setWishlistId(data.id); }
+                  else if (error.code === "23505") {
+                    // Already exists — just mark as wishlisted
+                    setWishlisted(true);
+                  }
+                }
+              }}
               title="Add to wishlist"
             >
               {wishlisted ? "♥" : "♡"}

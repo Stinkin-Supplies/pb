@@ -7,14 +7,11 @@
 // ============================================================
 
 import { useState } from "react";
-import { createBrowserClient } from "@supabase/ssr";
+import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import AddressAutocomplete from "@/components/AddressAutocomplete";
 import NavBar from "@/components/NavBar";
 
-const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+const supabase = createBrowserSupabaseClient();
 
 // ── YMM Data ─────────────────────────────────────────────────
 const YEARS = Array.from({ length: 35 }, (_, i) => 2025 - i);

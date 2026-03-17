@@ -12,7 +12,7 @@
 // ============================================================
 
 import { notFound } from "next/navigation";
-// import { db } from "@/lib/supabase/client";
+import { db } from "@/lib/supabase/admin";
 import ProductDetailClient from "./ProductDetailClient";
 
 export default async function ProductDetailPage({ params }) {

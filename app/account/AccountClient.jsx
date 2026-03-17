@@ -3,12 +3,9 @@
 import { useState } from "react";
 import NavBar from "@/components/NavBar";
 import AddressAutocomplete from "@/components/AddressAutocomplete";
-import { createBrowserClient } from "@supabase/ssr";
+import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 
-const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+const supabase = createBrowserSupabaseClient();
 
 const css = `
   *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
