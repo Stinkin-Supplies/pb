@@ -12,7 +12,6 @@ const supabaseAdmin = createClient(
 export async function POST(req: Request) {
   try {
     console.log("WEBHOOK HIT");
-    console.log("KEY LENGTH:", process.env.SUPABASE_SERVICE_ROLE_KEY?.length);
 
     const body = await req.text();
     const sig = req.headers.get("stripe-signature");
@@ -53,22 +52,8 @@ export async function POST(req: Request) {
 
     if (event.type === "payment_intent.succeeded") {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
-      console.log("PAYMENT INTENT HIT");
-      console.log(JSON.stringify(event.data.object, null, 2));
       console.log("Payment success:", paymentIntent.id);
-      console.log("USING ADMIN CLIENT");
-      const customerEmail =
-        paymentIntent.receipt_email ||
-        paymentIntent.metadata?.customer_email ||
-        "unknown@example.com";
-
-      const customerName =
-        paymentIntent.shipping?.name ||
-        paymentIntent.metadata?.customer_name ||
-        "Guest Customer";
-
-      console.log("CUSTOMER EMAIL:", customerEmail);
-      console.log("CUSTOMER NAME:", customerName);
+      const { customerEmail, customerName } = getCustomerInfo(paymentIntent);
 
       const items = [
         { product_id: null, name: "Test Product", price: 100, qty: 1 },
@@ -129,4 +114,18 @@ export async function POST(req: Request) {
     console.error("WEBHOOK CRASH:", err);
     return new NextResponse("Error", { status: 500 });
   }
+}
+
+function getCustomerInfo(paymentIntent: Stripe.PaymentIntent) {
+  const customerEmail =
+    paymentIntent.receipt_email ||
+    paymentIntent.metadata?.customer_email ||
+    "unknown@example.com";
+
+  const customerName =
+    paymentIntent.shipping?.name ||
+    paymentIntent.metadata?.customer_name ||
+    "Guest Customer";
+
+  return { customerEmail, customerName };
 }
