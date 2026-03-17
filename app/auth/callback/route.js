@@ -29,9 +29,16 @@ export async function GET(request) {
   if (code) {
     const cookieStore = await cookies();
 
+    const key =
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!key) {
+      return NextResponse.redirect(`${origin}/auth?error=missing_supabase_key`);
+    }
+
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+      key,
       {
         cookies: {
           getAll() { return cookieStore.getAll(); },
