@@ -237,6 +237,8 @@ const css = `
     color: #f0ebe3; font-family: 'Bebas Neue', sans-serif;
     font-size: 20px; letter-spacing: 0.05em;
     text-align: center; outline: none;
+    display: flex; align-items: center; justify-content: center;
+    line-height: 1;
   }
   .add-to-cart-btn {
     flex: 1; height: 48px;
