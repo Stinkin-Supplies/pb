@@ -1,9 +1,12 @@
+export const runtime = "nodejs";
+
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 
 export async function POST(req: Request) {
   try {
     console.log("WEBHOOK HIT");
+    console.log("KEY LENGTH:", process.env.SUPABASE_SERVICE_ROLE_KEY?.length);
 
     const body = await req.text();
     const sig = req.headers.get("stripe-signature");
