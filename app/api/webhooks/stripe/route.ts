@@ -67,6 +67,8 @@ export async function POST(req: Request) {
       );
       const billing = charge.billing_details;
 
+      const amount = paymentIntent.amount / 100;
+
       const orderData = {
         customer_email: billing?.email || "unknown@example.com",
         customer_name: billing?.name || "Guest",
@@ -80,7 +82,11 @@ export async function POST(req: Request) {
         stripe_charge_id: charge.id,
         payment_method_last4: charge.payment_method_details?.card?.last4 || null,
 
-        total: paymentIntent.amount / 100,
+        subtotal: amount,
+        shipping: 0,
+        tax: 0,
+        discount: 0,
+        total: amount,
       };
 
       console.log("FINAL ORDER DATA:", orderData);
