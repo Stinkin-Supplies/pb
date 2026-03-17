@@ -31,9 +31,7 @@ export async function POST(req: Request) {
       return new NextResponse("Missing secret key", { status: 500 });
     }
 
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-      apiVersion: "2026-02-25.clover",
-    });
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
     let event: Stripe.Event;
 
@@ -64,6 +62,25 @@ export async function POST(req: Request) {
       const tax = 0;
       const total = 100;
 
+      let customer_email = customerEmail;
+      let customer_name = customerName;
+      const shipping_address = paymentIntent.shipping?.address ?? null;
+      let billing_address: string | null = null;
+
+      if (paymentIntent.latest_charge) {
+        const charge = await stripe.charges.retrieve(
+          String(paymentIntent.latest_charge)
+        );
+        const billing = charge.billing_details;
+        if (billing?.address?.line1 && billing?.address?.city && billing?.address?.state) {
+          billing_address = `${billing.address.line1}, ${billing.address.city}, ${billing.address.state}`;
+        }
+        if (billing?.email) customer_email = billing.email;
+        if (billing?.name) customer_name = billing.name;
+      }
+
+      const amount = paymentIntent.amount;
+
       const test = await fetch(
         `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/`,
         {
@@ -74,6 +91,14 @@ export async function POST(req: Request) {
         }
       );
       console.log("SUPABASE STATUS:", test.status);
+
+      console.log("INSERTING ORDER WITH:", {
+        customer_email,
+        customer_name,
+        shipping_address,
+        billing_address,
+        amount,
+      });
 
       const { data: order, error } = await supabaseAdmin
         .from("orders")
@@ -86,6 +111,8 @@ export async function POST(req: Request) {
         })
         .select()
         .single();
+
+      console.log("SUPABASE RESPONSE:", order, error);
 
       if (error) {
         console.error("Order insert failed:", JSON.stringify(error, null, 2));
