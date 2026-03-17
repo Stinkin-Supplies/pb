@@ -103,6 +103,7 @@ export async function POST(req: Request) {
       }
 
       console.log("Order created:", order.id);
+      console.log("SUCCESS URL:", `http://localhost:3000/checkout/success?order_id=${order.id}`);
 
       const orderItems = items.map((item) => ({
         order_id: order.id,
