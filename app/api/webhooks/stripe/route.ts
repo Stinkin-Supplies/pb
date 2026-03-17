@@ -44,6 +44,8 @@ export async function POST(req: Request) {
 
     if (event.type === "payment_intent.succeeded") {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
+      console.log("PAYMENT INTENT HIT");
+      console.log(JSON.stringify(event.data.object, null, 2));
       console.log("Payment success:", paymentIntent.id);
       const { supabase } = await import("@/lib/supabase/server");
 
