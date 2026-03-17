@@ -40,7 +40,38 @@ export default async function SuccessPage({ searchParams }) {
       <p>{order.customer_email || "No email"}</p>
 
       <h3>Shipping</h3>
-      <p>{order.shipping_address || "No address provided"}</p>
+      {order.shipping_address ? (
+        <div>
+          <p>{order.shipping_address.line1}</p>
+          {order.shipping_address.line2 && (
+            <p>{order.shipping_address.line2}</p>
+          )}
+          <p>
+            {order.shipping_address.city}, {order.shipping_address.state}{" "}
+            {order.shipping_address.postal_code}
+          </p>
+          <p>{order.shipping_address.country}</p>
+        </div>
+      ) : (
+        <p>No address provided</p>
+      )}
+
+      <h3>Billing</h3>
+      {order.billing_address ? (
+        <div>
+          <p>{order.billing_address.line1}</p>
+          {order.billing_address.line2 && (
+            <p>{order.billing_address.line2}</p>
+          )}
+          <p>
+            {order.billing_address.city}, {order.billing_address.state}{" "}
+            {order.billing_address.postal_code}
+          </p>
+          <p>{order.billing_address.country}</p>
+        </div>
+      ) : (
+        <p>No address provided</p>
+      )}
     </div>
   );
 }
