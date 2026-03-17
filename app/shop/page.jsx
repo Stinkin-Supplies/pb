@@ -15,7 +15,7 @@
 //   /shop?q=air+cleaner
 // ============================================================
 
-// // import { db } from "@/lib/supabase/client";
+import { db } from "@/lib/supabase/admin";
 import ShopClient from "./ShopClient";
 
 // Next.js passes searchParams as a prop to page components

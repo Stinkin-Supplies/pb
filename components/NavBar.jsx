@@ -14,12 +14,9 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useCartSafe } from "@/components/CartContext";
-import { createBrowserClient } from "@supabase/ssr";
+import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 
-const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+const supabase = createBrowserSupabaseClient();
 
 const NAV_LINKS = [
   { label: "Shop",   href: "/shop"    },
@@ -129,6 +126,12 @@ const css = `
   }
   .ss-mobile-menu a.active {
     color: #e8621a;
+  }
+  .ss-mobile-menu .ss-nav-garage {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: max-content;
   }
   .ss-mobile-menu-close {
     align-self: flex-end;

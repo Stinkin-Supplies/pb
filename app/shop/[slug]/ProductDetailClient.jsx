@@ -16,9 +16,12 @@
 // TODO Phase 5: fitmentIds populated by ACES vendor sync
 // ============================================================
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import NavBar from "@/components/NavBar";
 import { useCartSafe } from "@/components/CartContext";
+import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+
+const supabase = createBrowserSupabaseClient();
 
 // Saved garage vehicle — hardcoded until Phase 3 auth
 const SAVED_VEHICLE = { id:1, year:2022, make:"Harley-Davidson", model:"Road King" };
@@ -419,6 +422,7 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
   const [activeImg,  setActiveImg]  = useState(0);
   const [qty,        setQty]        = useState(1);
   const [wishlisted, setWishlisted] = useState(false);
+  const [wishlistBusy, setWishlistBusy] = useState(false);
   const [added,      setAdded]      = useState(false);
   const [toast,      setToast]      = useState(false);
   const { addItem } = useCartSafe();
@@ -449,6 +453,61 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
     //   })
     setTimeout(() => setAdded(false), 2000);
     setTimeout(() => setToast(false),  2500);
+  };
+
+  // ── Wishlist (Supabase) ────────────────────────────────────
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        if (mounted) setWishlisted(false);
+        return;
+      }
+      const { data, error } = await supabase
+        .from("wishlists")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("product_id", product.id)
+        .maybeSingle();
+      if (!mounted) return;
+      if (!error && data?.id) setWishlisted(true);
+      else setWishlisted(false);
+    };
+    load();
+    return () => { mounted = false; };
+  }, [product.id]);
+
+  const handleWishlistToggle = async () => {
+    if (wishlistBusy) return;
+    setWishlistBusy(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        window.location.href = "/auth";
+        return;
+      }
+
+      if (wishlisted) {
+        const { error } = await supabase
+          .from("wishlists")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("product_id", product.id);
+        if (!error) setWishlisted(false);
+      } else {
+        const { error } = await supabase
+          .from("wishlists")
+          .insert({
+            user_id: user.id,
+            product_id: product.id,
+            notify_in_stock: !product.inStock,
+          });
+        if (!error) setWishlisted(true);
+      }
+    } finally {
+      setWishlistBusy(false);
+    }
   };
 
   // ── Render helpers ─────────────────────────────────────────
@@ -584,8 +643,9 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
 
             <button
               className={`wishlist-btn ${wishlisted?"active":""}`}
-              onClick={() => setWishlisted(w => !w)}
-              title="Add to wishlist"
+              onClick={handleWishlistToggle}
+              title={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
+              disabled={wishlistBusy}
             >
               {wishlisted ? "♥" : "♡"}
             </button>
