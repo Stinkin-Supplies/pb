@@ -69,7 +69,7 @@ export async function POST(req: Request) {
         .single();
 
       if (error) {
-        console.error("Order insert failed:", error);
+        console.error("Order insert failed:", JSON.stringify(error, null, 2));
         return;
       }
 
