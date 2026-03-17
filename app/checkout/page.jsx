@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import NavBar from "@/components/NavBar";
 import { useCart } from "@/components/CartContext";
 
 export default function CheckoutPage() {
@@ -25,78 +26,196 @@ export default function CheckoutPage() {
 
   const total = Math.max(totalBeforeClamp, 0);
 
+  const css = `
+    *, *::before, *::after { box-sizing: border-box; }
+    .checkout-wrap {
+      min-height: 100vh;
+      background: #0a0909;
+      color: #f0ebe3;
+      font-family: 'Barlow Condensed', sans-serif;
+    }
+    .checkout-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 28px 24px 60px;
+      display: grid;
+      grid-template-columns: 1fr 420px;
+      gap: 24px;
+    }
+    .checkout-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 34px;
+      letter-spacing: 0.05em;
+      margin-bottom: 16px;
+    }
+    .card {
+      background: #111010;
+      border: 1px solid #2a2828;
+      border-radius: 3px;
+      padding: 18px;
+    }
+    .card-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 20px;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+    }
+    .label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 0.14em;
+      color: #8a8784;
+      margin-bottom: 6px;
+    }
+    .input {
+      width: 100%;
+      height: 44px;
+      background: #1a1919;
+      border: 1px solid #2a2828;
+      color: #f0ebe3;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 16px;
+      padding: 0 12px;
+      border-radius: 2px;
+      outline: none;
+    }
+    .input:focus { border-color: #e8621a; }
+    .muted {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      color: #8a8784;
+      margin-top: 8px;
+    }
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      color: #f0ebe3;
+    }
+    .summary-row.muted { color: #8a8784; }
+    .summary-divider {
+      border: none;
+      border-top: 1px solid #2a2828;
+      margin: 12px 0;
+    }
+    .summary-total {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 24px;
+      letter-spacing: 0.05em;
+      margin-top: 6px;
+    }
+    .checkout-btn {
+      width: 100%;
+      height: 50px;
+      background: #e8621a;
+      border: none;
+      color: #0a0909;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 20px;
+      letter-spacing: 0.1em;
+      border-radius: 2px;
+      cursor: pointer;
+      margin-top: 12px;
+      box-shadow: 0 4px 24px rgba(232,98,26,0.3);
+      transition: all 0.2s;
+    }
+    .checkout-btn:hover { background: #c94f0f; transform: translateY(-1px); }
+    .empty {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 40px 24px;
+      text-align: center;
+      color: #8a8784;
+    }
+    @media (max-width: 900px) {
+      .checkout-inner { grid-template-columns: 1fr; }
+    }
+  `;
+
   if (!cartItems.length) {
-    return <div className="p-6">Your cart is empty</div>;
+    return (
+      <div className="checkout-wrap">
+        <style>{css}</style>
+        <NavBar activePage="shop" />
+        <div className="empty">YOUR CART IS EMPTY</div>
+      </div>
+    );
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
-
-      {/* LEFT */}
-      <div className="space-y-6">
-        <h1 className="text-2xl font-bold">Checkout</h1>
-
-        {/* Points */}
+    <div className="checkout-wrap">
+      <style>{css}</style>
+      <NavBar activePage="shop" />
+      <div className="checkout-inner">
+        {/* LEFT */}
         <div>
-          <h2 className="font-semibold mb-2">Redeem Points</h2>
-          <input
-            type="number"
-            value={points}
-            onChange={(e) => setPoints(Number(e.target.value))}
-            className="input"
-          />
-          <p className="text-sm text-gray-500">
-            {points} pts = ${pointsValue.toFixed(2)}
-          </p>
-        </div>
-      </div>
-
-      {/* RIGHT */}
-      <div className="border rounded-2xl p-6 space-y-4">
-        <h2 className="text-xl font-semibold">Order Summary</h2>
-
-        {cartItems.map((item) => (
-          <div key={item.id} className="flex justify-between text-sm">
-            <span>{item.name} x{item.qty}</span>
-            <span>${(item.price * item.qty).toFixed(2)}</span>
+          <div className="checkout-title">CHECKOUT</div>
+          <div className="card">
+            <div className="card-title">REDEEM <span style={{color:"#e8621a"}}>POINTS</span></div>
+            <div className="label">POINTS TO APPLY</div>
+            <input
+              type="number"
+              value={points}
+              onChange={(e) => setPoints(Number(e.target.value))}
+              className="input"
+            />
+            <div className="muted">
+              {points} PTS = ${pointsValue.toFixed(2)}
+            </div>
           </div>
-        ))}
-
-        <hr />
-
-        <div className="flex justify-between">
-          <span>Subtotal</span>
-          <span>${subtotal.toFixed(2)}</span>
         </div>
 
-        <div className="flex justify-between">
-          <span>Shipping</span>
-          <span>${shipping.toFixed(2)}</span>
+        {/* RIGHT */}
+        <div className="card">
+          <div className="card-title">ORDER <span style={{color:"#e8621a"}}>SUMMARY</span></div>
+          {cartItems.map((item) => (
+            <div key={item.id} className="summary-row">
+              <span>{item.name} × {item.qty}</span>
+              <span>${(item.price * item.qty).toFixed(2)}</span>
+            </div>
+          ))}
+
+          <hr className="summary-divider" />
+
+          <div className="summary-row muted">
+            <span>SUBTOTAL</span>
+            <span>${subtotal.toFixed(2)}</span>
+          </div>
+          <div className="summary-row muted">
+            <span>SHIPPING</span>
+            <span>${shipping.toFixed(2)}</span>
+          </div>
+          <div className="summary-row muted">
+            <span>TAX</span>
+            <span>${tax.toFixed(2)}</span>
+          </div>
+          <div className="summary-row" style={{color:"#c9a84c"}}>
+            <span>POINTS DISCOUNT</span>
+            <span>- ${pointsValue.toFixed(2)}</span>
+          </div>
+
+          <hr className="summary-divider" />
+
+          <div className="summary-total">
+            <span>ORDER TOTAL</span>
+            <span>${total.toFixed(2)}</span>
+          </div>
+
+          <button
+            className="checkout-btn"
+            onClick={() => alert("Next: MAP enforcement")}
+          >
+            CONTINUE →
+          </button>
         </div>
-
-        <div className="flex justify-between">
-          <span>Tax</span>
-          <span>${tax.toFixed(2)}</span>
-        </div>
-
-        <div className="flex justify-between text-red-500">
-          <span>Points Discount</span>
-          <span>- ${pointsValue.toFixed(2)}</span>
-        </div>
-
-        <hr />
-
-        <div className="flex justify-between font-bold text-lg">
-          <span>Total</span>
-          <span>${total.toFixed(2)}</span>
-        </div>
-
-        <button
-          className="w-full bg-black text-white py-3 rounded-xl"
-          onClick={() => alert("Next: MAP enforcement")}
-        >
-          Continue
-        </button>
       </div>
     </div>
   );
