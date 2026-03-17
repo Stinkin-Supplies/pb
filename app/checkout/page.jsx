@@ -5,6 +5,7 @@ import NavBar from "@/components/NavBar";
 import { useCart } from "@/components/CartContext";
 import AddressAutocomplete from "@/components/AddressAutocomplete";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { applyMapPricing } from "@/lib/map/engine";
 
 const supabase = createBrowserSupabaseClient();
 
@@ -172,21 +173,21 @@ export default function CheckoutPage() {
   };
 
   // 🔹 Calculations
-  const subtotal = useMemo(() => {
-    return cartItems.reduce(
-      (acc, item) => acc + Number(item.price) * item.qty,
-      0
-    );
-  }, [cartItems]);
-
+  const pointsValue = points * 0.01;
+  const mapResult = applyMapPricing(
+    cartItems.map(item => ({
+      id: item.id,
+      price: item.price,
+      qty: item.qty,
+      map_floor: item.map_floor,
+    })),
+    pointsValue
+  );
+  const subtotal = mapResult.subtotal;
+  const pointsDiscount = mapResult.appliedDiscount;
   const shipping = subtotal >= 99 ? 0 : 5;
   const tax = subtotal * 0.07;
-
-  const pointsValue = points * 0.01;
-
-  const totalBeforeClamp = subtotal + shipping + tax - pointsValue;
-
-  const total = Math.max(totalBeforeClamp, 0);
+  const total = Math.max(mapResult.finalTotal + shipping + tax, 0);
 
   const css = `
     *, *::before, *::after { box-sizing: border-box; }
@@ -377,7 +378,7 @@ export default function CheckoutPage() {
             </div>
             <div className="summary-row" style={{color:"#c9a84c"}}>
               <span>POINTS DISCOUNT</span>
-              <span>- ${pointsValue.toFixed(2)}</span>
+              <span>- ${pointsDiscount.toFixed(2)}</span>
             </div>
 
             <hr className="summary-divider" />
@@ -525,6 +526,11 @@ export default function CheckoutPage() {
             <div className="muted">
               {points} PTS = ${pointsValue.toFixed(2)}
             </div>
+            {mapResult.appliedDiscount < pointsValue && (
+              <div className="muted" style={{color:"#c9a84c"}}>
+                DISCOUNT LIMITED DUE TO PRICING RULES
+              </div>
+            )}
           </div>
         </div>
       </div>
