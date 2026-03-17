@@ -2,9 +2,25 @@ import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !serviceKey) {
+  throw new Error(
+    "Missing Supabase service configuration. Ensure NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set."
+  );
+}
+
+// Service role keys are JWTs and typically start with "eyJ".
+if (!serviceKey.startsWith("eyJ")) {
+  throw new Error(
+    "SUPABASE_SERVICE_ROLE_KEY looks invalid. Make sure you copied the Service Role key from Supabase for the same project as NEXT_PUBLIC_SUPABASE_URL."
+  );
+}
+
 export const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  supabaseUrl,
+  serviceKey
 );
 
 export async function createServerSupabaseClient() {
