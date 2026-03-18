@@ -1,13 +1,12 @@
-import { createClient } from "@supabase/supabase-js";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { formatMoney } from "@/lib/utils/money";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+import { redirect } from "next/navigation";
 
 export default async function OrderPage({ params }) {
   const { id } = params;
+  const supabase = await createServerSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect(`/auth?next=/order/${id}`);
 
   // 🔥 Fetch order
   const { data: order, error } = await supabase
