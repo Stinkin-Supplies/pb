@@ -3,7 +3,7 @@ import { formatMoney } from "@/lib/utils/money";
 import { redirect } from "next/navigation";
 
 export default async function OrderPage({ params }) {
-  const { id } = params;
+  const { id } = await params;
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect(`/auth?next=/order/${id}`);
