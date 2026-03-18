@@ -53,7 +53,7 @@ const phases: RoadmapPhase[] = [
     items: [
       { name: "Checkout flow /checkout", done: true, note: "Address, shipping, points redemption", file: "app/checkout/page.jsx" },
       { name: "Stripe integration", done: true, note: "Payment intent, webhook handler", file: "app/api/webhooks/stripe/route.ts" },
-      { name: "Order confirmation /order/[id]", done: false, note: "Summary, timeline, tracking", file: "app/order/[id]/page.jsx" },
+      { name: "Order confirmation /order/[id]", done: true, note: "Summary, timeline, tracking", file: "app/order/[id]/page.jsx" },
       { name: "Order history /account/orders", done: false, note: "List + detail view", file: "app/account/orders/page.jsx" },
       { name: "MAP enforcement at checkout", done: true, note: "Points can't reduce below MAP floor", file: "lib/map/engine.ts" },
     ]
