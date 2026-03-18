@@ -67,7 +67,7 @@ export async function POST(req: Request) {
       product_id: null, // 👈 ignore for now
       name: item.name ?? "Item",
       quantity: Number(item.qty ?? 1) || 1,
-      unit_price: normalizeMoney(item.price),
+      price: normalizeMoney(item.price),
     }));
 
     console.log("ORDER PAYLOAD:", orderPayload);
