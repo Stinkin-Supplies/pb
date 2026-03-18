@@ -23,7 +23,7 @@
 // ============================================================
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 const FREE_SHIPPING_THRESHOLD = 99;
 
@@ -130,9 +130,6 @@ const css = `
     align-items: center;
     cursor: pointer;
     min-width: 0;
-    grid-column: 1 / 2;
-    position: relative;
-    z-index: 1;
   }
 
   .item-img {
@@ -177,9 +174,6 @@ const css = `
     align-items: center;
     gap: 6px;
     justify-self: end;
-    grid-column: 2 / 3;
-    position: relative;
-    z-index: 2;
   }
   .item-qty-btn {
     width: 24px; height: 24px;
@@ -352,14 +346,10 @@ const css = `
     .cart-item {
       grid-template-columns: 1fr;
     }
-    .item-main {
-      grid-column: 1 / -1;
-    }
     .item-controls {
       justify-self: start;
       margin-left: 84px;
       flex-wrap: wrap;
-      grid-column: 1 / -1;
     }
     .item-remove {
       order: 4;
@@ -379,7 +369,6 @@ const POINTS_TO_DOLLAR    = 0.01; // 100 points = $1
 export default function CartDrawer({ isOpen, onClose, cartItems, onUpdateQty, onRemove }) {
   const [redeemPoints, setRedeemPoints] = useState(false);
   const router = useRouter();
-  const pathname = usePathname();
 
   // Lock body scroll when drawer is open
   useEffect(() => {
@@ -614,13 +603,7 @@ export default function CartDrawer({ isOpen, onClose, cartItems, onUpdateQty, on
 
               <button
                 className="checkout-btn"
-                onClick={() => {
-                  if (pathname === "/checkout") {
-                    onClose?.();
-                    return;
-                  }
-                  router.push("/checkout");
-                }}
+                onClick={() => window.location.href = "/checkout"}
               >
                 PROCEED TO CHECKOUT →
               </button>
