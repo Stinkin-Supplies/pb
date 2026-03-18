@@ -53,8 +53,10 @@ export default async function SuccessPage({ searchParams }) {
   const normalizedStatus =
     rawStatus === "pending_payment" ? "pending" : rawStatus;
 
+  const pointsEarned = Math.floor((order.total ?? 0) / 100 * 10);
+
   return (
-    <div className="max-w-3xl mx-auto px-6 py-12 space-y-8 text-white success-wrap">
+    <div className="max-w-3xl mx-auto px-6 py-8 space-y-6 text-white success-wrap">
       <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[length:100%_3px]" />
       <style>{`
         .success-wrap {
@@ -83,12 +85,12 @@ export default async function SuccessPage({ searchParams }) {
           text-align: center;
           border: 1px solid #2a2828;
           background: #111010;
-          padding: 20px 24px;
+          padding: 16px 20px;
           box-shadow: 0 20px 40px rgba(0,0,0,0.35);
         }
         .success-title {
           font-family: 'Bebas Neue', sans-serif;
-          font-size: 36px;
+          font-size: 30px;
           letter-spacing: 0.08em;
         }
         .success-sub {
@@ -108,7 +110,7 @@ export default async function SuccessPage({ searchParams }) {
         .card {
           border: 1px solid #2a2828;
           background: #111010;
-          padding: 18px 20px;
+          padding: 14px 16px;
         }
         .card-title {
           font-family: 'Bebas Neue', sans-serif;
@@ -120,7 +122,7 @@ export default async function SuccessPage({ searchParams }) {
           display: flex;
           justify-content: space-between;
           border-bottom: 1px solid #1a1919;
-          padding: 10px 0;
+          padding: 8px 0;
         }
         .item-name {
           font-weight: 700;
@@ -144,7 +146,7 @@ export default async function SuccessPage({ searchParams }) {
           display: flex;
           justify-content: space-between;
           font-family: 'Bebas Neue', sans-serif;
-          font-size: 22px;
+          font-size: 20px;
           letter-spacing: 0.06em;
           margin-top: 12px;
         }
@@ -165,11 +167,11 @@ export default async function SuccessPage({ searchParams }) {
         }
         .cta-btn {
           display: inline-block;
-          padding: 12px 28px;
+          padding: 10px 22px;
           background: #e8621a;
           color: #0a0909;
           font-family: 'Bebas Neue', sans-serif;
-          font-size: 18px;
+          font-size: 16px;
           letter-spacing: 0.1em;
           border: none;
           text-decoration: none;
@@ -189,11 +191,11 @@ export default async function SuccessPage({ searchParams }) {
 
         @media (max-width: 640px) {
           .success-wrap { padding: 28px 16px; }
-          .success-title { font-size: 28px; }
-          .card { padding: 14px 16px; }
-          .card-title { font-size: 18px; }
+          .success-title { font-size: 26px; }
+          .card { padding: 12px 14px; }
+          .card-title { font-size: 17px; }
           .item-row { flex-direction: column; gap: 6px; }
-          .summary-total { font-size: 20px; }
+          .summary-total { font-size: 18px; }
           .addr-grid { grid-template-columns: 1fr; }
         }
       `}</style>
@@ -210,7 +212,17 @@ export default async function SuccessPage({ searchParams }) {
         </div>
         <div className="h-[2px] bg-red-500 animate-pulse" />
 
-        <div className="card" style={{ marginTop: 20 }}>
+        <div className="card" style={{ marginTop: 12 }}>
+          <div className="card-title">POINTS EARNED</div>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <span className="item-meta">THIS ORDER</span>
+            <span style={{ fontFamily: "Bebas Neue, sans-serif", fontSize: 22 }}>
+              {pointsEarned.toLocaleString()} PTS
+            </span>
+          </div>
+        </div>
+
+        <div className="card" style={{ marginTop: 12 }}>
           <div className="card-title">ITEMS</div>
           {orderItems.length === 0 ? (
             <div className="item-meta">NO ITEMS FOUND</div>
@@ -230,7 +242,7 @@ export default async function SuccessPage({ searchParams }) {
           )}
         </div>
 
-        <div className="card" style={{ marginTop: 16 }}>
+        <div className="card" style={{ marginTop: 12 }}>
           <div className="card-title">SUMMARY</div>
           <div className="summary-row">
             <span>SUBTOTAL</span>
@@ -250,7 +262,7 @@ export default async function SuccessPage({ searchParams }) {
           </div>
         </div>
 
-        <div className="addr-grid" style={{ marginTop: 16 }}>
+        <div className="addr-grid" style={{ marginTop: 12 }}>
           <div className="card">
             <div className="card-title">SHIPPING</div>
             {order.shipping_address ? (
