@@ -276,6 +276,8 @@ const css = `
   .summary-value {
     font-family: 'Share Tech Mono', monospace;
     font-size: 10px; color: #f0ebe3; letter-spacing: 0.1em;
+    white-space: nowrap; text-align: right; min-width: 90px;
+    font-variant-numeric: tabular-nums;
   }
   .summary-value.green  { color: #22c55e; }
   .summary-value.gold   { color: #c9a84c; }
@@ -294,6 +296,8 @@ const css = `
   .summary-total-value {
     font-family: 'Bebas Neue', sans-serif;
     font-size: 28px; color: #f0ebe3; letter-spacing: 0.04em;
+    white-space: nowrap; text-align: right; min-width: 140px;
+    font-variant-numeric: tabular-nums;
   }
 
   /* ── CHECKOUT BTN ── */
