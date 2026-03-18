@@ -51,11 +51,11 @@ const phases: RoadmapPhase[] = [
   {
     id: 4, label: "PHASE 4", title: "Checkout & Payments", status: "current", color: "#c9a84c",
     items: [
-      { name: "Checkout flow /checkout", done: false, note: "Address, shipping, points redemption", file: "app/checkout/page.jsx" },
-      { name: "Stripe integration", done: false, note: "Payment intent, webhook handler", file: "app/api/webhooks/stripe/route.ts" },
+      { name: "Checkout flow /checkout", done: true, note: "Address, shipping, points redemption", file: "app/checkout/page.jsx" },
+      { name: "Stripe integration", done: true, note: "Payment intent, webhook handler", file: "app/api/webhooks/stripe/route.ts" },
       { name: "Order confirmation /order/[id]", done: false, note: "Summary, timeline, tracking", file: "app/order/[id]/page.jsx" },
       { name: "Order history /account/orders", done: false, note: "List + detail view", file: "app/account/orders/page.jsx" },
-      { name: "MAP enforcement at checkout", done: false, note: "Points can't reduce below MAP floor", file: "lib/map/engine.ts" },
+      { name: "MAP enforcement at checkout", done: true, note: "Points can't reduce below MAP floor", file: "lib/map/engine.ts" },
     ]
   },
   {
