@@ -27,6 +27,7 @@ export default function CheckoutPage() {
   });
   const [shipmentBusy, setShipmentBusy] = useState(false);
   const [shipmentToast, setShipmentToast] = useState(null);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -188,6 +189,74 @@ export default function CheckoutPage() {
   const shipping = subtotal >= 99 ? 0 : 5;
   const tax = subtotal * 0.07;
   const total = Math.max(mapResult.finalTotal + shipping + tax, 0);
+
+  const handleCheckout = async () => {
+    if (checkoutLoading) return;
+    setCheckoutLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const shippingAddress = {
+        line1: ship.address1,
+        line2: ship.address2 || null,
+        city: ship.city,
+        state: ship.state,
+        postal_code: ship.zip,
+        country: ship.country || "US",
+      };
+      const payload = {
+        customer_email: user?.email ?? null,
+        customer_name: ship.full_name || null,
+        shipping_address: shippingAddress,
+        billing_address: shippingAddress,
+        subtotal,
+        shipping,
+        tax,
+        discount: pointsDiscount,
+        points_redeemed: points,
+        points_redeemed_value: pointsValue,
+        total,
+        items: cartItems.map((item) => ({
+          product_id: item.id,
+          name: item.name,
+          price: item.price,
+          qty: item.qty,
+        })),
+      };
+
+      const orderRes = await fetch("/api/checkout/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const orderJson = await orderRes.json();
+      if (!orderRes.ok || !orderJson?.order_id) {
+        console.error("Create order failed:", orderJson);
+        setCheckoutLoading(false);
+        return;
+      }
+
+      const sessionRes = await fetch("/api/checkout/create-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          order_id: orderJson.order_id,
+          amount: total,
+        }),
+      });
+      const sessionJson = await sessionRes.json();
+      if (!sessionRes.ok || !sessionJson?.url) {
+        console.error("Create session failed:", sessionJson);
+        setCheckoutLoading(false);
+        return;
+      }
+
+      window.location.href = sessionJson.url;
+    } catch (err) {
+      console.error("Checkout error:", err);
+    } finally {
+      setCheckoutLoading(false);
+    }
+  };
 
   const css = `
     *, *::before, *::after { box-sizing: border-box; }
@@ -405,9 +474,9 @@ export default function CheckoutPage() {
 
           <button
             className="checkout-btn"
-            onClick={() => {}}
+            onClick={handleCheckout}
           >
-            CONTINUE →
+            {checkoutLoading ? "REDIRECTING..." : "CONTINUE →"}
           </button>
         </div>
         </div>
