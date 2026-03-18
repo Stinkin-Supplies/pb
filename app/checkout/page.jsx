@@ -199,6 +199,7 @@ export default function CheckoutPage() {
     setCheckoutError("");
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      const customerEmail = user?.email ?? null;
       const { data: profile } = await supabase
         .from("user_profiles")
         .select("first_name, last_name")
