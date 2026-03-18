@@ -3,6 +3,7 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
+import { sendOrderEmail } from "@/lib/email/sendOrderEmail";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -80,6 +81,24 @@ export async function POST(req: Request) {
         console.error("Order update failed:", error);
         return new NextResponse("Order update failed", { status: 500 });
       }
+
+      const { data: order, error: orderError } = await supabaseAdmin
+        .from("orders")
+        .select(
+          `
+          *,
+          order_items (*)
+        `
+        )
+        .eq("id", orderId)
+        .single();
+
+      if (orderError) {
+        console.error("Order fetch failed:", orderError);
+        return new NextResponse("Order fetch failed", { status: 500 });
+      }
+
+      await sendOrderEmail(order);
     }
 
     return new NextResponse("OK", { status: 200 });

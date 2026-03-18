@@ -14,18 +14,24 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No items" }, { status: 400 });
     }
 
+    const normalizeMoney = (value: unknown) => {
+      const num = Number(value ?? 0);
+      if (!Number.isFinite(num)) return 0;
+      return Number.isInteger(num) ? num : Math.round(num * 100);
+    };
+
     const orderPayload = {
       customer_email: body.customer_email ?? null,
       customer_name: body.customer_name ?? null,
       shipping_address: body.shipping_address ?? null,
       billing_address: body.billing_address ?? null,
-      subtotal: body.subtotal ?? 0,
-      shipping: body.shipping ?? 0,
-      tax: body.tax ?? 0,
-      discount: body.discount ?? 0,
-      points_redeemed: body.points_redeemed ?? 0,
-      points_redeemed_value: body.points_redeemed_value ?? 0,
-      total: body.total ?? 0,
+      subtotal: normalizeMoney(body.subtotal),
+      shipping: normalizeMoney(body.shipping),
+      tax: normalizeMoney(body.tax),
+      discount: normalizeMoney(body.discount),
+      points_redeemed: Number(body.points_redeemed ?? 0) || 0,
+      points_redeemed_value: normalizeMoney(body.points_redeemed_value),
+      total: normalizeMoney(body.total),
       status: "pending_payment",
     };
 
@@ -46,8 +52,8 @@ export async function POST(req: Request) {
       order_id: order.id,
       product_id: item.product_id ?? null,
       name: item.name ?? "Item",
-      quantity: item.qty ?? 1,
-      unit_price: item.price ?? 0,
+      quantity: Number(item.qty ?? 1) || 1,
+      unit_price: normalizeMoney(item.price),
     }));
 
     const { error: itemsError } = await supabaseAdmin
