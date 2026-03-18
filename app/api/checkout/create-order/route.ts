@@ -35,8 +35,8 @@ export async function POST(req: Request) {
     };
 
     const orderPayload = {
-      customer_email: body.customer_email ?? null,
-      customer_name: body.customer_name ?? null,
+      customer_email: body.customer_email ?? body.email ?? null,
+      customer_name: body.customer_name ?? body.name ?? null,
       shipping_address: body.shipping_address ?? null,
       billing_address: body.billing_address ?? null,
       subtotal: normalizeMoney(body.subtotal),
@@ -66,15 +66,19 @@ export async function POST(req: Request) {
       order_id: order.id,
       product_id: item.product_id ?? null,
       name: item.name ?? "Item",
-      quantity: Number(item.qty ?? 1) || 1,
-      unit_price: normalizeMoney(item.price),
+      quantity: Number(item.quantity ?? item.qty ?? 1),
+      price: normalizeMoney(item.price),
     }));
 
+    console.log("ORDER PAYLOAD:", orderPayload);
+    console.log("ITEMS:", orderItems);
+
     const { error: itemsError } = await supabaseAdmin
-      .from("order_line_items")
+      .from("order_items") // ✅ FIXED
       .insert(orderItems);
 
     if (itemsError) {
+      console.error("ITEM INSERT ERROR:", itemsError);
       return NextResponse.json(
         { error: itemsError.message, details: itemsError.details },
         { status: 500 }

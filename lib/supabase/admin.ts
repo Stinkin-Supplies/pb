@@ -238,7 +238,7 @@ export const db = {
       .from('orders')
       .select(`
         *,
-        order_line_items (*),
+        order_items (*),
         vendor_orders (*),
         order_timeline (*)
       `)
@@ -251,7 +251,7 @@ export const db = {
   async getUserOrders(userId: string, limit = 20, offset = 0) {
     const { data, error, count } = await adminSupabase
       .from('orders')
-      .select('*, order_line_items (*)', { count: 'exact' })
+      .select('*, order_items (*)', { count: 'exact' })
       .eq('user_id', userId)
       .not('status', 'in', '("pending_payment","payment_failed")')
       .order('created_at', { ascending: false })

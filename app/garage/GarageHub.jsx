@@ -733,9 +733,9 @@ export default function GarageHub({ user, initialAddresses, initialVehicles, led
                       </span>
                       <span className="order-total">${Number(order.total_amount).toFixed(2)}</span>
                     </div>
-                    {order.order_line_items?.length > 0 && (
+                    {order.order_items?.length > 0 && (
                       <div className="order-items">
-                        {order.order_line_items.map(line => (
+                        {order.order_items.map(line => (
                           <div key={line.id} className="order-item">
                             <span>{line.quantity}× {line.products?.name ?? "Product"}</span>
                             <span>${(line.unit_price * line.quantity).toFixed(2)}</span>
