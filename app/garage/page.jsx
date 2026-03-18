@@ -27,7 +27,7 @@ export default async function GaragePage() {
     supabase.from("user_garage").select("id, nickname, is_primary, added_at, vehicles(id, year, make, model, submodel, type)").eq("user_id", user.id).order("is_primary", { ascending: false }),
     supabase.from("points_ledger").select("id, points, type, description, created_at, expires_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50),
     supabase.from("wishlists").select("id, added_at, notify_in_stock, products(id, slug, name, price, brand_name, stock_quantity)").eq("user_id", user.id).order("added_at", { ascending: false }),
-    supabase.from("orders").select("id, created_at, status, total_amount, order_line_items(id, quantity, unit_price, products(name, slug))").eq("user_id", user.id).order("created_at", { ascending: false }).limit(20),
+    supabase.from("orders").select("id, created_at, status, total_amount, order_items(id, quantity, unit_price, products(name, slug))").eq("user_id", user.id).order("created_at", { ascending: false }).limit(20),
   ]);
 
   const vehicles = (garageRows ?? []).map(r => ({
