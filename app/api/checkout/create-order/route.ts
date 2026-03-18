@@ -73,9 +73,13 @@ export async function POST(req: Request) {
     console.log("ORDER PAYLOAD:", orderPayload);
     console.log("ITEMS:", orderItems);
 
-    const { error: itemsError } = await supabaseAdmin
+    console.log("ORDER ITEMS TO INSERT:", orderItems);
+    const { data: insertedItems, error: itemsError } = await supabaseAdmin
       .from("order_items") // ✅ FIXED
-      .insert(orderItems);
+      .insert(orderItems)
+      .select();
+    console.log("INSERTED ITEMS:", insertedItems);
+    console.log("ITEM ERROR:", itemsError);
 
     if (itemsError) {
       console.error("ITEM INSERT ERROR:", itemsError);
