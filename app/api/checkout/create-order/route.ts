@@ -14,6 +14,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No items" }, { status: 400 });
     }
 
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+      return NextResponse.json(
+        { error: "Missing NEXT_PUBLIC_SUPABASE_URL" },
+        { status: 500 }
+      );
+    }
+
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return NextResponse.json(
+        { error: "Missing SUPABASE_SERVICE_ROLE_KEY" },
+        { status: 500 }
+      );
+    }
+
     const normalizeMoney = (value: unknown) => {
       const num = Number(value ?? 0);
       if (!Number.isFinite(num)) return 0;
@@ -43,7 +57,7 @@ export async function POST(req: Request) {
 
     if (error) {
       return NextResponse.json(
-        { error: error.message },
+        { error: error.message, details: error.details },
         { status: 500 }
       );
     }
@@ -62,7 +76,7 @@ export async function POST(req: Request) {
 
     if (itemsError) {
       return NextResponse.json(
-        { error: itemsError.message },
+        { error: itemsError.message, details: itemsError.details },
         { status: 500 }
       );
     }
