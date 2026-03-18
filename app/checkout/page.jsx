@@ -28,6 +28,7 @@ export default function CheckoutPage() {
   const [shipmentBusy, setShipmentBusy] = useState(false);
   const [shipmentToast, setShipmentToast] = useState(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState("");
 
   useEffect(() => {
     let mounted = true;
@@ -195,6 +196,7 @@ export default function CheckoutPage() {
   const handleCheckout = async () => {
     if (checkoutLoading) return;
     setCheckoutLoading(true);
+    setCheckoutError("");
     try {
       const { data: { user } } = await supabase.auth.getUser();
       const { data: profile } = await supabase
@@ -252,6 +254,9 @@ export default function CheckoutPage() {
         console.error("STATUS:", orderRes.status);
         console.error("RAW RESPONSE:", orderText);
         console.error("PARSED:", orderJson);
+        setCheckoutError(
+          "Checkout failed while creating your order. Please try again."
+        );
         setCheckoutLoading(false);
         return;
       }
@@ -267,6 +272,9 @@ export default function CheckoutPage() {
       const sessionJson = await sessionRes.json();
       if (!sessionRes.ok || !sessionJson?.url) {
         console.error("Create session failed:", sessionJson);
+        setCheckoutError(
+          "Checkout failed while starting payment. Please try again."
+        );
         setCheckoutLoading(false);
         return;
       }
@@ -274,6 +282,7 @@ export default function CheckoutPage() {
       window.location.href = sessionJson.url;
     } catch (err) {
       console.error("Checkout error:", err);
+      setCheckoutError("Checkout failed. Please try again.");
     } finally {
       setCheckoutLoading(false);
     }
@@ -495,10 +504,16 @@ export default function CheckoutPage() {
 
           <button
             className="checkout-btn"
+            type="button"
             onClick={handleCheckout}
           >
             {checkoutLoading ? "REDIRECTING..." : "CONTINUE →"}
           </button>
+          {checkoutError && (
+            <div style={{ marginTop: 8, color: "#c9a84c", fontSize: 12, letterSpacing: "0.08em" }}>
+              {checkoutError}
+            </div>
+          )}
         </div>
         </div>
 
