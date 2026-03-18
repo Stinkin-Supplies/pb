@@ -28,6 +28,23 @@ export default async function SuccessPage({ searchParams }) {
     return <div>Order not found.</div>;
   }
 
+  let orderItems = [];
+  const { data: items, error: itemsError } = await supabase
+    .from("order_items")
+    .select("*")
+    .eq("order_id", orderId);
+  if (!itemsError && items?.length) {
+    orderItems = items;
+  } else {
+    const { data: lineItems, error: lineError } = await supabase
+      .from("order_line_items")
+      .select("*")
+      .eq("order_id", orderId);
+    if (!lineError && lineItems?.length) {
+      orderItems = lineItems;
+    }
+  }
+
   return (
     <div style={{ padding: "40px" }}>
       <h1>🎉 Order Confirmed</h1>
@@ -72,6 +89,20 @@ export default async function SuccessPage({ searchParams }) {
         </div>
       ) : (
         <p>Same as shipping</p>
+      )}
+
+      <h3>Items</h3>
+      {orderItems.length === 0 ? (
+        <p>No items found.</p>
+      ) : (
+        <ul>
+          {orderItems.map((item) => (
+            <li key={item.id ?? `${item.name}-${item.quantity}`}>
+              {item.quantity ?? 1}× {item.name ?? "Item"} —{" "}
+              {formatMoney(item.unit_price ?? item.price ?? 0)}
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );

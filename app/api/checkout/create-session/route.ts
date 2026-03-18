@@ -46,6 +46,9 @@ export async function POST(req: Request) {
       cancel_url: `${
         process.env.NEXT_PUBLIC_URL ?? "http://localhost:3000"
       }/checkout`,
+      metadata: {
+        order_id: String(orderId),
+      },
       payment_intent_data: {
         metadata: {
           order_id: String(orderId),
