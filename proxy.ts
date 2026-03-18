@@ -8,6 +8,13 @@ export function proxy(request: NextRequest) {
 
   if (pathname.startsWith("/auth/callback")) return NextResponse.next();
 
+  const isPublic =
+    pathname.startsWith("/checkout/success") ||
+    pathname.startsWith("/api/webhooks") ||
+    pathname === "/";
+
+  if (isPublic) return NextResponse.next();
+
   const isProtected = PROTECTED.some((route) => pathname.startsWith(route));
 
   const allCookies = request.cookies.getAll();
