@@ -9,7 +9,7 @@ export function proxy(request: NextRequest) {
   if (pathname.startsWith("/auth/callback")) return NextResponse.next();
 
   const isPublic =
-    pathname.startsWith("/checkout/success") ||
+    pathname.startsWith("/checkout") ||
     pathname.startsWith("/api/webhooks") ||
     pathname === "/";
 

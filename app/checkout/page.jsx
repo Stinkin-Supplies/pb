@@ -286,7 +286,11 @@ export default function CheckoutPage() {
       window.location.href = sessionJson.url;
     } catch (err) {
       console.error("Checkout error:", err);
-      setCheckoutError("Checkout failed. Please try again.");
+      const message =
+        err && typeof err === "object" && "message" in err
+          ? err.message
+          : "Unknown error";
+      setCheckoutError(`Checkout failed: ${message}`);
     } finally {
       setCheckoutLoading(false);
     }
