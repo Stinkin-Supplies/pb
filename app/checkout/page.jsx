@@ -229,9 +229,18 @@ export default function CheckoutPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const orderJson = await orderRes.json();
+      const orderText = await orderRes.text();
+      let orderJson = null;
+      try {
+        orderJson = orderText ? JSON.parse(orderText) : null;
+      } catch {
+        orderJson = null;
+      }
       if (!orderRes.ok || !orderJson?.order_id) {
-        console.error("Create order failed:", orderJson);
+        console.error("Create order failed:", {
+          status: orderRes.status,
+          body: orderJson ?? orderText ?? "Empty response",
+        });
         setCheckoutLoading(false);
         return;
       }
