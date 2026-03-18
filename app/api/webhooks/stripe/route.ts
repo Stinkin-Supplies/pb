@@ -67,15 +67,20 @@ export async function POST(req: Request) {
         return new NextResponse("Missing order_id", { status: 400 });
       }
 
+      const stripe_charge_id = charge.id;
+      const payment_method_last4 =
+        charge.payment_method_details?.card?.last4 || null;
+      const order_id = orderId;
+
       const { error } = await supabaseAdmin
         .from("orders")
         .update({
           status: "processing",
           stripe_payment_intent_id: paymentIntent.id,
-          stripe_charge_id: charge.id,
-          payment_method_last4: charge.payment_method_details?.card?.last4 || null,
+          stripe_charge_id,
+          payment_method_last4,
         })
-        .eq("id", orderId);
+        .eq("id", order_id);
 
       if (error) {
         console.error("Order update failed:", error);
@@ -90,7 +95,7 @@ export async function POST(req: Request) {
           order_items (*)
         `
         )
-        .eq("id", orderId)
+        .eq("id", order_id)
         .single();
 
       if (orderError) {
