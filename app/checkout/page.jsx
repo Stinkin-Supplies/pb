@@ -189,6 +189,7 @@ export default function CheckoutPage() {
   const shipping = subtotal >= 99 ? 0 : 5;
   const tax = subtotal * 0.07;
   const total = Math.max(mapResult.finalTotal + shipping + tax, 0);
+  const toCents = (value) => Math.round(value * 100);
 
   const handleCheckout = async () => {
     if (checkoutLoading) return;
@@ -208,17 +209,17 @@ export default function CheckoutPage() {
         customer_name: ship.full_name || null,
         shipping_address: shippingAddress,
         billing_address: shippingAddress,
-        subtotal,
-        shipping,
-        tax,
-        discount: pointsDiscount,
+        subtotal: toCents(subtotal),
+        shipping: toCents(shipping),
+        tax: toCents(tax),
+        discount: toCents(pointsDiscount),
         points_redeemed: points,
-        points_redeemed_value: pointsValue,
-        total,
+        points_redeemed_value: toCents(pointsValue),
+        total: toCents(total),
         items: cartItems.map((item) => ({
           product_id: item.id,
           name: item.name,
-          price: item.price,
+          price: toCents(item.price),
           qty: item.qty,
         })),
       };
@@ -240,7 +241,7 @@ export default function CheckoutPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           order_id: orderJson.order_id,
-          amount: total,
+          amount_cents: Math.round(total * 100),
         }),
       });
       const sessionJson = await sessionRes.json();

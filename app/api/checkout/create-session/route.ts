@@ -1,17 +1,24 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2026-02-25.clover",
-});
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const orderId = body?.order_id;
-    const amount = Number(body?.amount ?? 0);
+    const amountCents = Number(body?.amount_cents ?? 0);
+    const amountDollars = Number(body?.amount ?? 0);
+    const resolvedAmountCents =
+      Number.isFinite(amountCents) && amountCents > 0
+        ? amountCents
+        : Math.round(amountDollars * 100);
 
-    if (!orderId || !Number.isFinite(amount) || amount <= 0) {
+    if (
+      !orderId ||
+      !Number.isFinite(resolvedAmountCents) ||
+      resolvedAmountCents <= 0
+    ) {
       return NextResponse.json(
         { error: "Invalid payload" },
         { status: 400 }
@@ -19,21 +26,31 @@ export async function POST(req: Request) {
     }
 
     const session = await stripe.checkout.sessions.create({
-      mode: "payment",
       payment_method_types: ["card"],
+      mode: "payment",
       line_items: [
         {
           price_data: {
             currency: "usd",
-            product_data: { name: "Stinkin' Supplies Order" },
-            unit_amount: Math.round(amount * 100),
+            product_data: {
+              name: "Order",
+            },
+            unit_amount: Math.round(resolvedAmountCents),
           },
           quantity: 1,
         },
       ],
-      metadata: { order_id: String(orderId) },
-      success_url: `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/checkout/success?order_id=${orderId}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/checkout`,
+      success_url: `${
+        process.env.NEXT_PUBLIC_URL ?? "http://localhost:3000"
+      }/checkout/success?order_id=${orderId}`,
+      cancel_url: `${
+        process.env.NEXT_PUBLIC_URL ?? "http://localhost:3000"
+      }/checkout`,
+      payment_intent_data: {
+        metadata: {
+          order_id: String(orderId),
+        },
+      },
     });
 
     return NextResponse.json({ url: session.url });
