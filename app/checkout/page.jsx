@@ -33,6 +33,7 @@ export default function CheckoutPage() {
     let mounted = true;
     const load = async () => {
       const { data: { user } } = await supabase.auth.getUser();
+      const customerEmail = user?.email ?? null;
       if (!user) return;
       const { data } = await supabase
         .from("user_addresses")
@@ -196,6 +197,14 @@ export default function CheckoutPage() {
     setCheckoutLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      const { data: profile } = await supabase
+        .from("user_profiles")
+        .select("first_name, last_name")
+        .eq("id", user?.id ?? "")
+        .single();
+      const profileName =
+        [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
+        null;
       const shippingAddress = {
         line1: ship.address1,
         line2: ship.address2 || null,
@@ -205,8 +214,8 @@ export default function CheckoutPage() {
         country: ship.country || "US",
       };
       const payload = {
-        customer_email: user?.email ?? null,
-        customer_name: ship.full_name || null,
+        customer_email: customerEmail,
+        customer_name: profileName || ship.full_name || null,
         shipping_address: shippingAddress,
         billing_address: shippingAddress,
         subtotal: toCents(subtotal),
