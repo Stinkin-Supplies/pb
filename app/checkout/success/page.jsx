@@ -6,6 +6,23 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
+function RaceStatus({ status }) {
+  const styles = {
+    pending: "text-yellow-400",
+    processing: "text-blue-400",
+    shipped: "text-red-400",
+    delivered: "text-green-400",
+  };
+
+  return (
+    <div className="text-sm tracking-widest">
+      <span className={styles[status] || "text-gray-400"}>
+        {status.toUpperCase()}
+      </span>
+    </div>
+  );
+}
+
 export default async function SuccessPage({ searchParams }) {
   const params = await searchParams;
   console.log("PARAMS:", params);
@@ -18,7 +35,10 @@ export default async function SuccessPage({ searchParams }) {
 
   const { data: order, error } = await supabase
     .from("orders")
-    .select("*")
+    .select(`
+      *,
+      order_items (name, quantity)
+    `)
     .eq("id", orderId)
     .single();
   console.log("ORDER DATA:", order);
@@ -36,17 +56,13 @@ export default async function SuccessPage({ searchParams }) {
   if (!itemsError && items?.length) {
     orderItems = items;
   }
-  const statusSteps = ["pending", "processing", "shipped", "delivered"];
   const rawStatus = String(order.status ?? "").toLowerCase();
   const normalizedStatus =
     rawStatus === "pending_payment" ? "pending" : rawStatus;
-  const activeIndex = Math.max(
-    0,
-    statusSteps.indexOf(normalizedStatus)
-  );
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-12 space-y-8 text-white success-wrap">
+      <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[length:100%_3px]" />
       <style>{`
         .success-wrap {
           min-height: 100vh;
@@ -194,23 +210,12 @@ export default async function SuccessPage({ searchParams }) {
           <div className="success-title">ORDER CONFIRMED</div>
           <div className="success-sub">THANK YOU FOR YOUR PURCHASE</div>
           <div className="success-sub">ORDER #{order.order_number || order.id}</div>
-          <div className="success-status">
-            {statusSteps.map((step, idx) => (
-              <span
-                key={step}
-                style={{
-                  color: idx === activeIndex ? "#22c55e" : "#8a8784",
-                }}
-              >
-                {step.toUpperCase()}
-                {idx < statusSteps.length - 1 ? " \u2192 " : ""}
-              </span>
-            ))}
-          </div>
+          <RaceStatus status={normalizedStatus || "pending"} />
           {order.tracking_number && (
             <div className="success-sub">TRACKING: {order.tracking_number}</div>
           )}
         </div>
+        <div className="h-[2px] bg-red-500 animate-pulse" />
 
         <div className="card" style={{ marginTop: 20 }}>
           <div className="card-title">ITEMS</div>
