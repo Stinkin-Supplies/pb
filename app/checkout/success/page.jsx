@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { formatMoney } from "@/lib/utils/money";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -33,7 +34,7 @@ export default async function SuccessPage({ searchParams }) {
 
       <p><strong>Order ID:</strong> {order.id}</p>
       <p><strong>Status:</strong> {order.status}</p>
-      <p><strong>Total:</strong> ${(order.total / 100).toFixed(2)}</p>
+      <p><strong>Total:</strong> {formatMoney(order.total)}</p>
 
       <h3>Customer</h3>
       <p>{order.customer_name || "Guest"}</p>
