@@ -230,17 +230,19 @@ export default function CheckoutPage() {
         body: JSON.stringify(payload),
       });
       const orderText = await orderRes.text();
+
       let orderJson = null;
       try {
-        orderJson = orderText ? JSON.parse(orderText) : null;
-      } catch {
-        orderJson = null;
+        orderJson = JSON.parse(orderText);
+      } catch (e) {
+        // not JSON
       }
+
       if (!orderRes.ok || !orderJson?.order_id) {
-        console.error("Create order failed:", {
-          status: orderRes.status,
-          body: orderJson ?? orderText ?? "Empty response",
-        });
+        console.error("Create order failed:");
+        console.error("STATUS:", orderRes.status);
+        console.error("RAW RESPONSE:", orderText);
+        console.error("PARSED:", orderJson);
         setCheckoutLoading(false);
         return;
       }
