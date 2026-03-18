@@ -36,6 +36,14 @@ export default async function SuccessPage({ searchParams }) {
   if (!itemsError && items?.length) {
     orderItems = items;
   }
+  const statusSteps = ["pending", "processing", "shipped", "delivered"];
+  const rawStatus = String(order.status ?? "").toLowerCase();
+  const normalizedStatus =
+    rawStatus === "pending_payment" ? "pending" : rawStatus;
+  const activeIndex = Math.max(
+    0,
+    statusSteps.indexOf(normalizedStatus)
+  );
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-12 space-y-8 text-white success-wrap">
@@ -158,6 +166,17 @@ export default async function SuccessPage({ searchParams }) {
           text-decoration: none;
         }
         .cta-btn:hover { background: #c94f0f; }
+        .cta-btn.secondary {
+          background: transparent;
+          color: #f0ebe3;
+          border: 1px solid #2a2828;
+          margin-left: 12px;
+        }
+        .cta-btn.secondary:hover {
+          border-color: #e8621a;
+          color: #e8621a;
+          background: rgba(232,98,26,0.08);
+        }
 
         @media (max-width: 640px) {
           .success-wrap { padding: 28px 16px; }
@@ -175,7 +194,22 @@ export default async function SuccessPage({ searchParams }) {
           <div className="success-title">ORDER CONFIRMED</div>
           <div className="success-sub">THANK YOU FOR YOUR PURCHASE</div>
           <div className="success-sub">ORDER #{order.order_number || order.id}</div>
-          <div className="success-status">STATUS: {order.status}</div>
+          <div className="success-status">
+            {statusSteps.map((step, idx) => (
+              <span
+                key={step}
+                style={{
+                  color: idx === activeIndex ? "#22c55e" : "#8a8784",
+                }}
+              >
+                {step.toUpperCase()}
+                {idx < statusSteps.length - 1 ? " \u2192 " : ""}
+              </span>
+            ))}
+          </div>
+          {order.tracking_number && (
+            <div className="success-sub">TRACKING: {order.tracking_number}</div>
+          )}
         </div>
 
         <div className="card" style={{ marginTop: 20 }}>
@@ -260,6 +294,9 @@ export default async function SuccessPage({ searchParams }) {
 
         <div className="cta-wrap" style={{ marginTop: 20 }}>
           <a href="/shop" className="cta-btn">CONTINUE SHOPPING</a>
+          <a href={`/order/${order.id}`} className="cta-btn secondary">
+            VIEW ORDER
+          </a>
         </div>
       </div>
     </div>
