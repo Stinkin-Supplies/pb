@@ -254,8 +254,10 @@ export default function CheckoutPage() {
         console.error("STATUS:", orderRes.status);
         console.error("RAW RESPONSE:", orderText);
         console.error("PARSED:", orderJson);
+        const orderErrMsg =
+          orderJson?.error || orderText || "Unknown error";
         setCheckoutError(
-          "Checkout failed while creating your order. Please try again."
+          `Checkout failed while creating your order: ${orderErrMsg}`
         );
         setCheckoutLoading(false);
         return;
@@ -272,8 +274,10 @@ export default function CheckoutPage() {
       const sessionJson = await sessionRes.json();
       if (!sessionRes.ok || !sessionJson?.url) {
         console.error("Create session failed:", sessionJson);
+        const sessionErrMsg =
+          sessionJson?.error || "Unknown error";
         setCheckoutError(
-          "Checkout failed while starting payment. Please try again."
+          `Checkout failed while starting payment: ${sessionErrMsg}`
         );
         setCheckoutLoading(false);
         return;

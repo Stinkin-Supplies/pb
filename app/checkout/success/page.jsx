@@ -37,7 +37,7 @@ export default async function SuccessPage({ searchParams }) {
     .from("orders")
     .select(`
       *,
-      order_items (name, quantity)
+      order_items (*)
     `)
     .eq("id", orderId)
     .single();
@@ -48,14 +48,7 @@ export default async function SuccessPage({ searchParams }) {
     return <div>Order not found.</div>;
   }
 
-  let orderItems = [];
-  const { data: items, error: itemsError } = await supabase
-    .from("order_items")
-    .select("*")
-    .eq("order_id", orderId);
-  if (!itemsError && items?.length) {
-    orderItems = items;
-  }
+  const orderItems = order.order_items ?? [];
   const rawStatus = String(order.status ?? "").toLowerCase();
   const normalizedStatus =
     rawStatus === "pending_payment" ? "pending" : rawStatus;
