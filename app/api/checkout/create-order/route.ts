@@ -64,9 +64,9 @@ export async function POST(req: Request) {
 
     const orderItems = items.map((item: any) => ({
       order_id: order.id,
-      product_id: item.product_id ?? null,
+      product_id: null, // 👈 ignore for now
       name: item.name ?? "Item",
-      quantity: Number(item.quantity ?? item.qty ?? 1),
+      quantity: Number(item.qty ?? 1) || 1,
       price: normalizeMoney(item.price),
     }));
 
