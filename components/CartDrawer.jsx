@@ -114,7 +114,7 @@ const css = `
 
   .cart-item {
     display: grid;
-    grid-template-columns: 72px 1fr auto;
+    grid-template-columns: 1fr auto;
     gap: 12px;
     padding: 14px 20px;
     border-bottom: 1px solid #1a1919;
@@ -167,8 +167,14 @@ const css = `
   .item-price {
     font-family: 'Bebas Neue', sans-serif;
     font-size: 18px; color: #f0ebe3; letter-spacing: 0.04em;
+    white-space: nowrap;
   }
-  .item-controls { display: flex; align-items: center; gap: 6px; }
+  .item-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    justify-self: end;
+  }
   .item-qty-btn {
     width: 24px; height: 24px;
     background: #1a1919; border: 1px solid #2a2828;
@@ -334,6 +340,24 @@ const css = `
     font-family: 'Share Tech Mono', monospace;
     font-size: 8px; color: #c9a84c; letter-spacing: 0.12em;
     flex-shrink: 0;
+  }
+
+  @media (max-width: 520px) {
+    .cart-item {
+      grid-template-columns: 1fr;
+    }
+    .item-controls {
+      justify-self: start;
+      margin-left: 84px;
+      flex-wrap: wrap;
+    }
+    .item-remove {
+      order: 4;
+      width: 100%;
+      text-align: left;
+      margin-left: 0;
+      margin-top: 6px;
+    }
   }
 `;
 
