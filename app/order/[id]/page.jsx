@@ -135,6 +135,22 @@ export default async function OrderPage({ params }) {
           <p>{order.billing_address?.country}</p>
         </div>
       </div>
+
+      {/* CTA */}
+      <div className="flex flex-wrap gap-3">
+        <a
+          href="/shop"
+          className="px-6 py-3 bg-orange-500 text-black font-bold tracking-widest rounded hover:bg-orange-400 transition"
+        >
+          CONTINUE SHOPPING
+        </a>
+        <a
+          href="/account/orders"
+          className="px-6 py-3 border border-gray-700 text-gray-200 font-bold tracking-widest rounded hover:border-orange-500 hover:text-orange-400 transition"
+        >
+          BACK TO ORDERS
+        </a>
+      </div>
     </div>
   );
 }
