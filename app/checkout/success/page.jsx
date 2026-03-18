@@ -35,141 +35,232 @@ export default async function SuccessPage({ searchParams }) {
     .eq("order_id", orderId);
   if (!itemsError && items?.length) {
     orderItems = items;
-  } else {
-    const { data: lineItems, error: lineError } = await supabase
-      .from("order_line_items")
-      .select("*")
-      .eq("order_id", orderId);
-    if (!lineError && lineItems?.length) {
-      orderItems = lineItems;
-    }
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-12 space-y-8">
-      {/* Header */}
-      <div className="text-center">
-        <h1 className="text-3xl font-bold">🎉 Order Confirmed</h1>
-        <p className="text-gray-500 mt-2">
-          Thank you for your purchase
-        </p>
-        <p className="mt-2 text-sm text-gray-400">
-          Order #{order.order_number || order.id}
-        </p>
-        <p className="mt-1 text-green-600 font-medium">
-          Status: {order.status}
-        </p>
-      </div>
-  
-      {/* Items */}
-      <div className="bg-white shadow rounded-2xl p-6">
-        <h2 className="text-lg font-semibold mb-4">Items</h2>
-  
-        {orderItems.length === 0 ? (
-          <p className="text-gray-500">No items found.</p>
-        ) : (
-          <div className="space-y-3">
-            {orderItems.map((item) => (
+    <div className="max-w-3xl mx-auto px-6 py-12 space-y-8 text-white success-wrap">
+      <style>{`
+        .success-wrap {
+          min-height: 100vh;
+          background: #0a0909;
+          position: relative;
+          font-family: 'Barlow Condensed', sans-serif;
+          color: #f0ebe3;
+        }
+        .success-wrap::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background-image:
+            linear-gradient(rgba(232,98,26,0.04) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(232,98,26,0.04) 1px, transparent 1px);
+          background-size: 32px 32px;
+          pointer-events: none;
+          z-index: 0;
+        }
+        .success-inner {
+          position: relative;
+          z-index: 1;
+        }
+        .success-header {
+          text-align: center;
+          border: 1px solid #2a2828;
+          background: #111010;
+          padding: 20px 24px;
+          box-shadow: 0 20px 40px rgba(0,0,0,0.35);
+        }
+        .success-title {
+          font-family: 'Bebas Neue', sans-serif;
+          font-size: 36px;
+          letter-spacing: 0.08em;
+        }
+        .success-sub {
+          font-family: 'Share Tech Mono', monospace;
+          color: #8a8784;
+          font-size: 10px;
+          letter-spacing: 0.12em;
+          margin-top: 6px;
+        }
+        .success-status {
+          color: #22c55e;
+          font-family: 'Share Tech Mono', monospace;
+          font-size: 10px;
+          letter-spacing: 0.12em;
+          margin-top: 6px;
+        }
+        .card {
+          border: 1px solid #2a2828;
+          background: #111010;
+          padding: 18px 20px;
+        }
+        .card-title {
+          font-family: 'Bebas Neue', sans-serif;
+          font-size: 20px;
+          letter-spacing: 0.08em;
+          margin-bottom: 12px;
+        }
+        .item-row {
+          display: flex;
+          justify-content: space-between;
+          border-bottom: 1px solid #1a1919;
+          padding: 10px 0;
+        }
+        .item-name {
+          font-weight: 700;
+        }
+        .item-meta {
+          font-family: 'Share Tech Mono', monospace;
+          font-size: 10px;
+          color: #8a8784;
+          letter-spacing: 0.1em;
+        }
+        .summary-row {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 8px;
+          font-family: 'Share Tech Mono', monospace;
+          font-size: 11px;
+          letter-spacing: 0.1em;
+          color: #c2b9b0;
+        }
+        .summary-total {
+          display: flex;
+          justify-content: space-between;
+          font-family: 'Bebas Neue', sans-serif;
+          font-size: 22px;
+          letter-spacing: 0.06em;
+          margin-top: 12px;
+        }
+        .addr-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+          gap: 16px;
+        }
+        .addr-text {
+          font-family: 'Share Tech Mono', monospace;
+          font-size: 10px;
+          color: #8a8784;
+          letter-spacing: 0.1em;
+          line-height: 1.6;
+        }
+        .cta-wrap {
+          text-align: center;
+        }
+        .cta-btn {
+          display: inline-block;
+          padding: 12px 28px;
+          background: #e8621a;
+          color: #0a0909;
+          font-family: 'Bebas Neue', sans-serif;
+          font-size: 18px;
+          letter-spacing: 0.1em;
+          border: none;
+          text-decoration: none;
+        }
+        .cta-btn:hover { background: #c94f0f; }
+
+        @media (max-width: 640px) {
+          .success-wrap { padding: 28px 16px; }
+          .success-title { font-size: 28px; }
+          .card { padding: 14px 16px; }
+          .card-title { font-size: 18px; }
+          .item-row { flex-direction: column; gap: 6px; }
+          .summary-total { font-size: 20px; }
+          .addr-grid { grid-template-columns: 1fr; }
+        }
+      `}</style>
+
+      <div className="success-inner">
+        <div className="success-header">
+          <div className="success-title">ORDER CONFIRMED</div>
+          <div className="success-sub">THANK YOU FOR YOUR PURCHASE</div>
+          <div className="success-sub">ORDER #{order.order_number || order.id}</div>
+          <div className="success-status">STATUS: {order.status}</div>
+        </div>
+
+        <div className="card" style={{ marginTop: 20 }}>
+          <div className="card-title">ITEMS</div>
+          {orderItems.length === 0 ? (
+            <div className="item-meta">NO ITEMS FOUND</div>
+          ) : (
+            orderItems.map((item) => (
               <div
                 key={item.id ?? `${item.name}-${item.quantity}`}
-                className="flex justify-between border-b pb-2"
+                className="item-row"
               >
                 <div>
-                  <p className="font-medium">
-                    {item.name ?? "Item"}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    Qty: {item.quantity ?? 1}
-                  </p>
+                  <div className="item-name">{item.name ?? "Item"}</div>
+                  <div className="item-meta">QTY: {item.quantity ?? 1}</div>
                 </div>
-  
-                <p>
-                  {formatMoney(item.unit_price ?? item.price ?? 0)}
-                </p>
+                <div>{formatMoney(item.unit_price ?? item.price ?? 0)}</div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
-  
-      {/* Summary */}
-      <div className="bg-white shadow rounded-2xl p-6">
-        <h2 className="text-lg font-semibold mb-4">Summary</h2>
-  
-        <div className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span>Subtotal</span>
+            ))
+          )}
+        </div>
+
+        <div className="card" style={{ marginTop: 16 }}>
+          <div className="card-title">SUMMARY</div>
+          <div className="summary-row">
+            <span>SUBTOTAL</span>
             <span>{formatMoney(order.subtotal)}</span>
           </div>
-  
-          <div className="flex justify-between">
-            <span>Shipping</span>
+          <div className="summary-row">
+            <span>SHIPPING</span>
             <span>{formatMoney(order.shipping)}</span>
           </div>
-  
-          <div className="flex justify-between">
-            <span>Tax</span>
+          <div className="summary-row">
+            <span>TAX</span>
             <span>{formatMoney(order.tax)}</span>
           </div>
-  
-          <div className="flex justify-between font-bold text-lg mt-3">
-            <span>Total</span>
+          <div className="summary-total">
+            <span>ORDER TOTAL</span>
             <span>{formatMoney(order.total)}</span>
           </div>
         </div>
-      </div>
-  
-      {/* Addresses */}
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="bg-white shadow rounded-2xl p-6">
-          <h3 className="font-semibold mb-2">Shipping</h3>
-          {order.shipping_address ? (
-            <>
-              <p>{order.shipping_address.line1}</p>
-              {order.shipping_address.line2 && (
-                <p>{order.shipping_address.line2}</p>
-              )}
-              <p>
-                {order.shipping_address.city},{" "}
-                {order.shipping_address.state}{" "}
-                {order.shipping_address.postal_code}
-              </p>
-              <p>{order.shipping_address.country}</p>
-            </>
-          ) : (
-            <p className="text-gray-500">No address</p>
-          )}
+
+        <div className="addr-grid" style={{ marginTop: 16 }}>
+          <div className="card">
+            <div className="card-title">SHIPPING</div>
+            {order.shipping_address ? (
+              <div className="addr-text">
+                <div>{order.shipping_address.line1}</div>
+                {order.shipping_address.line2 && (
+                  <div>{order.shipping_address.line2}</div>
+                )}
+                <div>
+                  {order.shipping_address.city}, {order.shipping_address.state}{" "}
+                  {order.shipping_address.postal_code}
+                </div>
+                <div>{order.shipping_address.country}</div>
+              </div>
+            ) : (
+              <div className="addr-text">NO ADDRESS</div>
+            )}
+          </div>
+
+          <div className="card">
+            <div className="card-title">BILLING</div>
+            {order.billing_address ? (
+              <div className="addr-text">
+                <div>{order.billing_address.line1}</div>
+                {order.billing_address.line2 && (
+                  <div>{order.billing_address.line2}</div>
+                )}
+                <div>
+                  {order.billing_address.city}, {order.billing_address.state}{" "}
+                  {order.billing_address.postal_code}
+                </div>
+                <div>{order.billing_address.country}</div>
+              </div>
+            ) : (
+              <div className="addr-text">SAME AS SHIPPING</div>
+            )}
+          </div>
         </div>
-  
-        <div className="bg-white shadow rounded-2xl p-6">
-          <h3 className="font-semibold mb-2">Billing</h3>
-          {order.billing_address ? (
-            <>
-              <p>{order.billing_address.line1}</p>
-              {order.billing_address.line2 && (
-                <p>{order.billing_address.line2}</p>
-              )}
-              <p>
-                {order.billing_address.city},{" "}
-                {order.billing_address.state}{" "}
-                {order.billing_address.postal_code}
-              </p>
-              <p>{order.billing_address.country}</p>
-            </>
-          ) : (
-            <p className="text-gray-500">Same as shipping</p>
-          )}
+
+        <div className="cta-wrap" style={{ marginTop: 20 }}>
+          <a href="/shop" className="cta-btn">CONTINUE SHOPPING</a>
         </div>
-      </div>
-  
-      {/* CTA */}
-      <div className="text-center">
-        <a
-          href="/shop"
-          className="inline-block mt-4 px-6 py-3 bg-black text-white rounded-xl hover:opacity-90"
-        >
-          Continue Shopping
-        </a>
       </div>
     </div>
   );
