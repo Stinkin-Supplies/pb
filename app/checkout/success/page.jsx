@@ -418,7 +418,7 @@ export default async function SuccessPage({ searchParams }) {
             </div>
           ) : (
             orderItems.map((item) => {
-              const unitPrice = item.unit_price ?? item.price ?? 0;
+              const unitPrice = item.price ?? 0;
               const qty = item.quantity ?? 1;
               const lineTotal = unitPrice * qty;
               return (
