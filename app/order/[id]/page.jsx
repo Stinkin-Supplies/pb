@@ -481,7 +481,7 @@ export default async function OrderPage({ params }) {
             </div>
           ) : (
             items.map((item) => {
-              const unitPrice = item.unit_price ?? item.price ?? 0;
+              const unitPrice = item.price ?? 0;
               const qty = item.quantity ?? 1;
               return (
                 <div key={item.id} className="item-row">
