@@ -54,7 +54,8 @@ const ALLOWED_PRODUCT_CODES = new Set([
 // ── Sync log helpers ──────────────────────────────────────────
 
 async function getLastSuccessfulSync(
-  supabase: ReturnType<typeof createClient>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any
 ): Promise<{ completed_at: string } | null> {
   const { data } = await (supabase as any)
     .from("sync_log")
@@ -67,27 +68,18 @@ async function getLastSuccessfulSync(
   return data ?? null;
 }
 
-async function writeSyncLog(
-  supabase: ReturnType<typeof createClient>,
-  entry: {
-    status:        "success" | "error";
-    total_parts:   number;
-    upserted:      number;
-    skipped:       number;
-    discontinued:  number;
-    errors:        number;
-    duration_ms:   number;
-    error_message?: string;
+async function writeSyncLog(supabase: any, entry: Record<string, unknown>) {
+  try {
+    await (supabase as any)
+      .from("sync_log")
+      .insert({
+        vendor:       "parts-unlimited",
+        completed_at: new Date().toISOString(),
+        ...entry,
+      });
+  } catch (e: any) {
+    console.warn("[PU Sync] Failed to write sync log:", e.message);
   }
-) {
-  await (supabase as any)
-    .from("sync_log")
-    .insert({
-      vendor:       "parts-unlimited",
-      completed_at: new Date().toISOString(),
-      ...entry,
-    })
-    .catch((e: Error) => console.warn("[PU Sync] Failed to write sync log:", e.message));
 }
 
 // ── POST: run the sync ────────────────────────────────────────
@@ -126,7 +118,7 @@ export async function POST(req: Request) {
   const forceOverride = req.headers.get("x-force-sync") === "true";
 
   if (!forceOverride) {
-    const lastSync = await getLastSuccessfulSync(supabase);
+    const lastSync = await getLastSuccessfulSync(supabase as any);
 
     if (lastSync) {
       const lastSyncDate   = new Date(lastSync.completed_at);
@@ -190,7 +182,7 @@ export async function POST(req: Request) {
       const errText = await puResponse.text();
       console.error("[PU Sync] API error:", puResponse.status, errText);
 
-      await writeSyncLog(supabase, {
+      await writeSyncLog(supabase as any, {
         status:        "error",
         total_parts:   0,
         upserted:      0,
@@ -286,6 +278,11 @@ export async function POST(req: Request) {
     }
 
     // ── Step 5: Process & batch upsert ───────────────────────
+    if (baseRows.length > 0) {
+      console.log("[PU Sync] First row keys:", Object.keys(baseRows[0]));
+      console.log("[PU Sync] First row sample:", baseRows[0]);
+    }
+
     const result = {
       totalParts:   baseRows.length,
       upserted:     0,
@@ -295,19 +292,65 @@ export async function POST(req: Request) {
       durationMs:   0,
     };
 
+    const products: ReturnType<typeof mapToProduct>[] = [];
     let batch: ReturnType<typeof mapToProduct>[] = [];
+
+    // ── 1. Collect unique brand names ─────────────────────────
+    const uniqueBrands = [
+      ...new Set(
+        baseRows.map((row) => {
+          const p = mapBaseRow(row);
+          return p.brandName || "Parts Unlimited";
+        })
+      ),
+    ];
+
+    // ── 2. Upsert brands and fetch their IDs ──────────────────
+    const { error: brandErr } = await (supabase as any)
+      .from("brands")
+      .upsert(
+        uniqueBrands.map((name) => ({
+          name,
+          slug: name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+        })),
+        { onConflict: "name" }
+      );
+    if (brandErr) console.warn("[PU Sync] Brand upsert warning:", brandErr.message);
+
+    const { data: brandRows } = await (supabase as any)
+      .from("brands")
+      .select("id, name")
+      .in("name", uniqueBrands);
+
+    const brandMap: Record<string, number> = {};
+    for (const b of (brandRows ?? [])) {
+      brandMap[b.name] = b.id;
+    }
+    console.log("[PU Sync] Brand map loaded:", Object.keys(brandMap).length, "brands");
 
     const flushBatch = async () => {
       if (batch.length === 0) return;
-      const { error } = await supabase
+      const validBatch = batch.filter(
+        (p: any) => p.sku?.trim() && p.part_number?.trim() && p.brand_id
+      );
+      if (validBatch.length === 0) {
+        batch = [];
+        return;
+      }
+      const { error } = await (supabase as any)
         .from("products")
-        .upsert(batch, { onConflict: "sku", ignoreDuplicates: false });
+        .upsert(validBatch, { onConflict: "sku", ignoreDuplicates: false });
 
       if (error) {
-        console.error("[PU Sync] Upsert error:", error.message);
-        result.errors += batch.length;
+        console.error(
+          "[PU Sync] Upsert error:",
+          error.message,
+          "| Sample row:",
+          JSON.stringify(validBatch[0])
+        );
+        result.errors += validBatch.length;
       } else {
-        result.upserted += batch.length;
+        result.upserted += validBatch.length;
       }
       batch = [];
     };
@@ -336,7 +379,13 @@ export async function POST(req: Request) {
       }
 
       const dealerPrice = dealerPriceMap.get(part.partNumber) ?? 0;
-      batch.push(mapToProduct(part, dealerPrice, vendorId));
+      const product = mapToProduct(part, dealerPrice, vendorId);
+      product.brand_id =
+        brandMap[product.brand_name] ??
+        brandMap["Parts Unlimited"] ??
+        null;
+      products.push(product);
+      batch.push(product);
 
       if (batch.length >= BATCH_SIZE) {
         await flushBatch();
@@ -353,7 +402,7 @@ export async function POST(req: Request) {
     result.durationMs = Date.now() - start;
 
     // ── Step 6: Write success to sync log ────────────────────
-    await writeSyncLog(supabase, {
+    await writeSyncLog(supabase as any, {
       status:       "success",
       total_parts:  result.totalParts,
       upserted:     result.upserted,
@@ -369,7 +418,7 @@ export async function POST(req: Request) {
   } catch (err: any) {
     console.error("[PU Sync] Fatal error:", err);
 
-    await writeSyncLog(supabase, {
+    await writeSyncLog(supabase as any, {
       status:        "error",
       total_parts:   0,
       upserted:      0,
