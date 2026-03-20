@@ -25,28 +25,7 @@ import { useCartSafe } from "@/components/CartContext";
 // ── MOCK FALLBACK ─────────────────────────────────────────────
 // Used when Supabase fetch fails or returns empty (e.g. before
 // vendor sync in Phase 5). Remove once real products are flowing.
-const MOCK_PRODUCTS = [
-  { id:1,  slug:"screamin-eagle-stage-iv-kit",      brand:"Screamin Eagle",   name:"Stage IV High Torque Kit",              category:"Engine & Performance",  price:849.99, was:999.99, badge:"sale", inStock:true,  fitmentIds:null },
-  { id:2,  slug:"vance-hines-pro-pipe-chrome",      brand:"Vance & Hines",    name:"Pro Pipe Chrome 2-into-1 Exhaust",       category:"Exhaust Systems",       price:524.95, was:null,   badge:"new",  inStock:true,  fitmentIds:null },
-  { id:3,  slug:"arlen-ness-beveled-air-cleaner",   brand:"Arlen Ness",       name:"Beveled Air Cleaner Kit — Chrome",       category:"Engine & Performance",  price:189.95, was:null,   badge:null,   inStock:true,  fitmentIds:null },
-  { id:4,  slug:"saddlemen-road-sofa-seat",         brand:"Drag Specialties", name:"Saddlemen Road Sofa Seat",               category:"Seats & Comfort",       price:379.99, was:429.99, badge:"sale", inStock:true,  fitmentIds:null },
-  { id:5,  slug:"roland-sands-clarity-derby",       brand:"Roland Sands",     name:"Clarity Derby Cover — Contrast Cut",     category:"Body & Fenders",        price:145.00, was:null,   badge:null,   inStock:false, fitmentIds:null },
-  { id:6,  slug:"kuryakyn-hypercharger-es",         brand:"Kuryakyn",         name:"Hypercharger ES Air Intake Kit",         category:"Engine & Performance",  price:264.95, was:null,   badge:"new",  inStock:true,  fitmentIds:null },
-  { id:7,  slug:"wps-lithium-battery-12v",          brand:"WPS",              name:"Rechargeable Lithium Battery 12V",       category:"Lighting & Electrical", price:139.95, was:null,   badge:null,   inStock:true,  fitmentIds:null },
-  { id:8,  slug:"progressive-412-shocks",           brand:"Progressive",      name:"412 Series Rear Shocks — Chrome",       category:"Brakes & Wheels",       price:299.95, was:null,   badge:null,   inStock:true,  fitmentIds:null },
-  { id:9,  slug:"rinehart-true-dual-exhaust",       brand:"Rinehart",         name:"True Dual Exhaust — Black",              category:"Exhaust Systems",       price:649.95, was:699.95, badge:"sale", inStock:true,  fitmentIds:null },
-  { id:10, slug:"ss-cycle-610-cams",                brand:"S&S Cycle",        name:"610 Chain Drive Camshaft Kit",           category:"Engine & Performance",  price:419.00, was:null,   badge:null,   inStock:false, fitmentIds:null },
-  { id:11, slug:"cobra-power-pro-exhaust",          brand:"Cobra",            name:"Power Pro 2-into-1 Exhaust — Chrome",   category:"Exhaust Systems",       price:489.95, was:null,   badge:null,   inStock:true,  fitmentIds:null },
-  { id:12, slug:"kuryakyn-iso-footpegs",            brand:"Kuryakyn",         name:"ISO Ergo II Footpegs w/ Adapters",       category:"Handlebars & Controls", price:94.95,  was:null,   badge:null,   inStock:true,  fitmentIds:null },
-  { id:13, slug:"metzeler-me888-front",             brand:"Metzeler",         name:"ME888 Marathon Ultra Front 130/80",      category:"Tires & Tubes",         price:134.95, was:null,   badge:null,   inStock:true,  fitmentIds:null },
-  { id:14, slug:"drag-led-passing-lamps",           brand:"Drag Specialties", name:'5.75" LED Passing Lamps — Chrome',      category:"Lighting & Electrical", price:219.95, was:249.95, badge:"sale", inStock:true,  fitmentIds:null },
-  { id:15, slug:"arlen-ness-speed-5-wheel",         brand:"Arlen Ness",       name:'Speed 5 Spoke Wheel — Chrome 16"',      category:"Brakes & Wheels",       price:749.00, was:null,   badge:null,   inStock:false, fitmentIds:null },
-  { id:16, slug:"samson-fishtail-exhaust",          brand:"Samson",           name:"True Dual Fishtail Exhaust — Black",     category:"Exhaust Systems",       price:559.95, was:null,   badge:"new",  inStock:true,  fitmentIds:null },
-];
-
-const DEFAULT_CATEGORIES = ["Engine & Performance","Exhaust Systems","Lighting & Electrical","Body & Fenders","Seats & Comfort","Brakes & Wheels","Handlebars & Controls","Tires & Tubes"];
-const DEFAULT_BRANDS     = ["Arlen Ness","Cobra","Drag Specialties","Kuryakyn","Metzeler","Progressive","Rinehart","Roland Sands","S&S Cycle","Samson","Screamin Eagle","Vance & Hines","WPS"];
-const SORT_OPTIONS       = [
+const SORT_OPTIONS = [
   { value:"featured",   label:"Featured"        },
   { value:"price-asc",  label:"Price: Low→High" },
   { value:"price-desc", label:"Price: High→Low" },
@@ -90,10 +69,9 @@ export default function ShopClient({
   initialBrand      = null,
   fetchError        = null,
 }) {
-  // Use server-fetched data if available, fall back to mock
-  const rawProducts = initialProducts.length > 0 ? initialProducts : MOCK_PRODUCTS;
-  const brands      = availableBrands.length > 0 ? availableBrands : DEFAULT_BRANDS;
-  const categories  = availableCategories.length > 0 ? availableCategories : DEFAULT_CATEGORIES;
+  const rawProducts = initialProducts;
+  const brands      = availableBrands;
+  const categories  = availableCategories;
 
   // ── Filter state ────────────────────────────────────────────
   const [selCats,   setSelCats]   = useState(initialCategory ? [initialCategory] : []);
@@ -203,24 +181,6 @@ export default function ShopClient({
 
       <NavBar activePage="shop" />
 
-      {/* ── DATA SOURCE INDICATOR (dev only — remove in prod) ── */}
-      {process.env.NODE_ENV === "development" && (
-        <div style={{ background: initialProducts.length > 0 ? "rgba(34,197,94,0.08)" : "rgba(201,168,76,0.08)",
-                      borderBottom: `1px solid ${initialProducts.length > 0 ? "rgba(34,197,94,0.2)" : "rgba(201,168,76,0.2)"}`,
-                      padding:"5px 20px", display:"flex", alignItems:"center", gap:8 }}>
-          <div style={{ width:6, height:6, borderRadius:"50%",
-                        background: initialProducts.length > 0 ? "#22c55e" : "#c9a84c",
-                        boxShadow: `0 0 5px ${initialProducts.length > 0 ? "#22c55e" : "#c9a84c"}` }}/>
-          <span style={S({fontSize:9, color: initialProducts.length > 0 ? "#22c55e" : "#c9a84c",
-                          letterSpacing:"0.15em"})}>
-            {initialProducts.length > 0
-              ? `SUPABASE — ${initialProducts.length} PRODUCTS LOADED`
-              : fetchError
-                ? `SUPABASE ERROR: ${fetchError} — USING MOCK DATA`
-                : "MOCK DATA — VENDOR SYNC PENDING (PHASE 5)"}
-          </span>
-        </div>
-      )}
 
       {/* ── FITMENT BANNER ── */}
       <div style={{ background:"rgba(232,98,26,0.07)", borderBottom:"1px solid rgba(232,98,26,0.2)",
