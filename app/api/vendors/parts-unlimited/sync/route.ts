@@ -56,7 +56,7 @@ const ALLOWED_PRODUCT_CODES = new Set([
 async function getLastSuccessfulSync(
   supabase: ReturnType<typeof createClient>
 ): Promise<{ completed_at: string } | null> {
-  const { data } = await supabase
+  const { data } = await (supabase as any)
     .from("sync_log")
     .select("completed_at")
     .eq("vendor", "parts-unlimited")
@@ -80,8 +80,8 @@ async function writeSyncLog(
     error_message?: string;
   }
 ) {
-  await supabase
-    .from("sync_log" as any)
+  await (supabase as any)
+    .from("sync_log")
     .insert({
       vendor:       "parts-unlimited",
       completed_at: new Date().toISOString(),
@@ -406,7 +406,7 @@ export async function GET(req: Request) {
       .from("products")
       .select("*", { count: "exact", head: true })
       .eq("status", "active"),
-    supabase
+    (supabase as any)
       .from("sync_log")
       .select("*")
       .eq("vendor", "parts-unlimited")
