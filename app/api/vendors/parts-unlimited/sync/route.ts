@@ -322,7 +322,7 @@ export async function POST(req: Request) {
       .select("id, name")
       .in("name", uniqueBrands);
 
-    const brandMap: Record<string, number> = {};
+    const brandMap: Record<string, string> = {};
     for (const b of (brandRows ?? [])) {
       brandMap[b.name] = b.id;
     }
@@ -379,7 +379,7 @@ export async function POST(req: Request) {
       }
 
       const dealerPrice = dealerPriceMap.get(part.partNumber) ?? 0;
-      const product = mapToProduct(part, dealerPrice, vendorId);
+      const product = mapToProduct(part, dealerPrice, vendorId) as any;
       product.brand_id =
         brandMap[product.brand_name] ??
         brandMap["Parts Unlimited"] ??
@@ -463,7 +463,7 @@ export async function GET(req: Request) {
       .limit(10),
   ]);
 
-  const lastSuccess = (logsRes.data ?? []).find((l) => l.status === "success");
+  const lastSuccess = (logsRes.data ?? []).find((l: any) => l.status === "success");
   const hoursSince  = lastSuccess?.completed_at
     ? (Date.now() - new Date(lastSuccess.completed_at).getTime()) / (1000 * 60 * 60)
     : null;
