@@ -6,31 +6,37 @@
 // Wraps the app in app/layout.jsx.
 //
 // Persists to localStorage so cart survives page navigation.
-// TODO Phase 3: sync to Supabase cart_items table on change.
+// Syncs to Supabase cart_items table on every change.
+//
+// Auth state (userId) is tracked here once and exposed via
+// context so consumers like NavBar don't need their own
+// Supabase subscriptions.
 // ============================================================
 
-import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
+import {
+  createContext, useContext, useState, useEffect,
+  useCallback, useRef,
+} from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { getGuestCart, clearGuestCart } from "@/lib/guestCart";
 
 const CartContext = createContext(null);
 
 export function CartProvider({ children }) {
+  const [cartItems, setCartItems] = useState([]);
+  const [isOpen,    setIsOpen]    = useState(false);
+  const [userId,    setUserId]    = useState(null);
+
+  const cartIdRef        = useRef(null);
+  const prevItemsRef     = useRef([]);
+  const syncingRef       = useRef(false);
+  const mergedForUserRef = useRef(null);
+
+  // ── Single Supabase client for this provider lifetime ────
   const supabaseRef = useRef(null);
   if (!supabaseRef.current) {
     supabaseRef.current = createBrowserSupabaseClient();
   }
-  const supabase = supabaseRef.current;
-
-  const [cartItems, setCartItems] = useState([]);
-  const [isOpen,    setIsOpen]    = useState(false);
-  const [userId,    setUserId]    = useState(null);
-  const cartIdRef = useRef(null);
-  const prevItemsRef = useRef([]);
-  const syncingRef = useRef(false);
-  const pendingSyncRef = useRef(false);
-  const hasMountedRef = useRef(false);
-  const mergedForUserRef = useRef(null);
 
   // ── Load from localStorage on mount ──────────────────────
   useEffect(() => {
@@ -40,6 +46,38 @@ export function CartProvider({ children }) {
     } catch (_) {}
   }, []);
 
+  // ── Track auth user ──────────────────────────────────────
+  // Single subscription here — all consumers (NavBar etc.)
+  // read userId from context instead of subscribing themselves.
+  useEffect(() => {
+    const supabase = supabaseRef.current;
+    let mounted = true;
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (mounted) setUserId(session?.user?.id ?? null);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (!mounted) return;
+        // Ignore silent token refreshes — they don't change the user
+        if (
+          event === "SIGNED_IN"   ||
+          event === "SIGNED_OUT"  ||
+          event === "USER_UPDATED"
+        ) {
+          setUserId(session?.user?.id ?? null);
+        }
+      }
+    );
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  // ── Merge guest cart when user signs in ──────────────────
   const mergeGuestCartOnLogin = useCallback(async (id) => {
     if (!id || mergedForUserRef.current === id) return;
     const guest = getGuestCart();
@@ -48,9 +86,9 @@ export function CartProvider({ children }) {
       return;
     }
     const res = await fetch("/api/cart/merge", {
-      method: "POST",
+      method:  "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items: guest }),
+      body:    JSON.stringify({ items: guest }),
     });
     if (!res.ok) {
       console.error("Cart merge failed:", await res.text());
@@ -65,21 +103,6 @@ export function CartProvider({ children }) {
     mergeGuestCartOnLogin(userId);
   }, [mergeGuestCartOnLogin, userId]);
 
-  // ── Track auth user ──────────────────────────────────────
-  useEffect(() => {
-    let mounted = true;
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (mounted) setUserId(session?.user?.id ?? null);
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (mounted) setUserId(session?.user?.id ?? null);
-    });
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
-
   // ── Persist to localStorage on every change ───────────────
   useEffect(() => {
     try {
@@ -87,9 +110,12 @@ export function CartProvider({ children }) {
     } catch (_) {}
   }, [cartItems]);
 
+  // ── Ensure Supabase cart row exists ───────────────────────
   const ensureCartId = useCallback(async () => {
     if (!userId) return null;
     if (cartIdRef.current) return cartIdRef.current;
+
+    const supabase = supabaseRef.current;
 
     const { data: existing, error: fetchErr } = await supabase
       .from("carts")
@@ -121,69 +147,58 @@ export function CartProvider({ children }) {
   }, [userId]);
 
   // ── Sync cart to Supabase on every change ────────────────
-  const syncCart = useCallback(async () => {
-    if (!userId) return;
-    if (syncingRef.current) {
-      pendingSyncRef.current = true;
-      return;
-    }
-
-    syncingRef.current = true;
-    try {
-      const cartId = await ensureCartId();
-      if (!cartId) return;
-
-      const prevIds = new Set(prevItemsRef.current.map(i => i.id));
-      const nextIds = new Set(cartItems.map(i => i.id));
-      const removedIds = [...prevIds].filter(id => !nextIds.has(id));
-
-      if (removedIds.length) {
-        await supabase
-          .from("cart_items")
-          .delete()
-          .eq("cart_id", cartId)
-          .in("product_id", removedIds);
-      }
-
-      if (cartItems.length === 0) {
-        prevItemsRef.current = cartItems;
-        return;
-      }
-
-      const rows = cartItems.map(i => ({
-        cart_id: cartId,
-        product_id: i.id,
-        quantity: i.qty,
-        unit_price: i.price,
-      }));
-
-      const { error: upsertErr } = await supabase
-        .from("cart_items")
-        .upsert(rows, { onConflict: "cart_id,product_id" });
-
-      if (upsertErr) {
-        console.warn("CartContext: unable to sync cart_items", upsertErr);
-      }
-
-      prevItemsRef.current = cartItems;
-    } finally {
-      syncingRef.current = false;
-      if (pendingSyncRef.current) {
-        pendingSyncRef.current = false;
-        syncCart();
-      }
-    }
-  }, [cartItems, ensureCartId, supabase, userId]);
-
   useEffect(() => {
     if (!userId) return;
-    if (!hasMountedRef.current) {
-      hasMountedRef.current = true;
-      prevItemsRef.current = cartItems;
-      return;
-    }
-    syncCart();
-  }, [cartItems, syncCart, userId]);
+    if (syncingRef.current) return;
+
+    const sync = async () => {
+      syncingRef.current = true;
+      try {
+        const supabase = supabaseRef.current;
+        const cartId   = await ensureCartId();
+        if (!cartId) return;
+
+        // Delete removed items
+        const prevIds    = new Set(prevItemsRef.current.map(i => i.id));
+        const nextIds    = new Set(cartItems.map(i => i.id));
+        const removedIds = [...prevIds].filter(id => !nextIds.has(id));
+
+        if (removedIds.length) {
+          await supabase
+            .from("cart_items")
+            .delete()
+            .eq("cart_id", cartId)
+            .in("product_id", removedIds);
+        }
+
+        if (cartItems.length === 0) {
+          prevItemsRef.current = cartItems;
+          return;
+        }
+
+        const rows = cartItems.map(i => ({
+          cart_id:    cartId,
+          product_id: i.id,
+          quantity:   i.qty,
+          unit_price: i.price,
+        }));
+
+        const { error: upsertErr } = await supabase
+          .from("cart_items")
+          .upsert(rows, { onConflict: "cart_id,product_id" });
+
+        if (upsertErr) {
+          console.warn("CartContext: unable to sync cart_items", upsertErr);
+        }
+
+        prevItemsRef.current = cartItems;
+      } finally {
+        syncingRef.current = false;
+      }
+    };
+
+    sync();
+  }, [cartItems, ensureCartId, userId]);
 
   // ── Actions ───────────────────────────────────────────────
   const addItem = useCallback((product, qty = 1) => {
@@ -205,7 +220,7 @@ export function CartProvider({ children }) {
         qty,
       }];
     });
-    setIsOpen(true); // open drawer on add
+    setIsOpen(true);
   }, []);
 
   const updateQty = useCallback((id, qty) => {
@@ -230,29 +245,35 @@ export function CartProvider({ children }) {
       isOpen, setIsOpen,
       addItem, updateQty, removeItem, clearCart,
       itemCount, subtotal,
+      // Exposed so consumers (NavBar etc.) don't need their own
+      // Supabase subscriptions — read auth state from here instead.
+      userId,
     }}>
       {children}
     </CartContext.Provider>
   );
 }
 
-// Hook — use this in any client component
+// ── Hooks ─────────────────────────────────────────────────────
+
 export function useCart() {
   const ctx = useContext(CartContext);
   if (!ctx) throw new Error("useCart must be used inside <CartProvider>");
   return ctx;
 }
 
+// Safe version for components that may render outside CartProvider
 const EMPTY_CART = {
-  cartItems: [],
-  isOpen: false,
-  setIsOpen: () => {},
-  addItem: () => {},
-  updateQty: () => {},
+  cartItems:  [],
+  isOpen:     false,
+  setIsOpen:  () => {},
+  addItem:    () => {},
+  updateQty:  () => {},
   removeItem: () => {},
-  clearCart: () => {},
-  itemCount: 0,
-  subtotal: 0,
+  clearCart:  () => {},
+  itemCount:  0,
+  subtotal:   0,
+  userId:     null, // ← matches shape of real context
 };
 
 export function useCartSafe() {
