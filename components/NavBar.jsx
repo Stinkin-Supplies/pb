@@ -2,7 +2,6 @@
 // ============================================================
 // components/NavBar.jsx  —  SHARED NAV
 // ============================================================
-// Import this in every page instead of repeating nav markup.
 // Usage:
 //   import NavBar from "@/components/NavBar";
 //   <NavBar activePage="shop" />
@@ -10,26 +9,22 @@
 // activePage options: "home" | "shop" | "brands" | "garage" |
 //                     "search" | "account" | "deals"
 //
-// FIX: Removed module-level createBrowserSupabaseClient() call.
-// The old pattern stacked onAuthStateChange subscriptions on every
-// Strict Mode remount, causing cascading re-renders that re-fetched
-// the current server page on every auth token refresh.
-//
-// Auth state is now read from CartContext (which already tracks it)
-// via a single shared subscription. NavBar only keeps a local
-// supabase ref for the session check, created once via useRef.
+// Auth state is read from CartContext (useCartSafe) which holds
+// the single onAuthStateChange subscription for the whole app.
+// NavBar has no Supabase imports or local subscriptions — this
+// prevents the stacked-subscription bug that caused every token
+// refresh to re-fetch the current server page.
 // ============================================================
 
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useCartSafe } from "@/components/CartContext";
-import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 
 const NAV_LINKS = [
-  { label: "Shop",   href: "/shop"           },
-  { label: "Brands", href: "/brands"         },
-  { label: "Deals",  href: "/shop?badge=sale" },
-  { label: "Search", href: "/search"         },
+  { label: "Shop",   href: "/shop"            },
+  { label: "Brands", href: "/brands"          },
+  { label: "Deals",  href: "/shop?badge=sale"  },
+  { label: "Search", href: "/search"          },
 ];
 
 const css = `
@@ -99,14 +94,10 @@ const css = `
   }
   .ss-mobile-toggle {
     display: none;
-    align-items: center;
-    justify-content: center;
+    align-items: center; justify-content: center;
     width: 32px; height: 32px;
-    background: #1a1919;
-    border: 1px solid #2a2828;
-    border-radius: 2px;
-    color: #f0ebe3;
-    cursor: pointer;
+    background: #1a1919; border: 1px solid #2a2828;
+    border-radius: 2px; color: #f0ebe3; cursor: pointer;
   }
   @media (max-width: 700px) {
     .ss-nav-links { display: none; }
@@ -115,12 +106,10 @@ const css = `
     .ss-nav-garage { display: none; }
   }
   .ss-mobile-menu {
-    position: fixed;
-    inset: 54px 0 0;
+    position: fixed; inset: 54px 0 0;
     background: rgba(10,9,9,0.95);
     display: flex; flex-direction: column;
-    padding: 20px 28px; gap: 14px;
-    z-index: 101;
+    padding: 20px 28px; gap: 14px; z-index: 101;
   }
   .ss-mobile-menu a {
     font-family: 'Share Tech Mono', monospace;
@@ -140,63 +129,26 @@ const css = `
 `;
 
 export default function NavBar({ activePage = "", cartCount, onCartClick }) {
-  const [user,          setUser]          = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // ── Single supabase instance per component lifecycle ─────
-  // useRef ensures we never create more than one client per
-  // NavBar mount, and the same instance is used for both the
-  // initial getSession() call and the subscription cleanup.
-  const supabaseRef = useRef(null);
-  if (!supabaseRef.current) {
-    supabaseRef.current = createBrowserSupabaseClient();
-  }
+  // ── Auth + cart state from CartContext ───────────────────
+  // CartContext owns the single Supabase auth subscription for
+  // the whole app. Reading userId here costs nothing extra.
+  const { itemCount, setIsOpen, userId } = useCartSafe();
 
-  const { itemCount, setIsOpen } = useCartSafe();
   const displayCount = cartCount ?? itemCount;
+  const isSignedIn   = Boolean(userId);
 
   const handleCartClick = () => {
     if (onCartClick) { onCartClick(); return; }
     setIsOpen(true);
   };
 
-  // ── Auth: single subscription, stable ref, no module leak ─
-  useEffect(() => {
-    const supabase = supabaseRef.current;
-    let mounted = true;
-
-    // Initial session check
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (mounted) setUser(session?.user ?? null);
-    });
-
-    // Listen for sign-in / sign-out only — NOT token refreshes.
-    // TOKEN_REFRESHED fires every ~55 min and previously caused
-    // a NavBar re-render → layout re-render → server page re-fetch.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (!mounted) return;
-        // Only update on actual auth changes, not silent token refreshes
-        if (
-          event === "SIGNED_IN"  ||
-          event === "SIGNED_OUT" ||
-          event === "USER_UPDATED"
-        ) {
-          setUser(session?.user ?? null);
-        }
-      }
-    );
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []); // empty — runs once per mount, cleans up on unmount
-
   return (
     <>
       <style>{css}</style>
       <nav className="ss-nav">
+
         {/* Logo */}
         <Link href="/" className="ss-nav-logo">
           STINKIN<span>'</span> SUPPLIES
@@ -226,7 +178,7 @@ export default function NavBar({ activePage = "", cartCount, onCartClick }) {
 
         {/* Actions */}
         <div className="ss-nav-actions">
-          {user ? (
+          {isSignedIn ? (
             <Link
               href="/account"
               style={{
