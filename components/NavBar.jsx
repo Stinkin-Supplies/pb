@@ -5,24 +5,31 @@
 // Import this in every page instead of repeating nav markup.
 // Usage:
 //   import NavBar from "@/components/NavBar";
-//   <NavBar activePage="shop" cartCount={cartCount} />
+//   <NavBar activePage="shop" />
 //
 // activePage options: "home" | "shop" | "brands" | "garage" |
 //                     "search" | "account" | "deals"
+//
+// FIX: Removed module-level createBrowserSupabaseClient() call.
+// The old pattern stacked onAuthStateChange subscriptions on every
+// Strict Mode remount, causing cascading re-renders that re-fetched
+// the current server page on every auth token refresh.
+//
+// Auth state is now read from CartContext (which already tracks it)
+// via a single shared subscription. NavBar only keeps a local
+// supabase ref for the session check, created once via useRef.
 // ============================================================
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useCartSafe } from "@/components/CartContext";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 
-const supabase = createBrowserSupabaseClient();
-
 const NAV_LINKS = [
-  { label: "Shop",   href: "/shop"    },
-  { label: "Brands", href: "/brands"  },
+  { label: "Shop",   href: "/shop"           },
+  { label: "Brands", href: "/brands"         },
   { label: "Deals",  href: "/shop?badge=sale" },
-  { label: "Search", href: "/search"  },
+  { label: "Search", href: "/search"         },
 ];
 
 const css = `
@@ -94,8 +101,7 @@ const css = `
     display: none;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: 32px; height: 32px;
     background: #1a1919;
     border: 1px solid #2a2828;
     border-radius: 2px;
@@ -112,64 +118,80 @@ const css = `
     position: fixed;
     inset: 54px 0 0;
     background: rgba(10,9,9,0.95);
-    display: flex;
-    flex-direction: column;
-    padding: 20px 28px;
-    gap: 14px;
+    display: flex; flex-direction: column;
+    padding: 20px 28px; gap: 14px;
     z-index: 101;
   }
   .ss-mobile-menu a {
     font-family: 'Share Tech Mono', monospace;
-    letter-spacing: 0.12em;
-    color: #f0ebe3;
+    letter-spacing: 0.12em; color: #f0ebe3;
     text-transform: uppercase;
   }
-  .ss-mobile-menu a.active {
-    color: #e8621a;
-  }
+  .ss-mobile-menu a.active { color: #e8621a; }
   .ss-mobile-menu .ss-nav-garage {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: max-content;
+    display: inline-flex; align-items: center;
+    justify-content: center; width: max-content;
   }
   .ss-mobile-menu-close {
-    align-self: flex-end;
-    background: none;
-    border: none;
-    color: #8a8784;
-    font-size: 20px;
-    cursor: pointer;
+    align-self: flex-end; background: none;
+    border: none; color: #8a8784;
+    font-size: 20px; cursor: pointer;
   }
 `;
 
 export default function NavBar({ activePage = "", cartCount, onCartClick }) {
-  const [user,        setUser]        = useState(null);
-  const [userChecked, setUserChecked] = useState(false);
+  const [user,          setUser]          = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // ── Single supabase instance per component lifecycle ─────
+  // useRef ensures we never create more than one client per
+  // NavBar mount, and the same instance is used for both the
+  // initial getSession() call and the subscription cleanup.
+  const supabaseRef = useRef(null);
+  if (!supabaseRef.current) {
+    supabaseRef.current = createBrowserSupabaseClient();
+  }
+
   const { itemCount, setIsOpen } = useCartSafe();
   const displayCount = cartCount ?? itemCount;
+
   const handleCartClick = () => {
-    if (onCartClick) {
-      onCartClick();
-      return;
-    }
+    if (onCartClick) { onCartClick(); return; }
     setIsOpen(true);
   };
 
-  // Check auth state once on mount
+  // ── Auth: single subscription, stable ref, no module leak ─
   useEffect(() => {
+    const supabase = supabaseRef.current;
+    let mounted = true;
+
+    // Initial session check
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      setUserChecked(true);
+      if (mounted) setUser(session?.user ?? null);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
+    // Listen for sign-in / sign-out only — NOT token refreshes.
+    // TOKEN_REFRESHED fires every ~55 min and previously caused
+    // a NavBar re-render → layout re-render → server page re-fetch.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (!mounted) return;
+        // Only update on actual auth changes, not silent token refreshes
+        if (
+          event === "SIGNED_IN"  ||
+          event === "SIGNED_OUT" ||
+          event === "USER_UPDATED"
+        ) {
+          setUser(session?.user ?? null);
+        }
+      }
+    );
 
-    return () => subscription.unsubscribe();
-  }, []);
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []); // empty — runs once per mount, cleans up on unmount
 
   return (
     <>
@@ -180,7 +202,7 @@ export default function NavBar({ activePage = "", cartCount, onCartClick }) {
           STINKIN<span>'</span> SUPPLIES
         </Link>
 
-        {/* Links */}
+        {/* Desktop links */}
         <div className="ss-nav-links">
           {NAV_LINKS.map(({ label, href }) => (
             <Link
@@ -193,6 +215,7 @@ export default function NavBar({ activePage = "", cartCount, onCartClick }) {
             </Link>
           ))}
         </div>
+
         <button
           className="ss-mobile-toggle"
           aria-label="Toggle navigation"
@@ -203,16 +226,44 @@ export default function NavBar({ activePage = "", cartCount, onCartClick }) {
 
         {/* Actions */}
         <div className="ss-nav-actions">
+          {user ? (
+            <Link
+              href="/account"
+              style={{
+                fontFamily: "'Share Tech Mono', monospace",
+                fontSize: 10, letterSpacing: "0.1em",
+                color: "#8a8784", textDecoration: "none",
+                padding: "5px 12px", borderRadius: 2,
+                border: "1px solid rgba(232,98,26,0.3)",
+                transition: "all 0.2s", whiteSpace: "nowrap",
+              }}
+            >
+              ACCOUNT
+            </Link>
+          ) : (
+            <Link href="/auth" className="ss-nav-signin">
+              SIGN IN
+            </Link>
+          )}
           <Link href="/garage" className="ss-nav-garage">MY GARAGE</Link>
           <button className="ss-nav-cart" onClick={handleCartClick} aria-label="Cart">
             🛒
-            {displayCount > 0 && <span className="ss-cart-badge">{displayCount}</span>}
+            {displayCount > 0 && (
+              <span className="ss-cart-badge">{displayCount}</span>
+            )}
           </button>
         </div>
       </nav>
+
+      {/* Mobile menu */}
       {mobileMenuOpen && (
         <div className="ss-mobile-menu">
-          <button className="ss-mobile-menu-close" onClick={() => setMobileMenuOpen(false)}>✕</button>
+          <button
+            className="ss-mobile-menu-close"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            ✕
+          </button>
           {NAV_LINKS.map(({ label, href }) => (
             <Link
               key={label}
@@ -223,7 +274,13 @@ export default function NavBar({ activePage = "", cartCount, onCartClick }) {
               {label.toUpperCase()}
             </Link>
           ))}
-          <Link href="/garage" className="ss-nav-garage" onClick={() => setMobileMenuOpen(false)}>MY GARAGE</Link>
+          <Link
+            href="/garage"
+            className="ss-nav-garage"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            MY GARAGE
+          </Link>
         </div>
       )}
     </>

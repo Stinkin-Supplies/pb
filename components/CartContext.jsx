@@ -13,17 +13,23 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { getGuestCart, clearGuestCart } from "@/lib/guestCart";
 
-const supabase = createBrowserSupabaseClient();
-
 const CartContext = createContext(null);
 
 export function CartProvider({ children }) {
+  const supabaseRef = useRef(null);
+  if (!supabaseRef.current) {
+    supabaseRef.current = createBrowserSupabaseClient();
+  }
+  const supabase = supabaseRef.current;
+
   const [cartItems, setCartItems] = useState([]);
   const [isOpen,    setIsOpen]    = useState(false);
   const [userId,    setUserId]    = useState(null);
   const cartIdRef = useRef(null);
   const prevItemsRef = useRef([]);
   const syncingRef = useRef(false);
+  const pendingSyncRef = useRef(false);
+  const hasMountedRef = useRef(false);
   const mergedForUserRef = useRef(null);
 
   // ── Load from localStorage on mount ──────────────────────
@@ -115,56 +121,69 @@ export function CartProvider({ children }) {
   }, [userId]);
 
   // ── Sync cart to Supabase on every change ────────────────
+  const syncCart = useCallback(async () => {
+    if (!userId) return;
+    if (syncingRef.current) {
+      pendingSyncRef.current = true;
+      return;
+    }
+
+    syncingRef.current = true;
+    try {
+      const cartId = await ensureCartId();
+      if (!cartId) return;
+
+      const prevIds = new Set(prevItemsRef.current.map(i => i.id));
+      const nextIds = new Set(cartItems.map(i => i.id));
+      const removedIds = [...prevIds].filter(id => !nextIds.has(id));
+
+      if (removedIds.length) {
+        await supabase
+          .from("cart_items")
+          .delete()
+          .eq("cart_id", cartId)
+          .in("product_id", removedIds);
+      }
+
+      if (cartItems.length === 0) {
+        prevItemsRef.current = cartItems;
+        return;
+      }
+
+      const rows = cartItems.map(i => ({
+        cart_id: cartId,
+        product_id: i.id,
+        quantity: i.qty,
+        unit_price: i.price,
+      }));
+
+      const { error: upsertErr } = await supabase
+        .from("cart_items")
+        .upsert(rows, { onConflict: "cart_id,product_id" });
+
+      if (upsertErr) {
+        console.warn("CartContext: unable to sync cart_items", upsertErr);
+      }
+
+      prevItemsRef.current = cartItems;
+    } finally {
+      syncingRef.current = false;
+      if (pendingSyncRef.current) {
+        pendingSyncRef.current = false;
+        syncCart();
+      }
+    }
+  }, [cartItems, ensureCartId, supabase, userId]);
+
   useEffect(() => {
     if (!userId) return;
-    if (syncingRef.current) return;
-
-    const sync = async () => {
-      syncingRef.current = true;
-      try {
-        const cartId = await ensureCartId();
-        if (!cartId) return;
-
-        const prevIds = new Set(prevItemsRef.current.map(i => i.id));
-        const nextIds = new Set(cartItems.map(i => i.id));
-        const removedIds = [...prevIds].filter(id => !nextIds.has(id));
-
-        if (removedIds.length) {
-          await supabase
-            .from("cart_items")
-            .delete()
-            .eq("cart_id", cartId)
-            .in("product_id", removedIds);
-        }
-
-        if (cartItems.length === 0) {
-          prevItemsRef.current = cartItems;
-          return;
-        }
-
-        const rows = cartItems.map(i => ({
-          cart_id: cartId,
-          product_id: i.id,
-          quantity: i.qty,
-          unit_price: i.price,
-        }));
-
-        const { error: upsertErr } = await supabase
-          .from("cart_items")
-          .upsert(rows, { onConflict: "cart_id,product_id" });
-
-        if (upsertErr) {
-          console.warn("CartContext: unable to sync cart_items", upsertErr);
-        }
-
-        prevItemsRef.current = cartItems;
-      } finally {
-        syncingRef.current = false;
-      }
-    };
-
-    sync();
-  }, [cartItems, ensureCartId, userId]);
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      prevItemsRef.current = cartItems;
+      return;
+    }
+    syncCart();
+  }, [cartItems, syncCart, userId]);
 
   // ── Actions ───────────────────────────────────────────────
   const addItem = useCallback((product, qty = 1) => {
