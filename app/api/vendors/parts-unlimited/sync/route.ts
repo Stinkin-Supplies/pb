@@ -24,6 +24,8 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import AdmZip from "adm-zip";
+import fs from "fs";
+import path from "path";
 import {
   buildPUAuthHeader,
   parseCSV,
@@ -153,86 +155,102 @@ export async function POST(req: Request) {
   console.log("[PU Sync] Starting sync...");
 
   try {
-    // ── Step 1: Download ZIP from Parts Unlimited ────────────
-    console.log("[PU Sync] Downloading price file ZIP...");
+    // ── Step 1: Load price files (local if available, otherwise API) ──
+    let baseCSV: string;
+    let dealerCSV: string | null = null;
 
-    const puResponse = await fetch(PU_API_URL, {
-      method: "POST",
-      headers: {
-        Authorization:  buildPUAuthHeader(dealerNumber, username, password),
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        dealerCodes:      [dealerNumber],
-        headersPrepended: true,
-        auxillaryColumns: [
-          "PRODUCT_CODE",
-          "BRAND_NAME",
-          "WEIGHT",
-          "COUNTRY_OF_ORIGIN",
-          "UPC_CODE",
-          "COMMODITY_CODE",
-          "DRAG_PART",
-          "CLOSEOUT_CATALOG_INDICATOR",
-        ],
-      }),
-    });
+    const localBase   = path.join(process.cwd(), "data/pu/BasePriceFile.csv");
+    const localDealer = path.join(process.cwd(), "data/pu/D00108_PriceFile.csv");
 
-    if (!puResponse.ok) {
-      const errText = await puResponse.text();
-      console.error("[PU Sync] API error:", puResponse.status, errText);
+    if (fs.existsSync(localBase) && fs.existsSync(localDealer)) {
+      console.log("[PU Sync] Using local files from data/pu/");
+      baseCSV   = fs.readFileSync(localBase, "utf-8");
+      dealerCSV = fs.readFileSync(localDealer, "utf-8");
+    } else {
+      // ── Download ZIP from Parts Unlimited ────────────
+      console.log("[PU Sync] Downloading price file ZIP...");
 
-      await writeSyncLog(supabase as any, {
-        status:        "error",
-        total_parts:   0,
-        upserted:      0,
-        skipped:       0,
-        discontinued:  0,
-        errors:        0,
-        duration_ms:   Date.now() - start,
-        error_message: `HTTP ${puResponse.status}: ${errText}`,
+      const puResponse = await fetch(PU_API_URL, {
+        method: "POST",
+        headers: {
+          Authorization:  buildPUAuthHeader(dealerNumber, username, password),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          dealerCodes:      [dealerNumber],
+          headersPrepended: true,
+          auxillaryColumns: [
+            "PRODUCT_CODE",
+            "BRAND_NAME",
+            "WEIGHT",
+            "COUNTRY_OF_ORIGIN",
+            "UPC_CODE",
+            "COMMODITY_CODE",
+            "DRAG_PART",
+            "CLOSEOUT_CATALOG_INDICATOR",
+          ],
+        }),
       });
 
-      return NextResponse.json(
-        { error: `Parts Unlimited API returned ${puResponse.status}: ${errText}` },
-        { status: 502 }
+      if (!puResponse.ok) {
+        const errText = await puResponse.text();
+        console.error("[PU Sync] API error:", puResponse.status, errText);
+
+        await writeSyncLog(supabase as any, {
+          status:        "error",
+          total_parts:   0,
+          upserted:      0,
+          skipped:       0,
+          discontinued:  0,
+          errors:        0,
+          duration_ms:   Date.now() - start,
+          error_message: `HTTP ${puResponse.status}: ${errText}`,
+        });
+
+        return NextResponse.json(
+          { error: `Parts Unlimited API returned ${puResponse.status}: ${errText}` },
+          { status: 502 }
+        );
+      }
+
+      // ── Extract ZIP ───────────────────────────────────
+      console.log("[PU Sync] Extracting ZIP...");
+      const zipBuffer  = Buffer.from(await puResponse.arrayBuffer());
+      const zip        = new AdmZip(zipBuffer);
+      const zipEntries = zip.getEntries();
+
+      console.log("[PU Sync] ZIP contains:", zipEntries.map((e) => e.entryName).join(", "));
+
+      const baseEntry = zipEntries.find((e) =>
+        e.entryName.toLowerCase().includes("basepricefile")
       );
+      const dealerEntry = zipEntries.find(
+        (e) =>
+          e.entryName.toLowerCase().includes("pricefile") &&
+          !e.entryName.toLowerCase().includes("base")
+      );
+
+      if (!baseEntry) {
+        return NextResponse.json(
+          { error: "BasePriceFile.csv not found in ZIP" },
+          { status: 500 }
+        );
+      }
+
+      baseCSV = baseEntry.getData().toString("utf-8");
+      dealerCSV = dealerEntry ? dealerEntry.getData().toString("utf-8") : null;
     }
 
-    // ── Step 2: Extract ZIP ───────────────────────────────────
-    console.log("[PU Sync] Extracting ZIP...");
-    const zipBuffer  = Buffer.from(await puResponse.arrayBuffer());
-    const zip        = new AdmZip(zipBuffer);
-    const zipEntries = zip.getEntries();
-
-    console.log("[PU Sync] ZIP contains:", zipEntries.map((e) => e.entryName).join(", "));
-
-    const baseEntry = zipEntries.find((e) =>
-      e.entryName.toLowerCase().includes("basepricefile")
-    );
-    const dealerEntry = zipEntries.find(
-      (e) =>
-        e.entryName.toLowerCase().includes("pricefile") &&
-        !e.entryName.toLowerCase().includes("base")
-    );
-
-    if (!baseEntry) {
-      return NextResponse.json(
-        { error: "BasePriceFile.csv not found in ZIP" },
-        { status: 500 }
-      );
-    }
-
-    // ── Step 3: Parse CSVs ────────────────────────────────────
+    // ── Step 2: Parse CSVs ────────────────────────────────────
     console.log("[PU Sync] Parsing BasePriceFile.csv...");
-    const baseRows = parseCSV(baseEntry.getData().toString("utf-8"));
+    const baseRows = parseCSV(baseCSV);
     console.log(`[PU Sync] ${baseRows.length.toLocaleString()} parts in catalog`);
 
     // Dealer price lookup: partNumber → your dealer price
     const dealerPriceMap = new Map<string, number>();
-    if (dealerEntry) {
-      console.log(`[PU Sync] Parsing ${dealerEntry.entryName}...`);
-      const dealerRows = parseCSV(dealerEntry.getData().toString("utf-8"));
+    if (dealerCSV) {
+      console.log("[PU Sync] Parsing dealer price file...");
+      const dealerRows = parseCSV(dealerCSV);
       for (const row of dealerRows) {
         const mapped = mapDealerRow(row);
         if (mapped.partNumber) {
