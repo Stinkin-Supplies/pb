@@ -18,49 +18,36 @@
 import { db } from "@/lib/supabase/admin";
 import ShopClient from "./ShopClient";
 
-// Next.js passes searchParams as a prop to page components
 export default async function ShopPage({ searchParams }) {
   const resolvedParams = await searchParams;
   const category = resolvedParams?.category ?? null;
   const brand    = resolvedParams?.brand    ?? null;
   const q        = resolvedParams?.q        ?? null;
 
-  // ── Fetch products server-side ──────────────────────────────
-  // db.getProducts uses adminSupabase — safe here, server only.
-  // Falls back to empty array if Supabase is unreachable during build.
-  let initialProducts = [];
-  let fetchError      = null;
+  let rawProducts = [];
+  let fetchError  = null;
 
   try {
-    initialProducts = await db.getProducts({
+    rawProducts = await db.getProducts({
       category: category ?? undefined,
       brand:    brand    ?? undefined,
-      // Full text search handled client-side for now;
-      // TODO Phase 5: replace with Typesense query when index is populated
-      limit: 200, // reasonable cap; paginate later
+      limit:    200,
     });
   } catch (err) {
     console.error("[ShopPage] db.getProducts failed:", err.message);
     fetchError = err.message;
-    // ShopClient will use its built-in mock fallback
   }
 
-  // ── Fetch filter option lists server-side ──────────────────
-  // These rarely change — could be cached with next/cache in future
-  let brands     = [];
-  let categories = [];
+  // ── Normalize FIRST, then derive filter lists ─────────────
+  // The DB uses snake_case (our_price, brand_name, category_name).
+  // Normalize to camelCase before deriving brand/category lists so
+  // the sidebar values always match what the filter compares against.
+  const normalized = rawProducts.map(normalizeProductRow);
 
-  try {
-    // TODO: add db.getBrands() and db.getCategories() helpers
-    // For now derive from the product list (good enough for Phase 2)
-    brands     = [...new Set(initialProducts.map(p => p.brand))].filter(Boolean).sort();
-    categories = [...new Set(initialProducts.map(p => p.category))].filter(Boolean).sort();
-  } catch (_) {}
-
-  // ── Normalize rows to the shape ShopClient expects ─────────
-  // Supabase returns snake_case; component uses camelCase.
-  // Centralizing this here means ShopClient never touches raw DB shape.
-  const normalized = initialProducts.map(normalizeProductRow);
+  const brands     = [...new Set(normalized.map(p => p.brand))]
+    .filter(Boolean).sort();
+  const categories = [...new Set(normalized.map(p => p.category))]
+    .filter(Boolean).sort();
 
   return (
     <ShopClient
@@ -76,29 +63,46 @@ export default async function ShopPage({ searchParams }) {
 
 // ── Row normalizer ────────────────────────────────────────────
 // Maps DB column names → component prop names.
-// Add fields here as your schema evolves.
+// PU sync writes: our_price, brand_name, category_name, map_price,
+//                 compare_at_price, stock_quantity, is_new, images
 function normalizeProductRow(row) {
   return {
-    id:        row.id,
-    slug:      row.slug,
-    name:      row.name,
-    brand:     row.brand_name   ?? row.brand   ?? "Unknown",
-    category:  row.category_name ?? row.category ?? "Uncategorized",
-    price:     Number(row.price  ?? 0),
-    was:       row.compare_at_price ? Number(row.compare_at_price) : null,
-    badge:     row.is_new  ? "new"
-             : row.on_sale ? "sale"
-             : null,
-    inStock:   (row.stock_quantity ?? row.fitment_count ?? 1) > 0,
-    // fitment_ids populated by vendor sync (Phase 5)
-    // Until then every product shows as fitting — ShopClient handles null
+    id:       row.id,
+    slug:     row.slug,
+    name:     row.name,
+
+    // vendor sync writes brand_name / category_name (snake_case)
+    brand:    row.brand_name    ?? row.brand    ?? "Unknown",
+    category: row.category_name ?? row.category ?? "Uncategorized",
+
+    // vendor sync writes our_price — NOT `price`
+    price:    Number(row.our_price ?? row.price ?? 0),
+    // PU sync writes msrp; compare_at_price is an alias some schemas use
+    was:      row.compare_at_price ? Number(row.compare_at_price)
+            : row.msrp             ? Number(row.msrp)
+            : null,
+    mapPrice: row.map_price        ? Number(row.map_price)        : null,
+
+    badge:    row.is_new  ? "new"
+            : row.on_sale ? "sale"
+            : null,
+
+    // treat stock_quantity > 0 as in-stock; fall back to true if column missing
+    inStock:    row.in_stock ?? (row.stock_quantity != null
+                  ? row.stock_quantity > 0
+                  : true),
+
     fitmentIds: row.fitment_ids ?? null,
-    image:     row.primary_image_url ?? null,
-    mapPrice:  row.map_price ? Number(row.map_price) : null,
+
+    // images is a text[] array from the sync; primary_image_url is a
+    // computed/virtual column some schemas add — handle both
+    image:    row.primary_image_url
+           ?? (Array.isArray(row.images) ? row.images[0] : null)
+           ?? null,
   };
 }
 
-// ── Metadata (SSR, good for SEO) ─────────────────────────────
+// ── Metadata ──────────────────────────────────────────────────
 export const metadata = {
   title:       "Shop All Parts | Stinkin' Supplies",
   description: "Browse 500K+ powersports parts and accessories. Filter by your bike.",
