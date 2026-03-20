@@ -27,8 +27,7 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts",
-    "**/*.mts"
-, "app/checkout/page.jsx", "app/api/stripe/create-intent/route.js"  ],
+    ".next/dev/types/**/*.ts"
+  ],
   "exclude": ["node_modules"]
 }
