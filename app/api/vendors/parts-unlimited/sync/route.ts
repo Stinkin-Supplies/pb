@@ -419,6 +419,9 @@ export async function POST(req: Request) {
     await flushBatch();
     result.durationMs = Date.now() - start;
 
+    // Refresh cached facets after all writes complete
+    await supabase.rpc("refresh_facets_cache");
+
     // ── Step 6: Write success to sync log ────────────────────
     await writeSyncLog(supabase as any, {
       status:       "success",
