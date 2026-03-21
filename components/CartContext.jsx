@@ -213,10 +213,14 @@ export function CartProvider({ children }) {
         id:       product.id,
         slug:     product.slug,
         name:     product.name,
-        brand:    product.brand,
-        price:    product.price,
+        brand:    product.brand ?? product.brand_name ?? "",
+        price:    product.price ?? 0,
         mapPrice: product.mapPrice ?? null,
-        image:    product.image    ?? null,
+        // store both so CartDrawer can resolve whichever is available
+        image:    product.image
+                    ?? (Array.isArray(product.images) && product.images.length > 0
+                        ? product.images[0] : null),
+        images:   product.images ?? [],
         qty,
       }];
     });
