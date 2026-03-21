@@ -1,11 +1,5 @@
-import { createClient } from "@supabase/supabase-js";
+import { adminSupabase } from "@/lib/supabase/admin";
 import { formatMoney } from "@/lib/utils/money";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
-
 function StatusPill({ status }) {
   const normalized =
     String(status ?? "").toLowerCase() === "pending_payment"
@@ -355,7 +349,7 @@ export default async function SuccessPage({ searchParams }) {
     );
   }
 
-  const { data: order, error } = await supabase
+  const { data: order, error } = await adminSupabase
     .from("orders")
     .select("*, order_items (*)")
     .eq("id", orderId)
