@@ -54,6 +54,7 @@ export async function GET(req: Request) {
   const minPrice = url.searchParams.get("minPrice")   ? Number(url.searchParams.get("minPrice"))  : null;
   const maxPrice = url.searchParams.get("maxPrice")   ? Number(url.searchParams.get("maxPrice"))  : null;
   const inStock  = url.searchParams.get("inStock") === "true" ? true : null;
+  const search   = url.searchParams.get("search")?.trim() || null;
   const sort     = url.searchParams.get("sort")       || "newest";
   const page     = Math.max(0, parseInt(url.searchParams.get("page")     || "0",  10));
   const pageSize = Math.min(
@@ -85,6 +86,8 @@ export async function GET(req: Request) {
         if (minPrice) q = q.gte("our_price",    minPrice);
         if (maxPrice) q = q.lte("our_price",    maxPrice);
         if (inStock)  q = q.eq("in_stock",      true);
+        // Full-text search using the tsvector column built by the sync
+        if (search)   q = q.textSearch("search_vector", search, { type: "websearch" });
 
         const order = ORDER_MAP[sort] ?? ORDER_MAP.newest;
         q = q.order(order.column, { ascending: order.ascending }).range(from, to);
