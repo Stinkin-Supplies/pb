@@ -30,42 +30,51 @@ export default async function ShopPage({ searchParams }) {
   const order = ORDER_MAP[sort] ?? ORDER_MAP.newest;
 
   try {
-    // Products + facets in parallel — same queries as /api/products
-    const [prodRes, facetRes] = await Promise.all([
-      (() => {
-        let q = adminSupabase
-          .from("products")
-          .select(
-            "id,sku,slug,name,brand_name,category_name," +
-            "our_price,msrp,compare_at_price,map_price," +
-            "in_stock,stock_quantity,is_new,images",
-            { count:"exact" }
-          )
-          .eq("status","active");
-        if (category) q = q.eq("category_name", category);
-        if (brand)    q = q.eq("brand_name",    brand);
-        return q.order(order.column, { ascending:order.ascending }).range(0, PAGE_SIZE - 1);
-      })(),
-      adminSupabase.rpc("get_product_facets", {
+    // ── Products query (must succeed for page to render) ────
+    let q = adminSupabase
+      .from("products")
+      .select(
+        "id,sku,slug,name,brand_name,category_name," +
+        "our_price,msrp,compare_at_price,map_price," +
+        "in_stock,stock_quantity,is_new,images",
+        { count:"exact" }
+      )
+      .eq("status","active");
+    if (category) q = q.eq("category_name", category);
+    if (brand)    q = q.eq("brand_name",    brand);
+    const prodRes = await q
+      .order(order.column, { ascending:order.ascending })
+      .range(0, PAGE_SIZE - 1);
+
+    if (prodRes.error) console.error("[ShopPage] products:", prodRes.error.message);
+    products = (prodRes.data ?? []).map(normalizeRow);
+    total    = prodRes.count ?? 0;
+
+    // ── Facets query (non-fatal — page still loads if this times out) ──
+    // Runs after products so a slow facet query never blocks first paint.
+    try {
+      const facetRes = await adminSupabase.rpc("get_product_facets", {
         p_brand:     brand,
         p_category:  category,
         p_min_price: null,
         p_max_price: null,
         p_in_stock:  null,
-      }),
-    ]);
+      });
+      if (facetRes.error) {
+        console.warn("[ShopPage] facets timed out — ShopClient will fetch via /api/products");
+      } else {
+        const f = facetRes.data ?? {};
+        facets = {
+          categories: f.categories ?? [],
+          brands:     f.brands     ?? [],
+          priceRange: f.price_range ?? { min:0, max:0 },
+        };
+      }
+    } catch (facetErr) {
+      console.warn("[ShopPage] facets error:", facetErr.message);
+      // facets stay as empty defaults — ShopClient fetches them on first filter interaction
+    }
 
-    if (prodRes.error)  console.error("[ShopPage] products:", prodRes.error.message);
-    if (facetRes.error) console.error("[ShopPage] facets:",   facetRes.error.message);
-
-    products = (prodRes.data  ?? []).map(normalizeRow);
-    total    = prodRes.count  ?? 0;
-    const f  = facetRes.data  ?? {};
-    facets   = {
-      categories: f.categories ?? [],
-      brands:     f.brands     ?? [],
-      priceRange: f.price_range ?? { min:0, max:0 },
-    };
   } catch (err) {
     console.error("[ShopPage]", err.message);
   }
