@@ -62,8 +62,7 @@ export const db = {
       .select(
         'id, sku, slug, name, brand_name, category_name, ' +
         'our_price, msrp, compare_at_price, map_price, ' +
-        'in_stock, stock_quantity, is_new, images, ' +
-        'fitment_ids',
+        'in_stock, stock_quantity, is_new, images',
         { count: 'exact' }
       )
       .eq('status', 'active')
