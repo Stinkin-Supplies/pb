@@ -7,34 +7,10 @@
 //   on each keystroke (debounced 300ms).
 // ============================================================
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useCartSafe } from "@/components/CartContext";
 import NavBar from "@/components/NavBar";
 
-// ── Full mock catalog (same data as shop page) ────────────────
-const ALL_PRODUCTS = [
-  { id:1,  slug:"screamin-eagle-stage-iv-kit",      brand:"Screamin Eagle",   name:"Stage IV High Torque Kit",                category:"Engine & Performance",  price:849.99, was:999.99, badge:"sale", inStock:true  },
-  { id:2,  slug:"vance-hines-pro-pipe-chrome",      brand:"Vance & Hines",    name:"Pro Pipe Chrome 2-into-1 Exhaust",         category:"Exhaust Systems",       price:524.95, was:null,   badge:"new",  inStock:true  },
-  { id:3,  slug:"arlen-ness-beveled-air-cleaner",   brand:"Arlen Ness",       name:"Beveled Air Cleaner Kit — Chrome",         category:"Engine & Performance",  price:189.95, was:null,   badge:null,   inStock:true  },
-  { id:4,  slug:"saddlemen-road-sofa-seat",         brand:"Drag Specialties", name:"Saddlemen Road Sofa Seat",                 category:"Seats & Comfort",       price:379.99, was:429.99, badge:"sale", inStock:true  },
-  { id:5,  slug:"roland-sands-clarity-derby",       brand:"Roland Sands",     name:"Clarity Derby Cover — Contrast Cut",       category:"Body & Fenders",        price:145.00, was:null,   badge:null,   inStock:false },
-  { id:6,  slug:"kuryakyn-hypercharger-es",         brand:"Kuryakyn",         name:"Hypercharger ES Air Intake Kit",           category:"Engine & Performance",  price:264.95, was:null,   badge:"new",  inStock:true  },
-  { id:7,  slug:"wps-lithium-battery-12v",          brand:"WPS",              name:"Rechargeable Lithium Battery 12V",         category:"Lighting & Electrical", price:139.95, was:null,   badge:null,   inStock:true  },
-  { id:8,  slug:"progressive-412-shocks",           brand:"Progressive",      name:"412 Series Rear Shocks — Chrome",         category:"Brakes & Wheels",       price:299.95, was:null,   badge:null,   inStock:true  },
-  { id:9,  slug:"rinehart-true-dual-exhaust",       brand:"Rinehart",         name:"True Dual Exhaust — Black",                category:"Exhaust Systems",       price:649.95, was:699.95, badge:"sale", inStock:true  },
-  { id:10, slug:"ss-cycle-610-cams",                brand:"S&S Cycle",        name:"610 Chain Drive Camshaft Kit",             category:"Engine & Performance",  price:419.00, was:null,   badge:null,   inStock:false },
-  { id:11, slug:"cobra-power-pro-exhaust",          brand:"Cobra",            name:"Power Pro 2-into-1 Exhaust — Chrome",     category:"Exhaust Systems",       price:489.95, was:null,   badge:null,   inStock:true  },
-  { id:12, slug:"kuryakyn-iso-footpegs",            brand:"Kuryakyn",         name:"ISO Ergo II Footpegs w/ Adapters",         category:"Handlebars & Controls", price:94.95,  was:null,   badge:null,   inStock:true  },
-  { id:13, slug:"metzeler-me888-front",             brand:"Metzeler",         name:"ME888 Marathon Ultra Front Tire 130/80",   category:"Tires & Tubes",         price:134.95, was:null,   badge:null,   inStock:true  },
-  { id:14, slug:"drag-led-passing-lamps",           brand:"Drag Specialties", name:'5.75" LED Passing Lamps — Chrome',        category:"Lighting & Electrical", price:219.95, was:249.95, badge:"sale", inStock:true  },
-  { id:15, slug:"arlen-ness-speed-5-wheel",         brand:"Arlen Ness",       name:'Speed 5 Spoke Wheel — Chrome 16"',        category:"Brakes & Wheels",       price:749.00, was:null,   badge:null,   inStock:false },
-  { id:16, slug:"samson-fishtail-exhaust",          brand:"Samson",           name:"True Dual Fishtail Exhaust — Black",       category:"Exhaust Systems",       price:559.95, was:null,   badge:"new",  inStock:true  },
-  { id:17, slug:"drag-fork-seals",                  brand:"Drag Specialties", name:"Fork Seal Kit — 39mm",                    category:"Brakes & Wheels",       price:24.95,  was:null,   badge:null,   inStock:true  },
-  { id:18, slug:"kuryakyn-omni-bag",                brand:"Kuryakyn",         name:"Omni Bag with Tank Panel",                 category:"Body & Fenders",        price:109.95, was:null,   badge:null,   inStock:true  },
-  { id:19, slug:"vance-hines-fuelpak-fp3",          brand:"Vance & Hines",    name:"FuelPak FP3 Fuel Management",             category:"Engine & Performance",  price:189.95, was:null,   badge:"new",  inStock:true  },
-  { id:20, slug:"progressive-monotube-fork",        brand:"Progressive",      name:"Monotube Fork Cartridge Kit",             category:"Brakes & Wheels",       price:449.95, was:null,   badge:null,   inStock:true  },
-];
-
-const POPULAR = ["exhaust", "air cleaner", "handlebars", "seat", "wheels", "shocks", "battery", "footpegs"];
 
 const css = `
   *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
@@ -150,15 +126,106 @@ function highlight(text, query) {
   );
 }
 
+// ── Result card ───────────────────────────────────────────────
+function ResultCard({ p, i, query, onAdd }) {
+  const M = s => ({ fontFamily:"'Share Tech Mono',monospace", ...s });
+  const B = s => ({ fontFamily:"'Bebas Neue',sans-serif", ...s });
+  const img = p.image ?? (Array.isArray(p.images) && p.images.length > 0 ? p.images[0] : null);
+  return (
+    <div
+      className="s-card"
+      style={{ animationDelay:`${Math.min(i,12) * 0.03}s`, opacity: p.inStock ? 1 : 0.55 }}
+      onClick={() => window.location.href = `/shop/${p.slug}`}
+    >
+      <div className="s-card-img">
+        {img
+          ? <img src={img} alt={p.name} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+          : <span style={M({fontSize:8, color:"#3a3838", letterSpacing:"0.1em", position:"relative", zIndex:1})}>NO IMAGE</span>
+        }
+        {p.badge && <span className={`s-badge ${p.badge}`}>{p.badge.toUpperCase()}</span>}
+        {!p.inStock && <span className="s-oos">OUT OF STOCK</span>}
+      </div>
+      <div className="s-card-body">
+        <div className="s-brand">{p.brand}</div>
+        <div className="s-name">{highlight(p.name, query)}</div>
+        <div className="s-cat">{p.category}</div>
+        <div className="s-footer">
+          <div>
+            {p.was && <span className="s-was">${p.was.toFixed(2)}</span>}
+            <span className="s-price">${p.price.toFixed(2)}</span>
+          </div>
+          <button
+            className="s-add"
+            disabled={!p.inStock}
+            onClick={e => { e.stopPropagation(); if (p.inStock) onAdd(); }}
+          >
+            {p.inStock ? "ADD" : "OOS"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const POPULAR      = ["exhaust", "air cleaner", "handlebars", "seat", "wheels", "shocks", "battery", "footpegs", "helmet", "tires"];
+const CATEGORIES   = ["Street","ATV","Common Parts","MX / Off-Road","Watercraft","Scooter","Drag Specialties","Moose ATV"];
+const DEBOUNCE_MS  = 350;
+
 export default function SearchClient({ initialQuery = "" }) {
-  const [query,  setQuery]  = useState(initialQuery);
-  const [input,  setInput]  = useState(initialQuery);
-  const [sort,   setSort]   = useState("relevance");
+  const [query,        setQuery]        = useState(initialQuery);
+  const [input,        setInput]        = useState(initialQuery);
+  const [sort,         setSort]         = useState("relevance");
+  const [results,      setResults]      = useState([]);
+  const [total,        setTotal]        = useState(0);
+  const [loading,      setLoading]      = useState(false);
+  const [saleProducts, setSaleProducts] = useState([]);
   const inputRef = useRef(null);
-  // Focus input on mount
+  const abortRef = useRef(null);
+
+  const { addItem } = useCartSafe();
+
+  // Focus on mount
   useEffect(() => { inputRef.current?.focus(); }, []);
 
-  // Update URL without navigation on search
+  // Load sale products for landing page
+  useEffect(() => {
+    fetch("/api/products?sort=price_desc&pageSize=8")
+      .then(r => r.json())
+      .then(d => setSaleProducts((d.products ?? []).filter(p => p.was)))
+      .catch(() => {});
+  }, []);
+
+  // Debounced search
+  const fetchResults = useCallback(async (q, s) => {
+    if (!q.trim()) { setResults([]); setTotal(0); return; }
+    if (abortRef.current) abortRef.current.abort();
+    abortRef.current = new AbortController();
+    setLoading(true);
+    try {
+      const sortParam = s === "relevance" ? "" : `&sort=${s.replace("-","_")}`;
+      const res  = await fetch(
+        `/api/products?search=${encodeURIComponent(q)}&pageSize=48${sortParam}`,
+        { signal: abortRef.current.signal }
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setResults(data.products ?? []);
+      setTotal(data.total ?? 0);
+    } catch (err) {
+      if (err.name !== "AbortError") {
+        console.error("[Search]", err.message);
+        setResults([]);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => fetchResults(query, sort), DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [query, sort, fetchResults]);
+
   const doSearch = (q) => {
     setQuery(q);
     setInput(q);
@@ -170,25 +237,6 @@ export default function SearchClient({ initialQuery = "" }) {
     e.preventDefault();
     doSearch(input.trim());
   };
-
-  // ── Client-side search (mock) ─────────────────────────────
-  // TODO Phase 5: replace with Typesense debounced fetch
-  const results = useMemo(() => {
-    if (!query.trim()) return [];
-    const q = query.toLowerCase();
-    let list = ALL_PRODUCTS.filter(p =>
-      p.name.toLowerCase().includes(q)     ||
-      p.brand.toLowerCase().includes(q)    ||
-      p.category.toLowerCase().includes(q)
-    );
-    switch (sort) {
-      case "price-asc":  list.sort((a,b) => a.price - b.price); break;
-      case "price-desc": list.sort((a,b) => b.price - a.price); break;
-      case "name-asc":   list.sort((a,b) => a.name.localeCompare(b.name)); break;
-      default: break; // relevance = natural order
-    }
-    return list;
-  }, [query, sort]);
 
   const B = s => ({ fontFamily:"'Bebas Neue',sans-serif",     ...s });
   const M = s => ({ fontFamily:"'Share Tech Mono',monospace", ...s });
@@ -210,10 +258,13 @@ export default function SearchClient({ initialQuery = "" }) {
               type="text"
               placeholder="Search parts, brands, categories..."
               value={input}
-              onChange={e => setInput(e.target.value)}
+              onChange={e => { setInput(e.target.value); doSearch(e.target.value); }}
             />
             {input && (
-              <button type="button" className="search-clear" onClick={() => { setInput(""); doSearch(""); inputRef.current?.focus(); }}>✕</button>
+              <button type="button" className="search-clear"
+                onClick={() => { setInput(""); doSearch(""); inputRef.current?.focus(); }}>
+                ✕
+              </button>
             )}
             <button type="submit" className="search-btn">🔍</button>
           </form>
@@ -236,9 +287,13 @@ export default function SearchClient({ initialQuery = "" }) {
           {/* Toolbar */}
           <div className="search-toolbar">
             <span className="result-count">
-              <span>{results.length}</span> RESULTS FOR "{query.toUpperCase()}"
+              {loading
+                ? <span style={M({color:"#3a3838"})}>SEARCHING…</span>
+                : <><span>{total.toLocaleString()}</span> RESULTS FOR "{query.toUpperCase()}"</>
+              }
             </span>
-            <select className="sort-select" value={sort} onChange={e => setSort(e.target.value)}>
+            <select className="sort-select" value={sort}
+              onChange={e => setSort(e.target.value)}>
               <option value="relevance">Relevance</option>
               <option value="price-asc">Price: Low→High</option>
               <option value="price-desc">Price: High→Low</option>
@@ -247,7 +302,20 @@ export default function SearchClient({ initialQuery = "" }) {
           </div>
 
           <div className="search-body">
-            {results.length === 0 ? (
+            {loading ? (
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))", gap:12 }}>
+                {Array.from({length:8}).map((_,i) => (
+                  <div key={i} className="s-card" style={{opacity:0.4}}>
+                    <div className="s-card-img"/>
+                    <div className="s-card-body">
+                      <div style={{height:8, background:"#2a2828", borderRadius:2, marginBottom:8, width:"60%"}}/>
+                      <div style={{height:12, background:"#2a2828", borderRadius:2, marginBottom:8}}/>
+                      <div style={{height:8, background:"#2a2828", borderRadius:2, width:"40%"}}/>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : results.length === 0 ? (
               <div className="search-empty">
                 <div className="search-empty-title">NO RESULTS FOR "{query.toUpperCase()}"</div>
                 <div className="search-empty-sub">TRY A DIFFERENT SEARCH TERM OR BROWSE BY CATEGORY</div>
@@ -260,74 +328,35 @@ export default function SearchClient({ initialQuery = "" }) {
             ) : (
               <div className="results-grid">
                 {results.map((p, i) => (
-                  <div
-                    key={p.id}
-                    className="s-card"
-                    style={{ animationDelay:`${i * 0.03}s`, opacity: p.inStock ? 1 : 0.55 }}
-                    onClick={() => window.location.href = `/shop/${p.slug}`}
-                  >
-                    <div className="s-card-img">
-                      <span style={M({fontSize:8, color:"#3a3838", letterSpacing:"0.1em", position:"relative", zIndex:1})}>NO IMAGE</span>
-                      {p.badge && <span className={`s-badge ${p.badge}`}>{p.badge.toUpperCase()}</span>}
-                      {!p.inStock && <span className="s-oos">OUT OF STOCK</span>}
-                    </div>
-                    <div className="s-card-body">
-                      <div className="s-brand">{p.brand}</div>
-                      <div className="s-name">{highlight(p.name, query)}</div>
-                      <div className="s-cat">{p.category}</div>
-                      <div className="s-footer">
-                        <div>
-                          {p.was && <span className="s-was">${p.was.toFixed(2)}</span>}
-                          <span className="s-price">${p.price.toFixed(2)}</span>
-                        </div>
-                        <button
-                          className="s-add"
-                          disabled={!p.inStock}
-                          onClick={e => { e.stopPropagation(); if (p.inStock) setCart(c => c+1); }}
-                        >
-                          {p.inStock ? "ADD" : "OOS"}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                  <ResultCard key={p.id} p={p} i={i} query={query} onAdd={() => addItem(p)} />
                 ))}
               </div>
             )}
           </div>
         </>
       ) : (
-        /* LANDING — no query yet */
+        /* LANDING */
         <div className="search-landing">
           <div className="landing-section-title">BROWSE BY <span>CATEGORY</span></div>
           <div className="cat-pills">
-            {["Engine & Performance","Exhaust Systems","Lighting & Electrical","Body & Fenders","Seats & Comfort","Brakes & Wheels","Handlebars & Controls","Tires & Tubes"].map(c => (
-              <div key={c} className="cat-pill" onClick={() => window.location.href = `/shop?category=${encodeURIComponent(c)}`}>{c}</div>
-            ))}
-          </div>
-
-          <div className="landing-section-title">ON <span>SALE NOW</span></div>
-          <div className="results-grid">
-            {ALL_PRODUCTS.filter(p => p.badge === "sale").map((p, i) => (
-              <div key={p.id} className="s-card" style={{ animationDelay:`${i*0.04}s` }} onClick={() => window.location.href = `/shop/${p.slug}`}>
-                <div className="s-card-img">
-                  <span style={M({fontSize:8, color:"#3a3838", letterSpacing:"0.1em", position:"relative", zIndex:1})}>NO IMAGE</span>
-                  <span className="s-badge sale">SALE</span>
-                </div>
-                <div className="s-card-body">
-                  <div className="s-brand">{p.brand}</div>
-                  <div className="s-name">{p.name}</div>
-                  <div className="s-cat">{p.category}</div>
-                  <div className="s-footer">
-                    <div>
-                      {p.was && <span className="s-was">${p.was.toFixed(2)}</span>}
-                      <span className="s-price">${p.price.toFixed(2)}</span>
-                    </div>
-                    <button className="s-add" onClick={e => { e.stopPropagation(); setCart(c=>c+1); }}>ADD</button>
-                  </div>
-                </div>
+            {CATEGORIES.map(c => (
+              <div key={c} className="cat-pill"
+                onClick={() => window.location.href = `/shop?category=${encodeURIComponent(c)}`}>
+                {c}
               </div>
             ))}
           </div>
+
+          {saleProducts.length > 0 && (
+            <>
+              <div className="landing-section-title">ON <span>SALE NOW</span></div>
+              <div className="results-grid">
+                {saleProducts.map((p, i) => (
+                  <ResultCard key={p.id} p={p} i={i} query="" onAdd={() => addItem(p)} />
+                ))}
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
