@@ -364,9 +364,9 @@ export default function ShopClient({
   useEffect(() => {
     if (isFirst.current) {
       isFirst.current = false;
-      // If SSR gave us products, skip — data already in state.
-      // If SSR returned empty (env var missing on Vercel), fetch immediately.
-      if (initialProducts.length > 0) return;
+      // Only skip the initial fetch if SSR gave us BOTH products AND facets.
+      // If facets are empty (timeout on Supabase), still fetch so sidebar populates.
+      if (initialProducts.length > 0 && initialFacets.categories.length > 0) return;
     }
     const t = setTimeout(() => fetchProducts(filters, sort, page), DEBOUNCE_MS);
     return () => clearTimeout(t);
