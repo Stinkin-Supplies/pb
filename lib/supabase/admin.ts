@@ -21,7 +21,7 @@ export const db = {
 
   // ── PRODUCTS ──────────────────────────────────────────────
 
-  async getProduct(sku: string) {
+  async getProduct(slug: string) {
     const { data, error } = await adminSupabase
       .from('products')
       .select(`
@@ -35,7 +35,7 @@ export const db = {
           vendors (id, name, slug, avg_ship_time_days)
         )
       `)
-      .eq('sku', sku)
+      .eq('slug', slug)
       .eq('status', 'active')
       .single()
     if (error) throw error
@@ -43,39 +43,51 @@ export const db = {
   },
 
   async getProducts(options: {
-    category?: string
-    brand?: string
-    limit?: number
+    category?: string   // matches category_name column directly
+    brand?: string      // matches brand_name column directly
+    limit?: number      // page size — default 48
+    offset?: number     // for pagination: page * limit
     orderBy?: 'price_asc' | 'price_desc' | 'newest'
     inStockOnly?: boolean
   } = {}) {
+    const pageSize = options.limit ?? 48
+    const from     = options.offset ?? 0
+    const to       = from + pageSize - 1
+
+    // Select only the columns the shop UI actually needs.
+    // Avoids pulling heavy columns (search_vector, specs, etc.)
+    // on a list page. getProduct() fetches the full row.
     let query = adminSupabase
       .from('products')
-      .select(`
-        *,
-        brands (name, slug),
-        categories (name, slug),
-        product_images (url, is_primary)
-      `, { count: 'exact' })
+      .select(
+        'id, sku, slug, name, brand_name, category_name, ' +
+        'our_price, msrp, compare_at_price, map_price, ' +
+        'in_stock, stock_quantity, is_new, images, ' +
+        'fitment_ids',
+        { count: 'exact' }
+      )
       .eq('status', 'active')
 
-    if (options.category) query = query.eq('categories.slug', options.category)
-    if (options.brand) query = query.eq('brands.slug', options.brand)
+    // Filter directly on denormalized columns written by the sync.
+    // category_name and brand_name live on the products row itself —
+    // no join needed, and PostgREST handles these reliably.
+    if (options.category)   query = query.eq('category_name', options.category)
+    if (options.brand)      query = query.eq('brand_name', options.brand)
     if (options.inStockOnly) query = query.eq('in_stock', true)
 
     const orderMap = {
-      price_asc:  { column: 'our_price',   ascending: true },
-      price_desc: { column: 'our_price',   ascending: false },
-      newest:     { column: 'created_at',  ascending: false },
+      price_asc:  { column: 'our_price',  ascending: true  },
+      price_desc: { column: 'our_price',  ascending: false },
+      newest:     { column: 'created_at', ascending: false },
     }
     const order = orderMap[options.orderBy ?? 'newest']
-    query = query.order(order.column, { ascending: order.ascending })
+    query = query
+      .order(order.column, { ascending: order.ascending })
+      .range(from, to)  // Supabase hard-caps at 1000 without range()
 
-    if (options.limit) query = query.limit(options.limit)
-
-    const { data, error } = await query
+    const { data, error, count } = await query
     if (error) throw error
-    return data ?? []
+    return { products: data ?? [], total: count ?? 0 }
   },
 
   async getProductsByVehicle(vehicleId: string, options: {

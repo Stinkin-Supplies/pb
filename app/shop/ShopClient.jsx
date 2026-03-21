@@ -62,12 +62,15 @@ const css = `
 
 // ── COMPONENT ─────────────────────────────────────────────────
 export default function ShopClient({
-  initialProducts   = [],
-  availableBrands   = [],
+  initialProducts     = [],
+  availableBrands     = [],
   availableCategories = [],
-  initialCategory   = null,
-  initialBrand      = null,
-  fetchError        = null,
+  initialCategory     = null,
+  initialBrand        = null,
+  fetchError          = null,
+  totalProducts       = 0,
+  currentPage         = 0,
+  pageSize            = 48,
 }) {
   const rawProducts = initialProducts;
   const brands      = availableBrands;
@@ -462,8 +465,84 @@ export default function ShopClient({
               ))}
             </div>
           )}
+
+          {/* ── PAGINATION ── */}
+          {totalProducts > pageSize && (
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
+                          padding:"24px 0", marginTop:8, borderTop:"1px solid #2a2828",
+                          flexWrap:"wrap", gap:12 }}>
+              <span style={S({fontSize:9, color:"#8a8784", letterSpacing:"0.12em"})}>
+                SHOWING{" "}
+                <span style={{color:"#f0ebe3"}}>
+                  {currentPage * pageSize + 1}–{Math.min((currentPage + 1) * pageSize, totalProducts)}
+                </span>
+                {" "}OF{" "}
+                <span style={{color:"#e8621a"}}>{totalProducts.toLocaleString()}</span>
+                {" "}PRODUCTS
+              </span>
+              <div style={{display:"flex", gap:8, alignItems:"center"}}>
+                {currentPage > 0 && (
+                  <a
+                    href={buildPageUrl(currentPage - 1, initialCategory, initialBrand)}
+                    style={{ ...S({fontSize:10, letterSpacing:"0.1em"}),
+                             background:"#111010", border:"1px solid #2a2828",
+                             color:"#8a8784", padding:"7px 16px", borderRadius:2,
+                             textDecoration:"none", transition:"all 0.15s" }}
+                  >
+                    ← PREV
+                  </a>
+                )}
+                {/* Page number chips — show 5 around current */}
+                {getPageRange(currentPage, Math.ceil(totalProducts / pageSize)).map(pg => (
+                  <a
+                    key={pg}
+                    href={buildPageUrl(pg, initialCategory, initialBrand)}
+                    style={{ ...S({fontSize:10, letterSpacing:"0.08em"}),
+                             background: pg === currentPage ? "#e8621a" : "#111010",
+                             border: `1px solid ${pg === currentPage ? "#e8621a" : "#2a2828"}`,
+                             color: pg === currentPage ? "#0a0909" : "#8a8784",
+                             padding:"7px 13px", borderRadius:2,
+                             textDecoration:"none", minWidth:36, textAlign:"center" }}
+                  >
+                    {pg + 1}
+                  </a>
+                ))}
+                {(currentPage + 1) * pageSize < totalProducts && (
+                  <a
+                    href={buildPageUrl(currentPage + 1, initialCategory, initialBrand)}
+                    style={{ ...S({fontSize:10, letterSpacing:"0.1em"}),
+                             background:"#111010", border:"1px solid #2a2828",
+                             color:"#8a8784", padding:"7px 16px", borderRadius:2,
+                             textDecoration:"none", transition:"all 0.15s" }}
+                  >
+                    NEXT →
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
     </div>
   );
+}
+
+// ── Pagination helpers ────────────────────────────────────────
+function buildPageUrl(page, category, brand) {
+  const p = new URLSearchParams();
+  if (page > 0) p.set("page", String(page));
+  if (category) p.set("category", category);
+  if (brand)    p.set("brand", brand);
+  const qs = p.toString();
+  return qs ? `/shop?${qs}` : "/shop";
+}
+
+function getPageRange(current, total) {
+  const delta  = 2;
+  const start  = Math.max(0, current - delta);
+  const end    = Math.min(total - 1, current + delta);
+  const pages  = [];
+  for (let i = start; i <= end; i++) pages.push(i);
+  return pages;
 }
