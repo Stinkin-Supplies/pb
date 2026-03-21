@@ -89,8 +89,9 @@ function normalizeRow(row) {
     brand:      row.brand_name    ?? "Unknown",
     category:   row.category_name ?? "Uncategorized",
     price:      Number(row.our_price ?? 0),
-    was:        row.compare_at_price ? Number(row.compare_at_price)
-              : row.msrp             ? Number(row.msrp) : null,
+    was:        (row.compare_at_price > row.our_price) ? Number(row.compare_at_price)
+              : (row.msrp > row.our_price)             ? Number(row.msrp)
+              : null,
     mapPrice:   row.map_price ? Number(row.map_price) : null,
     badge:      row.is_new ? "new" : null,
     inStock:    row.in_stock ?? (row.stock_quantity > 0),
