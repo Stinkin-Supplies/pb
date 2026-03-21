@@ -38,7 +38,7 @@ export default async function ShopPage({ searchParams }) {
           .select(
             "id,sku,slug,name,brand_name,category_name," +
             "our_price,msrp,compare_at_price,map_price," +
-            "in_stock,stock_quantity,is_new,images,fitment_ids",
+            "in_stock,stock_quantity,is_new,images",
             { count:"exact" }
           )
           .eq("status","active");
@@ -94,7 +94,7 @@ function normalizeRow(row) {
     mapPrice:   row.map_price ? Number(row.map_price) : null,
     badge:      row.is_new ? "new" : null,
     inStock:    row.in_stock ?? (row.stock_quantity > 0),
-    fitmentIds: row.fitment_ids ?? null,
+    fitmentIds: null, // Phase 5 — ACES column not yet added
     image:      Array.isArray(row.images) && row.images.length > 0
                   ? row.images[0] : null,
   };
