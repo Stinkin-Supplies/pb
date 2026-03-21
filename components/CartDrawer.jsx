@@ -22,8 +22,8 @@
 //   - Pass cart state + points redemption to checkout page
 // ============================================================
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import Link from "next/link";
 
 const FREE_SHIPPING_THRESHOLD = 99;
 
@@ -130,7 +130,10 @@ const css = `
     align-items: center;
     cursor: pointer;
     min-width: 0;
+    color: inherit;
   }
+  .item-main:hover .item-name { color: #e8621a; }
+  .item-main:hover .item-img { border-color: rgba(232,98,26,0.35); }
 
   .item-img {
     width: 72px; height: 72px;
@@ -368,8 +371,6 @@ const POINTS_TO_DOLLAR    = 0.01; // 100 points = $1
 
 export default function CartDrawer({ isOpen, onClose, cartItems, onUpdateQty, onRemove }) {
   const [redeemPoints, setRedeemPoints] = useState(false);
-  const router = useRouter();
-
   // Lock body scroll when drawer is open
   useEffect(() => {
     if (isOpen) {
@@ -409,12 +410,6 @@ export default function CartDrawer({ isOpen, onClose, cartItems, onUpdateQty, on
 
   const M = s => ({ fontFamily:"'Share Tech Mono',monospace", ...s });
   const B = s => ({ fontFamily:"'Bebas Neue',sans-serif",     ...s });
-
-  const handleItemClick = useCallback((item) => {
-    if (!item?.slug) return;
-    onClose?.();
-    router.push(`/shop/${item.slug}`);
-  }, [onClose, router]);
 
   if (!isOpen) return null;
 
@@ -483,30 +478,27 @@ export default function CartDrawer({ isOpen, onClose, cartItems, onUpdateQty, on
             <div className="drawer-items">
               {cartItems.map(item => (
                 <div key={item.id} className="cart-item">
-                  <div
+                  <Link
+                    href={item.slug ? `/shop/${item.slug}` : "/shop"}
                     className="item-main"
-                    role="link"
-                    tabIndex={0}
-                    onClick={() => handleItemClick(item)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        handleItemClick(item);
-                      }
-                    }}
+                    onClick={() => onClose?.()}
+                    style={{ textDecoration: "none" }}
                   >
                     {/* Image */}
                     <div className="item-img">
-                      {item.image
-                        ? <img src={item.image} alt={item.name}/>
-                        : <span className="item-img-placeholder">NO IMG</span>
-                      }
+                      {(() => {
+                        const src = item.image
+                          ?? (Array.isArray(item.images) && item.images.length > 0 ? item.images[0] : null);
+                        return src
+                          ? <img src={src} alt={item.name} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                          : <span className="item-img-placeholder">NO IMG</span>;
+                      })()}
                     </div>
 
                     {/* Body */}
                     <div className="item-body">
-                      <div className="item-brand">{item.brand}</div>
-                      <div className="item-name" title={item.name}>{item.name}</div>
+                      <div className="item-brand">{item.brand ?? item.brand_name ?? ""}</div>
+                      <div className="item-name" title={item.name}>{item.name ?? "Product"}</div>
 
                       {/* MAP note if price is at floor */}
                       {item.mapPrice && item.price <= item.mapPrice && (
@@ -524,7 +516,7 @@ export default function CartDrawer({ isOpen, onClose, cartItems, onUpdateQty, on
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </Link>
 
                   <div className="item-controls">
                     <button className="item-qty-btn" onClick={() => onUpdateQty(item.id, item.qty - 1)} disabled={item.qty <= 1}>−</button>
