@@ -328,7 +328,11 @@ export function sortedImageUrls(images: WpsImage[] | null | undefined): string[]
     .sort((a, b) => {
       if (a.main && !b.main) return -1;
       if (!a.main && b.main) return 1;
-      return order.indexOf(a.type) - order.indexOf(b.type);
+      const aIndex = order.indexOf(a.type ?? "");
+      const bIndex = order.indexOf(b.type ?? "");
+      const aRank = aIndex === -1 ? order.length : aIndex;
+      const bRank = bIndex === -1 ? order.length : bIndex;
+      return aRank - bRank;
     })
     .map(buildImageUrl);
 }
