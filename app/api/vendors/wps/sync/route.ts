@@ -256,8 +256,10 @@ export async function POST(req: Request) {
       if (batch.length === 0) return;
 
       const validBatch = batch.filter(
-        (p) => p.sku?.trim() && p.part_number?.trim() && (p as any).brand_id
+        (p) => p.sku?.trim() && p.part_number?.trim()
       );
+      // Count items dropped only because of missing SKU (brand_id null is fine — column is nullable)
+      result.skipped += batch.length - validBatch.length;
       if (validBatch.length === 0) { batch = []; return; }
 
       const { error } = await supabase
