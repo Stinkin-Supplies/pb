@@ -101,7 +101,7 @@ function parseCatalogXml(filePath: string): CatalogItem[] {
   return result;
 }
 
-function isRealImage(url: string | null) {
+function isRealImage(url: string | null): url is string {
   if (!url || !url.startsWith("http")) return false;
 
   const lower = url.toLowerCase();
