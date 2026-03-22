@@ -27,15 +27,23 @@ export const WPS_STATUS_MAP: Record<string, string> = {
 // ── TypeScript Types ──────────────────────────────────────────
 
 export interface WpsImage {
-  id:       number;
-  item_id:  number;
-  main:     boolean;
-  /** relative path, prefix with WPS_CDN_BASE */
-  path:     string;
-  /** width × height bucket: "thumb" | "small" | "large" | "full" */
-  type:     string;
-  /** fully-qualified URL when present (preferred over constructing from path) */
-  url?:     string;
+  id:        number;
+  item_id?:  number;
+  main:      boolean;
+  /** CDN domain, e.g. "cdn.wpsstatic.com/" */
+  domain?:   string;
+  /** path segment, e.g. "images/" */
+  path:      string;
+  /** filename, e.g. "6dde-59cd72ea6f409.jpg" */
+  filename?: string;
+  alt?:      string | null;
+  mime?:     string;
+  width?:    number;
+  height?:   number;
+  /** style bucket returned by items sideload: "thumb"|"small"|"large"|"full" */
+  type?:     string;
+  /** fully-qualified URL when present — use directly */
+  url?:      string;
 }
 
 export interface WpsInventoryWarehouse {
@@ -60,6 +68,13 @@ export interface WpsItem {
   height:                 number | null;
   upc:                    string | null;
   country_code:           string | null;
+  /** Dealer cost from items response */
+  standard_dealer_price:  number | null;
+  /** MSRP / list price */
+  list_price:             number | null;
+  /** MAP price (when has_map_policy = true) */
+  mapp_price:             number | null;
+  has_map_policy:         boolean | null;
   /** Sideloaded via ?include=images */
   images?:                WpsImage[];
   /** Sideloaded via ?include=inventory */
@@ -286,10 +301,21 @@ export async function paginateAll<T>(
 
 // ── Image URL builder ─────────────────────────────────────────
 
+// Style preference order — use 1000_max for product images, fall back to full
+const IMAGE_STYLE = "1000_max";
+
 export function buildImageUrl(image: WpsImage): string {
-  // If WPS gives us a full URL, use it directly
+  // Prefer explicit full URL if provided
   if (image.url && image.url.startsWith("http")) return image.url;
-  // Otherwise prefix the CDN base
+
+  // V4 API format: domain + style + "/" + path + filename
+  if (image.domain && image.filename) {
+    const domain = image.domain.replace(/\/$/, "");
+    const path   = (image.path ?? "images").replace(/^\//, "").replace(/\/$/, "");
+    return `https://${domain}/${IMAGE_STYLE}/${path}/${image.filename}`;
+  }
+
+  // Legacy fallback: prefix CDN base with path
   const p = image.path.startsWith("/") ? image.path : `/${image.path}`;
   return `${WPS_CDN_BASE}${p}`;
 }
@@ -370,14 +396,16 @@ export interface WpsMappedProduct {
 
 export function mapWpsItemToProduct(
   item:       WpsItem,
-  pricing:    WpsDealerPricingEntry | null,
+  pricing:    WpsDealerPricingEntry | null,  // kept for back-compat, item fields preferred
   brandName:  string,
   vendorId:   string
 ): WpsMappedProduct {
-  const cost     = pricing?.dealer_cost ?? 0;
-  const retail   = pricing?.retail ?? 0;
-  const isMap    = pricing?.is_map ?? false;
-  const mapPrice = pricing?.map_price ?? null;
+  // Prefer pricing fields embedded on the item (WPS API v4 items response)
+  // Fall back to the separate pricing map entry if item fields are absent
+  const cost     = item.standard_dealer_price ?? pricing?.dealer_cost ?? 0;
+  const retail   = item.list_price            ?? pricing?.retail      ?? 0;
+  const isMap    = item.has_map_policy        ?? pricing?.is_map      ?? false;
+  const mapPrice = item.mapp_price            ?? pricing?.map_price   ?? null;
   const rawPrice = cost > 0 ? cost * 1.25 : retail * 0.65; // fallback margin
   const ourPrice = isMap && mapPrice ? Math.max(rawPrice, mapPrice) : rawPrice;
 

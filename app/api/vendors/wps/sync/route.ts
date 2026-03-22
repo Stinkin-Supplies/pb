@@ -271,11 +271,28 @@ export async function POST(req: Request) {
         .upsert(validBatch, { onConflict: "sku", ignoreDuplicates: false });
 
       if (error) {
-        console.error(
-          "[WPS Sync] Upsert error:", error.message,
-          "| Sample:", JSON.stringify(validBatch[0]?.sku)
-        );
-        result.errors += validBatch.length;
+        const isSlugConflict = error.message.includes("products_slug_key");
+        if (isSlugConflict) {
+          // Retry one-by-one so only the colliding row is skipped
+          for (const item of validBatch) {
+            const { error: singleErr } = await supabase
+              .from("products")
+              .upsert(item, { onConflict: "sku", ignoreDuplicates: false });
+            if (singleErr) {
+              console.warn("[WPS Sync] Slug conflict skipped:", item.sku, "—", singleErr.message);
+              result.skipped += 1;
+            } else {
+              result.upserted += 1;
+              result.images   += item.images?.length ?? 0;
+            }
+          }
+        } else {
+          console.error(
+            "[WPS Sync] Upsert error:", error.message,
+            "| Sample:", JSON.stringify(validBatch[0]?.sku)
+          );
+          result.errors += validBatch.length;
+        }
       } else {
         result.upserted += validBatch.length;
         result.images   += validBatch.reduce(
@@ -291,7 +308,8 @@ export async function POST(req: Request) {
       {
         // No status filter — WPS uses non-standard status values (NLA, etc.)
         // We map their status to our own via WPS_STATUS_MAP in wps.ts
-        "include": "images,inventory",
+        // Images live on products not items — include product.images via product sideload
+        "include": "inventory,product.images",
       },
       async (items, pageNum, pageInfo) => {
         result.totalItems += items.length;
