@@ -139,10 +139,18 @@ export async function POST(req: Request) {
     try {
       console.log("[WPS Sync] Requesting dealer pricing job...");
       const jobId      = await requestPricingJob(wps);
-      console.log(`[WPS Sync] Pricing job ID: ${jobId} — polling...`);
-      const downloadUrl = await pollPricingJob(wps, jobId);
-      console.log("[WPS Sync] Pricing job complete — downloading...");
-      const entries     = await downloadPricingData(downloadUrl);
+      // If requestPricingJob returns a URL directly, download immediately
+      // If it returns a job ID, poll until ready
+      let downloadUrl: string;
+      if (jobId.startsWith("http")) {
+        downloadUrl = jobId;
+        console.log("[WPS Sync] Pricing URL ready — downloading...");
+      } else {
+        console.log(`[WPS Sync] Pricing job ID: ${jobId} — polling...`);
+        downloadUrl = await pollPricingJob(wps, jobId);
+        console.log("[WPS Sync] Pricing job complete — downloading...");
+      }
+      const entries = await downloadPricingData(downloadUrl);
       pricingMap        = buildPricingMap(entries);
       console.log(`[WPS Sync] ${pricingMap.size.toLocaleString()} pricing entries loaded`);
     } catch (pricingErr: any) {
