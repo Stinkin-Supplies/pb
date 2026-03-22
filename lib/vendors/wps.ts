@@ -178,12 +178,14 @@ export class WpsClient {
   }
 
   async get<T>(path: string, params: Record<string, string> = {}): Promise<T> {
-    const url = new URL(`${WPS_API_BASE}${path}`);
-    for (const [k, v] of Object.entries(params)) {
-      url.searchParams.set(k, v);
-    }
+    // Build query string manually — URL.searchParams encodes brackets as %5B%5D
+    // but WPS requires raw brackets: page[size]=50 not page%5Bsize%5D=50
+    const qs = Object.entries(params)
+      .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+      .join("&");
+    const urlStr = `${WPS_API_BASE}${path}${qs ? `?${qs}` : ""}`;
 
-    const res = await fetch(url.toString(), { headers: this.headers() });
+    const res = await fetch(urlStr, { headers: this.headers() });
 
     if (!res.ok) {
       const text = await res.text();
@@ -401,8 +403,11 @@ export function mapWpsItemToProduct(
 // complete, then download the JSON file.
 
 export async function requestPricingJob(client: WpsClient): Promise<string> {
-  const res = await client.post<{ data: { id: string } }>("/items/pricing", {});
-  return res.data.id;
+  // WPS dealer pricing is a GET that returns a download URL directly
+  const res = await client.get<{ data: WpsPricingJobStatus }>("/items/pricing");
+  if (res.data?.download_url) return res.data.download_url;
+  // If async job, return the job id to poll
+  return res.data?.id ?? "";
 }
 
 export async function pollPricingJob(
