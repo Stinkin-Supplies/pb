@@ -20,6 +20,7 @@ import fs   from "fs";
 import path from "path";
 import { XMLParser } from "fast-xml-parser";
 import { createClient } from "@supabase/supabase-js";
+import { mergeProductImages } from "../lib/mergeProductImages";
 
 // ── Config ────────────────────────────────────────────────────
 const DEFAULT_FILE = path.join(process.cwd(), "data/pu/Brand_PIES_Export.xml");
@@ -118,7 +119,7 @@ function parsePiesXml(filePath: string): PiesItem[] {
 
     for (const asset of digitalFiles) {
       const uri = String(asset.URI ?? "").trim();
-      if (uri && uri.startsWith("http")) {
+      if (isRealImage(uri)) {
         images.push(uri);
       }
     }
@@ -135,6 +136,29 @@ function parsePiesXml(filePath: string): PiesItem[] {
   }
 
   return result;
+}
+
+function isRealImage(url: string) {
+  if (!url || !url.startsWith("http")) return false;
+
+  const lower = url.toLowerCase();
+
+  // reject known bad patterns
+  if (
+    lower.includes(".zip") ||
+    lower.includes("download") ||
+    lower.includes("asset")
+  ) return false;
+
+  // accept known image formats
+  return (
+    lower.endsWith(".jpg") ||
+    lower.endsWith(".jpeg") ||
+    lower.endsWith(".png") ||
+    lower.endsWith(".webp") ||
+    lower.endsWith(".gif") ||
+    lower.endsWith(".svg")
+  );
 }
 
 // ── Upsert logic ──────────────────────────────────────────────
@@ -170,14 +194,14 @@ async function upsertBatch(
     }
 
     const existingImages = match.images ?? [];
+    const piesImages = item.images;
+    const mergedImages = mergeProductImages({
+      wps: piesImages,
+      pies: existingImages,
+      pu: [],
+    });
 
-    // Merge images — add new URLs, keep existing ones, dedupe
-    const mergedImages = [...new Set([
-      ...item.images,
-      ...existingImages,
-    ])];
-
-    const hasNewImages = item.images.some(img => !existingImages.includes(img));
+    const hasNewImages = piesImages.some(img => !existingImages.includes(img));
 
     const shouldUpdate =
       hasNewImages ||

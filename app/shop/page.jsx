@@ -105,8 +105,7 @@ function normalizeRow(row) {
     badge:      row.is_new ? "new" : null,
     inStock:    row.in_stock ?? (row.stock_quantity > 0),
     fitmentIds: null, // Phase 5 — ACES column not yet added
-    image:      Array.isArray(row.images) && row.images.length > 0
-                  ? row.images[0] : null,
+    image:      row.images?.[0] ?? null,
   };
 }
 
