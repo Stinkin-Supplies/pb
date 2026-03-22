@@ -17,9 +17,11 @@
 // ============================================================
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import NavBar from "@/components/NavBar";
 import { useCartSafe } from "@/components/CartContext";
+import { getProductImage } from "@/lib/getProductImage";
 
 const PAGE_SIZE   = 48;
 const DEBOUNCE_MS = 350;
@@ -210,6 +212,8 @@ function FacetSection({ label, items, selected, loading, onSelect }) {
 
 // ── ProductCard ───────────────────────────────────────────────
 function ProductCard({ product:p, index, view, onAdd }) {
+  const imageSrc = getProductImage(p);
+
   return (
     <Link href={`/shop/${p.slug}`} className="pcard"
       style={{ background:"#111010", border:"1px solid #2a2828", borderRadius:2,
@@ -228,12 +232,14 @@ function ProductCard({ product:p, index, view, onAdd }) {
           backgroundImage:"linear-gradient(rgba(232,98,26,0.04) 1px,transparent 1px)," +
                           "linear-gradient(90deg,rgba(232,98,26,0.04) 1px,transparent 1px)",
           backgroundSize:"16px 16px" }}/>
-        {p.image
-          ? <img src={p.image} alt={p.name}
-              style={{width:"100%",height:"100%",objectFit:"cover",position:"relative",zIndex:1}}/>
-          : <span style={S({fontSize:8,color:"#3a3838",letterSpacing:"0.1em",
-                            position:"relative",zIndex:1})}>NO IMAGE</span>
-        }
+        <Image
+          src={imageSrc}
+          alt={p.name}
+          fill
+          sizes={view==="list" ? "140px" : "(min-width: 1024px) 20vw, (min-width: 768px) 33vw, 50vw"}
+          style={{ objectFit:"cover", position:"relative", zIndex:1 }}
+          unoptimized
+        />
         {p.badge && (
           <span style={{ position:"absolute", top:7, left:7, zIndex:2,
             ...S({fontSize:7,fontWeight:700,letterSpacing:"0.1em",padding:"2px 6px",borderRadius:1}),
