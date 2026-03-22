@@ -404,6 +404,10 @@ function WpsPanel() {
 
   const fetchStatus = useCallback(async () => {
     try {
+      if (!SYNC_SECRET) {
+        addLog("Missing NEXT_PUBLIC_SYNC_SECRET — cannot auth /api/vendors/wps/sync", "error");
+        return;
+      }
       const res  = await fetch("/api/vendors/wps/sync", {
         headers: { Authorization: `Bearer ${SYNC_SECRET}` },
       });
@@ -422,6 +426,11 @@ function WpsPanel() {
     setStatus("running");
     setSyncResult(null);
     setLogs([]);
+    if (!SYNC_SECRET) {
+      addLog("Missing NEXT_PUBLIC_SYNC_SECRET — cannot auth /api/vendors/wps/sync", "error");
+      setStatus("error");
+      return;
+    }
     addLog("Connecting to WPS API...", "info");
     addLog("Requesting dealer pricing job (async — may take 30–60s)...", "info");
 
