@@ -121,7 +121,7 @@ export async function POST(req: Request) {
 
     for (const id of itemIds) {
       const res = await wps.get<{ data: WpsItem }>(`/items/${id}`, {
-        include: "inventory,product.images",
+        include: "inventory,images",
       });
       if (res?.data) resolvedItems.push(res.data);
     }
@@ -129,7 +129,7 @@ export async function POST(req: Request) {
     for (const sku of skus) {
       const res = await wps.get<{ data: WpsItem[] }>("/items", {
         "filter[sku]": sku,
-        include: "inventory,product.images",
+        include: "inventory,images",
       });
       if (Array.isArray(res?.data)) resolvedItems.push(...res.data);
     }
