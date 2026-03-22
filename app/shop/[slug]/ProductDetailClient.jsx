@@ -17,9 +17,11 @@
 // ============================================================
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import NavBar from "@/components/NavBar";
 import { useCartSafe } from "@/components/CartContext";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { getProductImage } from "@/lib/getProductImage";
 
 const supabase = createBrowserSupabaseClient();
 
@@ -532,6 +534,10 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
 
   // ── Render helpers ─────────────────────────────────────────
   const hasImages = product.images && product.images.length > 0;
+  const hasAnyImage = Boolean(product.image) || hasImages;
+  const mainImageSrc = hasImages && product.images[activeImg]
+    ? product.images[activeImg]
+    : getProductImage(product);
 
   // Fake thumbnail slots until real images come from vendor sync
   const thumbSlots = hasImages
@@ -566,8 +572,17 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
                 {product.badge.toUpperCase()}
               </span>
             )}
-            {hasImages && product.images[activeImg]
-              ? <img src={product.images[activeImg]} alt={product.name}/>
+            {hasAnyImage
+              ? (
+                <Image
+                  src={mainImageSrc}
+                  alt={product.name}
+                  fill
+                  sizes="(min-width: 1024px) 50vw, 100vw"
+                  style={{ objectFit:"cover", position:"relative", zIndex:1 }}
+                  unoptimized
+                />
+              )
               : <span className="gallery-placeholder">NO IMAGE YET</span>
             }
           </div>
@@ -581,7 +596,16 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
                 onClick={() => setActiveImg(i)}
               >
                 {src
-                  ? <img src={src} alt={`View ${i+1}`}/>
+                  ? (
+                    <Image
+                      src={src}
+                      alt={`View ${i+1}`}
+                      width={72}
+                      height={72}
+                      style={{ objectFit:"cover" }}
+                      unoptimized
+                    />
+                  )
                   : <span className="gallery-thumb-placeholder">IMG {i+1}</span>
                 }
               </div>
