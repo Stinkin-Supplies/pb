@@ -271,9 +271,10 @@ export function buildImageUrl(image: WpsImage): string {
 }
 
 /** Returns image URLs sorted: main first, then by type preference */
-export function sortedImageUrls(images: WpsImage[]): string[] {
+export function sortedImageUrls(images: WpsImage[] | null | undefined): string[] {
   const order = ["full", "large", "small", "thumb"];
-  return [...images]
+  const list = Array.isArray(images) ? images : [];
+  return [...list]
     .sort((a, b) => {
       if (a.main && !b.main) return -1;
       if (!a.main && b.main) return 1;
