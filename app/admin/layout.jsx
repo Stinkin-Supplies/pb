@@ -190,6 +190,13 @@ const NAV = [
     ],
   },
   {
+    section: "VENDOR",
+    links: [
+      { href: "/admin/sync",    icon: "↺", label: "SYNC"         },
+      { href: "/admin/products",icon: "▤", label: "PRODUCTS"     },
+    ],
+  },
+  {
     section: "STORE",
     links: [
       { href: "/shop",   icon: "↗", label: "VIEW STORE"  },
@@ -217,15 +224,9 @@ export default async function AdminLayout({ children, params }) {
   const displayName = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || profile?.email || user.email;
 
   return (
-    <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
-      </head>
-      <body>
-        <style>{css}</style>
-        <div className="admin-shell">
+    <>
+      <style>{css}</style>
+      <div className="admin-shell">
 
           {/* SIDEBAR */}
           <aside className="admin-sidebar">
@@ -268,7 +269,6 @@ export default async function AdminLayout({ children, params }) {
           </div>
 
         </div>
-      </body>
-    </html>
+    </>
   );
 }
