@@ -236,8 +236,9 @@ function ProductCard({ product:p, index, view, onAdd }) {
           src={imageSrc}
           alt={p.name}
           fill
-          sizes={view==="list" ? "140px" : "(min-width: 1024px) 20vw, (min-width: 768px) 33vw, 50vw"}
+          sizes="(max-width: 768px) 50vw, 25vw"
           style={{ objectFit:"cover", zIndex:1 }}
+          priority={index < 6}
           unoptimized
         />
         {p.badge && (

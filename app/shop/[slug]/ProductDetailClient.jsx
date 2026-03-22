@@ -533,16 +533,9 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
   };
 
   // ── Render helpers ─────────────────────────────────────────
-  const hasImages = product.images && product.images.length > 0;
-  const hasAnyImage = Boolean(product.image) || hasImages;
-  const mainImageSrc = hasImages && product.images[activeImg]
-    ? product.images[activeImg]
-    : getProductImage(product);
-
-  // Fake thumbnail slots until real images come from vendor sync
-  const thumbSlots = hasImages
+  const images = product.images?.length
     ? product.images
-    : Array(3).fill(null);
+    : ["/placeholder-product.png"];
 
   return (
     <div className="pdp-wrap">
@@ -572,45 +565,34 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
                 {product.badge.toUpperCase()}
               </span>
             )}
-            {hasAnyImage
-              ? (
-                <Image
-                  src={mainImageSrc}
-                  alt={product.name}
-                  fill
-                  sizes="(min-width: 1024px) 50vw, 100vw"
-                  style={{ objectFit:"cover", zIndex:1 }}
-                  unoptimized
-                />
-              )
-              : <span className="gallery-placeholder">NO IMAGE YET</span>
-            }
+            <Image
+              src={images[activeImg]}
+              alt={product.name}
+              width={500}
+              height={500}
+              className="object-contain"
+              priority
+              unoptimized
+            />
           </div>
 
-          {/* Thumbnail rail */}
-          <div className="gallery-thumbs">
-            {thumbSlots.map((src, i) => (
-              <div
-                key={i}
-                className={`gallery-thumb ${activeImg===i?"active":""}`}
-                onClick={() => setActiveImg(i)}
-              >
-                {src
-                  ? (
-                    <Image
-                      src={src}
-                      alt={`View ${i+1}`}
-                      width={72}
-                      height={72}
-                      style={{ objectFit:"cover" }}
-                      unoptimized
-                    />
-                  )
-                  : <span className="gallery-thumb-placeholder">IMG {i+1}</span>
-                }
-              </div>
-            ))}
-          </div>
+          {/* Thumbnails (if multiple) */}
+          {images.length > 1 && (
+            <div className="flex gap-2 mt-4">
+              {images.map((img, i) => (
+                <Image
+                  key={i}
+                  src={img}
+                  alt={`${product.name} ${i}`}
+                  width={80}
+                  height={80}
+                  className={`border rounded cursor-pointer ${activeImg===i ? "border-[#e8621a]" : "border-[#2a2828]"}`}
+                  onClick={() => setActiveImg(i)}
+                  unoptimized
+                />
+              ))}
+            </div>
+          )}
 
           {/* Specs table — below gallery on desktop */}
           {product.specs && product.specs.length > 0 && (
