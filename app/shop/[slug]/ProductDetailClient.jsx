@@ -21,7 +21,7 @@ import Image from "next/image";
 import NavBar from "@/components/NavBar";
 import { useCartSafe } from "@/components/CartContext";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
-import { getProductImage } from "@/lib/getProductImage";
+import { getProductImage, filterImageUrls } from "@/lib/getProductImage";
 
 const supabase = createBrowserSupabaseClient();
 
@@ -533,9 +533,10 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
   };
 
   // ── Render helpers ─────────────────────────────────────────
-  const images = product.images?.length
-    ? product.images
-    : ["/placeholder-product.png"];
+  const images = (() => {
+    const valid = filterImageUrls(product.images);
+    return valid.length > 0 ? valid : [getProductImage(product)];
+  })();
 
   return (
     <div className="pdp-wrap">
