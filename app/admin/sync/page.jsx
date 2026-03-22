@@ -408,9 +408,7 @@ function WpsPanel() {
         addLog("Missing NEXT_PUBLIC_SYNC_SECRET — cannot auth /api/vendors/wps/sync", "error");
         return;
       }
-      const res  = await fetch("/api/vendors/wps/sync", {
-        headers: { Authorization: `Bearer ${SYNC_SECRET}` },
-      });
+      const res  = await fetch("/api/admin/wps/sync");
       const data = await res.json();
       setDbStatus(data);
     } catch {}
@@ -427,19 +425,16 @@ function WpsPanel() {
     setSyncResult(null);
     setLogs([]);
     if (!SYNC_SECRET) {
-      addLog("Missing NEXT_PUBLIC_SYNC_SECRET — cannot auth /api/vendors/wps/sync", "error");
-      setStatus("error");
-      return;
+      addLog("Missing NEXT_PUBLIC_SYNC_SECRET — using server proxy for auth", "info");
     }
     addLog("Connecting to WPS API...", "info");
     addLog("Requesting dealer pricing job (async — may take 30–60s)...", "info");
 
     try {
-      const res  = await fetch("/api/vendors/wps/sync", {
+      const res  = await fetch("/api/admin/wps/sync", {
         method:  "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization:  `Bearer ${SYNC_SECRET}`,
         },
       });
       const data = await res.json();
