@@ -197,19 +197,23 @@ export async function POST(req: Request) {
       console.warn("[WPS Sync] Pricing job failed, using retail fallback:", pricingErr.message);
     }
 
-    // ── Step 3: Load all WPS brands ────────────────────────
+    // ── Step 3: Load ALL WPS brands (paginated) ────────────
     console.log("[WPS Sync] Loading WPS brand list...");
-    const brandsRes = await wps.get<{ data: WpsBrand[] }>("/brands", {
-      "page[size]": "200",
-    });
+    const allWpsBrands: WpsBrand[] = [];
+    await paginateAll<WpsBrand>(
+      wps,
+      "/brands",
+      { "page[size]": "200" },
+      async (page) => { allWpsBrands.push(...page); }
+    );
     const wpsBrandMap = new Map<number, string>();
-    for (const b of brandsRes.data ?? []) {
+    for (const b of allWpsBrands) {
       wpsBrandMap.set(b.id, b.name);
     }
     console.log(`[WPS Sync] ${wpsBrandMap.size} brands loaded`);
 
-    // Upsert brands into Supabase
-    const uniqueBrandNames = [...new Set(brandsRes.data.map((b) => b.name))];
+    // Upsert all brands into Supabase
+    const uniqueBrandNames = [...new Set(allWpsBrands.map((b) => b.name))];
     await supabase
       .from("brands")
       .upsert(
