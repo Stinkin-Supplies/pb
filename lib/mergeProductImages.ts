@@ -35,14 +35,18 @@ export function mergeProductImages({
   pu = [],
   score
 }: {
-  wps?: string[]
-  pies?: string[]
-  pu?: string[]
+  wps?: string[] | null
+  pies?: string[] | null
+  pu?: string[] | null
   score?: (url: string) => number
 }) {
-  const cleanWps  = dedupe(wps.filter(isRealImage))
-  const cleanPies = dedupe(pies.filter(isRealImage))
-  const cleanPu   = dedupe(pu.filter(isRealImage))
+  const safeWps = Array.isArray(wps) ? wps : []
+  const safePies = Array.isArray(pies) ? pies : []
+  const safePu = Array.isArray(pu) ? pu : []
+
+  const cleanWps  = dedupe(safeWps.filter(isRealImage))
+  const cleanPies = dedupe(safePies.filter(isRealImage))
+  const cleanPu   = dedupe(safePu.filter(isRealImage))
 
   // Priority merge
   let merged = [
