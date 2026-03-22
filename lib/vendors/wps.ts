@@ -231,11 +231,11 @@ export async function paginateAll<T>(
   client:   WpsClient,
   path:     string,
   params:   Record<string, string>,
-  onPage:   (items: T[], pageNum: number) => Promise<void>,
-  options?: { maxPages?: number }
+  onPage:   (items: T[], pageNum: number, pageInfo: { cursor: string | null; nextCursor: string | null }) => Promise<void>,
+  options?: { maxPages?: number; startCursor?: string | null; startPage?: number }
 ): Promise<{ total: number; pages: number }> {
-  let cursor:  string | null = null;
-  let page     = 0;
+  let cursor:  string | null = options?.startCursor ?? null;
+  let page     = options?.startPage ?? 0;
   let total    = 0;
   const max    = options?.maxPages ?? Infinity;
 
@@ -250,9 +250,10 @@ export async function paginateAll<T>(
     page++;
     total += res.data.length;
 
-    await onPage(res.data, page);
+    const nextCursor = res.meta?.cursor?.next ?? null;
+    await onPage(res.data, page, { cursor, nextCursor });
 
-    cursor = res.meta?.cursor?.next ?? null;
+    cursor = nextCursor;
 
     if (page >= max) break;
   } while (cursor);
