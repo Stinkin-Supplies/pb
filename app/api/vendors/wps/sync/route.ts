@@ -26,6 +26,8 @@ export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
 import { createClient }  from "@supabase/supabase-js";
+import fs from "fs";
+import path from "path";
 import {
   WpsClient,
   WpsItem,
@@ -38,8 +40,45 @@ import {
   pollPricingJob,
   downloadPricingData,
 } from "@/lib/vendors/wps";
+import { mergeProductImages } from "@/lib/mergeProductImages";
 
 const BATCH_SIZE = 250; // smaller than PU — WPS items carry image arrays
+const CHECKPOINT_FILE = path.join(process.cwd(), "data/wps_sync_checkpoint.json");
+
+type WpsCheckpoint = {
+  cursor: string | null;
+  page: number;
+  totalItems: number;
+  updatedAt: string;
+};
+
+function readCheckpoint(): WpsCheckpoint | null {
+  try {
+    if (!fs.existsSync(CHECKPOINT_FILE)) return null;
+    const raw = fs.readFileSync(CHECKPOINT_FILE, "utf-8");
+    return JSON.parse(raw) as WpsCheckpoint;
+  } catch (e) {
+    console.warn("[WPS Sync] Failed to read checkpoint:", (e as Error).message);
+    return null;
+  }
+}
+
+function writeCheckpoint(cp: WpsCheckpoint) {
+  try {
+    fs.mkdirSync(path.dirname(CHECKPOINT_FILE), { recursive: true });
+    fs.writeFileSync(CHECKPOINT_FILE, JSON.stringify(cp, null, 2));
+  } catch (e) {
+    console.warn("[WPS Sync] Failed to write checkpoint:", (e as Error).message);
+  }
+}
+
+function clearCheckpoint() {
+  try {
+    if (fs.existsSync(CHECKPOINT_FILE)) fs.unlinkSync(CHECKPOINT_FILE);
+  } catch (e) {
+    console.warn("[WPS Sync] Failed to clear checkpoint:", (e as Error).message);
+  }
+}
 
 // ── Sync log helpers (mirrors PU pattern) ────────────────────
 
@@ -192,6 +231,23 @@ export async function POST(req: Request) {
     }
 
     // ── Step 4: Paginate items with images + inventory ─────
+    const forceRestart = req.headers.get("x-force-restart") === "true";
+    let startCursor: string | null = null;
+    let startPage = 0;
+    const checkpoint = readCheckpoint();
+    if (checkpoint && !forceRestart) {
+      if (checkpoint.cursor) {
+        startCursor = checkpoint.cursor;
+        startPage = checkpoint.page;
+        console.log(`[WPS Sync] Resuming from page ${startPage + 1} (cursor checkpoint)`);
+      } else {
+        // If cursor is null, last run completed.
+        clearCheckpoint();
+      }
+    } else if (forceRestart) {
+      clearCheckpoint();
+    }
+
     console.log("[WPS Sync] Starting item pagination...");
 
     let batch: ReturnType<typeof mapWpsItemToProduct>[] = [];
@@ -231,8 +287,25 @@ export async function POST(req: Request) {
         // We map their status to our own via WPS_STATUS_MAP in wps.ts
         "include": "images,inventory",
       },
-      async (items, pageNum) => {
+      async (items, pageNum, pageInfo) => {
         result.totalItems += items.length;
+
+        const skuList = items.map(i => i.sku).filter(Boolean);
+        const existingImagesMap = new Map<string, string[]>();
+        if (skuList.length > 0) {
+          const { data: existingRows, error: existingErr } = await supabase
+            .from("products")
+            .select("sku, images")
+            .in("sku", skuList as string[]);
+
+          if (existingErr) {
+            console.warn("[WPS Sync] Existing image fetch warning:", existingErr.message);
+          } else {
+            for (const row of existingRows ?? []) {
+              if (row.sku) existingImagesMap.set(row.sku, row.images ?? []);
+            }
+          }
+        }
 
         for (const item of items) {
           if (!item.sku?.trim()) { result.skipped++; continue; }
@@ -241,6 +314,13 @@ export async function POST(req: Request) {
           const brandName  = wpsBrandMap.get(item.brand_id) ?? "WPS";
           const product    = mapWpsItemToProduct(item, pricing, brandName, vendorId) as any;
           product.brand_id = supabaseBrandMap[product.brand_name] ?? null;
+          const existingImages = existingImagesMap.get(product.sku) ?? [];
+          const wpsImages = product.images ?? [];
+          product.images = mergeProductImages({
+            wps: wpsImages,
+            pies: existingImages,
+            pu: [],
+          });
 
           batch.push(product);
           if (batch.length >= BATCH_SIZE) await flushBatch();
@@ -254,11 +334,24 @@ export async function POST(req: Request) {
             `images: ${result.images.toLocaleString()}`
           );
         }
+
+        writeCheckpoint({
+          cursor: pageInfo.nextCursor,
+          page: pageNum,
+          totalItems: result.totalItems,
+          updatedAt: new Date().toISOString(),
+        });
+      },
+      {
+      startCursor,
+      startPage,
       }
     );
 
     await flushBatch();
     result.durationMs = Date.now() - start;
+
+    clearCheckpoint();
 
     console.log("[WPS Sync] Complete:", result);
     console.log(`[WPS Sync] Paginated ${total} total items across all pages`);
