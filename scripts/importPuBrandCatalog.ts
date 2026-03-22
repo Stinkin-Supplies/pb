@@ -22,6 +22,7 @@ import fs   from "fs";
 import path from "path";
 import { XMLParser } from "fast-xml-parser";
 import { createClient } from "@supabase/supabase-js";
+import { mergeProductImages } from "../lib/mergeProductImages";
 
 // ── Config ────────────────────────────────────────────────────
 const DEFAULT_FILE = path.join(process.cwd(), "data/pu/Brand_Catalog_Content_Export.xml");
@@ -75,8 +76,13 @@ function parseCatalogXml(filePath: string): CatalogItem[] {
     // Dedupe images — partImage is SKU-specific (preferred),
     // productImage is shared across variants
     const images: string[] = [];
-    if (partImage    && partImage.startsWith("http"))    images.push(partImage);
-    if (productImage && productImage.startsWith("http") && productImage !== partImage) {
+    if (isRealImage(partImage)) {
+      images.push(partImage);
+    }
+    if (
+      isRealImage(productImage) &&
+      productImage !== partImage
+    ) {
       images.push(productImage);
     }
 
@@ -93,6 +99,29 @@ function parseCatalogXml(filePath: string): CatalogItem[] {
   }
 
   return result;
+}
+
+function isRealImage(url: string | null) {
+  if (!url || !url.startsWith("http")) return false;
+
+  const lower = url.toLowerCase();
+
+  // reject known bad patterns
+  if (
+    lower.includes(".zip") ||
+    lower.includes("download") ||
+    lower.includes("asset")
+  ) return false;
+
+  // accept known image formats
+  return (
+    lower.endsWith(".jpg") ||
+    lower.endsWith(".jpeg") ||
+    lower.endsWith(".png") ||
+    lower.endsWith(".webp") ||
+    lower.endsWith(".gif") ||
+    lower.endsWith(".svg")
+  );
 }
 
 // ── Upsert logic ──────────────────────────────────────────────
@@ -127,10 +156,11 @@ async function updateBatch(
       if (item.images.length === 0) { stats.noImage++; }
 
       const existingImages = match.images ?? [];
+      const puImages = item.images;
 
       const hasNewImages =
-        item.images.length > 0 &&
-        item.images.some(img => !existingImages.includes(img));
+        puImages.length > 0 &&
+        puImages.some(img => !existingImages.includes(img));
 
       const shouldUpdate =
         hasNewImages ||
@@ -142,7 +172,7 @@ async function updateBatch(
       }
 
       stats.updated++;
-      if (!sample && item.images.length > 0) sample = item;
+      if (!sample && puImages.length > 0) sample = item;
     }
     console.log(`[BrandCatalog] DRY RUN — would update ${stats.updated} products`);
     if (sample) {
@@ -168,10 +198,11 @@ async function updateBatch(
     if (item.images.length === 0) stats.noImage++;
 
     const existingImages = match.images ?? [];
+    const puImages = item.images;
 
     const hasNewImages =
-      item.images.length > 0 &&
-      item.images.some(img => !existingImages.includes(img));
+      puImages.length > 0 &&
+      puImages.some(img => !existingImages.includes(img));
 
     const shouldUpdate =
       hasNewImages ||
@@ -182,11 +213,11 @@ async function updateBatch(
       continue;
     }
 
-    // Merge: new images first (direct JPGs), then keep any existing ones
-    const mergedImages = [...new Set([
-      ...item.images,
-      ...existingImages,
-    ])];
+    const mergedImages = mergeProductImages({
+      wps: puImages,
+      pies: existingImages,
+      pu: [],
+    });
 
     updates.push({
       id:          match.id,

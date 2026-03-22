@@ -10,25 +10,39 @@ const BRAND_FALLBACKS: Record<string, string> = {
   "drag specialties": "/brands/drag-specialties.png",
 };
 
-const IMAGE_EXT_RE = /\.(avif|webp|png|jpe?g|gif|svg)(\?|#|$)/i;
+function isRealImage(url: string) {
+  if (!url || !url.startsWith("http")) return false;
 
-function isProbablyImageUrl(url: string) {
-  const trimmed = url.trim();
-  if (!trimmed) return false;
-  if (trimmed.startsWith("data:image/")) return true;
-  return IMAGE_EXT_RE.test(trimmed);
+  const lower = url.toLowerCase();
+
+  // reject known bad patterns
+  if (
+    lower.includes(".zip") ||
+    lower.includes("download") ||
+    lower.includes("asset")
+  ) return false;
+
+  // accept known image formats
+  return (
+    lower.endsWith(".jpg") ||
+    lower.endsWith(".jpeg") ||
+    lower.endsWith(".png") ||
+    lower.endsWith(".webp") ||
+    lower.endsWith(".gif") ||
+    lower.endsWith(".svg")
+  );
 }
 
 export function filterImageUrls(urls?: (string | null)[] | null) {
   if (!Array.isArray(urls)) return [];
-  return urls.filter((u): u is string => typeof u === "string" && isProbablyImageUrl(u));
+  return urls.filter((u): u is string => typeof u === "string" && isRealImage(u));
 }
 
 export function getProductImage(product?: ProductImageInput | null) {
   if (!product) return FALLBACK_IMAGE;
 
   const direct = typeof product.image === "string" ? product.image.trim() : "";
-  if (direct && isProbablyImageUrl(direct)) return direct;
+  if (direct && isRealImage(direct)) return direct;
 
   const first = filterImageUrls(product.images)[0] ?? null;
   if (first) return first;
