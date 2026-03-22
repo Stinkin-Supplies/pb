@@ -25,7 +25,7 @@ import { createClient } from "@supabase/supabase-js";
 
 // ── Config ────────────────────────────────────────────────────
 const DEFAULT_FILE = path.join(process.cwd(), "data/pu/Brand_Catalog_Content_Export.xml");
-const BATCH_SIZE   = 100;
+const BATCH_SIZE   = 500;
 
 const args    = process.argv.slice(2);
 const fileArg = args.indexOf("--file");
@@ -98,7 +98,7 @@ function parseCatalogXml(filePath: string): CatalogItem[] {
 // ── Upsert logic ──────────────────────────────────────────────
 async function updateBatch(
   items: CatalogItem[],
-  stats: { matched: number; skipped: number; noImage: number; errors: number }
+  stats: { updated: number; unchanged: number; skipped: number; noImage: number; errors: number }
 ) {
   const partNumbers = items.map(i => i.partNumber);
 
@@ -113,23 +113,38 @@ async function updateBatch(
     return;
   }
 
+  const normalize = (v: string) => v.trim().toLowerCase();
   const existingMap = new Map<string, { id: string; images: string[]; description: string | null }>();
   for (const row of existing ?? []) {
-    existingMap.set(row.sku.trim(), row);
+    existingMap.set(normalize(row.sku), row);
   }
 
   if (DRY_RUN) {
-    let wouldUpdate = 0;
     let sample: CatalogItem | null = null;
     for (const item of items) {
-      const match = existingMap.get(item.partNumber);
+      const match = existingMap.get(normalize(item.partNumber));
       if (!match) { stats.skipped++; continue; }
       if (item.images.length === 0) { stats.noImage++; }
-      wouldUpdate++;
-      stats.matched++;
+
+      const existingImages = match.images ?? [];
+
+      const hasNewImages =
+        item.images.length > 0 &&
+        item.images.some(img => !existingImages.includes(img));
+
+      const shouldUpdate =
+        hasNewImages ||
+        (!match.description && item.description);
+
+      if (!shouldUpdate) {
+        stats.unchanged++;
+        continue;
+      }
+
+      stats.updated++;
       if (!sample && item.images.length > 0) sample = item;
     }
-    console.log(`[BrandCatalog] DRY RUN — would update ${wouldUpdate} products`);
+    console.log(`[BrandCatalog] DRY RUN — would update ${stats.updated} products`);
     if (sample) {
       console.log("[BrandCatalog] Sample:", JSON.stringify({
         partNumber:  sample.partNumber,
@@ -141,30 +156,56 @@ async function updateBatch(
     return;
   }
 
+  const updates: { id: string; images: string[]; description: string | null }[] = [];
+
   for (const item of items) {
-    const match = existingMap.get(item.partNumber);
-    if (!match) { stats.skipped++; continue; }
+    const match = existingMap.get(normalize(item.partNumber));
+    if (!match) {
+      stats.skipped++;
+      continue;
+    }
 
     if (item.images.length === 0) stats.noImage++;
 
-    // Merge: new images first (direct JPGs), then keep any existing ones
     const existingImages = match.images ?? [];
-    const mergedImages   = [...new Set([...item.images, ...existingImages])];
 
-    const { error } = await supabase
-      .from("products")
-      .update({
-        images:      mergedImages,
-        description: item.description ?? match.description,
-      })
-      .eq("id", match.id);
+    const hasNewImages =
+      item.images.length > 0 &&
+      item.images.some(img => !existingImages.includes(img));
 
-    if (error) {
-      console.error("[BrandCatalog] Update error:", error.message, "sku:", item.partNumber);
-      stats.errors++;
-    } else {
-      stats.matched++;
+    const shouldUpdate =
+      hasNewImages ||
+      (!match.description && item.description);
+
+    if (!shouldUpdate) {
+      stats.unchanged++;
+      continue;
     }
+
+    // Merge: new images first (direct JPGs), then keep any existing ones
+    const mergedImages = [...new Set([
+      ...item.images,
+      ...existingImages,
+    ])];
+
+    updates.push({
+      id:          match.id,
+      images:      mergedImages,
+      description: match.description || item.description,
+    });
+    stats.updated++;
+  }
+
+  if (updates.length === 0) return;
+
+  const { error } = await supabase
+    .from("products")
+    .upsert(updates, { onConflict: "id" });
+
+  if (error) {
+    console.error("[BrandCatalog] Bulk upsert error:", error.message);
+    stats.errors += updates.length;
+    stats.updated -= updates.length;
   }
 }
 
@@ -179,7 +220,7 @@ async function main() {
   if (DRY_RUN) console.log("[BrandCatalog] DRY RUN MODE — no changes will be written");
 
   const items = parseCatalogXml(XML_FILE);
-  const stats = { matched: 0, skipped: 0, noImage: 0, errors: 0 };
+  const stats = { updated: 0, unchanged: 0, skipped: 0, noImage: 0, errors: 0 };
   const start = Date.now();
 
   for (let i = 0; i < items.length; i += BATCH_SIZE) {
@@ -189,19 +230,20 @@ async function main() {
     if ((i + BATCH_SIZE) % 500 === 0 || i + BATCH_SIZE >= items.length) {
       console.log(
         `[BrandCatalog] Progress ${Math.min(i + BATCH_SIZE, items.length)}/${items.length} — ` +
-        `matched: ${stats.matched} | skipped: ${stats.skipped} | no image: ${stats.noImage} | errors: ${stats.errors}`
+        `updated: ${stats.updated} | unchanged: ${stats.unchanged} | skipped: ${stats.skipped} | no image: ${stats.noImage} | errors: ${stats.errors}`
       );
     }
   }
 
   const duration = ((Date.now() - start) / 1000).toFixed(1);
   console.log(`\n[BrandCatalog] Complete in ${duration}s`);
-  console.log(`  Matched & updated : ${stats.matched}`);
+  console.log(`  Updated            : ${stats.updated}`);
+  console.log(`  Unchanged          : ${stats.unchanged}`);
   console.log(`  Not in DB (skipped): ${stats.skipped}`);
   console.log(`  No image URL       : ${stats.noImage}`);
   console.log(`  Errors             : ${stats.errors}`);
 
-  if (!DRY_RUN && stats.matched > 0) {
+  if (!DRY_RUN && stats.updated > 0) {
     console.log("\n[BrandCatalog] Refreshing facets cache...");
     await supabase.rpc("refresh_facets_cache");
     console.log("[BrandCatalog] Done.");
