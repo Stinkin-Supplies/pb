@@ -23,7 +23,7 @@ import { createClient } from "@supabase/supabase-js";
 
 // ── Config ────────────────────────────────────────────────────
 const DEFAULT_FILE = path.join(process.cwd(), "data/pu/Brand_PIES_Export.xml");
-const BATCH_SIZE   = 100;
+const BATCH_SIZE   = 500;
 
 const args    = process.argv.slice(2);
 const fileArg = args.indexOf("--file");
@@ -140,7 +140,7 @@ function parsePiesXml(filePath: string): PiesItem[] {
 // ── Upsert logic ──────────────────────────────────────────────
 async function upsertBatch(
   items: PiesItem[],
-  stats: { matched: number; skipped: number; errors: number }
+  stats: { updated: number; unchanged: number; skipped: number; errors: number }
 ) {
   // Look up matching SKUs in one query
   const { data: existing, error: fetchErr } = await supabase
@@ -154,30 +154,46 @@ async function upsertBatch(
     return;
   }
 
+  const normalize = (v: string) => v.trim().toLowerCase();
   const existingMap = new Map<string, { id: string; images: string[]; description: string | null }>();
   for (const row of existing ?? []) {
-    if (row.vendor_sku) existingMap.set(row.vendor_sku.trim(), row);
+    if (row.vendor_sku) existingMap.set(normalize(row.vendor_sku), row);
   }
 
   const updates: { id: string; images: string[]; description: string | null }[] = [];
 
   for (const item of items) {
-    const match = existingMap.get(item.partNumber);
+    const match = existingMap.get(normalize(item.partNumber));
     if (!match) {
       stats.skipped++;
       continue;
     }
 
-    // Merge images — add new URLs, keep existing ones, dedupe
     const existingImages = match.images ?? [];
-    const mergedImages   = [...new Set([...item.images, ...existingImages])];
+
+    // Merge images — add new URLs, keep existing ones, dedupe
+    const mergedImages = [...new Set([
+      ...item.images,
+      ...existingImages,
+    ])];
+
+    const hasNewImages = item.images.some(img => !existingImages.includes(img));
+
+    const shouldUpdate =
+      hasNewImages ||
+      (!match.description && item.description);
+
+    if (!shouldUpdate) {
+      stats.unchanged++;
+      continue;
+    }
 
     updates.push({
       id:          match.id,
       images:      mergedImages,
-      description: item.description ?? match.description,
+      description: match.description || item.description,
     });
-    stats.matched++;
+    stats.updated++;
   }
 
   if (DRY_RUN) {
@@ -190,23 +206,14 @@ async function upsertBatch(
 
   if (updates.length === 0) return;
 
-  // Use UPDATE not upsert — we only want to modify existing rows,
-  // never insert. Upsert triggers not-null constraints on required
-  // columns (sku etc.) even when the row already exists.
-  for (const u of updates) {
-    const { error } = await supabase
-      .from("products")
-      .update({
-        images:      u.images,
-        description: u.description,
-      })
-      .eq("id", u.id);
+  const { error } = await supabase
+    .from("products")
+    .upsert(updates, { onConflict: "id" });
 
-    if (error) {
-      console.error("[PIES] Update error:", error.message, "id:", u.id);
-      stats.errors++;
-      stats.matched--; // correct the matched count
-    }
+  if (error) {
+    console.error("[PIES] Bulk upsert error:", error.message);
+    stats.errors += updates.length;
+    stats.updated -= updates.length;
   }
 }
 
@@ -222,7 +229,7 @@ async function main() {
 
   const items = parsePiesXml(XML_FILE);
 
-  const stats = { matched: 0, skipped: 0, errors: 0 };
+  const stats = { updated: 0, unchanged: 0, skipped: 0, errors: 0 };
   const start = Date.now();
 
   // Process in batches
@@ -233,14 +240,15 @@ async function main() {
     if ((i + BATCH_SIZE) % 500 === 0 || i + BATCH_SIZE >= items.length) {
       console.log(
         `[PIES] Progress ${Math.min(i + BATCH_SIZE, items.length)}/${items.length} — ` +
-        `matched: ${stats.matched} | skipped: ${stats.skipped} | errors: ${stats.errors}`
+        `updated: ${stats.updated} | unchanged: ${stats.unchanged} | skipped: ${stats.skipped} | errors: ${stats.errors}`
       );
     }
   }
 
   const duration = ((Date.now() - start) / 1000).toFixed(1);
   console.log(`\n[PIES] Complete in ${duration}s`);
-  console.log(`  Matched & updated : ${stats.matched}`);
+  console.log(`  Updated            : ${stats.updated}`);
+  console.log(`  Unchanged          : ${stats.unchanged}`);
   console.log(`  Not in DB (skipped): ${stats.skipped}`);
   console.log(`  Errors             : ${stats.errors}`);
 
@@ -250,7 +258,7 @@ async function main() {
   }
 
   // After import, refresh facets cache
-  if (!DRY_RUN && stats.matched > 0) {
+  if (!DRY_RUN && stats.updated > 0) {
     console.log("\n[PIES] Refreshing facets cache...");
     await supabase.rpc("refresh_facets_cache");
     console.log("[PIES] Facets cache refreshed.");
