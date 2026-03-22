@@ -38,7 +38,6 @@ import {
   pollPricingJob,
   downloadPricingData,
 } from "@/lib/vendors/wps";
-import { mergeProductImages } from "@/lib/mergeProductImages";
 
 const BATCH_SIZE = 250; // smaller than PU — WPS items carry image arrays
 
@@ -220,28 +219,12 @@ export async function POST(req: Request) {
       wps,
       "/items",
       {
-        "filter[status]": "active",
-        "include":        "images,inventory",
+        // No status filter — WPS uses non-standard status values (NLA, etc.)
+        // We map their status to our own via WPS_STATUS_MAP in wps.ts
+        "include": "images,inventory",
       },
       async (items, pageNum) => {
         result.totalItems += items.length;
-
-        const skuList = items.map(i => i.sku).filter(Boolean);
-        const existingImagesMap = new Map<string, string[]>();
-        if (skuList.length > 0) {
-          const { data: existingRows, error: existingErr } = await supabase
-            .from("products")
-            .select("sku, images")
-            .in("sku", skuList as string[]);
-
-          if (existingErr) {
-            console.warn("[WPS Sync] Existing image fetch warning:", existingErr.message);
-          } else {
-            for (const row of existingRows ?? []) {
-              if (row.sku) existingImagesMap.set(row.sku, row.images ?? []);
-            }
-          }
-        }
 
         for (const item of items) {
           if (!item.sku?.trim()) { result.skipped++; continue; }
@@ -250,13 +233,6 @@ export async function POST(req: Request) {
           const brandName  = wpsBrandMap.get(item.brand_id) ?? "WPS";
           const product    = mapWpsItemToProduct(item, pricing, brandName, vendorId) as any;
           product.brand_id = supabaseBrandMap[product.brand_name] ?? null;
-          const existingImages = existingImagesMap.get(product.sku) ?? [];
-          const wpsImages = product.images ?? [];
-          product.images = mergeProductImages({
-            wps: wpsImages,
-            pies: existingImages,
-            pu: [],
-          });
 
           batch.push(product);
           if (batch.length >= BATCH_SIZE) await flushBatch();
