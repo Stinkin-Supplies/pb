@@ -219,7 +219,7 @@ function PuPanel() {
             </div>
             <div className="stat-box">
               <div className="stat-val">
-                {dbStatus?.hoursSinceLastSync !== null ? `${dbStatus.hoursSinceLastSync}H` : "—"}
+                {dbStatus?.hoursSinceLastSync != null ? `${dbStatus.hoursSinceLastSync}H` : "—"}
               </div>
               <div className="stat-label">SINCE LAST SYNC</div>
             </div>
