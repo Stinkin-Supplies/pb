@@ -356,7 +356,8 @@ export function mapWpsItemToProduct(
   const rawPrice = cost > 0 ? cost * 1.25 : retail * 0.65; // fallback margin
   const ourPrice = isMap && mapPrice ? Math.max(rawPrice, mapPrice) : rawPrice;
 
-  const totalStock = (item.inventory ?? []).reduce(
+  const inventory = Array.isArray(item.inventory) ? item.inventory : [];
+  const totalStock = inventory.reduce(
     (sum, w) => sum + (w.availability ?? 0), 0
   );
 
