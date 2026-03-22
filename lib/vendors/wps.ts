@@ -185,14 +185,37 @@ export class WpsClient {
       .join("&");
     const urlStr = `${WPS_API_BASE}${path}${qs ? `?${qs}` : ""}`;
 
-    const res = await fetch(urlStr, { headers: this.headers() });
+    const MAX_RETRIES = 4;
+    let lastErr: Error = new Error("unreachable");
 
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`WPS API ${res.status} on GET ${path}: ${text}`);
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      if (attempt > 0) {
+        const delayMs = Math.min(1000 * 2 ** attempt, 16000); // 2s, 4s, 8s, cap 16s
+        console.warn(`[WPS] Retry ${attempt}/${MAX_RETRIES - 1} for GET ${path} after ${delayMs}ms`);
+        await new Promise(r => setTimeout(r, delayMs));
+      }
+      try {
+        const res = await fetch(urlStr, { headers: this.headers() });
+        if (!res.ok) {
+          const text = await res.text();
+          // Don't retry 4xx client errors — they won't improve
+          if (res.status >= 400 && res.status < 500) {
+            throw new Error(`WPS API ${res.status} on GET ${path}: ${text}`);
+          }
+          lastErr = new Error(`WPS API ${res.status} on GET ${path}: ${text}`);
+          continue;
+        }
+        return res.json() as Promise<T>;
+      } catch (err: unknown) {
+        // Network-level error (fetch failed, ECONNRESET, etc.) — retry
+        lastErr = err instanceof Error ? err : new Error(String(err));
+        if (lastErr.message.includes("400") || lastErr.message.includes("401") ||
+            lastErr.message.includes("403") || lastErr.message.includes("404")) {
+          throw lastErr; // Don't retry auth/not-found errors
+        }
+      }
     }
-
-    return res.json() as Promise<T>;
+    throw lastErr;
   }
 
   async post<T>(path: string, body: unknown): Promise<T> {
