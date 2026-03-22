@@ -308,8 +308,8 @@ export async function POST(req: Request) {
       {
         // No status filter — WPS uses non-standard status values (NLA, etc.)
         // We map their status to our own via WPS_STATUS_MAP in wps.ts
-        // Images live on products not items — include product.images via product sideload
-        "include": "inventory,product.images",
+        // Include image derivatives directly on items
+        "include": "inventory,images",
       },
       async (items, pageNum, pageInfo) => {
         result.totalItems += items.length;
