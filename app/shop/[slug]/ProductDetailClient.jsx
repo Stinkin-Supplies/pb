@@ -579,7 +579,7 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
                   alt={product.name}
                   fill
                   sizes="(min-width: 1024px) 50vw, 100vw"
-                  style={{ objectFit:"cover", position:"relative", zIndex:1 }}
+                  style={{ objectFit:"cover", zIndex:1 }}
                   unoptimized
                 />
               )
