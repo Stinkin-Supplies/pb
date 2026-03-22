@@ -9,10 +9,7 @@
 // ============================================================
 
 import { createClient } from "@supabase/supabase-js";
-import { createRequire } from "module";
-
-const require = createRequire(import.meta.url);
-const { WpsClient, paginateAll } = require("../lib/vendors/wps.ts");
+import { WpsClient, paginateAll } from "../lib/vendors/wps";
 
 const args = process.argv.slice(2);
 const maxPagesArg = args.indexOf("--max-pages");

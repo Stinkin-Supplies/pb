@@ -10,12 +10,11 @@
 // ============================================================
 
 import { createClient } from "@supabase/supabase-js";
-import { createRequire } from "module";
 import fs from "fs";
 import path from "path";
-
-const require = createRequire(import.meta.url);
-const { WpsClient, paginateAll } = require("../lib/vendors/wps.ts");
+import { WpsClient, paginateAll } from "../lib/vendors/wps";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyRecord = Record<string, any>;
 
 const args = process.argv.slice(2);
 const maxPagesArg = args.indexOf("--max-pages");
@@ -61,7 +60,7 @@ const supabase = createClient(
   { auth: { persistSession: false } }
 );
 
-type WpsProduct = {
+type WpsProductRecord = {
   id: number;
   sku?: string | null;
   name?: string | null;
@@ -85,13 +84,13 @@ const ASSOC_TYPES = [
 
 type AssocType = typeof ASSOC_TYPES[number];
 
-async function fetchAllAssoc(client: any, productId: number, type: AssocType) {
-  const all: any[] = [];
-  await paginateAll<any>(
+async function fetchAllAssoc(client: InstanceType<typeof WpsClient>, productId: number, type: AssocType) {
+  const all: AnyRecord[] = [];
+  await paginateAll<AnyRecord>(
     client,
     `/products/${productId}/${type}`,
     { "page[size]": "200" },
-    async (items: any[]) => {
+    async (items) => {
       all.push(...items);
     }
   );
@@ -115,7 +114,7 @@ async function upsertAssociations(productId: number, data: Record<AssocType, any
   }
 }
 
-async function processProduct(client: any, product: WpsProduct) {
+async function processProduct(client: InstanceType<typeof WpsClient>, product: WpsProductRecord) {
   const productId = product.id;
 
   const assocData = {} as Record<AssocType, any[]>;
@@ -164,7 +163,7 @@ async function main() {
     console.log(`[WPS Assoc] Resuming at page ${startPage + 1}`);
   }
 
-  await paginateAll<WpsProduct>(
+  await paginateAll<WpsProductRecord>(
     wps,
     "/products",
     { "page[size]": "200" },
