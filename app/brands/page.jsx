@@ -111,8 +111,8 @@ export default function BrandsPage() {
   const featured = filtered.filter(b => b.is_featured);
   const rest     = filtered.filter(b => !b.is_featured);
 
-  const goToBrand = (slug) => {
-    window.location.href = `/shop?brand=${slug}`;
+  const goToBrand = (brand) => {
+    window.location.href = `/shop?brand=${encodeURIComponent(brand.name)}`;
   };
 
   return (
@@ -203,7 +203,7 @@ export default function BrandsPage() {
                       key={b.id}
                       className="featured-card"
                       style={{ animationDelay: `${i * 0.05}s` }}
-                      onClick={() => goToBrand(b.slug)}
+                      onClick={() => goToBrand(b)}
                     >
                       {b.logo_url && (
                         <img src={b.logo_url} alt={b.name} className="featured-logo" />
@@ -229,7 +229,7 @@ export default function BrandsPage() {
                       key={b.id}
                       className="brand-pill-card"
                       style={{ animationDelay: `${i * 0.03}s` }}
-                      onClick={() => goToBrand(b.slug)}
+                      onClick={() => goToBrand(b)}
                     >
                       {b.logo_url && (
                         <img src={b.logo_url} alt={b.name} className="brand-pill-logo" />
