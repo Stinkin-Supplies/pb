@@ -46,6 +46,9 @@ export interface WpsImage {
   url?:      string;
 }
 
+// WPS image sideload can come back as an array OR { data: [...] }
+export type WpsImageList = WpsImage[] | { data?: WpsImage[] } | null | undefined;
+
 export interface WpsInventoryWarehouse {
   id:             number;
   name:           string;
@@ -75,8 +78,8 @@ export interface WpsItem {
   /** MAP price (when has_map_policy = true) */
   mapp_price:             number | null;
   has_map_policy:         boolean | null;
-  /** Sideloaded via ?include=images */
-  images?:                WpsImage[];
+  /** Sideloaded via ?include=images (array or { data: [...] }) */
+  images?:                WpsImageList;
   /** Sideloaded via ?include=inventory */
   inventory?:             WpsInventoryWarehouse[];
 }
@@ -321,9 +324,18 @@ export function buildImageUrl(image: WpsImage): string {
 }
 
 /** Returns image URLs sorted: main first, then by type preference */
-export function sortedImageUrls(images: WpsImage[] | null | undefined): string[] {
+function normalizeImageList(images: WpsImageList): WpsImage[] {
+  if (Array.isArray(images)) return images;
+  if (images && typeof images === "object") {
+    const data = (images as { data?: WpsImage[] }).data;
+    if (Array.isArray(data)) return data;
+  }
+  return [];
+}
+
+export function sortedImageUrls(images: WpsImageList): string[] {
   const order = ["full", "large", "small", "thumb"];
-  const list = Array.isArray(images) ? images : [];
+  const list = normalizeImageList(images);
   return [...list]
     .sort((a, b) => {
       if (a.main && !b.main) return -1;
