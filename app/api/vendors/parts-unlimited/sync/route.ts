@@ -26,6 +26,7 @@ import { createClient } from "@supabase/supabase-js";
 import AdmZip from "adm-zip";
 import fs from "fs";
 import path from "path";
+import { db } from "@/lib/supabase/admin";
 import {
   buildPUAuthHeader,
   parseCSV,
@@ -418,6 +419,12 @@ export async function POST(req: Request) {
     // Flush final batch
     await flushBatch();
     result.durationMs = Date.now() - start;
+
+    // After products are upserted — run MAP check logging
+    const violationCount = await db.logMapCheckBulk(products, "sync");
+    console.log(
+      `[PU Sync] MAP check complete — ${violationCount ?? 0} violations logged`
+    );
 
     // Refresh cached facets after all writes complete
     await supabase.rpc("refresh_facets_cache");

@@ -16,14 +16,12 @@
 // TODO Phase 5: fitmentIds populated by ACES vendor sync
 // ============================================================
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import NavBar from "@/components/NavBar";
 import { useCartSafe } from "@/components/CartContext";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { getProductImage, filterImageUrls } from "@/lib/getProductImage";
-
-const supabase = createBrowserSupabaseClient();
 
 // Saved garage vehicle — hardcoded until Phase 3 auth
 const SAVED_VEHICLE = { id:1, year:2022, make:"Harley-Davidson", model:"Road King" };
@@ -431,6 +429,11 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
   const [added,      setAdded]      = useState(false);
   const [toast,      setToast]      = useState(false);
   const { addItem } = useCartSafe();
+  const supabaseRef = useRef(null);
+  if (!supabaseRef.current) {
+    supabaseRef.current = createBrowserSupabaseClient();
+  }
+  const supabase = supabaseRef.current;
 
   // ── Fitment check ──────────────────────────────────────────
   // Phase 5: fitmentIds will be an array of vehicle IDs from ACES data.
@@ -449,7 +452,12 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
   const handleAdd = () => {
     if (!product.inStock) return;
     setAdded(true);
-    addItem(product, qty);
+    // Ensure cart item has a resolved image
+    addItem({
+      ...product,
+      image: images[0] ?? product.image ?? null,
+      images: images,
+    }, qty);
     setToast(true);
     // TODO Phase 2 (cart drawer):
     //   await db.getOrCreateCart()
