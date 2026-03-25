@@ -28,6 +28,7 @@ import { NextResponse } from "next/server";
 import { createClient }  from "@supabase/supabase-js";
 import fs from "fs";
 import path from "path";
+import { db } from "@/lib/supabase/admin";
 import {
   WpsClient,
   WpsItem,
@@ -255,6 +256,7 @@ export async function POST(req: Request) {
     console.log("[WPS Sync] Starting item pagination...");
 
     let batch: ReturnType<typeof mapWpsItemToProduct>[] = [];
+    const upsertedProducts: ReturnType<typeof mapWpsItemToProduct>[] = [];
 
     const flushBatch = async () => {
       if (batch.length === 0) return;
@@ -347,6 +349,7 @@ export async function POST(req: Request) {
           });
 
           batch.push(product);
+          upsertedProducts.push(product);
           if (batch.length >= BATCH_SIZE) await flushBatch();
         }
 
@@ -374,6 +377,12 @@ export async function POST(req: Request) {
 
     await flushBatch();
     result.durationMs = Date.now() - start;
+
+    // After products are upserted — run MAP check logging
+    const violationCount = await db.logMapCheckBulk(upsertedProducts, "sync");
+    console.log(
+      `[WPS Sync] MAP check complete — ${violationCount ?? 0} violations logged`
+    );
 
     clearCheckpoint();
 

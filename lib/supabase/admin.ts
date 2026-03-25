@@ -320,6 +320,182 @@ export const db = {
     return data
   },
 
+  // ── MAP AUDIT LOG ──────────────────────────────────────────
+  // Call logMapCheck() any time a price is set or checked.
+  // Four trigger sources:
+  //   'sync'             — PU or WPS sync after upsert
+  //   'manual'           — admin changes our_price in /admin/products
+  //   'auto_correct'     — MAP monitor raises price to map_floor
+  //   'scheduled_check'  — nightly Vercel cron baseline audit
+
+  async logMapCheck(entry: {
+    sku: string
+    productName: string
+    brandName: string
+    mapFloor: number
+    ourPrice: number
+    trigger: 'sync' | 'manual' | 'auto_correct' | 'scheduled_check'
+    vendor?: string
+    productId?: string
+    correctedBy?: string       // auth user id — manual edits only
+    previousPrice?: number     // auto_correct only
+    notes?: string
+  }) {
+    const delta = entry.ourPrice - entry.mapFloor
+
+    // Determine status
+    let status: 'compliant' | 'violation' | 'corrected'
+    if (entry.trigger === 'auto_correct' || entry.trigger === 'manual') {
+      status = delta >= 0 ? 'corrected' : 'violation'
+    } else {
+      status = delta >= 0 ? 'compliant' : 'violation'
+    }
+
+    const { error } = await adminSupabase
+      .from('map_audit_log')
+      .insert({
+        product_id:     entry.productId ?? null,
+        sku:            entry.sku,
+        product_name:   entry.productName,
+        brand_name:     entry.brandName,
+        map_floor:      entry.mapFloor,
+        our_price:      entry.ourPrice,
+        delta,
+        status,
+        trigger:        entry.trigger,
+        vendor:         entry.vendor ?? null,
+        corrected_by:   entry.correctedBy ?? null,
+        corrected_at:   entry.trigger === 'auto_correct' || entry.trigger === 'manual'
+                          ? new Date().toISOString()
+                          : null,
+        previous_price: entry.previousPrice ?? null,
+        notes:          entry.notes ?? null,
+      })
+
+    if (error) {
+      // Never throw — a logging failure must not break a sync or checkout
+      console.error('[MAP audit] log failed:', error.message, { sku: entry.sku })
+    }
+
+    return status
+  },
+
+  // Bulk version for syncs — logs all products in one shot
+  // Pass the array of upserted products from PU or WPS sync
+  async logMapCheckBulk(products: Array<{
+    id?: string
+    sku: string
+    name: string
+    brand_name: string
+    map_floor: number
+    our_price: number
+    vendor_slug?: string
+  }>, trigger: 'sync' | 'scheduled_check') {
+    const rows = products
+      .filter(p => p.map_floor != null && p.our_price != null)
+      .map(p => {
+        const delta = p.our_price - p.map_floor
+        return {
+          product_id:   p.id ?? null,
+          sku:          p.sku,
+          product_name: p.name,
+          brand_name:   p.brand_name ?? 'Unknown',
+          map_floor:    p.map_floor,
+          our_price:    p.our_price,
+          delta,
+          status:       delta >= 0 ? 'compliant' : 'violation',
+          trigger,
+          vendor:       p.vendor_slug ?? null,
+        }
+      })
+
+    if (rows.length === 0) return
+
+    // Insert in batches of 500 to avoid payload limits
+    const BATCH = 500
+    for (let i = 0; i < rows.length; i += BATCH) {
+      const { error } = await adminSupabase
+        .from('map_audit_log')
+        .insert(rows.slice(i, i + BATCH))
+      if (error) {
+        console.error('[MAP audit] bulk log failed at batch', i, error.message)
+      }
+    }
+
+    // Return violation count for sync log
+    return rows.filter(r => r.status === 'violation').length
+  },
+
+  async getMAPAuditLog(filters: {
+    from?: string
+    to?: string
+    brand?: string
+    sku?: string
+    vendor?: string
+    status?: 'all' | 'compliant' | 'violation' | 'corrected'
+    limit?: number
+    offset?: number
+  } = {}) {
+    let query = adminSupabase
+      .from('map_audit_log')
+      .select('*', { count: 'exact' })
+      .order('checked_at', { ascending: false })
+
+    if (filters.from)   query = query.gte('checked_at', filters.from)
+    if (filters.to)     query = query.lte('checked_at', filters.to)
+    if (filters.brand)  query = query.ilike('brand_name', `%${filters.brand}%`)
+    if (filters.sku)    query = query.ilike('sku', `%${filters.sku}%`)
+    if (filters.vendor) query = query.eq('vendor', filters.vendor)
+    if (filters.status && filters.status !== 'all')
+                        query = query.eq('status', filters.status)
+
+    const limit  = filters.limit  ?? 100
+    const offset = filters.offset ?? 0
+    query = query.range(offset, offset + limit - 1)
+
+    const { data, error, count } = await query
+    if (error) throw error
+    return { entries: data ?? [], total: count ?? 0 }
+  },
+
+  async getMAPAuditSummary(from: string, to: string) {
+    const { data, error } = await adminSupabase
+      .from('map_audit_log')
+      .select('status, trigger, checked_at, corrected_at')
+      .gte('checked_at', from)
+      .lte('checked_at', to)
+
+    if (error) throw error
+    if (!data) return null
+
+    const total         = data.length
+    const compliant     = data.filter(r => r.status === 'compliant').length
+    const violations    = data.filter(r => r.status === 'violation').length
+    const corrected     = data.filter(r => r.status === 'corrected').length
+    const autoCorrected = data.filter(r => r.trigger === 'auto_correct').length
+    const manualFixed   = data.filter(r => r.trigger === 'manual' && r.status === 'corrected').length
+
+    // Avg violation duration in ms
+    const durations = data
+      .filter(r => r.status === 'corrected' && r.corrected_at)
+      .map(r => new Date(r.corrected_at!).getTime() - new Date(r.checked_at).getTime())
+    const avgViolationMs = durations.length
+      ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
+      : 0
+
+    return {
+      total,
+      compliant,
+      violations,
+      corrected,
+      autoCorrected,
+      manualFixed,
+      complianceRate: total > 0 ? ((compliant + corrected) / total * 100).toFixed(2) : '100.00',
+      avgViolationMs,
+      avgViolationMin: Math.round(avgViolationMs / 60000),
+    }
+  },
+
   // ── ADMIN ──────────────────────────────────────────────────
 
   async getDashboardMetrics() {
