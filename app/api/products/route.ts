@@ -101,17 +101,12 @@ export async function GET(req: Request) {
         };
         const orderClause = orderMap[sort] ?? orderMap.newest;
 
-        const countResult = await catalogDb.query(
-          `SELECT COUNT(*) FROM products p WHERE ${where}`,
-          values
-        );
-        const total = parseInt(countResult.rows[0].count, 10);
-
         const dataValues = [...values, pageSize, from];
         const { rows } = await catalogDb.query(
           `SELECT id, sku, slug, name, brand_name, category_name,
                   our_price, msrp, compare_at_price, map_price,
-                  in_stock, stock_quantity, is_new, images
+                  in_stock, stock_quantity, is_new, images,
+                  COUNT(*) OVER() AS total_count
            FROM products p
            WHERE ${where}
            ORDER BY ${orderClause}
@@ -119,6 +114,7 @@ export async function GET(req: Request) {
           dataValues
         );
 
+        const total = rows.length > 0 ? parseInt(rows[0].total_count, 10) : 0;
         const products = rows.map(normalizeRow);
 
         return { products, total };
