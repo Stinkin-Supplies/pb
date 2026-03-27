@@ -197,11 +197,11 @@ export const db = {
       p_user_id: userId,
       p_type: ledgerEntry.type,
       p_amount: ledgerEntry.amount,
-      p_order_id: ledgerEntry.orderId ?? null,
-      p_product_id: ledgerEntry.productId ?? null,
-      p_reason: ledgerEntry.reason ?? null,
-      p_admin_user_id: ledgerEntry.adminUserId ?? null,
-      p_expires_at: ledgerEntry.expiresAt?.toISOString() ?? null,
+      p_order_id: ledgerEntry.orderId ?? undefined,
+      p_product_id: ledgerEntry.productId ?? undefined,
+      p_reason: ledgerEntry.reason ?? undefined,
+      p_admin_user_id: ledgerEntry.adminUserId ?? undefined,
+      p_expires_at: ledgerEntry.expiresAt?.toISOString() ?? undefined,
     })
     if (error) throw error
     return data
