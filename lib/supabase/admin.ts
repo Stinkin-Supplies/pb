@@ -237,7 +237,7 @@ export const db = {
   async createOrder(orderData: Record<string, unknown>) {
     const { data, error } = await adminSupabase
       .from('orders')
-      .insert(orderData)
+      .insert(orderData as any)
       .select()
       .single()
     if (error) throw error
@@ -467,9 +467,9 @@ export const db = {
     const { data, error } = await adminSupabase
       .from('map_audit_log')
       .select('status, trigger, checked_at, corrected_at')
-      .returns<MapAuditSummaryRow[]>()
       .gte('checked_at', from)
       .lte('checked_at', to)
+      .returns<MapAuditSummaryRow[]>()
 
     if (error) throw error
     if (!data) return null
@@ -506,7 +506,7 @@ export const db = {
 
   async getDashboardMetrics() {
     const { data, error } = await adminSupabase
-      .from('dashboard_today')   // our VIEW
+      .from('dashboard_today' as any)   // our VIEW
       .select('*')
       .single()
     if (error) throw error
@@ -530,7 +530,7 @@ export const db = {
       .eq('compliance_status', 'violation')
 
     return {
-      ...(data as Record<string, unknown>),
+      ...(data as unknown as Record<string, unknown>),
       active_carts: activeCarts,
       abandoned_carts: abandonedCarts,
       map_violations: mapViolations,
