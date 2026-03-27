@@ -22,7 +22,7 @@ import NavBar from "@/components/NavBar";
 import { useCartSafe } from "@/components/CartContext";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { getProductImage, filterImageUrls } from "@/lib/getProductImage";
-import { proxyAllImages } from "@/lib/imageProxy";
+import { proxyAllImages, primaryImage } from "@/lib/imageProxy";
 
 // Saved garage vehicle — hardcoded until Phase 3 auth
 const SAVED_VEHICLE = { id:1, year:2022, make:"Harley-Davidson", model:"Road King" };
@@ -548,6 +548,39 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
     return proxyAllImages(source);
   })();
 
+  function RelatedCardImage({ product }) {
+    const src = primaryImage(product.images);
+    const isPlaceholder = src === "/images/placeholder.jpg";
+
+    return (
+      <div className="related-img">
+        {isPlaceholder ? (
+          <span
+            style={{
+              fontFamily: "'Share Tech Mono',monospace",
+              fontSize: 8,
+              color: "#3a3838",
+              letterSpacing: "0.1em",
+              position: "relative",
+              zIndex: 1,
+            }}
+          >
+            NO IMAGE
+          </span>
+        ) : (
+          <Image
+            src={src}
+            alt={product.name}
+            width={200}
+            height={200}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            unoptimized
+          />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="pdp-wrap">
       <style>{css}</style>
@@ -745,9 +778,7 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
                 className="related-card"
                 onClick={() => window.location.href = `/shop/${p.slug}`}
               >
-                <div className="related-img">
-                  <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#3a3838",letterSpacing:"0.1em",position:"relative",zIndex:1}}>NO IMAGE</span>
-                </div>
+                <RelatedCardImage product={p} />
                 <div className="related-body">
                   <div className="related-brand">{p.brand}</div>
                   <div className="related-name">{p.name}</div>
