@@ -24,10 +24,12 @@ export const db = {
 
   async getProduct(slug: string) {
     const catalogDb = getCatalogDb()
+    console.log('[getProduct] looking up slug:', slug)
     const { rows } = await catalogDb.query(
       `SELECT * FROM products WHERE slug = $1 AND status = 'active' LIMIT 1`,
       [slug]
     )
+    console.log('[getProduct] rows found:', rows.length)
     if (!rows[0]) throw new Error('Product not found')
     return rows[0]
   },
