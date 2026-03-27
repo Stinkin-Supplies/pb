@@ -40,43 +40,46 @@ export const db = {
     orderBy?: 'price_asc' | 'price_desc' | 'newest'
     inStockOnly?: boolean
   } = {}) {
+    const catalogDb = getCatalogDb()
     const pageSize = options.limit ?? 48
     const from     = options.offset ?? 0
-    const to       = from + pageSize - 1
 
-    // Select only the columns the shop UI actually needs.
-    // Avoids pulling heavy columns (search_vector, specs, etc.)
-    // on a list page. getProduct() fetches the full row.
-    let query = adminSupabase
-      .from('products')
-      .select(
-        'id, sku, slug, name, brand_name, category_name, ' +
-        'our_price, msrp, compare_at_price, map_price, ' +
-        'in_stock, stock_quantity, is_new, images',
-        { count: 'exact' }
-      )
-      .eq('status', 'active')
+    const conditions: string[] = ["status = 'active'"]
+    const values: any[] = []
+    let paramIdx = 1
 
-    // Filter directly on denormalized columns written by the sync.
-    // category_name and brand_name live on the products row itself —
-    // no join needed, and PostgREST handles these reliably.
-    if (options.category)   query = query.eq('category_name', options.category)
-    if (options.brand)      query = query.eq('brand_name', options.brand)
-    if (options.inStockOnly) query = query.eq('in_stock', true)
+    if (options.category)   { conditions.push(`category_name = $${paramIdx++}`); values.push(options.category) }
+    if (options.brand)      { conditions.push(`brand_name = $${paramIdx++}`);    values.push(options.brand) }
+    if (options.inStockOnly){ conditions.push(`in_stock = $${paramIdx++}`);      values.push(true) }
 
-    const orderMap = {
-      price_asc:  { column: 'our_price',  ascending: true  },
-      price_desc: { column: 'our_price',  ascending: false },
-      newest:     { column: 'created_at', ascending: false },
+    const where = conditions.join(' AND ')
+
+    const orderMap: Record<string, string> = {
+      price_asc:  'our_price ASC',
+      price_desc: 'our_price DESC',
+      newest:     'created_at DESC',
     }
     const order = orderMap[options.orderBy ?? 'newest']
-    query = query
-      .order(order.column, { ascending: order.ascending })
-      .range(from, to)  // Supabase hard-caps at 1000 without range()
 
-    const { data, error, count } = await query
-    if (error) throw error
-    return { products: data ?? [], total: count ?? 0 }
+    const countResult = await catalogDb.query(
+      `SELECT COUNT(*) FROM products WHERE ${where}`,
+      values
+    )
+    const total = parseInt(countResult.rows[0].count, 10)
+
+    const dataValues = [...values, pageSize, from]
+    const { rows } = await catalogDb.query(
+      `SELECT id, sku, slug, name, brand_name, category_name,
+              our_price, msrp, compare_at_price, map_price,
+              in_stock, stock_quantity, is_new, images
+       FROM products
+       WHERE ${where}
+       ORDER BY ${order}
+       LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
+      dataValues
+    )
+
+    return { products: rows ?? [], total }
   },
 
   async getProductsByVehicle(vehicleId: string, options: {
