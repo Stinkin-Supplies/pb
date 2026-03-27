@@ -6,7 +6,7 @@
 // filtered to this brand, pulled from self-hosted catalog DB
 // ============================================================
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, use } from "react";
 import NavBar from "@/components/NavBar";
 import { useCartSafe } from "@/components/CartContext";
 import { getProductImage } from "@/lib/getProductImage";
@@ -110,7 +110,7 @@ const SORT_OPTIONS = [
 ];
 
 export default function BrandDetailPage({ params }) {
-  const { slug } = params;
+  const { slug } = use(params);
 
   const [brand,    setBrand]    = useState(null);
   const [products, setProducts] = useState([]);
@@ -125,8 +125,16 @@ export default function BrandDetailPage({ params }) {
   // Fetch brand info
   useEffect(() => {
     fetch(`/api/brands/${slug}`)
-      .then(r => r.json())
-      .then(data => setBrand(data.brand ?? null))
+      .then(r => {
+        if (!r.ok) {
+          window.location.href = "/brands";
+          return;
+        }
+        return r.json();
+      })
+      .then(data => {
+        if (data) setBrand(data.brand ?? null);
+      })
       .catch(() => setError("Brand not found"));
   }, [slug]);
 

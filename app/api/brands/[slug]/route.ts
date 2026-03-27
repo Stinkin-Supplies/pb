@@ -3,10 +3,10 @@ import { NextResponse } from "next/server";
 
 export async function GET(
   req: Request,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   const supabase = await createServerSupabaseClient();
-  const { slug } = params;
+  const { slug } = await params;
 
   const { data, error } = await supabase
     .from("brands")
