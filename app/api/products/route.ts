@@ -104,12 +104,12 @@ export async function GET(req: Request) {
 
       // Facet counts via Postgres function (single round-trip)
       adminSupabase.rpc("get_product_facets", {
-        p_brand:      brand,
-        p_category:   category,
-        p_min_price:  minPrice,
-        p_max_price:  maxPrice,
-        p_in_stock:   inStock,
-      }).returns<FacetResponse>(),
+        p_brand:      brand     ?? undefined,
+        p_category:   category  ?? undefined,
+        p_min_price:  minPrice  ?? undefined,
+        p_max_price:  maxPrice  ?? undefined,
+        p_in_stock:   inStock   ?? undefined,
+      }) as any,
 
     ]);
 
@@ -117,7 +117,7 @@ export async function GET(req: Request) {
 
     const products = (productsResult.data ?? []).map(normalizeRow);
     const total    = productsResult.count ?? 0;
-    const facets   = facetsResult.data ?? { categories: [], brands: [], price_range: { min: 0, max: 0 } };
+    const facets   = (facetsResult.data as any) ?? { categories: [], brands: [], price_range: { min: 0, max: 0 } };
 
     return NextResponse.json({
       products,
