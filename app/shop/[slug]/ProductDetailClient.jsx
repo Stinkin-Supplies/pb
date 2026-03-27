@@ -22,6 +22,7 @@ import NavBar from "@/components/NavBar";
 import { useCartSafe } from "@/components/CartContext";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { getProductImage, filterImageUrls } from "@/lib/getProductImage";
+import { proxyAllImages } from "@/lib/imageProxy";
 
 // Saved garage vehicle — hardcoded until Phase 3 auth
 const SAVED_VEHICLE = { id:1, year:2022, make:"Harley-Davidson", model:"Road King" };
@@ -543,7 +544,8 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
   // ── Render helpers ─────────────────────────────────────────
   const images = (() => {
     const valid = filterImageUrls(product.images);
-    return valid.length > 0 ? valid : [getProductImage(product)];
+    const source = valid.length > 0 ? valid : [getProductImage(product)];
+    return proxyAllImages(source);
   })();
 
   return (
