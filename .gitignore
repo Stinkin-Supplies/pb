@@ -38,3 +38,4 @@ tsconfig.tsbuildinfo
 .env*.local
 data/
 data/
+data/
