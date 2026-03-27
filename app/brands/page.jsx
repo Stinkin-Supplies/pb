@@ -112,7 +112,7 @@ export default function BrandsPage() {
   const rest     = filtered.filter(b => !b.is_featured);
 
   const goToBrand = (brand) => {
-    window.location.href = `/shop?brand=${encodeURIComponent(brand.name)}`;
+    window.location.href = `/brands/${brand.slug}`;
   };
 
   return (
