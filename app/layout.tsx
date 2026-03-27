@@ -1,4 +1,5 @@
 import SpeedInsights from "@/lib/stubs/speed-insights-next";
+import { Analytics } from "@vercel/analytics/next";
 import CartRoot from "@/components/CartRoot";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
@@ -34,6 +35,7 @@ export default function RootLayout({
         <CartRoot>
           <SpeedInsights />
           {children}
+          <Analytics />
         </CartRoot>
       </body>
     </html>
