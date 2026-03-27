@@ -29,6 +29,7 @@ import { createClient }  from "@supabase/supabase-js";
 import fs from "fs";
 import path from "path";
 import { db } from "@/lib/supabase/admin";
+import getCatalogDb from "@/lib/db/catalog";
 import {
   WpsClient,
   WpsItem,
@@ -213,18 +214,21 @@ export async function POST(req: Request) {
     }
     console.log(`[WPS Sync] ${wpsBrandMap.size} brands loaded`);
 
-    // Upsert all brands into Supabase
     const uniqueBrandNames = [...new Set(allWpsBrands.map((b) => b.name))];
-    await supabase
-      .from("brands")
-      .upsert(
-        uniqueBrandNames.map((name) => ({
-          name,
-          slug: name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-        })),
-        { onConflict: "name" }
-      );
+    const catalogDb = getCatalogDb();
 
+    // Upsert brands to self-hosted Postgres
+    for (const name of uniqueBrandNames) {
+      const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+      await catalogDb.query(
+        `INSERT INTO brands (name, slug)
+         VALUES ($1, $2)
+         ON CONFLICT (name) DO NOTHING`,
+        [name, slug]
+      ).catch(() => {}); // ignore errors — brands table may not exist on self-hosted yet
+    }
+
+    // Keep Supabase brand map for brand_id FK (brands table stays in Supabase)
     const { data: brandRows } = await supabase
       .from("brands")
       .select("id, name")
@@ -264,42 +268,68 @@ export async function POST(req: Request) {
       const validBatch = batch.filter(
         (p) => p.sku?.trim() && p.part_number?.trim()
       );
-      // Count items dropped only because of missing SKU (brand_id null is fine — column is nullable)
       result.skipped += batch.length - validBatch.length;
       if (validBatch.length === 0) { batch = []; return; }
 
-      const { error } = await supabase
-        .from("products")
-        .upsert(validBatch, { onConflict: "sku", ignoreDuplicates: false });
-
-      if (error) {
-        const isSlugConflict = error.message.includes("products_slug_key");
-        if (isSlugConflict) {
-          // Retry one-by-one so only the colliding row is skipped
-          for (const item of validBatch) {
-            const { error: singleErr } = await supabase
-              .from("products")
-              .upsert(item, { onConflict: "sku", ignoreDuplicates: false });
-            if (singleErr) {
-              console.warn("[WPS Sync] Slug conflict skipped:", item.sku, "—", singleErr.message);
-              result.skipped += 1;
-            } else {
-              result.upserted += 1;
-              result.images   += item.images?.length ?? 0;
-            }
-          }
-        } else {
-          console.error(
-            "[WPS Sync] Upsert error:", error.message,
-            "| Sample:", JSON.stringify(validBatch[0]?.sku)
+      // Write to self-hosted Postgres
+      for (const item of validBatch) {
+        try {
+          const i = item as any;
+          await catalogDb.query(
+            `INSERT INTO products (
+              sku, part_number, name, slug, vendor_id, vendor_sku,
+              brand_id, brand_name, category_name, description,
+              our_price, compare_at_price, map_price, map_floor,
+              in_stock, stock_quantity, total_qty,
+              weight_lbs, length_in, width_in, height_in,
+              is_map, is_new, is_closeout, is_drag_specialties,
+              wps_item_id, wps_product_id, images,
+              status, condition, last_synced_at, updated_at
+            ) VALUES (
+              $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
+              $11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,
+              $22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32
+            )
+            ON CONFLICT (sku) DO UPDATE SET
+              name             = EXCLUDED.name,
+              description      = EXCLUDED.description,
+              our_price        = EXCLUDED.our_price,
+              compare_at_price = EXCLUDED.compare_at_price,
+              map_price        = EXCLUDED.map_price,
+              map_floor        = EXCLUDED.map_floor,
+              in_stock         = EXCLUDED.in_stock,
+              stock_quantity   = EXCLUDED.stock_quantity,
+              total_qty        = EXCLUDED.total_qty,
+              images           = EXCLUDED.images,
+              wps_item_id      = EXCLUDED.wps_item_id,
+              wps_product_id   = EXCLUDED.wps_product_id,
+              last_synced_at   = EXCLUDED.last_synced_at,
+              updated_at       = EXCLUDED.updated_at
+            WHERE products.updated_manually = false`,
+            [
+              i.sku, i.part_number, i.name, i.slug,
+              i.vendor_id, i.vendor_sku,
+              i.brand_id, i.brand_name, i.category_name, i.description,
+              i.our_price, i.compare_at_price, i.map_price, i.map_floor,
+              i.in_stock, i.stock_quantity, i.total_qty,
+              i.weight_lbs, i.length_in, i.width_in, i.height_in,
+              i.is_map, i.is_new, i.is_closeout, i.is_drag_specialties,
+              i.wps_item_id, i.wps_product_id, i.images,
+              i.status ?? 'active', i.condition ?? 'new',
+              i.last_synced_at ?? new Date().toISOString(),
+              new Date().toISOString(),
+            ]
           );
-          result.errors += validBatch.length;
+          result.upserted += 1;
+          result.images += i.images?.length ?? 0;
+        } catch (err: any) {
+          if (err.message?.includes('slug')) {
+            result.skipped += 1;
+          } else {
+            console.error("[WPS Sync] Row error:", item.sku, err.message);
+            result.errors += 1;
+          }
         }
-      } else {
-        result.upserted += validBatch.length;
-        result.images   += validBatch.reduce(
-          (sum, p) => sum + (p.images?.length ?? 0), 0
-        );
       }
       batch = [];
     };
@@ -319,17 +349,14 @@ export async function POST(req: Request) {
         const skuList = items.map(i => i.sku).filter(Boolean);
         const existingImagesMap = new Map<string, string[]>();
         if (skuList.length > 0) {
-          const { data: existingRows, error: existingErr } = await supabase
-            .from("products")
-            .select("sku, images")
-            .in("sku", skuList as string[]);
+          const placeholders = skuList.map((_: any, i: number) => `$${i + 1}`).join(',');
+          const { rows: existingRows, } = await catalogDb.query(
+            `SELECT sku, images FROM products WHERE sku IN (${placeholders})`,
+            skuList
+          ).catch(() => ({ rows: [] }));
 
-          if (existingErr) {
-            console.warn("[WPS Sync] Existing image fetch warning:", existingErr.message);
-          } else {
-            for (const row of existingRows ?? []) {
-              if (row.sku) existingImagesMap.set(row.sku, row.images ?? []);
-            }
+          for (const row of existingRows ?? []) {
+            if (row.sku) existingImagesMap.set(row.sku, row.images ?? []);
           }
         }
 
