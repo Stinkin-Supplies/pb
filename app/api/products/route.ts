@@ -49,12 +49,12 @@ const ORDER_MAP: Record<string, { column: string; ascending: boolean }> = {
 
 export async function GET(req: Request) {
   const url      = new URL(req.url);
-  const category = url.searchParams.get("category")  || null;
-  const brand    = url.searchParams.get("brand")      || null;
-  const minPrice = url.searchParams.get("minPrice")   ? Number(url.searchParams.get("minPrice"))  : null;
-  const maxPrice = url.searchParams.get("maxPrice")   ? Number(url.searchParams.get("maxPrice"))  : null;
-  const inStock  = url.searchParams.get("inStock") === "true" ? true : null;
-  const search   = url.searchParams.get("search")?.trim() || null;
+  const category = url.searchParams.get("category")  || undefined;
+  const brand    = url.searchParams.get("brand")      || undefined;
+  const minPrice = url.searchParams.get("minPrice")   ? Number(url.searchParams.get("minPrice"))  : undefined;
+  const maxPrice = url.searchParams.get("maxPrice")   ? Number(url.searchParams.get("maxPrice"))  : undefined;
+  const inStock  = url.searchParams.get("inStock") === "true" ? true : undefined;
+  const search   = url.searchParams.get("search")?.trim() || undefined;
   const sort     = url.searchParams.get("sort")       || "newest";
   const page     = Math.max(0, parseInt(url.searchParams.get("page")     || "0",  10));
   const pageSize = Math.min(
@@ -64,6 +64,13 @@ export async function GET(req: Request) {
 
   const from = page * pageSize;
   const to   = from + pageSize - 1;
+
+  type FacetCounts = { name: string; count: number };
+  type FacetResponse = {
+    categories: FacetCounts[];
+    brands: FacetCounts[];
+    price_range: { min: number; max: number };
+  };
 
   try {
     // ── Run products query + facets in parallel ────────────
@@ -102,7 +109,7 @@ export async function GET(req: Request) {
         p_min_price:  minPrice,
         p_max_price:  maxPrice,
         p_in_stock:   inStock,
-      }),
+      }).returns<FacetResponse>(),
 
     ]);
 
