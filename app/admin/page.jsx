@@ -335,6 +335,7 @@ export default async function AdminDashboard() {
                 { href: "/admin/points",       icon: "★", label: "POINTS",            sub: "Award & adjust balances"    },
                 { href: "/admin/map",          icon: "⚑", label: "MAP COMPLIANCE",    sub: "Review pricing violations"  },
                 { href: "/admin/competitors",  icon: "◎", label: "COMPETITOR PRICING",sub: "RevZilla / JPC comparison"  },
+                { href: "/admin/build-tracker",icon: "⌁", label: "BUILD TRACKER",     sub: "View vehicle builds"        },
               ].map(({ href, icon, label, sub }) => (
                 <a key={href} href={href} className="quick-btn">
                   <div className="quick-btn-icon">{icon}</div>

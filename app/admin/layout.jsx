@@ -172,6 +172,7 @@ const NAV = [
   {
     section: "OVERVIEW",
     links: [
+      { href: "/admin/build-tracker", icon: "⌁", label: "BUILD TRACKER" },
       { href: "/admin",         icon: "◈", label: "DASHBOARD"   },
     ],
   },
