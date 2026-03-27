@@ -7,6 +7,7 @@
 // ============================================================
 
 import { adminSupabase } from "@/lib/supabase/admin";
+import getCatalogDb from "@/lib/db/catalog";
 import ShopClient from "./ShopClient";
 
 const PAGE_SIZE = 48;
@@ -53,23 +54,17 @@ export default async function ShopPage({ searchParams }) {
     // ── Facets query (non-fatal — page still loads if this times out) ──
     // Runs after products so a slow facet query never blocks first paint.
     try {
-      const facetRes = await adminSupabase.rpc("get_product_facets", {
-        p_brand:     brand,
-        p_category:  category,
-        p_min_price: null,
-        p_max_price: null,
-        p_in_stock:  null,
-      });
-      if (facetRes.error) {
-        console.warn("[ShopPage] facets timed out — ShopClient will fetch via /api/products");
-      } else {
-        const f = facetRes.data ?? {};
-        facets = {
-          categories: f.categories ?? [],
-          brands:     f.brands     ?? [],
-          priceRange: f.price_range ?? { min:0, max:0 },
-        };
-      }
+      const catalogDb = getCatalogDb();
+      const facetResult = await catalogDb.query(
+        'SELECT get_product_facets($1, $2, $3, $4, $5) AS data',
+        [brand ?? null, category ?? null, null, null, null]
+      );
+      const initialFacets = facetResult.rows[0]?.data ?? { categories: [], brands: [], price_range: { min: 0, max: 0 } };
+      facets = {
+        categories: initialFacets.categories ?? [],
+        brands:     initialFacets.brands     ?? [],
+        priceRange: initialFacets.price_range ?? { min: 0, max: 0 },
+      };
     } catch (facetErr) {
       console.warn("[ShopPage] facets error:", facetErr.message);
       // facets stay as empty defaults — ShopClient fetches them on first filter interaction
