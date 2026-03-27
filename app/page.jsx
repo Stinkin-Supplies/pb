@@ -349,8 +349,22 @@ export default function HomePage() {
 
       <NavBar activePage="home" />
 
+      <div style={{
+        marginTop: 64,
+        padding: "10px 16px",
+        background: "rgba(232,98,26,0.12)",
+        borderTop: "1px solid rgba(232,98,26,0.35)",
+        borderBottom: "1px solid rgba(232,98,26,0.35)",
+        textAlign: "center",
+        fontFamily: "'Share Tech Mono',monospace",
+        letterSpacing: "0.12em",
+        fontSize: 11,
+      }}>
+        <strong>NOTE:</strong> HOMEPAGE CONTENT IS PLACEHOLDER — NEEDS REAL PRODUCTS/BRANDS
+      </div>
+
       {/* PROMO BANNER */}
-      <div className="promo-banner" style={{marginTop:64}}>
+      <div className="promo-banner">
         <span className="promo-text">
           FREE SHIPPING ON ORDERS OVER $99 — USE CODE
           <span className="promo-code">RIDE99</span>
