@@ -36,3 +36,4 @@ tsconfig.tsbuildinfo
 *.pem
 *.key
 .env*.local
+data/
