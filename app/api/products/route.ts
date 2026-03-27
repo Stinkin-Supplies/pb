@@ -36,6 +36,7 @@
 
 import { NextResponse } from "next/server";
 import { adminSupabase } from "@/lib/supabase/admin";
+import getCatalogDb from "@/lib/db/catalog";
 
 const PAGE_SIZE_DEFAULT = 48;
 const PAGE_SIZE_MAX     = 96;
@@ -63,7 +64,6 @@ export async function GET(req: Request) {
   );
 
   const from = page * pageSize;
-  const to   = from + pageSize - 1;
 
   type FacetCounts = { name: string; count: number };
   type FacetResponse = {
@@ -77,29 +77,51 @@ export async function GET(req: Request) {
     const [productsResult, facetsResult] = await Promise.all([
 
       // Products page
-      (() => {
-        let q = adminSupabase
-          .from("products")
-          .select(
-            "id, sku, slug, name, brand_name, category_name, " +
-            "our_price, msrp, compare_at_price, map_price, " +
-            "in_stock, stock_quantity, is_new, images",
-            { count: "exact" }
-          )
-          .eq("status", "active");
+      (async () => {
+        const catalogDb = getCatalogDb();
 
-        if (category) q = q.eq("category_name", category);
-        if (brand)    q = q.eq("brand_name",    brand);
-        if (minPrice) q = q.gte("our_price",    minPrice);
-        if (maxPrice) q = q.lte("our_price",    maxPrice);
-        if (inStock)  q = q.eq("in_stock",      true);
-        // Full-text search using the tsvector column built by the sync
-        if (search)   q = q.textSearch("search_vector", search, { type: "websearch" });
+        const conditions: string[] = ["p.status = $1"];
+        const values: any[] = ["active"];
+        let paramIdx = 2;
 
-        const order = ORDER_MAP[sort] ?? ORDER_MAP.newest;
-        q = q.order(order.column, { ascending: order.ascending }).range(from, to);
+        if (category) { conditions.push(`p.category_name = $${paramIdx++}`); values.push(category); }
+        if (brand)    { conditions.push(`p.brand_name = $${paramIdx++}`);    values.push(brand); }
+        if (minPrice) { conditions.push(`p.our_price >= $${paramIdx++}`);    values.push(minPrice); }
+        if (maxPrice) { conditions.push(`p.our_price <= $${paramIdx++}`);    values.push(maxPrice); }
+        if (inStock)  { conditions.push(`p.in_stock = $${paramIdx++}`);      values.push(true); }
+        if (search)   { conditions.push(`p.search_vector @@ websearch_to_tsquery('english', $${paramIdx++})`); values.push(search); }
 
-        return q;
+        const where = conditions.join(" AND ");
+
+        const orderMap: Record<string, string> = {
+          newest:     "p.created_at DESC",
+          price_asc:  "p.our_price ASC",
+          price_desc: "p.our_price DESC",
+          name_asc:   "p.name ASC",
+        };
+        const orderClause = orderMap[sort] ?? orderMap.newest;
+
+        const countResult = await catalogDb.query(
+          `SELECT COUNT(*) FROM products p WHERE ${where}`,
+          values
+        );
+        const total = parseInt(countResult.rows[0].count, 10);
+
+        const dataValues = [...values, pageSize, from];
+        const { rows } = await catalogDb.query(
+          `SELECT id, sku, slug, name, brand_name, category_name,
+                  our_price, msrp, compare_at_price, map_price,
+                  in_stock, stock_quantity, is_new, images
+           FROM products p
+           WHERE ${where}
+           ORDER BY ${orderClause}
+           LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
+          dataValues
+        );
+
+        const products = rows.map(normalizeRow);
+
+        return { products, total };
       })(),
 
       // Facet counts via Postgres function (single round-trip)
@@ -113,10 +135,8 @@ export async function GET(req: Request) {
 
     ]);
 
-    if (productsResult.error) throw productsResult.error;
-
-    const products = (productsResult.data ?? []).map(normalizeRow);
-    const total    = productsResult.count ?? 0;
+    const products = productsResult.products ?? [];
+    const total    = productsResult.total ?? 0;
     const facets   = (facetsResult.data as any) ?? { categories: [], brands: [], price_range: { min: 0, max: 0 } };
 
     return NextResponse.json({
