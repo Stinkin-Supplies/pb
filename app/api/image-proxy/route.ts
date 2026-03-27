@@ -1,70 +1,83 @@
 // app/api/image-proxy/route.ts
+// Proxies WPS CDN images which block direct browser hotlinking.
+
 import { NextRequest, NextResponse } from 'next/server'
 
-const ALLOWED_HOSTS = [
-  'cdn.wpsstatic.com',
-  'wpsstatic.com',
-]
+const ALLOWED_HOSTS = ['cdn.wpsstatic.com', 'wpsstatic.com']
 
 function isAllowedUrl(url: string): boolean {
   try {
-    const parsed = new URL(url)
-    return ALLOWED_HOSTS.some(host => parsed.hostname === host || parsed.hostname.endsWith(`.${host}`))
+    const { hostname } = new URL(url)
+    return ALLOWED_HOSTS.some(h => hostname === h || hostname.endsWith(`.${h}`))
   } catch {
     return false
   }
 }
 
+const AUTH_HEADER = process.env.WPS_API_KEY ? `Bearer ${process.env.WPS_API_KEY}` : ''
+const HEADER_VARIANTS: Array<Record<string, string>> = [
+  {
+    'Referer':        'https://www.wps-inc.com/',
+    'Origin':         'https://www.wps-inc.com',
+    'User-Agent':     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    'Accept':         'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+    'Sec-Fetch-Dest': 'image',
+    'Sec-Fetch-Mode': 'no-cors',
+    'Sec-Fetch-Site': 'same-site',
+  },
+  {
+    'Referer':    'https://www.wpsstatic.com/',
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    'Accept':     'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+  },
+  {
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    'Accept':     'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+  },
+  {
+    'User-Agent': 'curl/7.88.1',
+    'Accept':     '*/*',
+  },
+  {
+    'Authorization': AUTH_HEADER,
+    'User-Agent':    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    'Accept':        'image/*',
+  },
+]
+
 export async function GET(req: NextRequest) {
   const url = req.nextUrl.searchParams.get('url')
+  if (!url)               return new NextResponse('Missing url param', { status: 400 })
+  if (!isAllowedUrl(url)) return new NextResponse('Forbidden',         { status: 403 })
 
-  // Validate URL exists
-  if (!url) {
-    return new NextResponse('Missing url param', { status: 400 })
-  }
+  for (let i = 0; i < HEADER_VARIANTS.length; i++) {
+    try {
+      const upstream = await fetch(url, { headers: HEADER_VARIANTS[i], cache: 'no-store' })
 
-  // Whitelist check — never proxy arbitrary URLs
-  if (!isAllowedUrl(url)) {
-    return new NextResponse('Forbidden', { status: 403 })
-  }
+      if (!upstream.ok) {
+        console.log(`[image-proxy] variant ${i + 1} → ${upstream.status} for ${url}`)
+        continue
+      }
 
-  try {
-    const upstream = await fetch(url, {
-      headers: {
-        // WPS requires a Referer from their own domain
-        'Referer': 'https://www.wpsstatic.com/',
-        'User-Agent': 'Mozilla/5.0 (compatible; YstinkinSupplies/1.0)',
-        'Accept': 'image/webp,image/avif,image/*,*/*;q=0.8',
-      },
-      // Don't cache on the fetch level — we handle caching in the response
-      cache: 'no-store',
-    })
+      const contentType = upstream.headers.get('Content-Type') || 'image/jpeg'
+      if (!contentType.startsWith('image/')) continue
 
-    if (!upstream.ok) {
-      console.error(`[image-proxy] upstream ${upstream.status} for ${url}`)
-      return new NextResponse('Image unavailable', { status: 502 })
+      const blob = await upstream.arrayBuffer()
+      console.log(`[image-proxy] success with variant ${i + 1} for ${url}`)
+
+      return new NextResponse(blob, {
+        status: 200,
+        headers: {
+          'Content-Type':    contentType,
+          'Cache-Control':   'public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400',
+          'Content-Length':  blob.byteLength.toString(),
+          'X-Proxy-Variant': String(i + 1),
+        },
+      })
+    } catch (err) {
+      console.error(`[image-proxy] variant ${i + 1} error:`, err)
     }
-
-    const contentType = upstream.headers.get('Content-Type') || 'image/jpeg'
-
-    // Reject non-image responses (safety check)
-    if (!contentType.startsWith('image/')) {
-      return new NextResponse('Not an image', { status: 502 })
-    }
-
-    const blob = await upstream.arrayBuffer()
-
-    return new NextResponse(blob, {
-      status: 200,
-      headers: {
-        'Content-Type': contentType,
-        // Cache for 24 hours in browser, 7 days on CDN/edge
-        'Cache-Control': 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400',
-        'Content-Length': blob.byteLength.toString(),
-      },
-    })
-  } catch (err) {
-    console.error(`[image-proxy] fetch error for ${url}:`, err)
-    return new NextResponse('Proxy error', { status: 500 })
   }
+
+  return NextResponse.redirect(new URL('/images/placeholder.jpg', req.url))
 }
