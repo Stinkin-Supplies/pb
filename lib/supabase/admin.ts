@@ -8,11 +8,11 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!  // server only, never expose
 
 // Admin client — bypasses RLS, use only in workers and trusted server code
-export const adminSupabase = createClient(
+export const adminSupabase = createClient<Database>(
   SUPABASE_URL,
   SUPABASE_SERVICE_KEY,
   { auth: { persistSession: false } }
-) as unknown as ReturnType<typeof createClient<Database>> as any
+)
 
 // ─── TYPED QUERY HELPERS ──────────────────────────────────────
 // Replace Firestore collection helpers with typed Supabase queries
@@ -459,9 +459,15 @@ export const db = {
   },
 
   async getMAPAuditSummary(from: string, to: string) {
+    type MapAuditSummaryRow = Pick<
+      Database['public']['Tables']['map_audit_log']['Row'],
+      'status' | 'trigger' | 'checked_at' | 'corrected_at'
+    >
+
     const { data, error } = await adminSupabase
       .from('map_audit_log')
       .select('status, trigger, checked_at, corrected_at')
+      .returns<MapAuditSummaryRow[]>()
       .gte('checked_at', from)
       .lte('checked_at', to)
 
