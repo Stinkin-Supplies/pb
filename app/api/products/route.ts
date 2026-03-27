@@ -125,13 +125,10 @@ export async function GET(req: Request) {
       })(),
 
       // Facet counts via Postgres function (single round-trip)
-      adminSupabase.rpc("get_product_facets", {
-        p_brand:      brand     ?? undefined,
-        p_category:   category  ?? undefined,
-        p_min_price:  minPrice  ?? undefined,
-        p_max_price:  maxPrice  ?? undefined,
-        p_in_stock:   inStock   ?? undefined,
-      }) as any,
+      getCatalogDb().query(
+        'SELECT get_product_facets($1, $2, $3, $4, $5) AS data',
+        [brand ?? null, category ?? null, minPrice ?? null, maxPrice ?? null, inStock ?? null]
+      ).then(r => ({ data: r.rows[0].data })),
 
     ]);
 
