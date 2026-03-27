@@ -468,12 +468,12 @@ export async function GET(req: Request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  const [productsRes, logsRes] = await Promise.all([
-    supabase
-      .from("products")
-      .select("*", { count: "exact", head: true })
-      .eq("vendor_id", supabase.from("vendors").select("id").eq("slug", "wps"))
-      .eq("status", "active"),
+  const [catalogCount, logsRes] = await Promise.all([
+    getCatalogDb().query(
+      `SELECT COUNT(*) FROM products WHERE status = 'active' AND vendor_id = $1`,
+      ['12a97239-645c-4198-8c0e-b7f895f29ea6']
+    ).then(r => parseInt(r.rows[0].count, 10))
+     .catch(() => 0),
     supabase
       .from("sync_log")
       .select("*")
@@ -482,18 +482,12 @@ export async function GET(req: Request) {
       .limit(10),
   ]);
 
-  // Simpler active product count via a separate query
-  const { count: wpsCount } = await supabase
-    .from("products")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "active")
-    // vendor_id is a join — filter by slug requires a subquery or RPC.
-    // For simplicity, the dashboard shows total active; refine with RPC if needed.
+  const wpsCount = catalogCount;
 
   const lastSuccess = (logsRes.data ?? []).find((l: any) => l.status === "success");
 
   return NextResponse.json({
-    totalActiveProducts: wpsCount ?? productsRes.count ?? 0,
+    totalActiveProducts: wpsCount ?? 0,
     lastSyncAt:          lastSuccess?.completed_at ?? null,
     lastSyncImages:      lastSuccess?.error_message ?? null, // images count stored here
     recentLogs:          logsRes.data ?? [],
