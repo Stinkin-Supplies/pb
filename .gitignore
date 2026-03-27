@@ -37,3 +37,4 @@ tsconfig.tsbuildinfo
 *.key
 .env*.local
 data/
+data/

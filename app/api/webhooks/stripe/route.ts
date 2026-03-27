@@ -1,114 +1,194 @@
-export const runtime = "nodejs";
-
-import { NextResponse } from "next/server";
 import Stripe from "stripe";
+import { NextRequest, NextResponse } from "next/server";
+import type {
+  PurchaseOrder,
+  POLineItem,
+  CustomerAddress,
+  VendorId,
+  ResolvedCart,
+} from "@/lib/routing/types";
 import { createClient } from "@supabase/supabase-js";
-import { sendOrderEmail } from "@/lib/email/sendOrderEmail";
+import { wpsAdapter } from "@/lib/vendors/wps/adapter";
+import { puAdapter } from "@/lib/vendors/pu/adapter";
 
-const supabaseAdmin = createClient(
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
+
+const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export async function POST(req: Request) {
+const VENDOR_ADAPTERS = [wpsAdapter, puAdapter];
+
+// ---------------------------------------------------------------------------
+// Webhook handler
+// ---------------------------------------------------------------------------
+
+export async function POST(req: NextRequest) {
+  const body = await req.text();
+  const sig = req.headers.get("stripe-signature")!;
+
+  let event: Stripe.Event;
   try {
-    console.log("WEBHOOK HIT");
-
-    const body = await req.text();
-    const sig = req.headers.get("stripe-signature");
-
-    if (!sig) {
-      console.error("Missing stripe signature");
-      return new NextResponse("Missing signature", { status: 400 });
-    }
-
-    if (!process.env.STRIPE_WEBHOOK_SECRET) {
-      console.error("Missing webhook secret");
-      return new NextResponse("Missing webhook secret", { status: 500 });
-    }
-
-    if (!process.env.STRIPE_SECRET_KEY) {
-      console.error("Missing STRIPE_SECRET_KEY");
-      return new NextResponse("Missing secret key", { status: 500 });
-    }
-
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-
-    let event: Stripe.Event;
-
-    try {
-      event = stripe.webhooks.constructEvent(
-        body,
-        sig,
-        process.env.STRIPE_WEBHOOK_SECRET
-      );
-    } catch (err: any) {
-      console.error("Signature verification failed:", err?.message || err);
-      return new NextResponse("Invalid signature", { status: 400 });
-    }
-
-    console.log("Event:", event.type);
-
-    if (event.type === "payment_intent.succeeded") {
-      const paymentIntent = event.data.object as Stripe.PaymentIntent;
-      console.log("Payment success:", paymentIntent.id);
-      if (!paymentIntent.latest_charge) {
-        console.error("Missing latest_charge on payment intent");
-        return new NextResponse("Missing latest_charge", { status: 500 });
-      }
-
-      const charge = await stripe.charges.retrieve(
-        String(paymentIntent.latest_charge)
-      );
-
-      const orderId = paymentIntent.metadata?.order_id;
-      if (!orderId) {
-        console.error("Missing order_id in metadata");
-        return new NextResponse("Missing order_id", { status: 400 });
-      }
-
-      const stripe_charge_id = charge.id;
-      const payment_method_last4 =
-        charge.payment_method_details?.card?.last4 || null;
-      const order_id = orderId;
-
-      const { error } = await supabaseAdmin
-        .from("orders")
-        .update({
-          status: "processing",
-          stripe_payment_intent_id: paymentIntent.id,
-          stripe_charge_id,
-          payment_method_last4,
-        })
-        .eq("id", order_id);
-
-      if (error) {
-        console.error("Order update failed:", error);
-        return new NextResponse("Order update failed", { status: 500 });
-      }
-
-      const { data: order, error: orderError } = await supabaseAdmin
-        .from("orders")
-        .select(
-          `
-          *,
-          order_items (*)
-        `
-        )
-        .eq("id", order_id)
-        .single();
-
-      if (orderError) {
-        console.error("Order fetch failed:", orderError);
-        return new NextResponse("Order fetch failed", { status: 500 });
-      }
-
-      await sendOrderEmail(order);
-    }
-
-    return new NextResponse("OK", { status: 200 });
+    event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
   } catch (err) {
-    console.error("WEBHOOK CRASH:", err);
-    return new NextResponse("Error", { status: 500 });
+    console.error("[webhook] signature verification failed:", err);
+    return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
+
+  if (event.type === "checkout.session.completed") {
+    const session = event.data.object as Stripe.Checkout.Session;
+    await handleCheckoutCompleted(session);
+  }
+
+  return NextResponse.json({ received: true });
+}
+
+// ---------------------------------------------------------------------------
+// Main handler
+// ---------------------------------------------------------------------------
+
+async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+  const meta = session.metadata ?? {};
+  const strategy = meta.routing_strategy as ResolvedCart["strategy"];
+  const vendorPrimary = meta.routing_vendor_primary as VendorId | "none";
+  const vendorSecondary = meta.routing_vendor_secondary as VendorId | "none";
+
+  // Parse line items from Stripe (expand in session creation if needed)
+  const lineItems = await stripe.checkout.sessions.listLineItems(session.id, {
+    limit: 100,
+  });
+
+  // Parse routing results to get per-SKU cost data
+  let routingResults: ResolvedCart["results"] = [];
+  try {
+    routingResults = JSON.parse(meta.routing_results ?? "[]");
+  } catch {
+    console.error("[webhook] failed to parse routing_results");
+  }
+
+  // Build cost map from routing results
+  const costMap = new Map<string, { cost: number; name: string }>();
+  routingResults.forEach((r) => {
+    if (r.winner) {
+      costMap.set(r.sku, {
+        cost: r.winner.offer.cost,
+        name: r.sku, // fallback — enrich from your DB if needed
+      });
+    }
+  });
+
+  // Build customer address from Stripe shipping details
+  const shipping = session.shipping_details;
+  const shippingAddress: CustomerAddress = {
+    name: shipping?.name ?? session.customer_details?.name ?? "",
+    line1: shipping?.address?.line1 ?? "",
+    line2: shipping?.address?.line2 ?? undefined,
+    city: shipping?.address?.city ?? "",
+    state: shipping?.address?.state ?? "",
+    postalCode: shipping?.address?.postal_code ?? "",
+    country: shipping?.address?.country ?? "US",
+    phone: session.customer_details?.phone ?? undefined,
+  };
+
+  const customerEmail = session.customer_details?.email ?? "";
+  const placedAt = new Date().toISOString();
+
+  // ---------------------------------------------------------------------------
+  // Build and submit POs
+  // ---------------------------------------------------------------------------
+  const poResults = [];
+
+  const vendorsToSubmit: VendorId[] = [];
+  if (vendorPrimary !== "none") vendorsToSubmit.push(vendorPrimary);
+  if (vendorSecondary !== "none") vendorsToSubmit.push(vendorSecondary);
+
+  for (const vendorId of vendorsToSubmit) {
+    const adapter = VENDOR_ADAPTERS.find((a) => a.vendorId === vendorId);
+    if (!adapter) {
+      console.error(`[webhook] no adapter found for vendor: ${vendorId}`);
+      continue;
+    }
+
+    // Filter line items for this vendor
+    const vendorResults = routingResults.filter(
+      (r) => r.winner?.offer.vendor === vendorId
+    );
+
+    const poLines: POLineItem[] = vendorResults.map((r) => {
+      const stripeItem = lineItems.data.find((li) =>
+        li.description?.includes(r.sku)
+      );
+      return {
+        sku: r.sku,
+        qty: stripeItem?.quantity ?? 1,
+        unitCost: costMap.get(r.sku)?.cost ?? 0,
+        unitRetail: (stripeItem?.amount_total ?? 0) / 100,
+        name: costMap.get(r.sku)?.name ?? r.sku,
+      };
+    });
+
+    const shippingOption = JSON.parse(
+      vendorId === vendorPrimary
+        ? meta.routing_shipping_primary
+        : meta.routing_shipping_secondary
+    );
+
+    const po: PurchaseOrder = {
+      orderId: session.id,
+      vendor: vendorId,
+      lines: poLines,
+      shippingAddress,
+      shippingOption,
+      customerEmail,
+      placedAt,
+      metadata: {
+        stripe_session_id: session.id,
+        routing_strategy: strategy,
+      },
+    };
+
+    const result = await adapter.submitPO(po);
+    poResults.push({ vendorId, ...result });
+
+    // Log to Supabase sync_log
+    await supabase.from("sync_log").insert({
+      vendor: vendorId,
+      event: "po_submitted",
+      success: result.success,
+      vendor_order_id: result.vendorOrderId,
+      stripe_session_id: session.id,
+      error: result.error ?? null,
+      raw_response: result.rawResponse ?? null,
+      created_at: placedAt,
+    });
+
+    if (!result.success) {
+      console.error(`[webhook] PO failed for ${vendorId}:`, result.error);
+      // TODO: trigger alert / admin notification
+    }
+  }
+
+  // Handle backorders — save notification requests
+  try {
+    const backorders = JSON.parse(meta.routing_backorders ?? "[]");
+    if (backorders.length > 0) {
+      await supabase.from("stock_notifications").upsert(
+        backorders.map((b: any) => ({
+          sku: b.sku,
+          customer_email: customerEmail,
+          restock_date: b.restockDate ?? null,
+          added_from: "backorder",
+          stripe_session_id: session.id,
+          created_at: placedAt,
+        })),
+        { onConflict: "sku,customer_email" }
+      );
+    }
+  } catch {
+    console.error("[webhook] failed to save backorder notifications");
+  }
+
+  console.log(`[webhook] checkout.session.completed — strategy: ${strategy}`, poResults);
 }
