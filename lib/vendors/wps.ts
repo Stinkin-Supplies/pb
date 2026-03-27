@@ -69,6 +69,7 @@ export interface WpsItem {
   length:                 number | null;
   width:                  number | null;
   height:                 number | null;
+  description:            string | null;
   upc:                    string | null;
   country_code:           string | null;
   /** Dealer cost from items response */
