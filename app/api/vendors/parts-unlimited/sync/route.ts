@@ -27,6 +27,7 @@ import AdmZip from "adm-zip";
 import fs from "fs";
 import path from "path";
 import { db } from "@/lib/supabase/admin";
+import getCatalogDb from "@/lib/db/catalog";
 import {
   buildPUAuthHeader,
   parseCSV,
@@ -325,6 +326,16 @@ export async function POST(req: Request) {
     ];
 
     // ── 2. Upsert brands and fetch their IDs ──────────────────
+    const catalogDb = getCatalogDb();
+    for (const name of uniqueBrands) {
+      const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+      await catalogDb.query(
+        `INSERT INTO brands (name, slug) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING`,
+        [name, slug]
+      ).catch(() => {});
+    }
+
+    // Keep Supabase brand fetch for brand_id FK
     const { error: brandErr } = await (supabase as any)
       .from("brands")
       .upsert(
@@ -352,24 +363,67 @@ export async function POST(req: Request) {
       const validBatch = batch.filter(
         (p: any) => p.sku?.trim() && p.part_number?.trim() && p.brand_id
       );
-      if (validBatch.length === 0) {
-        batch = [];
-        return;
-      }
-      const { error } = await (supabase as any)
-        .from("products")
-        .upsert(validBatch, { onConflict: "sku", ignoreDuplicates: false });
+      if (validBatch.length === 0) { batch = []; return; }
 
-      if (error) {
-        console.error(
-          "[PU Sync] Upsert error:",
-          error.message,
-          "| Sample row:",
-          JSON.stringify(validBatch[0])
-        );
-        result.errors += validBatch.length;
-      } else {
-        result.upserted += validBatch.length;
+      const catalogDb = getCatalogDb();
+
+      for (const item of validBatch) {
+        const i = item as any;
+        try {
+          await catalogDb.query(
+            `INSERT INTO products (
+              sku, part_number, upc, upc_code, name, slug,
+              vendor_id, vendor_sku, brand_id, brand_name, category_name,
+              our_price, map_price, map_floor, msrp, compare_at_price,
+              dealer_cost, in_stock, stock_quantity, total_qty,
+              weight_lbs, country_of_origin, commodity_code, product_code,
+              wi_qty, ny_qty, tx_qty, nv_qty, nc_qty,
+              hazardous_code, truck_only, is_map, is_drag_specialties,
+              is_closeout, is_new, part_add_date,
+              status, condition, last_synced_at, updated_at
+            ) VALUES (
+              $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
+              $11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
+              $21,$22,$23,$24,$25,$26,$27,$28,$29,
+              $30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40
+            )
+            ON CONFLICT (sku) DO UPDATE SET
+              name             = EXCLUDED.name,
+              our_price        = EXCLUDED.our_price,
+              map_price        = EXCLUDED.map_price,
+              map_floor        = EXCLUDED.map_floor,
+              dealer_cost      = EXCLUDED.dealer_cost,
+              in_stock         = EXCLUDED.in_stock,
+              stock_quantity   = EXCLUDED.stock_quantity,
+              total_qty        = EXCLUDED.total_qty,
+              wi_qty           = EXCLUDED.wi_qty,
+              ny_qty           = EXCLUDED.ny_qty,
+              tx_qty           = EXCLUDED.tx_qty,
+              nv_qty           = EXCLUDED.nv_qty,
+              nc_qty           = EXCLUDED.nc_qty,
+              is_new           = EXCLUDED.is_new,
+              is_closeout      = EXCLUDED.is_closeout,
+              last_synced_at   = EXCLUDED.last_synced_at,
+              updated_at       = EXCLUDED.updated_at
+            WHERE products.updated_manually = false`,
+            [
+              i.sku, i.part_number, i.upc, i.upc_code, i.name, i.slug,
+              i.vendor_id, i.vendor_sku, i.brand_id, i.brand_name, i.category_name,
+              i.our_price, i.map_price, i.map_floor, i.msrp, i.compare_at_price,
+              i.dealer_cost, i.in_stock, i.stock_quantity, i.total_qty,
+              i.weight_lbs, i.country_of_origin, i.commodity_code, i.product_code,
+              i.wi_qty ?? 0, i.ny_qty ?? 0, i.tx_qty ?? 0, i.nv_qty ?? 0, i.nc_qty ?? 0,
+              i.hazardous_code, i.truck_only, i.is_map, i.is_drag_specialties,
+              i.is_closeout, i.is_new, i.part_add_date,
+              i.status ?? 'active', i.condition ?? 'new',
+              new Date().toISOString(), new Date().toISOString(),
+            ]
+          );
+          result.upserted += 1;
+        } catch (err: any) {
+          console.error("[PU Sync] Row error:", i.sku, err.message);
+          result.errors += 1;
+        }
       }
       batch = [];
     };
@@ -479,10 +533,10 @@ export async function GET(req: Request) {
   );
 
   const [productsRes, logsRes] = await Promise.all([
-    supabase
-      .from("products")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "active"),
+    getCatalogDb().query(
+      `SELECT COUNT(*) FROM products WHERE status = 'active'`
+    ).then(r => ({ count: parseInt(r.rows[0].count, 10) }))
+     .catch(() => ({ count: 0 })),
     (supabase as any)
       .from("sync_log")
       .select("*")
