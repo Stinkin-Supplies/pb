@@ -103,43 +103,60 @@ async function fetchPuInventory(skus: string[]): Promise<RawVendorItem[]> {
 // ---------------------------------------------------------------------------
 
 function buildCartLines(
-  items: { sku: string; qty: number; retailPrice: number }[],
+  items: { sku: string; qty: number; retailPrice: number; name?: string }[],
   wpsItems: RawVendorItem[],
   puItems: RawVendorItem[]
 ): CartLine[] {
   const wpsMap = new Map(wpsItems.map((i) => [i.sku, i]));
-  const puMap = new Map(puItems.map((i) => [i.sku, i]));
+  const puMap  = new Map(puItems.map((i) => [i.sku, i]));
 
-  return items.map(({ sku, qty, retailPrice }) => {
+  return items.map(({ sku, qty, retailPrice, name }) => {
     const offers: VendorOffer[] = [];
 
     const wps = wpsMap.get(sku);
     if (wps) {
       offers.push({
-        vendor: "WPS" as VendorId,
+        vendor:       "WPS" as VendorId,
         sku,
-        cost: wps.cost,
-        mapPrice: wps.mapPrice,
-        stockQty: wps.stockQty,
-        shippingDays: wps.shippingDays,
-        shippingCost: wps.shippingCost,
+        cost:         wps.cost,
+        mapPrice:     wps.mapPrice,
+        retailPrice,
+        stockQty:     wps.stockQty,
+        status:       wps.stockQty > 0 ? "available" : "backorder",
+        restockDate:  null,
+        shippingOptions: wps.shippingDays != null ? [{
+          label:       "Standard",
+          carrier:     "UPS",
+          transitDays: wps.shippingDays,
+          cost:        wps.shippingCost ?? 0,
+          retailRate:  0,
+        }] : [],
       });
     }
 
     const pu = puMap.get(sku);
     if (pu) {
       offers.push({
-        vendor: "PU" as VendorId,
+        vendor:       "PU" as VendorId,
         sku,
-        cost: pu.cost,
-        mapPrice: pu.mapPrice,
-        stockQty: pu.stockQty,
-        shippingDays: pu.shippingDays,
-        shippingCost: pu.shippingCost,
+        cost:         pu.cost,
+        mapPrice:     pu.mapPrice,
+        retailPrice,
+        stockQty:     pu.stockQty,
+        status:       pu.stockQty > 0 ? "available" : "backorder",
+        restockDate:  null,
+        shippingOptions: pu.shippingDays != null ? [{
+          label:       "Standard",
+          carrier:     "UPS",
+          transitDays: pu.shippingDays,
+          cost:        pu.shippingCost ?? 0,
+          retailRate:  0,
+        }] : [],
       });
     }
-
-    return { sku, qty, retailPrice, offers };
+    const resolvedName = name ?? sku;
+    
+    return { sku, qty, retailPrice, name: resolvedName, offers };
   });
 }
 
