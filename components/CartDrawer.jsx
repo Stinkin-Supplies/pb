@@ -24,6 +24,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import NotifyMeButton from "@/components/NotifyMeButton";
 
 const FREE_SHIPPING_THRESHOLD = 99;
 
@@ -517,6 +518,17 @@ export default function CartDrawer({ isOpen, onClose, cartItems, onUpdateQty, on
                       </div>
                     </div>
                   </Link>
+
+                  {!item.in_stock && (
+                    <div style={{ padding: "0 0 0 84px", marginTop: 6 }}>
+                      <NotifyMeButton
+                        sku={item.sku}
+                        productName={item.name}
+                        vendor={item.vendor ?? "wps"}
+                        source="cart"
+                      />
+                    </div>
+                  )}
 
                   <div className="item-controls">
                     <button className="item-qty-btn" onClick={() => onUpdateQty(item.id, item.qty - 1)} disabled={item.qty <= 1}>−</button>

@@ -16,9 +16,10 @@
 //          Component interface stays identical.
 // ============================================================
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter, usePathname } from "next/navigation";
 import NavBar from "@/components/NavBar";
 import { useCartSafe } from "@/components/CartContext";
 import { getProductImage } from "@/lib/getProductImage";
@@ -210,6 +211,55 @@ function FacetSection({ label, items, selected, loading, onSelect }) {
   );
 }
 
+// ── GridNotifyButton ─────────────────────────────────────────
+// Lightweight inline notify for shop grid cards.
+// Shares the same API route as NotifyMeButton.
+function GridNotifyButton({ sku, productName, vendor }) {
+  const [state, setState] = React.useState("idle"); // idle | loading | done | error
+
+  const handleClick = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (state !== "idle" && state !== "error") return;
+    setState("loading");
+    try {
+      const res = await fetch("/api/notifications/restock", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ product_sku: sku, product_name: productName, vendor, source: "pdp" }),
+      });
+      if (res.status === 401) { window.location.href = "/auth"; return; }
+      setState("done");
+    } catch {
+      setState("error");
+    }
+  };
+
+  const cfg = {
+    idle:    { label: "🔔 NOTIFY ME",   color: "#e8621a", bg: "transparent",            border: "#e8621a" },
+    loading: { label: "...",             color: "#8a8784", bg: "transparent",            border: "#3a3838" },
+    done:    { label: "✓ ON THE LIST",  color: "#22c55e", bg: "rgba(34,197,94,0.08)",   border: "#22c55e" },
+    error:   { label: "RETRY",          color: "#ef4444", bg: "transparent",            border: "#ef4444" },
+  }[state];
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={state === "loading" || state === "done"}
+      style={{
+        width: "100%", padding: "5px 8px",
+        background: cfg.bg, border: `1px solid ${cfg.border}`,
+        color: cfg.color, borderRadius: 2, cursor: state === "done" ? "default" : "pointer",
+        fontFamily: "'Share Tech Mono', monospace",
+        fontSize: 8, letterSpacing: "0.1em",
+        transition: "all 0.15s",
+      }}
+    >
+      {cfg.label}
+    </button>
+  );
+}
+
 // ── ProductCard ───────────────────────────────────────────────
 function ProductCard({ product:p, index, view, onAdd }) {
   const imageSrc = getProductImage(p);
@@ -286,15 +336,21 @@ function ProductCard({ product:p, index, view, onAdd }) {
               ${p.price.toFixed(2)}
             </div>
           </div>
-          <button className="add-btn" disabled={!p.inStock}
-            onClick={e => { e.preventDefault(); e.stopPropagation(); if(p.inStock) onAdd(); }}
-            style={{ background:p.inStock?"#e8621a":"#2a2828", border:"none",
-                     color:p.inStock?"#0a0909":"#8a8784",
-                     ...B({fontSize:13,letterSpacing:"0.1em",padding:"5px 12px",
-                     borderRadius:2,cursor:p.inStock?"pointer":"not-allowed",
-                     transition:"background 0.2s"}) }}>
-            {p.inStock?"ADD":"OOS"}
-          </button>
+          {p.inStock ? (
+            <button className="add-btn"
+              onClick={e => { e.preventDefault(); e.stopPropagation(); onAdd(); }}
+              style={{ background:"#e8621a", border:"none", color:"#0a0909",
+                       ...B({fontSize:13,letterSpacing:"0.1em",padding:"5px 12px",
+                       borderRadius:2,cursor:"pointer",transition:"background 0.2s"}) }}>
+              ADD
+            </button>
+          ) : (
+            <GridNotifyButton
+              sku={p.sku}
+              productName={p.name}
+              vendor={p.vendor ?? "wps"}
+            />
+          )}
         </div>
       </div>
     </Link>
@@ -318,6 +374,19 @@ export default function ShopClient({
   initialCategory = null,
   initialBrand    = null,
 }) {
+  // ── Read initial state from URL (supports share/back/refresh) ──
+  const searchParams = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search)
+    : new URLSearchParams();
+
+  const urlCategory = searchParams.get("category");
+  const urlBrand    = searchParams.get("brand");
+  const urlMinPrice = searchParams.get("minPrice");
+  const urlMaxPrice = searchParams.get("maxPrice");
+  const urlInStock  = searchParams.get("inStock") === "true";
+  const urlSort     = searchParams.get("sort") ?? "newest";
+  const urlPage     = parseInt(searchParams.get("page") ?? "0", 10);
+
   const [products, setProducts] = useState(initialProducts);
   const [facets,   setFacets]   = useState(initialFacets);
   const [total,    setTotal]    = useState(initialTotal);
@@ -325,21 +394,37 @@ export default function ShopClient({
   const [error,    setError]    = useState(null);
 
   const [filters, setFilters] = useState({
-    category: initialCategory ?? null,
-    brand:    initialBrand    ?? null,
-    minPrice: null,
-    maxPrice: null,
-    inStock:  false,
+    category: urlCategory ?? initialCategory ?? null,
+    brand:    urlBrand    ?? initialBrand    ?? null,
+    minPrice: urlMinPrice ? Number(urlMinPrice) : null,
+    maxPrice: urlMaxPrice ? Number(urlMaxPrice) : null,
+    inStock:  urlInStock,
   });
-  const [minInput, setMinInput] = useState("");
-  const [maxInput, setMaxInput] = useState("");
-  const [sort,     setSort]     = useState("newest");
-  const [page,     setPage]     = useState(0);
+  const [minInput, setMinInput] = useState(urlMinPrice ?? "");
+  const [maxInput, setMaxInput] = useState(urlMaxPrice ?? "");
+  const [sort,     setSort]     = useState(urlSort);
+  const [page,     setPage]     = useState(isNaN(urlPage) ? 0 : urlPage);
   const [view,     setView]     = useState("grid");
 
   const { addItem } = useCartSafe();
+  const router   = useRouter();
+  const pathname = usePathname();
   const isFirst  = useRef(true);
   const abortRef = useRef(null);
+
+  // ── Persist filters + sort + page to URL ──────────────────
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (filters.category)         params.set("category", filters.category);
+    if (filters.brand)            params.set("brand",    filters.brand);
+    if (filters.minPrice != null) params.set("minPrice", String(filters.minPrice));
+    if (filters.maxPrice != null) params.set("maxPrice", String(filters.maxPrice));
+    if (filters.inStock)          params.set("inStock",  "true");
+    if (sort !== "newest")        params.set("sort",     sort);
+    if (page > 0)                 params.set("page",     String(page));
+    const qs = params.toString();
+    router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
+  }, [filters, sort, page, pathname, router]);
 
   const fetchProducts = useCallback(async (f, s, p) => {
     if (abortRef.current) abortRef.current.abort();
