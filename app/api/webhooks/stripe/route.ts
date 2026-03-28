@@ -79,20 +79,20 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     }
   });
 
-  // Build customer address from Stripe shipping details
-  const shipping = session.shipping_details;
+  // Build customer address from Stripe customer details
+  const customer = session.customer_details;
   const shippingAddress: CustomerAddress = {
-    name: shipping?.name ?? session.customer_details?.name ?? "",
-    line1: shipping?.address?.line1 ?? "",
-    line2: shipping?.address?.line2 ?? undefined,
-    city: shipping?.address?.city ?? "",
-    state: shipping?.address?.state ?? "",
-    postalCode: shipping?.address?.postal_code ?? "",
-    country: shipping?.address?.country ?? "US",
-    phone: session.customer_details?.phone ?? undefined,
+    name: customer?.name ?? "",
+    line1: customer?.address?.line1 ?? "",
+    line2: customer?.address?.line2 ?? undefined,
+    city: customer?.address?.city ?? "",
+    state: customer?.address?.state ?? "",
+    postalCode: customer?.address?.postal_code ?? "",
+    country: customer?.address?.country ?? "US",
+    phone: customer?.phone ?? undefined,
   };
 
-  const customerEmail = session.customer_details?.email ?? "";
+  const customerEmail = customer?.email ?? "";
   const placedAt = new Date().toISOString();
 
   // ---------------------------------------------------------------------------
