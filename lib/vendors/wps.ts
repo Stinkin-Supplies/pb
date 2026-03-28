@@ -83,6 +83,8 @@ export interface WpsItem {
   images?:                WpsImageList;
   /** Sideloaded via ?include=inventory */
   inventory?:             WpsInventoryWarehouse[];
+  /** Sideloaded via ?include=product */
+  product?:                WpsProduct;
 }
 
 export interface WpsProduct {
@@ -441,7 +443,7 @@ export function mapWpsItemToProduct(
     name:              item.name,
     brand_name:        brandName || "WPS",
     category_name:     "General",          // enriched by Typesense/taxonomy later
-    description:       item.description ?? null,
+    description:       item.product?.description ?? item.description ?? null,
     our_price:         parseFloat(ourPrice.toFixed(2)),
     compare_at_price:  retail > 0 ? retail : null,
     map_price:         mapPrice,
