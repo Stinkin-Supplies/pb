@@ -606,7 +606,7 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
 
   function RelatedCardImage({ product }) {
     const src = primaryImage(product.images);
-    const isPlaceholder = src === "/images/placeholder.jpg";
+    const isPlaceholder = src === "/placeholder-product.png";
 
     return (
       <div className="related-img">

@@ -79,5 +79,5 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.redirect(new URL('/images/placeholder.jpg', req.url))
+  return NextResponse.redirect(new URL('/placeholder-product.png', req.url))
 }
