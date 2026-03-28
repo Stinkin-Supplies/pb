@@ -50,6 +50,16 @@ export async function GET(req: NextRequest) {
   if (!url)               return new NextResponse('Missing url param', { status: 400 })
   if (!isAllowedUrl(url)) return new NextResponse('Forbidden',         { status: 403 })
 
+  // WPS CDN serves images directly in the browser — server-side proxy always 403s.
+  // Redirect to the direct URL so the browser loads it natively.
+  const WPS_DIRECT = ['cdn.wpsstatic.com', 'wpsstatic.com']
+  try {
+    const { hostname } = new URL(url)
+    if (WPS_DIRECT.some(h => hostname === h || hostname.endsWith(`.${h}`))) {
+      return NextResponse.redirect(url, { status: 302 })
+    }
+  } catch {}
+
   for (let i = 0; i < HEADER_VARIANTS.length; i++) {
     try {
       const upstream = await fetch(url, { headers: HEADER_VARIANTS[i], cache: 'no-store' })
@@ -79,5 +89,5 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.redirect(new URL('/placeholder-product.png', req.url))
+  return NextResponse.redirect(new URL('/images/placeholder.jpg', req.url))
 }
