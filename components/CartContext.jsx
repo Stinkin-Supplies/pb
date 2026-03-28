@@ -23,9 +23,10 @@ import { getGuestCart, clearGuestCart } from "@/lib/guestCart";
 const CartContext = createContext(null);
 
 export function CartProvider({ children }) {
-  const [cartItems, setCartItems] = useState([]);
-  const [isOpen,    setIsOpen]    = useState(false);
-  const [userId,    setUserId]    = useState(null);
+  const [cartItems,     setCartItems]     = useState([]);
+  const [isOpen,        setIsOpen]        = useState(false);
+  const [userId,        setUserId]        = useState(null);
+  const [pointsBalance, setPointsBalance] = useState(0);
 
   const cartIdRef        = useRef(null);
   const prevItemsRef     = useRef([]);
@@ -76,6 +77,21 @@ export function CartProvider({ children }) {
       subscription.unsubscribe();
     };
   }, []);
+
+  // ── Fetch points balance when user logs in ──────────────
+  useEffect(() => {
+    if (!userId) { setPointsBalance(0); return; }
+    const supabase = supabaseRef.current;
+    supabase
+      .from("user_profiles")
+      .select("points_balance")
+      .eq("id", userId)
+      .maybeSingle()
+      .then(({ data }) => {
+        setPointsBalance(data?.points_balance ?? 0);
+      })
+      .catch(() => setPointsBalance(0));
+  }, [userId]);
 
   // ── Merge guest cart when user signs in ──────────────────
   const mergeGuestCartOnLogin = useCallback(async (id) => {
@@ -253,6 +269,7 @@ export function CartProvider({ children }) {
       // Exposed so consumers (NavBar etc.) don't need their own
       // Supabase subscriptions — read auth state from here instead.
       userId,
+      pointsBalance,
     }}>
       {children}
     </CartContext.Provider>
@@ -278,7 +295,8 @@ const EMPTY_CART = {
   clearCart:  () => {},
   itemCount:  0,
   subtotal:   0,
-  userId:     null, // ← matches shape of real context
+  userId:        null, // ← matches shape of real context
+  pointsBalance: 0,
 };
 
 export function useCartSafe() {

@@ -15,7 +15,7 @@ import CartDrawer from "./CartDrawer";
 
 // Inner component so it can useCart() which requires CartProvider above it
 function CartDrawerMount() {
-  const { cartItems, isOpen, setIsOpen, updateQty, removeItem } = useCart();
+  const { cartItems, isOpen, setIsOpen, updateQty, removeItem, pointsBalance } = useCart();
   return (
     <CartDrawer
       isOpen={isOpen}
@@ -23,6 +23,7 @@ function CartDrawerMount() {
       cartItems={cartItems}
       onUpdateQty={updateQty}
       onRemove={removeItem}
+      pointsBalance={pointsBalance}
     />
   );
 }

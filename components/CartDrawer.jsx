@@ -365,12 +365,9 @@ const css = `
   }
 `;
 
-// ── MOCK POINTS BALANCE ───────────────────────────────────────
-// TODO Phase 3: replace with user_profiles.points_balance from Supabase
-const MOCK_POINTS_BALANCE = 2840;
-const POINTS_TO_DOLLAR    = 0.01; // 100 points = $1
+const POINTS_TO_DOLLAR = 0.01; // 100 points = $1
 
-export default function CartDrawer({ isOpen, onClose, cartItems, onUpdateQty, onRemove }) {
+export default function CartDrawer({ isOpen, onClose, cartItems, onUpdateQty, onRemove, pointsBalance = 0 }) {
   const [redeemPoints, setRedeemPoints] = useState(false);
   // Lock body scroll when drawer is open
   useEffect(() => {
@@ -394,7 +391,7 @@ export default function CartDrawer({ isOpen, onClose, cartItems, onUpdateQty, on
   }, 0);
 
   // How much the user's points are worth in dollars
-  const pointsValue       = MOCK_POINTS_BALANCE * POINTS_TO_DOLLAR;
+  const pointsValue       = pointsBalance * POINTS_TO_DOLLAR;
   // Cap discount at the smaller of: points value OR MAP floor limit
   const pointsDiscount    = redeemPoints ? Math.min(pointsValue, maxPointsDiscount) : 0;
   const pointsUsed        = Math.ceil(pointsDiscount / POINTS_TO_DOLLAR);
@@ -541,7 +538,7 @@ export default function CartDrawer({ isOpen, onClose, cartItems, onUpdateQty, on
             </div>
 
             {/* ── Points redemption ── */}
-            {MOCK_POINTS_BALANCE > 0 && (
+            {pointsBalance > 0 && (
               <div className="points-section">
                 <div className="points-header">
                   <div className="points-label">
@@ -549,7 +546,7 @@ export default function CartDrawer({ isOpen, onClose, cartItems, onUpdateQty, on
                   </div>
                   <div style={{display:"flex", alignItems:"center", gap:8}}>
                     <span className="points-balance">
-                      {MOCK_POINTS_BALANCE.toLocaleString()} PTS AVAILABLE
+                      {pointsBalance.toLocaleString()} PTS AVAILABLE
                     </span>
                     <div
                       className={`points-toggle ${redeemPoints?"on":""}`}
@@ -571,7 +568,7 @@ export default function CartDrawer({ isOpen, onClose, cartItems, onUpdateQty, on
                 )}
                 {!redeemPoints && (
                   <div className="points-detail">
-                    YOUR {MOCK_POINTS_BALANCE.toLocaleString()} PTS ARE WORTH ${pointsValue.toFixed(2)} — TOGGLE TO APPLY
+                    YOUR {pointsBalance.toLocaleString()} PTS ARE WORTH ${pointsValue.toFixed(2)} — TOGGLE TO APPLY
                   </div>
                 )}
               </div>
