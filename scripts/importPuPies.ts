@@ -1,295 +1,363 @@
-// ============================================================
 // scripts/importPuPies.ts
 // ============================================================
-// Parses PU PIES XML exports and upserts:
-//   - description (TLE title + FAB bullets joined)
-//   - images[] (URI from DigitalAssets — LeMans CDN)
+// Scans data/pu/ for PU XML exports, detects PIES vs catalog
+// format by peeking at the first 200 chars, merges all files of
+// each type together, and upserts descriptions/images into the
+// self-hosted Postgres products table.
 //
-// Usage:
-//   npx ts-node scripts/importPuPies.ts
-//   npx ts-node scripts/importPuPies.ts --file data/pu/Brand_PIES_Export.xml
-//   npx ts-node scripts/importPuPies.ts --dry-run
-//
-// Part number matching:
-//   PIES uses punctuated format (1131-0683)
-//   DB uses unpunctuated SKU (11310683)
-//   Script strips all non-alphanumeric chars before matching.
+// Run with:
+//   npx ts-node --project tsconfig.scripts.json scripts/importPuPies.ts
+// Or via admin API route /api/admin/import-pies (POST)
 // ============================================================
 
-import fs   from "fs";
+import fs from "fs";
 import path from "path";
 import { XMLParser } from "fast-xml-parser";
-import { createClient } from "@supabase/supabase-js";
-import { mergeProductImages } from "../lib/mergeProductImages";
+import getCatalogDb from "../lib/db/catalog";
 
-// ── Config ────────────────────────────────────────────────────
-const DEFAULT_FILE = path.join(process.cwd(), "data/pu/Brand_PIES_Export.xml");
-const BATCH_SIZE   = 500;
+const PU_DIR = path.join(process.cwd(), "data", "pu");
+const BATCH_SIZE = 500;
 
-const args    = process.argv.slice(2);
-const fileArg = args.indexOf("--file");
-const XML_FILE = fileArg !== -1 ? args[fileArg + 1] : DEFAULT_FILE;
-const DRY_RUN  = args.includes("--dry-run");
+type XmlKind = "pies" | "catalog" | "unknown";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { persistSession: false } }
-);
-
-// ── Types ─────────────────────────────────────────────────────
-interface PiesAsset {
-  uri:       string;
-  assetType: string;
-  fileName:  string;
-}
-
-interface PiesItem {
-  partNumber:   string; // punctuated e.g. "1131-0683"
-  sku:          string; // stripped  e.g. "11310683"
-  brandLabel:   string;
-  title:        string | null;        // DescriptionCode=TLE
-  bullets:      string[];             // DescriptionCode=FAB (ordered by Sequence)
-  description:  string | null;        // title + bullets joined
-  images:       string[];             // CDN URIs
-}
-
-// ── Parser ────────────────────────────────────────────────────
-function stripPunctuation(partNumber: string): string {
-  return partNumber.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-}
-
-function parsePiesXml(filePath: string): PiesItem[] {
-  console.log(`[PIES] Reading ${filePath}...`);
-  const xml = fs.readFileSync(filePath, "utf-8");
-
-  const parser = new XMLParser({
-    ignoreAttributes:        false,
-    attributeNamePrefix:     "@_",
-    isArray: (name) =>
-      ["Item", "Description", "DigitalFileInformation", "ExtendedProductInformation"].includes(name),
-  });
-
-  const parsed = parser.parse(xml);
-  const items  = parsed?.PIES?.Items?.Item ?? [];
-
-  console.log(`[PIES] Parsed ${items.length} items`);
-
-  const result: PiesItem[] = [];
-
-  for (const item of items) {
-    const partNumber = String(item.PartNumber ?? "").trim();
-    if (!partNumber) continue;
-
-    const sku        = stripPunctuation(partNumber);
-    const brandLabel = String(item.BrandLabel ?? "").trim();
-
-    // ── Descriptions ──────────────────────────────────────────
-    const descriptions = item.Descriptions?.Description ?? [];
-    let title: string | null = null;
-    const bulletMap: Map<number, string> = new Map();
-
-    for (const desc of descriptions) {
-      const code = desc["@_DescriptionCode"] ?? "";
-      const text = String(desc["#text"] ?? desc ?? "").trim();
-      if (!text) continue;
-
-      if (code === "TLE") {
-        title = text;
-      } else if (code === "FAB") {
-        const seq = parseInt(desc["@_Sequence"] ?? "0", 10);
-        bulletMap.set(seq, text);
-      }
-    }
-
-    // Sort bullets by sequence number
-    const bullets = [...bulletMap.entries()]
-      .sort((a, b) => a[0] - b[0])
-      .map(([, text]) => text);
-
-    // Build full description: title + bulleted features
-    const descParts: string[] = [];
-    if (title) descParts.push(title);
-    if (bullets.length > 0) descParts.push(...bullets);
-    const description = descParts.length > 0 ? descParts.join("\n") : null;
-
-    // ── Digital Assets (images) ───────────────────────────────
-    const digitalFiles = item.DigitalAssets?.DigitalFileInformation ?? [];
-    const images: string[] = [];
-
-    for (const asset of digitalFiles) {
-      const uri = String(asset.URI ?? "").trim();
-      if (isRealImage(uri)) {
-        images.push(uri);
-      }
-    }
-
-    result.push({
-      partNumber,
-      sku,
-      brandLabel,
-      title,
-      bullets,
-      description,
-      images,
-    });
-  }
-
-  return result;
-}
-
-function isRealImage(url: string) {
-  if (!url || !url.startsWith("http")) return false;
-
+// ── Image URL validator ───────────────────────────────────────
+function isValidImageUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  if (!url.startsWith("http")) return false;
   const lower = url.toLowerCase();
-
-  // reject known bad patterns
-  if (
-    lower.includes(".zip") ||
-    lower.includes("download") ||
-    lower.includes("asset")
-  ) return false;
-
-  // accept known image formats
+  if (lower.includes(".zip") || lower.includes("download")) return false;
   return (
     lower.endsWith(".jpg") ||
     lower.endsWith(".jpeg") ||
     lower.endsWith(".png") ||
     lower.endsWith(".webp") ||
     lower.endsWith(".gif") ||
-    lower.endsWith(".svg")
+    lower.match(/\/z\/[A-Za-z0-9+/=]+$/) !== null
   );
 }
 
-// ── Upsert logic ──────────────────────────────────────────────
-async function upsertBatch(
-  items: PiesItem[],
-  stats: { updated: number; unchanged: number; skipped: number; errors: number }
+function cleanUrl(url: string): string {
+  return url.replace("http://", "https://").split("?")[0].trim();
+}
+
+function peekXmlKind(filePath: string): XmlKind {
+  try {
+    const snippet = fs.readFileSync(filePath, "utf-8").slice(0, 200).toUpperCase();
+    if (snippet.includes("<PIES")) return "pies";
+    if (snippet.includes("<ROOT")) return "catalog";
+  } catch {
+    // ignore and fall through
+  }
+  return "unknown";
+}
+
+function listPuXmlFiles(): string[] {
+  if (!fs.existsSync(PU_DIR)) {
+    throw new Error(`PU data directory not found: ${PU_DIR}`);
+  }
+
+  return fs
+    .readdirSync(PU_DIR)
+    .map((name) => path.join(PU_DIR, name))
+    .filter((filePath) => fs.statSync(filePath).isFile())
+    .filter((filePath) => filePath.toLowerCase().endsWith(".xml"));
+}
+
+function mergeEntryMaps<T extends { description: string | null; images: string[] }>(
+  target: Map<string, T>,
+  source: Map<string, T>
 ) {
-  // Look up matching SKUs in one query
-  const { data: existing, error: fetchErr } = await supabase
-    .from("products")
-    .select("id, sku, vendor_sku, images, description")
-    .in("vendor_sku", items.map(i => i.partNumber));
-
-  if (fetchErr) {
-    console.error("[PIES] Fetch error:", fetchErr.message);
-    stats.errors += items.length;
-    return;
-  }
-
-  const normalize = (v: string) => v.trim().toLowerCase();
-  const existingMap = new Map<string, { id: string; images: string[]; description: string | null }>();
-  for (const row of existing ?? []) {
-    if (row.vendor_sku) existingMap.set(normalize(row.vendor_sku), row);
-  }
-
-  const updates: { id: string; images: string[]; description: string | null }[] = [];
-
-  for (const item of items) {
-    const match = existingMap.get(normalize(item.partNumber));
-    if (!match) {
-      stats.skipped++;
+  for (const [sku, entry] of source.entries()) {
+    const existing = target.get(sku);
+    if (!existing) {
+      target.set(sku, entry);
       continue;
     }
 
-    const existingImages = match.images ?? [];
-    const piesImages = item.images;
-    const mergedImages = mergeProductImages({
-      wps: piesImages,
-      pies: existingImages,
-      pu: [],
+    const description = entry.description ?? existing.description;
+    const imageSet = new Set<string>([...existing.images, ...entry.images]);
+
+    target.set(sku, {
+      ...existing,
+      ...entry,
+      description,
+      images: [...imageSet].slice(0, 5),
     });
-
-    const hasNewImages = piesImages.some(img => !existingImages.includes(img));
-
-    const shouldUpdate =
-      hasNewImages ||
-      (!match.description && item.description);
-
-    if (!shouldUpdate) {
-      stats.unchanged++;
-      continue;
-    }
-
-    updates.push({
-      id:          match.id,
-      images:      mergedImages,
-      description: match.description || item.description,
-    });
-    stats.updated++;
-  }
-
-  if (DRY_RUN) {
-    console.log(`[PIES] DRY RUN — would update ${updates.length} products`);
-    if (updates.length > 0) {
-      console.log("[PIES] Sample:", JSON.stringify(updates[0], null, 2));
-    }
-    return;
-  }
-
-  if (updates.length === 0) return;
-
-  const { error } = await supabase
-    .from("products")
-    .upsert(updates, { onConflict: "id" });
-
-  if (error) {
-    console.error("[PIES] Bulk upsert error:", error.message);
-    stats.errors += updates.length;
-    stats.updated -= updates.length;
   }
 }
 
-// ── Main ──────────────────────────────────────────────────────
-async function main() {
-  if (!fs.existsSync(XML_FILE)) {
-    console.error(`[PIES] File not found: ${XML_FILE}`);
-    console.error(`[PIES] Place the XML in data/pu/ or pass --file path/to/file.xml`);
-    process.exit(1);
+// ── Parse Catalog XML files ──────────────────────────────────
+interface CatalogEntry {
+  sku: string;
+  description: string | null;
+  images: string[];
+}
+
+function parseCatalogXml(filePath: string): Map<string, CatalogEntry> {
+  const fileName = path.basename(filePath);
+  console.log(`[PIES Import] Parsing catalog file: ${fileName}`);
+  const xml = fs.readFileSync(filePath, "utf-8");
+  const parser = new XMLParser({ ignoreAttributes: false, parseTagValue: true });
+  const root = parser.parse(xml);
+  const parts = root?.root?.part ?? [];
+  const map = new Map<string, CatalogEntry>();
+
+  for (const part of parts) {
+    const sku = String(part.partNumber ?? "").trim();
+    if (!sku) continue;
+
+    const bullets: string[] = [];
+    for (let i = 1; i <= 24; i++) {
+      const bullet = part[`bullet${i}`];
+      if (bullet && String(bullet).trim()) {
+        bullets.push(String(bullet).trim());
+      }
+    }
+    const description = bullets.length > 0 ? bullets.join("\n") : null;
+
+    const images: string[] = [];
+    if (part.partImage && isValidImageUrl(String(part.partImage))) {
+      images.push(cleanUrl(String(part.partImage)));
+    }
+    if (part.productImage && isValidImageUrl(String(part.productImage))) {
+      const url = cleanUrl(String(part.productImage));
+      if (!images.includes(url)) images.push(url);
+    }
+
+    map.set(sku, { sku, description, images });
   }
 
-  if (DRY_RUN) console.log("[PIES] DRY RUN MODE — no changes will be written");
+  console.log(`[PIES Import] ${fileName}: ${map.size.toLocaleString()} catalog parts parsed`);
+  return map;
+}
 
-  const items = parsePiesXml(XML_FILE);
+// ── Parse PIES XML files ─────────────────────────────────────
+interface PiesEntry {
+  sku: string;
+  description: string | null;
+  images: string[];
+}
 
-  const stats = { updated: 0, unchanged: 0, skipped: 0, errors: 0 };
-  const start = Date.now();
+function parsePiesXml(filePath: string): Map<string, PiesEntry> {
+  const fileName = path.basename(filePath);
+  console.log(`[PIES Import] Parsing PIES file: ${fileName}`);
+  const xml = fs.readFileSync(filePath, "utf-8");
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: "@_",
+    parseTagValue: true,
+    isArray: (name) => ["Item", "Description", "DigitalFileInformation"].includes(name),
+  });
+  const root = parser.parse(xml);
+  const items = root?.PIES?.Items?.Item ?? [];
+  const map = new Map<string, PiesEntry>();
 
-  // Process in batches
-  for (let i = 0; i < items.length; i += BATCH_SIZE) {
-    const batch = items.slice(i, i + BATCH_SIZE);
-    await upsertBatch(batch, stats);
+  for (const item of items) {
+    const sku = String(item.PartNumber ?? "").trim().replace(/-/g, "");
+    const skuPunctuated = String(item.PartNumber ?? "").trim();
+    if (!sku) continue;
 
-    if ((i + BATCH_SIZE) % 500 === 0 || i + BATCH_SIZE >= items.length) {
+    const descriptions = item.Descriptions?.Description ?? [];
+    const fabLines: string[] = [];
+    let shortDesc: string | null = null;
+
+    for (const desc of descriptions) {
+      const code = desc["@_DescriptionCode"];
+      const text = String(desc["#text"] ?? desc ?? "").trim();
+      if (!text) continue;
+      if (code === "TLE") shortDesc = text;
+      if (code === "FAB") fabLines.push(text);
+    }
+
+    const description = fabLines.length > 0 ? fabLines.join("\n") : shortDesc;
+
+    const assets = item.DigitalAssets?.DigitalFileInformation ?? [];
+    const images: string[] = [];
+    for (const asset of assets) {
+      const uri = String(asset.URI ?? "").trim();
+      const filename = String(asset.FileName ?? "").trim().toLowerCase();
+      if (filename.endsWith(".zip")) continue;
+      if (uri && isValidImageUrl(uri)) {
+        images.push(cleanUrl(uri));
+      }
+    }
+
+    const entry = { sku, description, images };
+    map.set(sku, entry);
+    if (skuPunctuated !== sku) map.set(skuPunctuated, entry);
+  }
+
+  console.log(`[PIES Import] ${fileName}: ${map.size.toLocaleString()} PIES entries parsed`);
+  return map;
+}
+
+// ── Merge both sources ────────────────────────────────────────
+interface MergedEntry {
+  sku: string;
+  description: string | null;
+  images: string[];
+}
+
+function mergeEntries(
+  catalog: Map<string, CatalogEntry>,
+  pies: Map<string, PiesEntry>
+): Map<string, MergedEntry> {
+  const merged = new Map<string, MergedEntry>();
+  const allSkus = new Set([...catalog.keys(), ...pies.keys()]);
+
+  for (const sku of allSkus) {
+    const c = catalog.get(sku);
+    const p = pies.get(sku);
+
+    const description = p?.description ?? c?.description ?? null;
+    const imageSet = new Set<string>();
+    for (const url of (c?.images ?? [])) imageSet.add(url);
+    for (const url of (p?.images ?? [])) imageSet.add(url);
+
+    merged.set(sku, {
+      sku,
+      description,
+      images: [...imageSet].slice(0, 5),
+    });
+  }
+
+  return merged;
+}
+
+async function upsertToDb(entries: Map<string, MergedEntry>) {
+  const catalogDb = getCatalogDb();
+  const allEntries = [...entries.values()];
+  let upserted = 0;
+  let skipped = 0;
+  let errors = 0;
+
+  console.log(`[PIES Import] Upserting ${allEntries.length.toLocaleString()} entries to self-hosted DB...`);
+
+  for (let i = 0; i < allEntries.length; i += BATCH_SIZE) {
+    const batch = allEntries.slice(i, i + BATCH_SIZE);
+
+    for (const entry of batch) {
+      try {
+        const result = await catalogDb.query(
+          `UPDATE products
+           SET
+             description = CASE
+               WHEN $1::text IS NOT NULL AND (description IS NULL OR description = '')
+               THEN $1::text
+               ELSE description
+             END,
+             images = CASE
+               WHEN $2::text[] IS NOT NULL AND array_length($2::text[], 1) > 0
+                    AND (images IS NULL OR images = '{}')
+               THEN $2::text[]
+               ELSE images
+             END,
+             updated_at = NOW()
+           WHERE sku = $3
+           RETURNING sku`,
+          [
+            entry.description,
+            entry.images.length > 0 ? entry.images : null,
+            entry.sku,
+          ]
+        );
+
+        if (result.rowCount && result.rowCount > 0) {
+          upserted++;
+        } else {
+          skipped++;
+        }
+      } catch (err: any) {
+        console.error(
+          `[PIES Import] Error for SKU ${entry.sku}:`,
+          err?.message ?? err?.detail ?? err
+        );
+        errors++;
+      }
+    }
+
+    if ((i / BATCH_SIZE) % 10 === 0) {
       console.log(
-        `[PIES] Progress ${Math.min(i + BATCH_SIZE, items.length)}/${items.length} — ` +
-        `updated: ${stats.updated} | unchanged: ${stats.unchanged} | skipped: ${stats.skipped} | errors: ${stats.errors}`
+        `[PIES Import] Progress — ` +
+        `upserted: ${upserted.toLocaleString()} | ` +
+        `skipped: ${skipped.toLocaleString()} | ` +
+        `errors: ${errors}`
       );
     }
   }
 
-  const duration = ((Date.now() - start) / 1000).toFixed(1);
-  console.log(`\n[PIES] Complete in ${duration}s`);
-  console.log(`  Updated            : ${stats.updated}`);
-  console.log(`  Unchanged          : ${stats.unchanged}`);
-  console.log(`  Not in DB (skipped): ${stats.skipped}`);
-  console.log(`  Errors             : ${stats.errors}`);
-
-  if (stats.skipped > 0) {
-    console.log(`\n[PIES] Note: ${stats.skipped} part numbers from PIES had no matching SKU in products.`);
-    console.log(`  This is normal — PIES may include parts not in your current price file.`);
-  }
-
-  // After import, refresh facets cache
-  if (!DRY_RUN && stats.updated > 0) {
-    console.log("\n[PIES] Refreshing facets cache...");
-    await supabase.rpc("refresh_facets_cache");
-    console.log("[PIES] Facets cache refreshed.");
-  }
+  return { upserted, skipped, errors };
 }
 
-main().catch(err => {
-  console.error("[PIES] Fatal:", err.message);
-  process.exit(1);
-});
+function combineFilesByKind(files: string[]) {
+  const catalogFiles: string[] = [];
+  const piesFiles: string[] = [];
+  const unknownFiles: string[] = [];
+
+  for (const filePath of files) {
+    const kind = peekXmlKind(filePath);
+    if (kind === "pies") piesFiles.push(filePath);
+    else if (kind === "catalog") catalogFiles.push(filePath);
+    else unknownFiles.push(filePath);
+  }
+
+  return { catalogFiles, piesFiles, unknownFiles };
+}
+
+// ── Main ──────────────────────────────────────────────────────
+export async function importPuPies() {
+  console.log("[PIES Import] Starting PU XML import...");
+  const start = Date.now();
+
+  const files = listPuXmlFiles();
+  const { catalogFiles, piesFiles, unknownFiles } = combineFilesByKind(files);
+
+  console.log(
+    `[PIES Import] Found ${files.length.toLocaleString()} XML files ` +
+    `(catalog: ${catalogFiles.length}, pies: ${piesFiles.length}, unknown: ${unknownFiles.length})`
+  );
+
+  if (unknownFiles.length > 0) {
+    console.log(
+      "[PIES Import] Unknown XML files skipped:",
+      unknownFiles.map((f) => path.basename(f)).join(", ")
+    );
+  }
+
+  const catalogMaps = catalogFiles.map(parseCatalogXml);
+  const piesMaps = piesFiles.map(parsePiesXml);
+
+  const catalogMerged = new Map<string, CatalogEntry>();
+  for (const map of catalogMaps) mergeEntryMaps(catalogMerged, map);
+
+  const piesMerged = new Map<string, PiesEntry>();
+  for (const map of piesMaps) mergeEntryMaps(piesMerged, map);
+
+  console.log(`[PIES Import] Combined catalog SKUs: ${catalogMerged.size.toLocaleString()}`);
+  console.log(`[PIES Import] Combined PIES SKUs: ${piesMerged.size.toLocaleString()}`);
+
+  const merged = mergeEntries(catalogMerged, piesMerged);
+  console.log(`[PIES Import] Total unique SKUs to process: ${merged.size.toLocaleString()}`);
+
+  const { upserted, skipped, errors } = await upsertToDb(merged);
+
+  const durationMs = Date.now() - start;
+  console.log("[PIES Import] Complete:", {
+    totalParsed: merged.size,
+    upserted,
+    skipped,
+    errors,
+    durationMs,
+  });
+
+  return { upserted, skipped, errors, durationMs };
+}
+
+if (require.main === module) {
+  importPuPies()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error("[PIES Import] Fatal:", err);
+      process.exit(1);
+    });
+}
