@@ -26,8 +26,6 @@ export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
 import { createClient }  from "@supabase/supabase-js";
-import fs from "fs";
-import path from "path";
 import { db } from "@/lib/supabase/admin";
 import getCatalogDb from "@/lib/db/catalog";
 import {
@@ -45,7 +43,6 @@ import {
 import { mergeProductImages } from "@/lib/mergeProductImages";
 
 const BATCH_SIZE = 250; // smaller than PU — WPS items carry image arrays
-const CHECKPOINT_FILE = path.join(process.cwd(), "data/wps_sync_checkpoint.json");
 
 type WpsCheckpoint = {
   cursor: string | null;
@@ -54,29 +51,48 @@ type WpsCheckpoint = {
   updatedAt: string;
 };
 
-function readCheckpoint(): WpsCheckpoint | null {
+// ── Checkpoint helpers (Supabase-backed, Vercel-safe) ─────────
+
+async function readCheckpoint(supabase: any): Promise<WpsCheckpoint | null> {
   try {
-    if (!fs.existsSync(CHECKPOINT_FILE)) return null;
-    const raw = fs.readFileSync(CHECKPOINT_FILE, "utf-8");
-    return JSON.parse(raw) as WpsCheckpoint;
+    const { data } = await supabase
+      .from("sync_checkpoints")
+      .select("*")
+      .eq("vendor", "wps")
+      .maybeSingle();
+    if (!data) return null;
+    return {
+      cursor:     data.cursor,
+      page:       data.page,
+      totalItems: data.total_items,
+      updatedAt:  data.updated_at,
+    };
   } catch (e) {
     console.warn("[WPS Sync] Failed to read checkpoint:", (e as Error).message);
     return null;
   }
 }
 
-function writeCheckpoint(cp: WpsCheckpoint) {
+async function writeCheckpoint(supabase: any, cp: WpsCheckpoint) {
   try {
-    fs.mkdirSync(path.dirname(CHECKPOINT_FILE), { recursive: true });
-    fs.writeFileSync(CHECKPOINT_FILE, JSON.stringify(cp, null, 2));
+    await supabase.from("sync_checkpoints").upsert({
+      vendor:      "wps",
+      cursor:      cp.cursor,
+      page:        cp.page,
+      total_items: cp.totalItems,
+      updated_at:  new Date().toISOString(),
+    }, { onConflict: "vendor" });
   } catch (e) {
     console.warn("[WPS Sync] Failed to write checkpoint:", (e as Error).message);
   }
 }
 
-function clearCheckpoint() {
+async function clearCheckpoint(supabase: any) {
   try {
-    if (fs.existsSync(CHECKPOINT_FILE)) fs.unlinkSync(CHECKPOINT_FILE);
+    await supabase
+      .from("sync_checkpoints")
+      .delete()
+      .eq("vendor", "wps");
   } catch (e) {
     console.warn("[WPS Sync] Failed to clear checkpoint:", (e as Error).message);
   }
@@ -123,6 +139,14 @@ export async function POST(req: Request) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
+
+  // Resume from checkpoint if exists
+  const checkpoint = await readCheckpoint(supabase);
+  const startCursor = checkpoint?.cursor ?? null;
+  const startPage   = checkpoint?.page   ?? 1;
+  if (checkpoint) {
+    console.log(`[WPS Sync] Resuming from page ${startPage}, cursor: ${startCursor}`);
+  }
 
   let wps: WpsClient;
   try {
@@ -241,20 +265,11 @@ export async function POST(req: Request) {
 
     // ── Step 4: Paginate items with images + inventory ─────
     const forceRestart = req.headers.get("x-force-restart") === "true";
-    let startCursor: string | null = null;
-    let startPage = 0;
-    const checkpoint = readCheckpoint();
-    if (checkpoint && !forceRestart) {
-      if (checkpoint.cursor) {
-        startCursor = checkpoint.cursor;
-        startPage = checkpoint.page;
-        console.log(`[WPS Sync] Resuming from page ${startPage + 1} (cursor checkpoint)`);
-      } else {
-        // If cursor is null, last run completed.
-        clearCheckpoint();
-      }
-    } else if (forceRestart) {
-      clearCheckpoint();
+    if (forceRestart) {
+      await clearCheckpoint(supabase);
+    } else if (checkpoint && !checkpoint.cursor) {
+      // If cursor is null, last run completed.
+      await clearCheckpoint(supabase);
     }
 
     console.log("[WPS Sync] Starting item pagination...");
@@ -389,7 +404,7 @@ export async function POST(req: Request) {
           );
         }
 
-        writeCheckpoint({
+        await writeCheckpoint(supabase, {
           cursor: pageInfo.nextCursor,
           page: pageNum,
           totalItems: result.totalItems,
@@ -411,7 +426,7 @@ export async function POST(req: Request) {
       `[WPS Sync] MAP check complete — ${violationCount ?? 0} violations logged`
     );
 
-    clearCheckpoint();
+    await clearCheckpoint(supabase);
 
     console.log("[WPS Sync] Complete:", result);
     console.log(`[WPS Sync] Paginated ${total} total items across all pages`);
