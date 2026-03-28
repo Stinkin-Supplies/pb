@@ -36,9 +36,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "product_sku required" }, { status: 400 });
   }
 
+  // Check if already waiting — avoid duplicate
+  const { data: existing } = await supabase
+    .from("stock_notifications")
+    .select("id, status")
+    .eq("email", session.user.email)
+    .eq("product_sku", product_sku)
+    .maybeSingle();
+
+  if (existing) {
+    // Already registered — return success silently
+    return NextResponse.json({ success: true, alreadyExists: true });
+  }
+
   const { error } = await supabase
     .from("stock_notifications")
-    .upsert({
+    .insert({
       user_id:      session.user.id,
       email:        session.user.email,
       product_sku,
@@ -46,9 +59,6 @@ export async function POST(req: Request) {
       vendor:       vendor       ?? null,
       source:       source       ?? "pdp",
       status:       "waiting",
-    }, {
-      onConflict:        "email,product_sku",
-      ignoreDuplicates:  true,   // silently skip if already waiting
     });
 
   if (error) {
