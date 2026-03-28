@@ -5,7 +5,7 @@ type ProductImageInput = {
   brand?: string | null;
 };
 
-const FALLBACK_IMAGE = "/placeholder-product.png";
+const FALLBACK_IMAGE = "/images/placeholder.jpg";
 const BRAND_FALLBACKS: Record<string, string> = {
   "drag specialties": "/brands/drag-specialties.png",
 };
@@ -15,22 +15,23 @@ function isRealImage(url: string) {
 
   const lower = url.toLowerCase();
 
-  // reject known bad patterns
-  if (
-    lower.includes(".zip") ||
-    lower.includes("download") ||
-    lower.includes("asset")
-  ) return false;
+  // reject zip files only
+  if (lower.includes(".zip")) return false;
 
   // accept known image formats
-  return (
+  if (
     lower.endsWith(".jpg") ||
     lower.endsWith(".jpeg") ||
     lower.endsWith(".png") ||
     lower.endsWith(".webp") ||
     lower.endsWith(".gif") ||
     lower.endsWith(".svg")
-  );
+  ) return true;
+
+  // accept LeMans CDN base64 paths (PU images)
+  if (lower.includes("asset.lemansnet.com/z/")) return true;
+
+  return false;
 }
 
 export function filterImageUrls(urls?: (string | null)[] | null) {
