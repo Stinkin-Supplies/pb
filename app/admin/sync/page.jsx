@@ -612,6 +612,209 @@ function WpsPanel() {
 }
 
 // ============================================================
+// SYNC LOG VIEWER — full searchable history for both vendors
+// ============================================================
+
+function SyncLogViewer() {
+  const [logs,         setLogs]         = useState([]);
+  const [loading,      setLoading]      = useState(true);
+  const [search,       setSearch]       = useState("");
+  const [vendorFilter, setVendorFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [page,         setPage]         = useState(0);
+  const [total,        setTotal]        = useState(0);
+
+  const PAGE_SIZE = 25;
+
+  const fetchLogs = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        vendor: vendorFilter,
+        status: statusFilter,
+        page:   String(page),
+        limit:  String(PAGE_SIZE),
+      });
+      const res  = await fetch(`/api/admin/sync-log?${params}`);
+      const data = await res.json();
+      setLogs(data.logs  ?? []);
+      setTotal(data.total ?? 0);
+    } catch (e) {
+      console.error("[SyncLog]", e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [vendorFilter, statusFilter, page]);
+
+  useEffect(() => { setPage(0); }, [vendorFilter, statusFilter]);
+  useEffect(() => { fetchLogs(); }, [fetchLogs]);
+
+  const filtered = search
+    ? logs.filter(l =>
+        l.vendor?.toLowerCase().includes(search.toLowerCase()) ||
+        l.status?.toLowerCase().includes(search.toLowerCase()) ||
+        l.error_message?.toLowerCase().includes(search.toLowerCase())
+      )
+    : logs;
+
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+
+  return (
+    <div className="card">
+      <div className="card-head">
+        <div className="card-title">SYNC <span>LOG VIEWER</span></div>
+        <span style={M({fontSize:9, color:"#8a8784", letterSpacing:"0.1em"})}>
+          {total.toLocaleString()} TOTAL RUNS
+        </span>
+      </div>
+      <div className="card-body">
+
+        {/* Toolbar */}
+        <div style={{display:"flex", gap:8, marginBottom:16, flexWrap:"wrap", alignItems:"center"}}>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="SEARCH LOGS..."
+            style={{
+              background:"#0a0909", border:"1px solid #2a2828", color:"#f0ebe3",
+              fontFamily:"'Share Tech Mono',monospace", fontSize:11,
+              letterSpacing:"0.06em", padding:"7px 12px", borderRadius:2,
+              outline:"none", width:220,
+            }}
+          />
+          {["all","wps","pu"].map(v => (
+            <button key={v}
+              onClick={() => setVendorFilter(v)}
+              style={{
+                background: vendorFilter===v ? "rgba(232,98,26,0.08)" : "none",
+                border: `1px solid ${vendorFilter===v ? "#e8621a" : "#2a2828"}`,
+                color: vendorFilter===v ? "#e8621a" : "#8a8784",
+                fontFamily:"'Share Tech Mono',monospace", fontSize:9,
+                letterSpacing:"0.1em", padding:"6px 12px", borderRadius:2,
+                cursor:"pointer", transition:"all 0.15s",
+              }}>
+              {v.toUpperCase()}
+            </button>
+          ))}
+          <div style={{width:1, height:20, background:"#2a2828"}}/>
+          {["all","success","error"].map(s => (
+            <button key={s}
+              onClick={() => setStatusFilter(s)}
+              style={{
+                background: statusFilter===s ? "rgba(232,98,26,0.08)" : "none",
+                border: `1px solid ${statusFilter===s ? "#e8621a" : "#2a2828"}`,
+                color: statusFilter===s ? "#e8621a" : "#8a8784",
+                fontFamily:"'Share Tech Mono',monospace", fontSize:9,
+                letterSpacing:"0.1em", padding:"6px 12px", borderRadius:2,
+                cursor:"pointer", transition:"all 0.15s",
+              }}>
+              {s.toUpperCase()}
+            </button>
+          ))}
+          <button
+            onClick={fetchLogs}
+            style={{
+              marginLeft:"auto", background:"none",
+              border:"1px solid #2a2828", color:"#8a8784",
+              fontFamily:"'Share Tech Mono',monospace", fontSize:9,
+              letterSpacing:"0.1em", padding:"6px 12px", borderRadius:2,
+              cursor:"pointer", transition:"all 0.15s",
+            }}>
+            ↻ REFRESH
+          </button>
+        </div>
+
+        {/* Table */}
+        {loading ? (
+          <div style={{textAlign:"center", padding:40}}>
+            <div style={{width:20, height:20, borderRadius:"50%", border:"2px solid #2a2828", borderTopColor:"#e8621a", animation:"spin 0.6s linear infinite", display:"inline-block"}}/>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div style={M({fontSize:10, color:"#3a3838", letterSpacing:"0.12em", padding:"40px 0", textAlign:"center"})}>
+            NO SYNC LOGS FOUND
+          </div>
+        ) : (
+          <div style={{overflowX:"auto"}}>
+            <table className="log-table">
+              <thead>
+                <tr>
+                  <th>DATE & TIME</th>
+                  <th>VENDOR</th>
+                  <th>STATUS</th>
+                  <th>UPSERTED</th>
+                  <th>SKIPPED</th>
+                  <th>ERRORS</th>
+                  <th>DURATION</th>
+                  <th>NOTES</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((log, i) => (
+                  <tr key={i}>
+                    <td style={M({fontSize:10, color:"#8a8784", whiteSpace:"nowrap"})}>
+                      {new Date(log.completed_at).toLocaleString()}
+                    </td>
+                    <td>
+                      <span style={{
+                        fontFamily:"'Share Tech Mono',monospace", fontSize:8,
+                        letterSpacing:"0.12em", padding:"2px 8px", borderRadius:1,
+                        border:"1px solid",
+                        color:      log.vendor==="wps" ? "#3b82f6" : "#c9a84c",
+                        borderColor:log.vendor==="wps" ? "rgba(59,130,246,0.3)" : "rgba(201,168,76,0.3)",
+                        background: log.vendor==="wps" ? "rgba(59,130,246,0.06)" : "rgba(201,168,76,0.06)",
+                      }}>
+                        {(log.vendor ?? "—").toUpperCase()}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`badge badge-${log.status}`}>
+                        {(log.status ?? "—").toUpperCase()}
+                      </span>
+                    </td>
+                    <td style={{color:"#22c55e"}}>{log.upserted?.toLocaleString() ?? "—"}</td>
+                    <td style={{color:"#8a8784"}}>{log.skipped?.toLocaleString() ?? "—"}</td>
+                    <td style={{color: log.errors > 0 ? "#ef4444" : "#8a8784"}}>{log.errors ?? 0}</td>
+                    <td style={M({fontSize:10, color:"#8a8784", whiteSpace:"nowrap"})}>
+                      {log.duration_ms ? `${(log.duration_ms / 1000).toFixed(1)}s` : "—"}
+                    </td>
+                    <td style={{fontSize:12, color:"#8a8784", maxWidth:200}}>
+                      {log.error_message ?? "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", paddingTop:16, marginTop:8, borderTop:"1px solid #2a2828", flexWrap:"wrap", gap:8}}>
+            <span style={M({fontSize:9, color:"#8a8784", letterSpacing:"0.1em"})}>
+              PAGE {page + 1} OF {totalPages}
+            </span>
+            <div style={{display:"flex", gap:6}}>
+              <button
+                disabled={page === 0}
+                onClick={() => setPage(p => p - 1)}
+                style={{background:"#111010", border:"1px solid #2a2828", color: page===0 ? "#3a3838" : "#8a8784", fontFamily:"'Share Tech Mono',monospace", fontSize:9, letterSpacing:"0.08em", padding:"5px 12px", borderRadius:2, cursor: page===0 ? "default" : "pointer"}}>
+                ← PREV
+              </button>
+              <button
+                disabled={page >= totalPages - 1}
+                onClick={() => setPage(p => p + 1)}
+                style={{background:"#111010", border:"1px solid #2a2828", color: page>=totalPages-1 ? "#3a3838" : "#8a8784", fontFamily:"'Share Tech Mono',monospace", fontSize:9, letterSpacing:"0.08em", padding:"5px 12px", borderRadius:2, cursor: page>=totalPages-1 ? "default" : "pointer"}}>
+                NEXT →
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
 // ROOT PAGE
 // ============================================================
 
@@ -650,10 +853,18 @@ export default function SyncAdminPage() {
             WESTERN POWER SPORTS
             <span className="tab-badge">API</span>
           </button>
+          <button
+            className={`tab ${activeTab === "log" ? "active" : ""}`}
+            onClick={() => setActiveTab("log")}
+          >
+            SYNC HISTORY
+            <span className="tab-badge">LOG</span>
+          </button>
         </div>
 
         {activeTab === "pu"  && <PuPanel />}
         {activeTab === "wps" && <WpsPanel />}
+        {activeTab === "log" && <SyncLogViewer />}
       </div>
     </div>
   );
