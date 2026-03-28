@@ -214,6 +214,7 @@ export function CartProvider({ children }) {
         slug:     product.slug,
         name:     product.name,
         brand:    product.brand ?? product.brand_name ?? "",
+        vendor:   product.vendor_slug ?? product.vendor ?? null,
         price:    product.price ?? 0,
         mapPrice: product.mapPrice ?? null,
         // store both so CartDrawer can resolve whichever is available

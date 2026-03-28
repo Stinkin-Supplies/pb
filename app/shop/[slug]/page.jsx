@@ -102,6 +102,7 @@ function normalizeProductRow(row) {
                        : [],
 
     sku:         row.sku          ?? row.vendor_sku  ?? null,
+    vendor:      row.vendor_slug  ?? row.vendor      ?? null,
     description: row.description  ?? null,
     specs:       row.specs        ?? row.attributes  ?? [],
     weight:      row.weight_lbs   ?? null,

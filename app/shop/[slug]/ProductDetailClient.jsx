@@ -20,6 +20,7 @@ import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import NavBar from "@/components/NavBar";
 import { useCartSafe } from "@/components/CartContext";
+import NotifyMeButton from "@/components/NotifyMeButton";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { getProductImage, filterImageUrls } from "@/lib/getProductImage";
 import { proxyAllImages, primaryImage } from "@/lib/imageProxy";
@@ -398,6 +399,26 @@ const css = `
     font-family: 'Bebas Neue', sans-serif;
     font-size: 20px; color: #f0ebe3; letter-spacing: 0.04em;
   }
+  .related-oos-badge {
+    position: absolute; bottom: 7px; left: 7px; z-index: 2;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 7px; color: #8a8784; letter-spacing: 0.1em;
+    background: rgba(0,0,0,0.7); padding: 2px 6px; border-radius: 1px;
+  }
+  .related-notify-btn {
+    width: 100%; margin-top: 8px;
+    padding: 6px 10px;
+    background: transparent; border: 1px solid #e8621a;
+    color: #e8621a; border-radius: 2px; cursor: pointer;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 8px; letter-spacing: 0.1em;
+    transition: all 0.15s;
+  }
+  .related-notify-btn:hover { background: rgba(232,98,26,0.1); }
+  .related-notify-btn.done {
+    border-color: #22c55e; color: #22c55e;
+    background: rgba(34,197,94,0.08); cursor: default;
+  }
 
   /* ── TOAST ── */
   .toast {
@@ -548,6 +569,41 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
     return proxyAllImages(source);
   })();
 
+  // Lightweight inline notify button for related cards
+  function RelatedNotifyButton({ sku, productName, vendor }) {
+    const [state, setState] = useState("idle"); // idle | loading | done | error
+
+    const handleClick = async (e) => {
+      e.stopPropagation();
+      if (state !== "idle" && state !== "error") return;
+      setState("loading");
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) { window.location.href = "/auth"; return; }
+        await fetch("/api/notifications/restock", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ product_sku: sku, product_name: productName, vendor, source: "pdp" }),
+        });
+        setState("done");
+      } catch {
+        setState("error");
+      }
+    };
+
+    const label = { idle: "🔔 NOTIFY ME", loading: "...", done: "✓ ON THE LIST", error: "RETRY" }[state];
+
+    return (
+      <button
+        className={`related-notify-btn ${state === "done" ? "done" : ""}`}
+        onClick={handleClick}
+        disabled={state === "loading" || state === "done"}
+      >
+        {label}
+      </button>
+    );
+  }
+
   function RelatedCardImage({ product }) {
     const src = primaryImage(product.images);
     const isPlaceholder = src === "/images/placeholder.jpg";
@@ -573,9 +629,12 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
             alt={product.name}
             width={200}
             height={200}
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            style={{ width: "100%", height: "100%", objectFit: "cover", opacity: product.inStock ? 1 : 0.5 }}
             unoptimized
           />
+        )}
+        {!product.inStock && (
+          <span className="related-oos-badge">OUT OF STOCK</span>
         )}
       </div>
     );
@@ -703,13 +762,21 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
               <button className="qty-btn" onClick={() => setQty(q => Math.min(product.stockQty||10, q+1))} disabled={!product.inStock}>+</button>
             </div>
 
-            <button
-              className={`add-to-cart-btn ${added?"added":""}`}
-              disabled={!product.inStock}
-              onClick={handleAdd}
-            >
-              {added ? "✓ ADDED TO CART" : product.inStock ? "ADD TO CART" : "OUT OF STOCK"}
-            </button>
+            {product.inStock ? (
+              <button
+                className={`add-to-cart-btn ${added?"added":""}`}
+                onClick={handleAdd}
+              >
+                {added ? "✓ ADDED TO CART" : "ADD TO CART"}
+              </button>
+            ) : (
+              <NotifyMeButton
+                sku={product.sku}
+                productName={product.name}
+                vendor={product.vendor_slug as "wps" | "pu"}
+                source="pdp"
+              />
+            )}
 
             <button
               className={`wishlist-btn ${wishlisted?"active":""}`}
@@ -783,9 +850,18 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
                   <div className="related-brand">{p.brand}</div>
                   <div className="related-name">{p.name}</div>
                   <div className="related-footer">
-                    <div className="related-price">${p.price.toFixed(2)}</div>
-                    <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#e8621a",letterSpacing:"0.1em"}}>VIEW →</span>
+                    <div className="related-price"
+                      style={{ color: p.inStock ? "#f0ebe3" : "#8a8784" }}>
+                      ${p.price.toFixed(2)}
+                    </div>
+                    {p.inStock
+                      ? <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#e8621a",letterSpacing:"0.1em"}}>VIEW →</span>
+                      : <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#8a8784",letterSpacing:"0.1em"}}>OOS</span>
+                    }
                   </div>
+                  {!p.inStock && (
+                    <RelatedNotifyButton sku={p.sku} productName={p.name} vendor={p.vendor_slug ?? "wps"} />
+                  )}
                 </div>
               </div>
             ))}

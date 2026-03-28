@@ -9,5 +9,11 @@
     "app/api/vendors/parts-unlimited/sync/route.ts": {
       "maxDuration": 300
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/restock-notify",
+      "schedule": "0 * * * *"
+    }
+  ]
 }

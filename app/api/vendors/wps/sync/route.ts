@@ -98,6 +98,35 @@ async function clearCheckpoint(supabase: any) {
   }
 }
 
+async function checkRestockNotifications(
+  supabase: any,
+  skuStockList: Array<{ sku: string; in_stock: boolean }>
+) {
+  const skus = skuStockList
+    .filter((item) => item.sku && item.in_stock)
+    .map((item) => item.sku);
+
+  if (skus.length === 0) return;
+
+  try {
+    const { data, error } = await supabase
+      .from("stock_notifications")
+      .select("sku, customer_email, restock_date")
+      .in("sku", skus);
+
+    if (error) {
+      console.warn("[WPS Sync] Restock notification lookup failed:", error.message);
+      return;
+    }
+
+    if ((data ?? []).length > 0) {
+      console.log(`[WPS Sync] Restock notifications match ${data.length} in-stock SKUs`);
+    }
+  } catch (e) {
+    console.warn("[WPS Sync] Restock notification check failed:", (e as Error).message);
+  }
+}
+
 // ── Sync log helpers (mirrors PU pattern) ────────────────────
 
 async function getLastSync(supabase: any) {
@@ -143,9 +172,9 @@ export async function POST(req: Request) {
   // Resume from checkpoint if exists
   const checkpoint = await readCheckpoint(supabase);
   const startCursor = checkpoint?.cursor ?? null;
-  const startPage   = checkpoint?.page   ?? 1;
+  const startPage   = checkpoint?.page   ?? 0;
   if (checkpoint) {
-    console.log(`[WPS Sync] Resuming from page ${startPage}, cursor: ${startCursor}`);
+    console.log(`[WPS Sync] Resuming from page ${startPage + 1}, cursor: ${startCursor}`);
   }
 
   let wps: WpsClient;
@@ -346,6 +375,10 @@ export async function POST(req: Request) {
           }
         }
       }
+
+      const skuStockList = validBatch.map((p) => ({ sku: p.sku, in_stock: p.in_stock ?? false }));
+      await checkRestockNotifications(supabase, skuStockList);
+
       batch = [];
     };
 

@@ -81,7 +81,6 @@ const css = `
   }
 `;
 
-const SYNC_SECRET = process.env.NEXT_PUBLIC_SYNC_SECRET ?? "";
 const PU_COOLDOWN = 10;
 
 // ── Helper styles ─────────────────────────────────────────────
@@ -104,9 +103,7 @@ function PuPanel() {
 
   const fetchStatus = useCallback(async () => {
     try {
-      const res  = await fetch("/api/vendors/parts-unlimited/sync", {
-        headers: { Authorization: `Bearer ${SYNC_SECRET}` },
-      });
+      const res  = await fetch("/api/admin/parts-unlimited/sync");
       const data = await res.json();
       setDbStatus(data);
     } catch {}
@@ -127,7 +124,6 @@ function PuPanel() {
 
     const headers = {
       "Content-Type": "application/json",
-      Authorization:  `Bearer ${SYNC_SECRET}`,
     };
     if (force) {
       headers["x-force-sync"] = "true";
@@ -135,7 +131,7 @@ function PuPanel() {
     }
 
     try {
-      const res  = await fetch("/api/vendors/parts-unlimited/sync", { method: "POST", headers });
+      const res  = await fetch("/api/admin/parts-unlimited/sync", { method: "POST", headers });
       const data = await res.json();
 
       if (res.status === 429) {
@@ -404,9 +400,7 @@ function WpsPanel() {
 
   const fetchStatus = useCallback(async () => {
     try {
-      const res  = await fetch("/api/vendors/wps/sync", {
-        headers: { Authorization: `Bearer ${SYNC_SECRET}` },
-      });
+      const res  = await fetch("/api/admin/wps/sync");
       const data = await res.json();
       setDbStatus(data);
     } catch {}
@@ -426,11 +420,10 @@ function WpsPanel() {
     addLog("Requesting dealer pricing job (async — may take 30–60s)...", "info");
 
     try {
-      const res  = await fetch("/api/vendors/wps/sync", {
+      const res  = await fetch("/api/admin/wps/sync", {
         method:  "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization:  `Bearer ${SYNC_SECRET}`,
         },
       });
       const data = await res.json();
