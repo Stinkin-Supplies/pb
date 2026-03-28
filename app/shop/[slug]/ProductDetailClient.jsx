@@ -506,12 +506,12 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
       }
       const { data, error } = await supabase
         .from("wishlists")
-        .select("id")
+        .select("user_id")
         .eq("user_id", user.id)
         .eq("product_id", product.id)
         .maybeSingle();
       if (!mounted) return;
-      if (!error && data?.id) setWishlisted(true);
+      if (!error && data?.user_id) setWishlisted(true);
       else setWishlisted(false);
     };
     load();
