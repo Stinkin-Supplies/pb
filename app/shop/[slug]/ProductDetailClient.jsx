@@ -773,7 +773,7 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
               <NotifyMeButton
                 sku={product.sku}
                 productName={product.name}
-                vendor={product.vendor_slug as "wps" | "pu"}
+                vendor={product.vendor_slug ?? "wps"}
                 source="pdp"
               />
             )}
