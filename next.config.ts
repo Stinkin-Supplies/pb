@@ -2,6 +2,11 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   images: {
+    domains: [
+      "cdn.wpsstatic.com",
+      "images.wps-inc.com",
+      "img.powersportsupport.com",
+    ],
     remotePatterns: [
       // ── Your own proxy (images served via /api/image-proxy) ──────────────
       // In dev this is localhost; in prod it's your Vercel domain.
@@ -14,17 +19,6 @@ const nextConfig: NextConfig = {
       {
         protocol: "https",
         hostname: "stinksupp.vercel.app",
-      },
-      // ── WPS CDN (kept here in case you use next/image with the proxy URL) ─
-      // The proxy URL is same-origin so next/image won't need this,
-      // but keep it if you ever switch to direct URLs later.
-      {
-        protocol: "https",
-        hostname: "cdn.wpsstatic.com",
-      },
-      {
-        protocol: "https",
-        hostname: "**.wpsstatic.com",
       },
       // ── Supabase Storage (profile photos, brand logos, etc.) ─────────────
       {

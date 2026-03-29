@@ -22,7 +22,7 @@ import fs   from "fs";
 import path from "path";
 import { XMLParser } from "fast-xml-parser";
 import { createClient } from "@supabase/supabase-js";
-import { mergeProductImages } from "../lib/mergeProductImages";
+import { cleanImageUrls } from "@/lib/images/cleanImageUrls";
 
 // ── Config ────────────────────────────────────────────────────
 const DEFAULT_FILE = path.join(process.cwd(), "data/pu/Brand_Catalog_Content_Export.xml");
@@ -38,6 +38,20 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
   { auth: { persistSession: false } }
 );
+
+function safeDescriptionUpdate(existing: string | null, incoming: unknown) {
+  if (!incoming) return existing;
+
+  const text = String(incoming).trim();
+
+  // Reject junk text
+  if (text.length < 20) return existing;
+  if (text === "N/A") return existing;
+  if (text === "None") return existing;
+  if (text.startsWith("See manufacturer")) return existing;
+
+  return text;
+}
 
 // ── Types ─────────────────────────────────────────────────────
 interface CatalogItem {
@@ -106,23 +120,36 @@ function isRealImage(url: string | null): url is string {
 
   const lower = url.toLowerCase();
 
-  // reject known bad patterns
-  if (
-    lower.includes(".zip") ||
-    lower.includes("download") ||
-    lower.includes("asset")
-  ) return false;
+  // reject zip files only
+  if (lower.includes(".zip")) return false;
 
   // accept known image formats
-  return (
+  if (
     lower.endsWith(".jpg") ||
     lower.endsWith(".jpeg") ||
     lower.endsWith(".png") ||
     lower.endsWith(".webp") ||
     lower.endsWith(".gif") ||
     lower.endsWith(".svg")
-  );
+  ) return true;
+
+  // accept WPS CDN URLs even when they lack a standard extension
+  if (lower.includes("cdn.wpsstatic.com")) return true;
+
+  return false;
 }
+
+const isRealImageUrl = (url: string) =>
+  typeof url === "string" &&
+  url.startsWith("http") &&
+  (url.endsWith(".jpg") ||
+   url.endsWith(".jpeg") ||
+   url.endsWith(".png") ||
+   url.endsWith(".webp") ||
+   url.includes("cdn.wpsstatic.com"));
+
+const cleanImages = (images: string[] = []) =>
+  images.filter(isRealImageUrl);
 
 // ── Upsert logic ──────────────────────────────────────────────
 async function updateBatch(
@@ -162,9 +189,10 @@ async function updateBatch(
         puImages.length > 0 &&
         puImages.some(img => !existingImages.includes(img));
 
+      const nextDescription = safeDescriptionUpdate(match.description, item.description);
       const shouldUpdate =
         hasNewImages ||
-        (!match.description && item.description);
+        nextDescription !== match.description;
 
       if (!shouldUpdate) {
         stats.unchanged++;
@@ -199,31 +227,47 @@ async function updateBatch(
 
     const existingImages = match.images ?? [];
     const puImages = item.images;
+    const cleanedImages = cleanImageUrls(puImages || []);
 
     const hasNewImages =
-      puImages.length > 0 &&
-      puImages.some(img => !existingImages.includes(img));
+      cleanedImages.length > 0 &&
+      cleanedImages.some(img => !existingImages.includes(img));
+
+    const nextDescription = safeDescriptionUpdate(
+      match.description,
+      item.description
+    );
 
     const shouldUpdate =
       hasNewImages ||
-      (!match.description && item.description);
+      nextDescription !== match.description;
 
     if (!shouldUpdate) {
       stats.unchanged++;
       continue;
     }
 
-    const mergedImages = mergeProductImages({
-      wps: puImages,
-      pies: existingImages,
-      pu: [],
-    });
+    const update: { id: string; images?: string[]; description?: string | null } = {
+      id: match.id,
+    };
 
-    updates.push({
-      id:          match.id,
-      images:      mergedImages,
-      description: match.description || item.description,
-    });
+    if (nextDescription !== match.description) {
+      update.description = safeDescriptionUpdate(
+        match.description,
+        item.description
+      );
+    }
+
+    if (cleanedImages.length > 0) {
+      update.images = Array.from(
+        new Set([
+          ...(existingImages || []),
+          ...cleanedImages,
+        ])
+      );
+    }
+
+    updates.push(update as { id: string; images: string[]; description: string | null });
     stats.updated++;
   }
 

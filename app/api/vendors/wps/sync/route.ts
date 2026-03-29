@@ -28,6 +28,7 @@ import { NextResponse } from "next/server";
 import { createClient }  from "@supabase/supabase-js";
 import { db } from "@/lib/supabase/admin";
 import getCatalogDb from "@/lib/db/catalog";
+import { cleanImageUrls } from "@/lib/images/cleanImageUrls";
 import {
   WpsClient,
   WpsItem,
@@ -417,11 +418,11 @@ export async function POST(req: Request) {
           product.brand_id = supabaseBrandMap[product.brand_name] ?? null;
           const existingImages = existingImagesMap.get(product.sku) ?? [];
           const wpsImages = product.images ?? [];
-          product.images = mergeProductImages({
+          product.images = cleanImageUrls(mergeProductImages({
             wps: wpsImages,
             pies: existingImages,
             pu: [],
-          });
+          }));
 
           batch.push(product);
           upsertedProducts.push(product);
