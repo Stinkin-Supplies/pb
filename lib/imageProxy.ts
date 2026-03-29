@@ -1,6 +1,6 @@
 // lib/imageProxy.ts
 
-const WPS_DOMAINS = ['cdn.wpsstatic.com', 'media.wps-inc.com', 'wpsstatic.com']
+const WPS_DOMAINS = ['cdn.wpsstatic.com']
 
 export function shouldProxy(url: string): boolean {
   try {

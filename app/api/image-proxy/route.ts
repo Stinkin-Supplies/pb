@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 
-const ALLOWED_HOSTS = ['cdn.wpsstatic.com', 'wpsstatic.com']
+const ALLOWED_HOSTS = ['cdn.wpsstatic.com']
 
 function isAllowedUrl(url: string): boolean {
   try {
@@ -26,7 +26,7 @@ const HEADER_VARIANTS: Array<Record<string, string>> = [
     'Sec-Fetch-Site': 'same-site',
   },
   {
-    'Referer':    'https://www.wpsstatic.com/',
+    'Referer':    'https://www.wps-inc.com/',
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
     'Accept':     'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
   },
@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
 
   // WPS CDN serves images directly in the browser — server-side proxy always 403s.
   // Redirect to the direct URL so the browser loads it natively.
-  const WPS_DIRECT = ['cdn.wpsstatic.com', 'wpsstatic.com']
+  const WPS_DIRECT = ['cdn.wpsstatic.com']
   try {
     const { hostname } = new URL(url)
     if (WPS_DIRECT.some(h => hostname === h || hostname.endsWith(`.${h}`))) {
