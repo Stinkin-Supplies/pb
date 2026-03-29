@@ -563,7 +563,7 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
   };
 
   // ── Render helpers ─────────────────────────────────────────
-  const WPS_DOMAINS = ["cdn.wpsstatic.com", "wpsstatic.com", "media.wps-inc.com"];
+  const WPS_DOMAINS = ["cdn.wpsstatic.com", "asset.lemansnet.com"];
   const isWpsCdn = (url) => {
     try { return WPS_DOMAINS.some(d => new URL(url).hostname.includes(d)); }
     catch { return false; }
