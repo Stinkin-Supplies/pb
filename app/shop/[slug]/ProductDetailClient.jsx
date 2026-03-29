@@ -680,14 +680,10 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
                 {product.badge.toUpperCase()}
               </span>
             )}
-            <Image
+            <img
               src={images[activeImg]}
               alt={product.name}
-              width={500}
-              height={500}
-              className="object-contain"
-              priority
-              unoptimized
+              style={{ width:"100%", height:"100%", objectFit:"contain", position:"relative", zIndex:1 }}
             />
           </div>
 
