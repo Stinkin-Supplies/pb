@@ -18,20 +18,19 @@ function isRealImage(url: string) {
   // reject zip files only
   if (lower.includes(".zip")) return false;
 
-  // accept known image formats
-  if (
-    lower.endsWith(".jpg") ||
+  // accept known CDN domains directly — these work in browser without proxy
+  if (lower.includes("wpsstatic.com")) return true;
+  if (lower.includes("lemansnet.com")) return true;
+
+  // accept standard image extensions
+  return (
+    lower.endsWith(".jpg")  ||
     lower.endsWith(".jpeg") ||
-    lower.endsWith(".png") ||
+    lower.endsWith(".png")  ||
     lower.endsWith(".webp") ||
-    lower.endsWith(".gif") ||
+    lower.endsWith(".gif")  ||
     lower.endsWith(".svg")
-  ) return true;
-
-  // accept LeMans CDN base64 paths (PU images)
-  if (lower.includes("asset.lemansnet.com/z/")) return true;
-
-  return false;
+  );
 }
 
 export function filterImageUrls(urls?: (string | null)[] | null) {
