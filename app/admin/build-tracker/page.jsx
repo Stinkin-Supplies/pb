@@ -18,7 +18,26 @@ const STATUS_STYLE = {
   planned: { color: "#8a8784", label: "PLANNED", dot: "#8a8784" },
 };
 
-const PHASE_ORDER = ["PHASE 0", "PHASE 0B", "PHASE 1", "PHASE 5", "PHASE 6", "PHASE 6B", "PHASE 7", "BUGS"];
+const PHASE_ORDER = [
+  "NEW PHASE 0",
+  "PHASE 0",
+  "NEW PHASE 1",
+  "PHASE 0B",
+  "NEW PHASE 2",
+  "PHASE 1",
+  "NEW PHASE 3",
+  "NEW PHASE 4",
+  "NEW PHASE 5",
+  "PHASE 2",
+  "PHASE 5",
+  "NEW PHASE 6",
+  "PHASE 6",
+  "PHASE 6B",
+  "PHASE 7",
+  "BUGS",
+];
+
+const PHASE_RANK = Object.fromEntries(PHASE_ORDER.map((phase, index) => [phase, index]));
 
 export default function BuildTrackerPage() {
   const [items,    setItems]    = useState([]);
@@ -74,6 +93,12 @@ export default function BuildTrackerPage() {
     if (!grouped[item.phase]) grouped[item.phase] = { label: item.phase_label, items: [] };
     grouped[item.phase].items.push(item);
   }
+  const orderedPhases = Object.keys(grouped).sort((a, b) => {
+    const rankA = PHASE_RANK[a] ?? 999;
+    const rankB = PHASE_RANK[b] ?? 999;
+    if (rankA !== rankB) return rankA - rankB;
+    return a.localeCompare(b);
+  });
 
   // ── Filter + search ──────────────────────────────────────────
   const visibleItems = (phaseItems) => phaseItems.filter(item => {
@@ -333,7 +358,7 @@ export default function BuildTrackerPage() {
             <div className="spinner" style={{width:24,height:24,borderWidth:3}}/>
           </div>
         ) : (
-          PHASE_ORDER.map(phase => {
+          orderedPhases.map(phase => {
             const group = grouped[phase];
             if (!group) return null;
 
