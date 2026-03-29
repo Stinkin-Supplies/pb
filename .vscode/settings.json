@@ -1,3 +1,16 @@
 {
-    "editor.fontSize": 14
+    "editor.fontSize": 14,
+    "sqltools.connections": [
+        {
+            "ssh": "Disabled",
+            "previewLimit": 50,
+            "server": "localhost",
+            "port": 5432,
+            "askForPassword": true,
+            "driver": "PostgreSQL",
+            "name": "stinkdb",
+            "database": "stinkin_catalog",
+            "username": "postgres"
+        }
+    ]
 }
