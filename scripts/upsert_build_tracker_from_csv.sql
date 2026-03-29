@@ -1,5 +1,6 @@
 -- Generated from build_tracker_updated.csv
 -- Safe upsert: updates existing rows by id without deleting the table
+-- Timestamp values are sanitized to strip malformed trailing data if present
 begin;
 
 insert into public.build_tracker_items (id, phase, phase_label, section, title, status, notes, sort_order, created_at, updated_at)
@@ -112,7 +113,7 @@ values
   ('f6de7bcb-6001-44c1-98b1-9573b909d845', 'PHASE 0', 'Infrastructure', NULL, '110,077 WPS images patched from Supabase CSV export', 'done', NULL, 110, '2026-03-27 06:06:56.928908+00', '2026-03-27 06:06:56.928908+00'),
   ('f7aa718c-58cc-4a54-b987-7611ac306456', 'PHASE 0B', 'Vendor Sync Architecture', NULL, 'Both syncs keep sync_log + vendor rows in Supabase', 'done', NULL, 80, '2026-03-27 06:06:56.928908+00', '2026-03-27 06:06:56.928908+00'),
   ('faacc226-046f-4bd0-af2f-d6eda7e7ca3e', 'PHASE 0B', 'Vendor Sync Architecture', NULL, 'WPS sync GET handler — product count from self-hosted', 'done', 'Supabase-backed sync_checkpoints — resume on failure confirmed working (WPS resumed from page 2289)', 40, '2026-03-27 06:06:56.928908+00', '2026-03-28 14:37:41.707795+00'),
-  ('fdc0de69-f77a-4148-844c-f896a5903b02', 'PHASE 5', 'Data & Catalog', '5.3 Product Detail', 'Queries self-hosted by slug', 'done', NULL, 120, '2026-03-27 06:06:56.928908+00', '2026-03-27 06:06:56.928908+0004920bc2-97bf-4857-9b7e-f328cbfbcd03'),
+  ('fdc0de69-f77a-4148-844c-f896a5903b02', 'PHASE 5', 'Data & Catalog', '5.3 Product Detail', 'Queries self-hosted by slug', 'done', NULL, 120, '2026-03-27 06:06:56.928908+00', '2026-03-27 06:06:56.928908+0004'),
   ('576ac527-1f49-44c8-bd22-92afc5a35f4f', 'NEW PHASE 0', 'Database + Schema', '0.1 Create Schemas', 'Clean public schema — ready for catalog tables', 'open', NULL, 20, '2026-03-29 12:00:00+00', '2026-03-29 12:00:00+00'),
   ('4eae1dbf-b709-45bd-a51b-4c6318a775b1', 'NEW PHASE 0', 'Database + Schema', '0.2 Run Migration Batch', '/migrations/001_init_schemas.sql', 'open', NULL, 30, '2026-03-29 12:00:00+00', '2026-03-29 12:00:00+00'),
   ('0ff6f73a-6a20-4b70-b29e-d5313acc43dd', 'NEW PHASE 0', 'Database + Schema', '0.2 Run Migration Batch', '/migrations/002_vendor_core_tables.sql', 'open', NULL, 40, '2026-03-29 12:00:00+00', '2026-03-29 12:00:00+00'),
@@ -198,6 +199,7 @@ on conflict (id) do update set
   status = excluded.status,
   notes = excluded.notes,
   sort_order = excluded.sort_order,
+  created_at = excluded.created_at,
   updated_at = excluded.updated_at;
 
 commit;
