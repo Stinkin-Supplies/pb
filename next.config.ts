@@ -2,35 +2,45 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   images: {
-    domains: [
-      "cdn.wpsstatic.com",
-      "images.wps-inc.com",
-      "img.powersportsupport.com",
-    ],
     remotePatterns: [
-      // ── Your own proxy (images served via /api/image-proxy) ──────────────
-      // In dev this is localhost; in prod it's your Vercel domain.
-      // next/image treats same-origin images as internal, so no entry needed
-      // for the proxy route itself — but include your Vercel domain for ISR:
+      // ── WPS CDN ──────────────────────────────────────────────
       {
         protocol: "https",
-        hostname: "*.vercel.app",     // covers preview + prod deployments
+        hostname: "cdn.wpsstatic.com",
+      },
+      {
+        protocol: "https",
+        hostname: "**.wpsstatic.com",
+      },
+      {
+        protocol: "https",
+        hostname: "media.wps-inc.com",
+      },
+      // ── Parts Unlimited / LeMans CDN ─────────────────────────
+      {
+        protocol: "https",
+        hostname: "asset.lemansnet.com",
+      },
+      {
+        protocol: "https",
+        hostname: "**.lemansnet.com",
+      },
+      // ── Vercel deployments ───────────────────────────────────
+      {
+        protocol: "https",
+        hostname: "*.vercel.app",
       },
       {
         protocol: "https",
         hostname: "stinksupp.vercel.app",
       },
-      // ── Supabase Storage (profile photos, brand logos, etc.) ─────────────
+      // ── Supabase Storage ─────────────────────────────────────
       {
         protocol: "https",
         hostname: "**.supabase.co",
       },
-      // ── Add PU image CDN here once PIES XML is imported ──────────────────
-      // { protocol: "https", hostname: "images.parts-unlimited.com" },
     ],
-    // Optional: tell Next.js to also accept webp/avif from the proxy
     formats: ["image/avif", "image/webp"],
-    // Bump up if product images are large
     deviceSizes: [640, 750, 828, 1080, 1200, 1920],
     imageSizes: [64, 128, 256, 384, 512],
   },
