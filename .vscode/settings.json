@@ -4,13 +4,13 @@
         {
             "ssh": "Disabled",
             "previewLimit": 50,
-            "server": "localhost",
+            "server": "5.161.100.126",
             "port": 5432,
             "askForPassword": true,
             "driver": "PostgreSQL",
             "name": "stinkdb",
             "database": "stinkin_catalog",
-            "username": "postgres"
+            "username": "catalog_app"
         }
     ]
 }
