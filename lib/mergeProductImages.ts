@@ -3,11 +3,9 @@ export function isRealImage(url: string) {
 
   const lower = url.toLowerCase()
 
-  if (
-    lower.includes(".zip") ||
-    lower.includes("download") ||
-    lower.includes("asset")
-  ) return false
+  if (lower.includes(".zip") || lower.includes("download")) return false
+
+  if (lower.includes("lemansnet.com")) return true
 
   return (
     lower.endsWith(".jpg") ||

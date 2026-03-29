@@ -19,7 +19,6 @@ function isRealImage(url: string) {
   if (lower.includes(".zip")) return false;
 
   // accept known CDN domains directly — these work in browser without proxy
-  if (lower.includes("wpsstatic.com")) return true;
   if (lower.includes("lemansnet.com")) return true;
 
   // accept standard image extensions
