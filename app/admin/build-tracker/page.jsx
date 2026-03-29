@@ -7,7 +7,6 @@
 // ============================================================
 
 import { useState, useEffect, useCallback } from "react";
-import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 
 const STATUS_CYCLE = { done: "open", open: "done", pending: "pending", planned: "planned" };
 
@@ -43,22 +42,29 @@ export default function BuildTrackerPage() {
   const [items,    setItems]    = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [saving,   setSaving]   = useState(null);
+  const [error,    setError]    = useState(null);
   const [filter,   setFilter]   = useState("all");   // all | open | done | pending
   const [editNote, setEditNote] = useState(null);     // id of item being note-edited
   const [noteVal,  setNoteVal]  = useState("");
   const [search,   setSearch]   = useState("");
 
-  const supabase = createBrowserSupabaseClient();
-
   // ── Load ────────────────────────────────────────────────────
   const load = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("build_tracker_items")
-      .select("*")
-      .order("phase")
-      .order("sort_order");
-    if (!error) setItems(data ?? []);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/build-tracker", {
+        cache: "no-store",
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error ?? "Failed to load build tracker");
+      }
+      setItems(json.items ?? []);
+    } catch (err) {
+      setItems([]);
+      setError(err instanceof Error ? err.message : "Failed to load build tracker");
+    }
     setLoading(false);
   }, []);
 
@@ -69,22 +75,41 @@ export default function BuildTrackerPage() {
     const next = item.status === "done" ? "open" : "done";
     setSaving(item.id);
     setItems(prev => prev.map(i => i.id === item.id ? { ...i, status: next } : i));
-    await supabase
-      .from("build_tracker_items")
-      .update({ status: next })
-      .eq("id", item.id);
+    try {
+      const res = await fetch("/api/admin/build-tracker", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: item.id, status: next }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Failed to update status");
+      if (json.item) {
+        setItems(prev => prev.map(i => i.id === item.id ? json.item : i));
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update status");
+      setItems(prev => prev.map(i => i.id === item.id ? item : i));
+    }
     setSaving(null);
   }
 
   // ── Save note ────────────────────────────────────────────────
   async function saveNote(id) {
-    await supabase
-      .from("build_tracker_items")
-      .update({ notes: noteVal || null })
-      .eq("id", id);
-    setItems(prev => prev.map(i => i.id === id ? { ...i, notes: noteVal || null } : i));
-    setEditNote(null);
-    setNoteVal("");
+    const nextNotes = noteVal || null;
+    try {
+      const res = await fetch("/api/admin/build-tracker", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, notes: nextNotes }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Failed to save note");
+      setItems(prev => prev.map(i => i.id === id ? { ...i, notes: nextNotes } : i));
+      setEditNote(null);
+      setNoteVal("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save note");
+    }
   }
 
   // ── Group by phase ───────────────────────────────────────────
@@ -353,6 +378,20 @@ export default function BuildTrackerPage() {
 
       {/* ── Body ── */}
       <div className="bt-body">
+        {error && (
+          <div style={{
+            marginBottom: 16,
+            padding: "10px 12px",
+            border: "1px solid rgba(185,28,28,0.35)",
+            background: "rgba(185,28,28,0.08)",
+            color: "#ef4444",
+            fontFamily: "'Share Tech Mono', monospace",
+            fontSize: 10,
+            letterSpacing: "0.08em",
+          }}>
+            {error}
+          </div>
+        )}
         {loading ? (
           <div style={{textAlign:"center",padding:60}}>
             <div className="spinner" style={{width:24,height:24,borderWidth:3}}/>
