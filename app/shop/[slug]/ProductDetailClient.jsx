@@ -563,10 +563,22 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
   };
 
   // ── Render helpers ─────────────────────────────────────────
+  const WPS_DOMAINS = ["cdn.wpsstatic.com", "wpsstatic.com", "media.wps-inc.com"];
+  const isWpsCdn = (url) => {
+    try { return WPS_DOMAINS.some(d => new URL(url).hostname.includes(d)); }
+    catch { return false; }
+  };
+
   const images = (() => {
-    const valid = filterImageUrls(product.images);
-    const source = valid.length > 0 ? valid : [getProductImage(product)];
-    return proxyAllImages(source);
+    // Accept WPS CDN URLs directly — they work in browser without proxy
+    const raw = Array.isArray(product.images) ? product.images.filter(Boolean) : [];
+    if (raw.length > 0) {
+      // Serve WPS URLs directly, proxy everything else
+      return raw.map(url => isWpsCdn(url) ? url : `/api/image-proxy?url=${encodeURIComponent(url)}`);
+    }
+    // Fallback to getProductImage
+    const fallback = getProductImage(product);
+    return [fallback];
   })();
 
   // Lightweight inline notify button for related cards
@@ -606,7 +618,7 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
 
   function RelatedCardImage({ product }) {
     const src = primaryImage(product.images);
-    const isPlaceholder = src === "/placeholder-product.png";
+    const isPlaceholder = src === "/placeholder-product.png" || src === "/images/placeholder.jpg";
 
     return (
       <div className="related-img">
