@@ -2,6 +2,12 @@ require('dotenv').config();
 const { Pool } = require('pg');
 const pool = new Pool({ connectionString: process.env.CATALOG_DATABASE_URL });
 
+// Safe numeric parser — returns null if value isn't a real number
+function num(val) {
+  const n = parseFloat(val);
+  return isNaN(n) ? null : n;
+}
+
 async function test() {
   const res = await fetch('https://api.wps-inc.com/items?page[size]=1&include=images,inventory,brand,product', {
     headers: {
@@ -64,28 +70,28 @@ async function test() {
         propd2: item.propd2 ?? null,
         sort: item.sort ?? null,
       }),
-      item.list_price ?? null,                            // $11 msrp
-      item.mapp_price ?? null,                            // $12 map_price
-      item.standard_dealer_price ?? null,                 // $13 wholesale_cost
-      item.drop_ship_fee ?? 0,                            // $14 drop_ship_fee
+      num(item.list_price),                               // $11 msrp
+      num(item.mapp_price),                               // $12 map_price
+      num(item.standard_dealer_price),                    // $13 wholesale_cost
+      num(item.drop_ship_fee) ?? 0,                       // $14 drop_ship_fee
       item.drop_ship_eligible ?? false,                   // $15 drop_ship_eligible
       JSON.stringify(images),                             // $16 images_raw
       JSON.stringify([]),                                 // $17 fitment_raw
-      item.weight ?? null,                                // $18 weight
-      item.length ?? null,                                // $19 length
-      item.width  ?? null,                                // $20 width
-      item.height ?? null,                                // $21 height
+      num(item.weight),                                   // $18 weight
+      num(item.length),                                   // $19 length
+      num(item.width),                                    // $20 width
+      num(item.height),                                   // $21 height
       item.upc ?? null,                                   // $22 upc
       item.superseded_sku ?? null,                        // $23 superseded_sku
       item.status ?? null,                                // $24 status
-      item.status_id ?? null,                             // $25 status_id
+      num(item.status_id),                                // $25 status_id
       item.product_type ?? null,                          // $26 product_type
       item.unit_of_measurement_id?.toString() ?? null,    // $27 unit_of_measurement
       item.has_map_policy ?? false,                       // $28 has_map_policy
       item.carb ?? null,                                  // $29 carb
       item.prop_65_code ?? null,                          // $30 prop_65_code
       item.prop_65_detail ?? null,                        // $31 prop_65_detail
-      item.country_id ?? null,                            // $32 country_id
+      num(item.country_id),                               // $32 country_id
       item.published_at ? new Date(item.published_at) : null,  // $33
       item.created_at  ? new Date(item.created_at)  : null,    // $34
       item.updated_at  ? new Date(item.updated_at)  : null,    // $35

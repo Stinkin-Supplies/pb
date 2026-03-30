@@ -5,6 +5,12 @@ const pool = new Pool({ connectionString: process.env.CATALOG_DATABASE_URL });
 const WPS_KEY = process.env.WPS_API_KEY;
 const PAGE_SIZE = 100;
 
+// Safe numeric parser — returns null if value is not a real number (e.g. "FR")
+function num(val) {
+  const n = parseFloat(val);
+  return isNaN(n) ? null : n;
+}
+
 async function fetchPage(cursor = null) {
   const url = new URL('https://api.wps-inc.com/items');
   url.searchParams.set('page[size]', PAGE_SIZE);
@@ -18,9 +24,8 @@ async function fetchPage(cursor = null) {
 }
 
 async function upsertProduct(client, item) {
-  // ── UNWRAP .data from all includes ──────────────────────
-  const brand     = item.brand?.data     ?? item.brand     ?? {};
-  const product   = item.product?.data   ?? item.product   ?? {};
+  const brand     = item.brand?.data     ?? {};
+  const product   = item.product?.data   ?? {};
   const images    = Array.isArray(item.images?.data)    ? item.images.data    : [];
   const inventory = Array.isArray(item.inventory?.data) ? item.inventory.data : [];
 
@@ -42,15 +47,15 @@ async function upsertProduct(client, item) {
       published_at, vendor_created_at, vendor_updated_at,
       created_at, updated_at
     ) VALUES (
-      gen_random_uuid(), 'wps',
-      $1,  $2,  $3,  $4,  $5,  $6,  $7,
-      $8::jsonb, $9::jsonb,
-      $10, $11, $12, $13, $14,
-      $15::jsonb, $16::jsonb,
-      $17, $18, $19, $20,
-      $21, $22, $23, $24, $25, $26,
-      $27, $28, $29, $30, $31,
-      $32, $33, $34,
+      gen_random_uuid(), $1,
+      $2, $3, $4, $5, $6, $7, $8,
+      $9::jsonb, $10::jsonb,
+      $11, $12, $13, $14, $15,
+      $16::jsonb, $17::jsonb,
+      $18, $19, $20, $21,
+      $22, $23, $24, $25, $26, $27,
+      $28, $29, $30, $31, $32,
+      $33, $34, $35,
       NOW(), NOW()
     )
     ON CONFLICT (vendor_part_number) DO UPDATE SET
@@ -88,52 +93,52 @@ async function upsertProduct(client, item) {
       vendor_updated_at     = EXCLUDED.vendor_updated_at,
       updated_at            = NOW()
   `, [
-    String(item.id ?? ''),                              // $1  vendor_item_id
-    String(item.product_id ?? ''),                      // $2  vendor_product_id
-    item.sku,                                           // $3  vendor_part_number
-    item.supplier_product_id ?? item.sku,               // $4  manufacturer_part_number
-    item.name ?? null,                                  // $5  title
-    product.description ?? null,                        // $6  description_raw  ← unwrapped
-    brand.name ?? null,                                 // $7  brand            ← unwrapped
-    JSON.stringify(product.categories ?? []),            // $8  categories_raw
-    JSON.stringify({                                    // $9  attributes_raw
+    'wps',                                              // $1
+    String(item.id ?? ''),                              // $2  vendor_item_id
+    String(item.product_id ?? ''),                      // $3  vendor_product_id
+    item.sku,                                           // $4  vendor_part_number
+    item.supplier_product_id ?? item.sku,               // $5  manufacturer_part_number
+    item.name ?? null,                                  // $6  title
+    product.description ?? null,                        // $7  description_raw
+    brand.name ?? null,                                 // $8  brand
+    JSON.stringify(product.categories ?? []),            // $9  categories_raw
+    JSON.stringify({                                    // $10 attributes_raw
       propd1: item.propd1 ?? null,
       propd2: item.propd2 ?? null,
       sort: item.sort ?? null,
       unit_of_measurement_id: item.unit_of_measurement_id ?? null,
     }),
-    item.list_price ?? null,                            // $10 msrp
-    item.mapp_price ?? null,                            // $11 map_price
-    item.standard_dealer_price ?? null,                 // $12 wholesale_cost
-    item.drop_ship_fee ?? 0,                            // $13 drop_ship_fee
-    item.drop_ship_eligible ?? false,                   // $14 drop_ship_eligible
-    JSON.stringify(images.map(img => ({                 // $15 images_raw      ← unwrapped
+    num(item.list_price),                               // $11 msrp
+    num(item.mapp_price),                               // $12 map_price
+    num(item.standard_dealer_price),                    // $13 wholesale_cost
+    num(item.drop_ship_fee) ?? 0,                       // $14 drop_ship_fee
+    item.drop_ship_eligible ?? false,                   // $15 drop_ship_eligible
+    JSON.stringify(images.map(img => ({                 // $16 images_raw
       url: img.url ?? img.link ?? img,
       position: img.position ?? null,
       primary: img.primary ?? false,
     }))),
-    JSON.stringify([]),                                 // $16 fitment_raw
-    item.weight ?? null,                                // $17 weight
-    item.length ?? null,                                // $18 length
-    item.width  ?? null,                                // $19 width
-    item.height ?? null,                                // $20 height
-    item.upc ?? null,                                   // $21 upc
-    item.superseded_sku ?? null,                        // $22 superseded_sku
-    item.status ?? null,                                // $23 status
-    item.status_id ?? null,                             // $24 status_id
-    item.product_type ?? null,                          // $25 product_type
-    item.unit_of_measurement_id?.toString() ?? null,    // $26 unit_of_measurement
-    item.has_map_policy ?? false,                       // $27 has_map_policy
-    item.carb ?? null,                                  // $28 carb
-    item.prop_65_code ?? null,                          // $29 prop_65_code
-    item.prop_65_detail ?? null,                        // $30 prop_65_detail
-    item.country_id ?? null,                            // $31 country_id
-    item.published_at ? new Date(item.published_at) : null, // $32
-    item.created_at  ? new Date(item.created_at)  : null,   // $33
-    item.updated_at  ? new Date(item.updated_at)  : null,   // $34
+    JSON.stringify([]),                                 // $17 fitment_raw
+    num(item.weight),                                   // $18 weight
+    num(item.length),                                   // $19 length
+    num(item.width),                                    // $20 width
+    num(item.height),                                   // $21 height
+    item.upc ?? null,                                   // $22 upc
+    item.superseded_sku ?? null,                        // $23 superseded_sku
+    item.status ?? null,                                // $24 status
+    item.status_id ?? null,                             // $25 status_id
+    item.product_type ?? null,                          // $26 product_type
+    item.unit_of_measurement_id?.toString() ?? null,    // $27 unit_of_measurement
+    item.has_map_policy ?? false,                       // $28 has_map_policy
+    item.carb ?? null,                                  // $29 carb
+    item.prop_65_code ?? null,                          // $30 prop_65_code
+    item.prop_65_detail ?? null,                        // $31 prop_65_detail
+    item.country_id ?? null,                            // $32 country_id
+    item.published_at ? new Date(item.published_at) : null, // $33
+    item.created_at  ? new Date(item.created_at)  : null,   // $34
+    item.updated_at  ? new Date(item.updated_at)  : null,   // $35
   ]);
 
-  // return unwrapped inventory for caller
   return inventory;
 }
 
@@ -154,8 +159,8 @@ async function upsertInventory(client, item, inventory) {
     `, [
       item.sku,
       String(inv.warehouse_id ?? inv.id ?? 'default'),
-      inv.quantity_on_hand ?? inv.qty ?? inv.quantity ?? 0,
-      inv.quantity_on_order ?? inv.on_order ?? 0,
+      num(inv.quantity_on_hand ?? inv.qty ?? inv.quantity) ?? 0,
+      num(inv.quantity_on_order ?? inv.on_order) ?? 0,
     ]);
   }
 }
