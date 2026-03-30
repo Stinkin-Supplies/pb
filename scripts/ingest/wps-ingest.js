@@ -1,11 +1,34 @@
 require('dotenv').config();
 const { Pool } = require('pg');
+const fs = require('fs');
+
 const pool = new Pool({ connectionString: process.env.CATALOG_DATABASE_URL });
 const WPS_KEY = process.env.WPS_API_KEY;
 const PAGE_SIZE = 100;
+const CHECKPOINT_FILE = './wps-cursor-checkpoint.json';
 
 function num(val) { const n = parseFloat(val); return isNaN(n) ? null : n; }
 
+// ── Checkpoint: save cursor after every page ──────────────────────────────────
+function saveCheckpoint(cursor, page, inserted, failed) {
+  fs.writeFileSync(CHECKPOINT_FILE, JSON.stringify({ cursor, page, inserted, failed }, null, 2));
+}
+
+function loadCheckpoint() {
+  if (fs.existsSync(CHECKPOINT_FILE)) {
+    const data = JSON.parse(fs.readFileSync(CHECKPOINT_FILE, 'utf8'));
+    console.log(`\n♻️  Resuming from checkpoint — page ${data.page}, cursor: ${data.cursor}`);
+    console.log(`   Previously inserted: ${data.inserted} | failed: ${data.failed}\n`);
+    return data;
+  }
+  return { cursor: null, page: 0, inserted: 0, failed: 0 };
+}
+
+function clearCheckpoint() {
+  if (fs.existsSync(CHECKPOINT_FILE)) fs.unlinkSync(CHECKPOINT_FILE);
+}
+
+// ── Fetch one page ────────────────────────────────────────────────────────────
 async function fetchPage(cursor = null) {
   const url = new URL('https://api.wps-inc.com/items');
   url.searchParams.set('page[size]', PAGE_SIZE);
@@ -18,6 +41,7 @@ async function fetchPage(cursor = null) {
   return res.json();
 }
 
+// ── Upsert one product ────────────────────────────────────────────────────────
 async function upsertProduct(client, item) {
   const brand     = item.brand?.data     ?? {};
   const product   = item.product?.data   ?? {};
@@ -118,6 +142,7 @@ async function upsertProduct(client, item) {
   return inventory;
 }
 
+// ── Upsert inventory rows ─────────────────────────────────────────────────────
 async function upsertInventory(client, item, inventory) {
   for (const inv of inventory) {
     await client.query(`
@@ -138,6 +163,7 @@ async function upsertInventory(client, item, inventory) {
   }
 }
 
+// ── Log sync result ───────────────────────────────────────────────────────────
 async function logSync(client, stats) {
   await client.query(`
     INSERT INTO vendor.vendor_sync_log
@@ -147,12 +173,21 @@ async function logSync(client, stats) {
   `, [stats.status, stats.inserted, stats.failed, stats.startedAt, stats.notes]);
 }
 
+// ── MAIN ──────────────────────────────────────────────────────────────────────
 async function run() {
   const client = await pool.connect();
   const startedAt = new Date();
-  let cursor = null, page = 0, inserted = 0, failed = 0;
 
-  console.log('▶  Starting WPS full catalog ingestion...\n');
+  // Load checkpoint if exists — resumes from last saved page
+  const checkpoint = loadCheckpoint();
+  let cursor   = checkpoint.cursor;
+  let page     = checkpoint.page;
+  let inserted = checkpoint.inserted;
+  let failed   = checkpoint.failed;
+
+  if (!cursor) {
+    console.log('▶  Starting WPS full catalog ingestion...\n');
+  }
 
   try {
     do {
@@ -177,21 +212,28 @@ async function run() {
         }
       }
 
+      // Save checkpoint after every page — safe to Ctrl+C anytime after this
+      saveCheckpoint(cursor, page, inserted, failed);
+
       console.log(`  Page ${page} | inserted: ${inserted} | failed: ${failed} | next: ${cursor ?? 'DONE'}`);
 
     } while (cursor !== null);
 
+    // Completed — write sync log and delete checkpoint
     await logSync(client, {
       status: failed === 0 ? 'success' : 'partial',
       inserted, failed, startedAt,
       notes: `${page} pages processed. ${failed} errors.`,
     });
 
+    clearCheckpoint();
     console.log(`\n✅  Done — ${inserted} products, ${failed} errors`);
 
   } catch (err) {
+    // Network/DB crash — checkpoint already saved, just log and exit
     await logSync(client, { status: 'failed', inserted, failed, startedAt, notes: err.message });
-    console.error('\n❌  Failed:', err.message);
+    console.error('\n❌  Crashed on page', page, '—', err.message);
+    console.error('    Run node wps-ingest.js again to resume from this page.');
   } finally {
     client.release();
     await pool.end();
