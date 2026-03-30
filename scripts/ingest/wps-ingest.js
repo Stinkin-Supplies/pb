@@ -18,6 +18,12 @@ async function fetchPage(cursor = null) {
 }
 
 async function upsertProduct(client, item) {
+  // ── UNWRAP .data from all includes ──────────────────────
+  const brand     = item.brand?.data     ?? item.brand     ?? {};
+  const product   = item.product?.data   ?? item.product   ?? {};
+  const images    = Array.isArray(item.images?.data)    ? item.images.data    : [];
+  const inventory = Array.isArray(item.inventory?.data) ? item.inventory.data : [];
+
   await client.query(`
     INSERT INTO vendor.vendor_products (
       id, vendor_code,
@@ -37,7 +43,7 @@ async function upsertProduct(client, item) {
       created_at, updated_at
     ) VALUES (
       gen_random_uuid(), 'wps',
-      $1, $2, $3, $4, $5, $6, $7,
+      $1,  $2,  $3,  $4,  $5,  $6,  $7,
       $8::jsonb, $9::jsonb,
       $10, $11, $12, $13, $14,
       $15::jsonb, $16::jsonb,
@@ -82,59 +88,57 @@ async function upsertProduct(client, item) {
       vendor_updated_at     = EXCLUDED.vendor_updated_at,
       updated_at            = NOW()
   `, [
-    String(item.id ?? ''),                            // $1  vendor_item_id
-    String(item.product_id ?? ''),                    // $2  vendor_product_id
-    item.sku,                                         // $3  vendor_part_number
-    item.supplier_product_id ?? item.sku,             // $4  manufacturer_part_number
-    item.name ?? null,                                // $5  title
-    item.product?.description ?? null,                // $6  description_raw
-    item.brand?.name ?? null,                         // $7  brand
-    JSON.stringify(item.product?.categories ?? []),   // $8  categories_raw
-    JSON.stringify({                                  // $9  attributes_raw
+    String(item.id ?? ''),                              // $1  vendor_item_id
+    String(item.product_id ?? ''),                      // $2  vendor_product_id
+    item.sku,                                           // $3  vendor_part_number
+    item.supplier_product_id ?? item.sku,               // $4  manufacturer_part_number
+    item.name ?? null,                                  // $5  title
+    product.description ?? null,                        // $6  description_raw  ← unwrapped
+    brand.name ?? null,                                 // $7  brand            ← unwrapped
+    JSON.stringify(product.categories ?? []),            // $8  categories_raw
+    JSON.stringify({                                    // $9  attributes_raw
       propd1: item.propd1 ?? null,
       propd2: item.propd2 ?? null,
       sort: item.sort ?? null,
       unit_of_measurement_id: item.unit_of_measurement_id ?? null,
     }),
-    item.list_price ?? null,                          // $10 msrp
-    item.mapp_price ?? null,                          // $11 map_price
-    item.standard_dealer_price ?? null,               // $12 wholesale_cost
-    item.drop_ship_fee ?? 0,                          // $13 drop_ship_fee
-    item.drop_ship_eligible ?? false,                 // $14 drop_ship_eligible
-    JSON.stringify(                                   // $15 images_raw
-      Array.isArray(item.images)
-        ? item.images.map(img => ({
-            url: img.url ?? img.link ?? img,
-            position: img.position ?? null,
-            primary: img.primary ?? false,
-          }))
-        : []
-    ),
-    JSON.stringify([]),                               // $16 fitment_raw
-    item.weight ?? null,                              // $17 weight
-    item.length ?? null,                              // $18 length
-    item.width  ?? null,                              // $19 width
-    item.height ?? null,                              // $20 height
-    item.upc ?? null,                                 // $21 upc
-    item.superseded_sku ?? null,                      // $22 superseded_sku
-    item.status ?? null,                              // $23 status
-    item.status_id ?? null,                           // $24 status_id
-    item.product_type ?? null,                        // $25 product_type
-    item.unit_of_measurement_id?.toString() ?? null,  // $26 unit_of_measurement
-    item.has_map_policy ?? false,                     // $27 has_map_policy
-    item.carb ?? null,                                // $28 carb
-    item.prop_65_code ?? null,                        // $29 prop_65_code
-    item.prop_65_detail ?? null,                      // $30 prop_65_detail
-    item.country_id ?? null,                          // $31 country_id
+    item.list_price ?? null,                            // $10 msrp
+    item.mapp_price ?? null,                            // $11 map_price
+    item.standard_dealer_price ?? null,                 // $12 wholesale_cost
+    item.drop_ship_fee ?? 0,                            // $13 drop_ship_fee
+    item.drop_ship_eligible ?? false,                   // $14 drop_ship_eligible
+    JSON.stringify(images.map(img => ({                 // $15 images_raw      ← unwrapped
+      url: img.url ?? img.link ?? img,
+      position: img.position ?? null,
+      primary: img.primary ?? false,
+    }))),
+    JSON.stringify([]),                                 // $16 fitment_raw
+    item.weight ?? null,                                // $17 weight
+    item.length ?? null,                                // $18 length
+    item.width  ?? null,                                // $19 width
+    item.height ?? null,                                // $20 height
+    item.upc ?? null,                                   // $21 upc
+    item.superseded_sku ?? null,                        // $22 superseded_sku
+    item.status ?? null,                                // $23 status
+    item.status_id ?? null,                             // $24 status_id
+    item.product_type ?? null,                          // $25 product_type
+    item.unit_of_measurement_id?.toString() ?? null,    // $26 unit_of_measurement
+    item.has_map_policy ?? false,                       // $27 has_map_policy
+    item.carb ?? null,                                  // $28 carb
+    item.prop_65_code ?? null,                          // $29 prop_65_code
+    item.prop_65_detail ?? null,                        // $30 prop_65_detail
+    item.country_id ?? null,                            // $31 country_id
     item.published_at ? new Date(item.published_at) : null, // $32
     item.created_at  ? new Date(item.created_at)  : null,   // $33
     item.updated_at  ? new Date(item.updated_at)  : null,   // $34
   ]);
+
+  // return unwrapped inventory for caller
+  return inventory;
 }
 
-async function upsertInventory(client, item) {
-  if (!Array.isArray(item.inventory)) return;
-  for (const inv of item.inventory) {
+async function upsertInventory(client, item, inventory) {
+  for (const inv of inventory) {
     await client.query(`
       INSERT INTO vendor.vendor_inventory (
         id, vendor_code, vendor_part_number,
@@ -180,8 +184,8 @@ async function run() {
 
       for (const item of items) {
         try {
-          await upsertProduct(client, item);
-          await upsertInventory(client, item);
+          const inventory = await upsertProduct(client, item);
+          await upsertInventory(client, item, inventory);
           inserted++;
         } catch (err) {
           failed++;
