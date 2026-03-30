@@ -12,6 +12,7 @@
   "type": "commonjs",
   "dependencies": {
     "dotenv": "^17.3.1",
+    "fast-xml-parser": "^5.5.9",
     "pg": "^8.20.0"
   }
 }
