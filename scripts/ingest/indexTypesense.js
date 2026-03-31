@@ -1,4 +1,3 @@
-require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env.local') });
 const { Pool } = require('pg');
 const Typesense = require('typesense');
 
