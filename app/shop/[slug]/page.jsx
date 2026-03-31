@@ -19,6 +19,7 @@ export default async function ProductDetailPage({ params }) {
   try {
     product = await db.getProduct(slug);
     console.log('[PDP] raw product keys:', Object.keys(product));
+    console.log('[PDP] sku:', product.sku);
     console.log('[PDP] description:', product.description);
     console.log('[PDP] images:', product.images);
   } catch (err) {
