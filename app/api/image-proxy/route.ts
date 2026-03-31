@@ -1,5 +1,5 @@
 // app/api/image-proxy/route.ts
-// Proxies WPS CDN images which block direct browser hotlinking.
+// Proxies CDN images which block direct browser hotlinking.
 
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -14,97 +14,91 @@ function isAllowedUrl(url: string): boolean {
   }
 }
 
-const AUTH_HEADER = process.env.WPS_API_KEY ? `Bearer ${process.env.WPS_API_KEY}` : ''
-const HEADER_VARIANTS: Array<Record<string, string>> = [
-  {
-    'Referer':        'https://www.wps-inc.com/',
-    'Origin':         'https://www.wps-inc.com',
-    'User-Agent':     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-    'Accept':         'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
-    'Sec-Fetch-Dest': 'image',
-    'Sec-Fetch-Mode': 'no-cors',
-    'Sec-Fetch-Site': 'same-site',
-  },
-  {
-    'Referer':    'https://www.wps-inc.com/',
-    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-    'Accept':     'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
-  },
-  {
-    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-    'Accept':     'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
-  },
-  {
-    'User-Agent': 'curl/7.88.1',
-    'Accept':     '*/*',
-  },
-  {
-    'Referer':       'https://www.lepartsmartner.com/',
-    'Authorization': AUTH_HEADER,
-    'User-Agent':    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-    'Accept':        'image/*',
-  },
-]
+// WPS CDN serves images directly in the browser — redirect, no proxy needed
+const WPS_DIRECT = ['cdn.wpsstatic.com']
+
+// LeMans requires the lepartsmartner.com referer and manual redirect following
+const LEMANS_HEADERS = {
+  'Referer':    'https://www.lepartsmartner.com/',
+  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+  'Accept':     'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+}
+
+async function fetchFollowingRedirects(url: string, headers: Record<string, string>, maxRedirects = 5): Promise<Response> {
+  let currentUrl = url
+  let hops = 0
+
+  while (hops < maxRedirects) {
+    const res = await fetch(currentUrl, {
+      headers,
+      cache: 'no-store',
+      redirect: 'manual',
+    })
+
+    if (res.status === 301 || res.status === 302 || res.status === 307 || res.status === 308) {
+      const location = res.headers.get('location')
+      if (!location) break
+
+      // Resolve relative URLs
+      currentUrl = location.startsWith('http')
+        ? location
+        : new URL(location, currentUrl).toString()
+
+      console.log(`[image-proxy] redirect ${hops + 1}: ${currentUrl}`)
+      hops++
+      continue
+    }
+
+    return res
+  }
+
+  throw new Error(`Too many redirects for ${url}`)
+}
 
 export async function GET(req: NextRequest) {
   const url = req.nextUrl.searchParams.get('url')
   if (!url)               return new NextResponse('Missing url param', { status: 400 })
   if (!isAllowedUrl(url)) return new NextResponse('Forbidden',         { status: 403 })
 
-  // WPS CDN serves images directly in the browser — server-side proxy always 403s.
-  // Redirect to the direct URL so the browser loads it natively.
-  const WPS_DIRECT = ['cdn.wpsstatic.com']
   try {
     const { hostname } = new URL(url)
+
+    // WPS: redirect directly to CDN — browser loads it fine
     if (WPS_DIRECT.some(h => hostname === h || hostname.endsWith(`.${h}`))) {
       return NextResponse.redirect(url, { status: 302 })
     }
-  } catch {}
 
-  for (let i = 0; i < HEADER_VARIANTS.length; i++) {
-    try {
-      let upstream = await fetch(url, {
-        headers: HEADER_VARIANTS[i],
-        cache: 'no-store',
-        redirect: 'manual',
-      })
+    // LeMans: proxy with manual redirect following + referer header
+    if (hostname === 'asset.lemansnet.com' || hostname.endsWith('.lemansnet.com')) {
+      try {
+        const upstream = await fetchFollowingRedirects(url, LEMANS_HEADERS)
 
-      if (upstream.status === 301 || upstream.status === 302 || upstream.status === 307) {
-        const location = upstream.headers.get('location')
-        if (location) {
-          const followed = await fetch(location, {
-            headers: HEADER_VARIANTS[i],
-            cache: 'no-store',
-          })
-          if (followed.ok) {
-            upstream = followed
-          }
+        if (!upstream.ok) {
+          console.warn(`[image-proxy] LeMans final status ${upstream.status} for ${url}`)
+          return NextResponse.redirect(new URL('/images/placeholder.jpg', req.url))
         }
+
+        const contentType = upstream.headers.get('Content-Type') ?? 'image/jpeg'
+        const blob = await upstream.arrayBuffer()
+
+        console.log(`[image-proxy] LeMans success — ${blob.byteLength} bytes, type: ${contentType}`)
+
+        return new NextResponse(blob, {
+          status: 200,
+          headers: {
+            'Content-Type':  contentType.startsWith('image/') ? contentType : 'image/jpeg',
+            'Cache-Control': 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400',
+            'Content-Length': blob.byteLength.toString(),
+          },
+        })
+      } catch (err: any) {
+        console.error(`[image-proxy] LeMans error for ${url}:`, err.message)
+        return NextResponse.redirect(new URL('/images/placeholder.jpg', req.url))
       }
-
-      if (!upstream.ok) {
-        console.log(`[image-proxy] variant ${i + 1} → ${upstream.status} for ${url}`)
-        continue
-      }
-
-      const contentType = upstream.headers.get('Content-Type') || 'image/jpeg'
-      if (!contentType.startsWith('image/') && contentType !== 'application/octet-stream') continue
-
-      const blob = await upstream.arrayBuffer()
-      console.log(`[image-proxy] success with variant ${i + 1} for ${url}`)
-
-      return new NextResponse(blob, {
-        status: 200,
-        headers: {
-          'Content-Type':    contentType.startsWith('image/') ? contentType : 'image/jpeg',
-          'Cache-Control':   'public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400',
-          'Content-Length':  blob.byteLength.toString(),
-          'X-Proxy-Variant': String(i + 1),
-        },
-      })
-    } catch (err) {
-      console.error(`[image-proxy] variant ${i + 1} error:`, err)
     }
+
+  } catch (err: any) {
+    console.error(`[image-proxy] error:`, err.message)
   }
 
   return NextResponse.redirect(new URL('/images/placeholder.jpg', req.url))
