@@ -435,7 +435,7 @@ export default function ShopClient({
     setLoading(true);
     setError(null);
     try {
-      const res  = await fetch(`/api/products?${buildQS(f, s, p)}`,
+      const res  = await fetch(`/api/search?${buildQS(f, s, p)}`,
         { signal: abortRef.current.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();

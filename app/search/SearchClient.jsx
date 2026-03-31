@@ -189,7 +189,7 @@ export default function SearchClient({ initialQuery = "" }) {
 
   // Load sale products for landing page
   useEffect(() => {
-    fetch("/api/products?sort=price_desc&pageSize=8")
+    fetch("/api/search?sort=price_desc&pageSize=8")
       .then(r => r.json())
       .then(d => setSaleProducts((d.products ?? []).filter(p => p.was)))
       .catch(() => {});
@@ -204,7 +204,7 @@ export default function SearchClient({ initialQuery = "" }) {
     try {
       const sortParam = s === "relevance" ? "" : `&sort=${s.replace("-","_")}`;
       const res  = await fetch(
-        `/api/products?search=${encodeURIComponent(q)}&pageSize=48${sortParam}`,
+        `/api/search?search=${encodeURIComponent(q)}&pageSize=48${sortParam}`,
         { signal: abortRef.current.signal }
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
