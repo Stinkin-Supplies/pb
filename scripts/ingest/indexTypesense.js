@@ -1,4 +1,5 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env.local') });
 const { Pool } = require('pg');
 const Typesense = require('typesense');
 
@@ -37,7 +38,7 @@ const SCHEMA = {
 async function run() {
   const client = new Typesense.Client({
     nodes:                   [NODE],
-    apiKey:                  process.env.TYPESENSE_API_KEY,
+    apiKey:                  process.env.TYPESENSE_ADMIN_API_KEY || process.env.TYPESENSE_API_KEY,
     connectionTimeoutSeconds: 60,
   });
 
