@@ -133,11 +133,10 @@ function normalizeRow(row) {
     brand:      row.brand ?? "Unknown",
     category:   row.category ?? "Uncategorized",
     price:      Number(row.price ?? 0),
-    was:        (row.msrp > row.price) ? Number(row.msrp)
-              : null,
-    mapPrice:   row.map_price ? Number(row.map_price) : null,
+    was:        Number(row.msrp ?? 0) > Number(row.price ?? 0) ? Number(row.msrp) : null,
+    mapPrice:   row.map_price != null ? Number(row.map_price) : null,
     badge:      row.is_new ? "new" : null,
-    inStock:    (row.stock_quantity ?? 0) > 0,
+    inStock:    Number(row.stock_quantity ?? 0) > 0,
     fitmentIds: null,
     image:      row.image ?? row.images?.[0] ?? null,
   };
