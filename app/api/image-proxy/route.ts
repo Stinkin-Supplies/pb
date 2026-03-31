@@ -63,11 +63,24 @@ export async function GET(req: NextRequest) {
 
   for (let i = 0; i < HEADER_VARIANTS.length; i++) {
     try {
-      const upstream = await fetch(url, {
+      let upstream = await fetch(url, {
         headers: HEADER_VARIANTS[i],
         cache: 'no-store',
-        redirect: 'follow',
+        redirect: 'manual',
       })
+
+      if (upstream.status === 301 || upstream.status === 302 || upstream.status === 307) {
+        const location = upstream.headers.get('location')
+        if (location) {
+          const followed = await fetch(location, {
+            headers: HEADER_VARIANTS[i],
+            cache: 'no-store',
+          })
+          if (followed.ok) {
+            upstream = followed
+          }
+        }
+      }
 
       if (!upstream.ok) {
         console.log(`[image-proxy] variant ${i + 1} → ${upstream.status} for ${url}`)
