@@ -518,6 +518,7 @@ export default function CartDrawer({ isOpen, onClose, cartItems, onUpdateQty, on
 
                   {!item.in_stock && (
                     <div style={{ padding: "0 0 0 84px", marginTop: 6 }}>
+                      {console.log('[CartDrawer] notify item:', item.sku, item.name)}
                       <NotifyMeButton
                         sku={item.sku}
                         productName={item.name}
