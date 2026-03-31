@@ -24,9 +24,9 @@ export async function POST(req: Request) {
     }
   );
 
-  // Verify session
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
+  // Verify logged-in user
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (!user || authError) {
     return NextResponse.json({ error: "Not logged in" }, { status: 401 });
   }
 
@@ -40,7 +40,7 @@ export async function POST(req: Request) {
   const { data: existing } = await supabase
     .from("stock_notifications")
     .select("id, status")
-    .eq("email", session.user.email)
+    .eq("email", user.email)
     .eq("product_sku", product_sku)
     .maybeSingle();
 
@@ -52,8 +52,8 @@ export async function POST(req: Request) {
   const { error } = await supabase
     .from("stock_notifications")
     .insert({
-      user_id:      session.user.id,
-      email:        session.user.email,
+      user_id:      user.id,
+      email:        user.email,
       product_sku,
       product_name: product_name ?? null,
       vendor:       vendor       ?? null,
