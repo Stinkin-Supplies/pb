@@ -93,7 +93,6 @@ export async function GET(req: Request) {
             FROM public.vendor_offers vo
             WHERE vo.catalog_product_id = cp.id
               AND vo.is_active = true
-              AND COALESCE(vo.total_qty, 0) > 0
           )`);
         }
         if (search)   {
@@ -147,7 +146,7 @@ export async function GET(req: Request) {
                     WHERE ci.catalog_product_id = cp.id
                   ), '{}'::text[]) AS images,
                   COALESCE((
-                    SELECT SUM(COALESCE(vo.total_qty, 0))
+                    SELECT COUNT(*) FILTER (WHERE vo.is_active = true)
                     FROM public.vendor_offers vo
                     WHERE vo.catalog_product_id = cp.id
                       AND vo.is_active = true
