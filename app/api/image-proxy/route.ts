@@ -63,7 +63,11 @@ export async function GET(req: NextRequest) {
 
   for (let i = 0; i < HEADER_VARIANTS.length; i++) {
     try {
-      const upstream = await fetch(url, { headers: HEADER_VARIANTS[i], cache: 'no-store' })
+      const upstream = await fetch(url, {
+        headers: HEADER_VARIANTS[i],
+        cache: 'no-store',
+        redirect: 'follow',
+      })
 
       if (!upstream.ok) {
         console.log(`[image-proxy] variant ${i + 1} → ${upstream.status} for ${url}`)
@@ -71,7 +75,7 @@ export async function GET(req: NextRequest) {
       }
 
       const contentType = upstream.headers.get('Content-Type') || 'image/jpeg'
-      if (!contentType.startsWith('image/')) continue
+      if (!contentType.startsWith('image/') && contentType !== 'application/octet-stream') continue
 
       const blob = await upstream.arrayBuffer()
       console.log(`[image-proxy] success with variant ${i + 1} for ${url}`)
@@ -79,7 +83,7 @@ export async function GET(req: NextRequest) {
       return new NextResponse(blob, {
         status: 200,
         headers: {
-          'Content-Type':    contentType,
+          'Content-Type':    contentType.startsWith('image/') ? contentType : 'image/jpeg',
           'Cache-Control':   'public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400',
           'Content-Length':  blob.byteLength.toString(),
           'X-Proxy-Variant': String(i + 1),
