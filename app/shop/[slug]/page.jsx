@@ -55,15 +55,15 @@ export default async function ProductDetailPage({ params }) {
 // ── Row normalizer ────────────────────────────────────────────
 // Maps DB column names → component prop names.
 //
-// Column reference (from live Supabase rows):
-//   our_price       → price
-//   msrp            → was  (compare_at_price is null in PU sync)
+// Column reference (from catalog rows):
+//   price           → price
+//   msrp            → was
 //   map_price       → mapPrice
-//   brand_name      → brand
-//   category_name   → category
-//   stock_quantity  → stockQty  (in_stock bool is also present)
-//   images text[]   → images array
-//   weight_lbs      → weight
+//   brand           → brand
+//   category        → category
+//   stock_quantity  → stockQty
+//   images[]        → images array
+//   weight          → weight
 function normalizeProductRow(row) {
   return {
     id:          row.id,
@@ -71,24 +71,20 @@ function normalizeProductRow(row) {
     name:        row.name,
 
     // snake_case DB columns → camelCase props
-    brand:       row.brand_name    ?? row.brand    ?? "Unknown",
-    category:    row.category_name ?? row.category ?? "Uncategorized",
+    brand:       row.brand         ?? row.brand_name ?? "Unknown",
+    category:    row.category      ?? row.category_name ?? "Uncategorized",
 
-    // PU sync writes our_price; compare_at_price unused — use msrp for was
-    price:       Number(row.our_price       ?? row.price ?? 0),
-    was:         row.compare_at_price       ? Number(row.compare_at_price)
-               : row.msrp                  ? Number(row.msrp)
-               : (row.was                  ? Number(row.was) : null),
-    mapPrice:    row.map_price              ? Number(row.map_price) : null,
+    price:       Number(row.price ?? row.our_price ?? 0),
+    was:         row.msrp != null ? Number(row.msrp)
+               : row.compare_at_price != null ? Number(row.compare_at_price)
+               : (row.was != null ? Number(row.was) : null),
+    mapPrice:    row.map_price != null ? Number(row.map_price) : null,
 
     badge:       row.is_new   ? "new"
                : row.on_sale  ? "sale"
                : (row.badge   ?? null),
 
-    // in_stock bool written by sync; fall back to stock_quantity check
-    inStock:     row.in_stock  ?? (row.stock_quantity != null
-                   ? row.stock_quantity > 0
-                   : true),
+    inStock:     Number(row.stock_quantity ?? 0) > 0,
     stockQty:    row.stock_quantity  ?? null,
     fitmentIds:  row.fitment_ids     ?? null,
 
@@ -102,12 +98,13 @@ function normalizeProductRow(row) {
                        : [],
 
     sku:         row.sku          ?? row.vendor_sku  ?? null,
-    vendor:      row.vendor_slug  ?? row.vendor      ?? null,
+    vendor:      row.vendor_codes?.[0] ?? row.vendor_slug ?? row.vendor ?? null,
+    vendor_slug: row.vendor_codes?.[0] ?? row.vendor_slug ?? row.vendor ?? null,
     description: row.description  ?? null,
     specs:       row.specs        ?? row.attributes  ?? [],
-    weight:      row.weight_lbs   ?? null,
-    shipping:    row.ships_free   ?? (Number(row.our_price ?? row.price ?? 0) >= 99),
-    pointsEarned: Math.floor(Number(row.our_price ?? row.price ?? 0) * 10),
+    weight:      row.weight       ?? row.weight_lbs   ?? null,
+    shipping:    row.ships_free   ?? (Number(row.price ?? row.our_price ?? 0) >= 99),
+    pointsEarned: Math.floor(Number(row.price ?? row.our_price ?? 0) * 10),
   };
 }
 
@@ -119,7 +116,7 @@ export async function generateMetadata({ params }) {
     product = await db.getProduct(slug);
   } catch (_) {}
   const name  = product?.name     ?? slug.replace(/-/g, " ");
-  const brand = product?.brand_name ?? "Stinkin' Supplies";
+  const brand = product?.brand ?? product?.brand_name ?? "Stinkin' Supplies";
   return {
     title:       `${name} | ${brand} | Stinkin' Supplies`,
     description: `Shop ${name} by ${brand}. Free shipping on orders over $99.`,
