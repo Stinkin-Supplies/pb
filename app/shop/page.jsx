@@ -13,8 +13,8 @@ const PAGE_SIZE = 48;
 
 const ORDER_MAP = {
   newest:     { col: "created_at", dir: "DESC" },
-  price_asc:  { col: "our_price",  dir: "ASC"  },
-  price_desc: { col: "our_price",  dir: "DESC" },
+  price_asc:  { col: "price",      dir: "ASC"  },
+  price_desc: { col: "price",      dir: "DESC" },
   name_asc:   { col: "name",       dir: "ASC"  },
 };
 
@@ -34,29 +34,59 @@ export default async function ShopPage({ searchParams }) {
     const catalogDb = getCatalogDb();
 
     // ── Build WHERE clause ───────────────────────────────
-    const conditions = ["status = 'active'"];
+    const conditions = ["cp.is_active = true"];
     const params     = [];
     let   idx        = 1;
 
-    if (category) { conditions.push(`category_name = $${idx++}`); params.push(category); }
-    if (brand)    { conditions.push(`brand_name = $${idx++}`);    params.push(brand);    }
+    if (category) { conditions.push(`cp.category = $${idx++}`); params.push(category); }
+    if (brand)    { conditions.push(`cp.brand = $${idx++}`);    params.push(brand);    }
 
     const WHERE = `WHERE ${conditions.join(" AND ")}`;
 
     // ── Products + count ─────────────────────────────────
     const [rowsResult, countResult] = await Promise.all([
       catalogDb.query(
-        `SELECT id, sku, slug, name, brand_name, category_name,
-                our_price, msrp, compare_at_price, map_price,
-                in_stock, stock_quantity, is_new, images
-         FROM products
+        `SELECT
+                cp.id,
+                cp.sku,
+                cp.slug,
+                cp.name,
+                cp.brand,
+                cp.category,
+                cp.price,
+                cp.msrp,
+                cp.map_price,
+                cp.weight,
+                cp.description,
+                cp.is_active,
+                cp.created_at,
+                COALESCE((
+                  SELECT ci.url
+                  FROM public.catalog_images ci
+                  WHERE ci.catalog_product_id = cp.id
+                    AND ci.is_primary = true
+                  ORDER BY ci.position
+                  LIMIT 1
+                ), NULL) AS image,
+                COALESCE((
+                  SELECT ARRAY_AGG(ci.url ORDER BY ci.position)
+                  FROM public.catalog_images ci
+                  WHERE ci.catalog_product_id = cp.id
+                ), '{}'::text[]) AS images,
+                COALESCE((
+                  SELECT SUM(COALESCE(vo.total_qty, 0))
+                  FROM public.vendor_offers vo
+                  WHERE vo.catalog_product_id = cp.id
+                    AND vo.is_active = true
+                ), 0) AS stock_quantity
+         FROM public.catalog_products cp
          ${WHERE}
-         ORDER BY ${order.col} ${order.dir}
+         ORDER BY cp.${order.col} ${order.dir}
          LIMIT ${PAGE_SIZE} OFFSET 0`,
         params
       ),
       catalogDb.query(
-        `SELECT COUNT(*) FROM products ${WHERE}`,
+        `SELECT COUNT(*) FROM public.catalog_products cp ${WHERE}`,
         params
       ),
     ]);
@@ -100,17 +130,16 @@ function normalizeRow(row) {
     id:         row.id,
     slug:       row.slug,
     name:       row.name,
-    brand:      row.brand_name    ?? "Unknown",
-    category:   row.category_name ?? "Uncategorized",
-    price:      Number(row.our_price ?? 0),
-    was:        (row.compare_at_price > row.our_price) ? Number(row.compare_at_price)
-              : (row.msrp > row.our_price)             ? Number(row.msrp)
+    brand:      row.brand ?? "Unknown",
+    category:   row.category ?? "Uncategorized",
+    price:      Number(row.price ?? 0),
+    was:        (row.msrp > row.price) ? Number(row.msrp)
               : null,
     mapPrice:   row.map_price ? Number(row.map_price) : null,
     badge:      row.is_new ? "new" : null,
-    inStock:    row.in_stock ?? (row.stock_quantity > 0),
+    inStock:    (row.stock_quantity ?? 0) > 0,
     fitmentIds: null,
-    image:      row.images?.[0] ?? null,
+    image:      row.image ?? row.images?.[0] ?? null,
   };
 }
 

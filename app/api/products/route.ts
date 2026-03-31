@@ -35,7 +35,6 @@
 // ============================================================
 
 import { NextResponse } from "next/server";
-import { adminSupabase } from "@/lib/supabase/admin";
 import getCatalogDb from "@/lib/db/catalog";
 
 const PAGE_SIZE_DEFAULT = 48;
@@ -80,34 +79,81 @@ export async function GET(req: Request) {
       (async () => {
         const catalogDb = getCatalogDb();
 
-        const conditions: string[] = ["p.status = $1"];
-        const values: any[] = ["active"];
-        let paramIdx = 2;
+        const conditions: string[] = ["cp.is_active = true"];
+        const values: any[] = [];
+        let paramIdx = 1;
 
-        if (category) { conditions.push(`p.category_name = $${paramIdx++}`); values.push(category); }
-        if (brand)    { conditions.push(`p.brand_name = $${paramIdx++}`);    values.push(brand); }
-        if (minPrice) { conditions.push(`p.our_price >= $${paramIdx++}`);    values.push(minPrice); }
-        if (maxPrice) { conditions.push(`p.our_price <= $${paramIdx++}`);    values.push(maxPrice); }
-        if (inStock)  { conditions.push(`p.in_stock = $${paramIdx++}`);      values.push(true); }
-        if (search)   { conditions.push(`p.search_vector @@ websearch_to_tsquery('english', $${paramIdx++})`); values.push(search); }
+        if (category) { conditions.push(`cp.category = $${paramIdx++}`); values.push(category); }
+        if (brand)    { conditions.push(`cp.brand = $${paramIdx++}`);    values.push(brand); }
+        if (minPrice) { conditions.push(`cp.price >= $${paramIdx++}`);    values.push(minPrice); }
+        if (maxPrice) { conditions.push(`cp.price <= $${paramIdx++}`);    values.push(maxPrice); }
+        if (inStock)  {
+          conditions.push(`EXISTS (
+            SELECT 1
+            FROM public.vendor_offers vo
+            WHERE vo.catalog_product_id = cp.id
+              AND vo.is_active = true
+              AND COALESCE(vo.total_qty, 0) > 0
+          )`);
+        }
+        if (search)   {
+          conditions.push(`(
+            cp.name ILIKE $${paramIdx}
+            OR cp.sku ILIKE $${paramIdx}
+            OR cp.brand ILIKE $${paramIdx}
+            OR cp.category ILIKE $${paramIdx}
+          )`);
+          values.push(`%${search}%`);
+          paramIdx++;
+        }
 
         const where = conditions.join(" AND ");
 
         const orderMap: Record<string, string> = {
-          newest:     "p.created_at DESC",
-          price_asc:  "p.our_price ASC",
-          price_desc: "p.our_price DESC",
-          name_asc:   "p.name ASC",
+          newest:     "cp.created_at DESC",
+          price_asc:  "cp.price ASC",
+          price_desc: "cp.price DESC",
+          name_asc:   "cp.name ASC",
         };
         const orderClause = orderMap[sort] ?? orderMap.newest;
 
         const dataValues = [...values, pageSize, from];
         const { rows } = await catalogDb.query(
-          `SELECT id, sku, slug, name, brand_name, category_name,
-                  our_price, msrp, compare_at_price, map_price,
-                  in_stock, stock_quantity, is_new, images,
+          `SELECT
+                  cp.id,
+                  cp.sku,
+                  cp.slug,
+                  cp.name,
+                  cp.brand,
+                  cp.category,
+                  cp.price,
+                  cp.msrp,
+                  cp.map_price,
+                  cp.weight,
+                  cp.description,
+                  cp.is_active,
+                  cp.created_at,
+                  COALESCE((
+                    SELECT ci.url
+                    FROM public.catalog_images ci
+                    WHERE ci.catalog_product_id = cp.id
+                      AND ci.is_primary = true
+                    ORDER BY ci.position
+                    LIMIT 1
+                  ), NULL) AS image,
+                  COALESCE((
+                    SELECT ARRAY_AGG(ci.url ORDER BY ci.position)
+                    FROM public.catalog_images ci
+                    WHERE ci.catalog_product_id = cp.id
+                  ), '{}'::text[]) AS images,
+                  COALESCE((
+                    SELECT SUM(COALESCE(vo.total_qty, 0))
+                    FROM public.vendor_offers vo
+                    WHERE vo.catalog_product_id = cp.id
+                      AND vo.is_active = true
+                  ), 0) AS stock_quantity,
                   COUNT(*) OVER() AS total_count
-           FROM products p
+           FROM public.catalog_products cp
            WHERE ${where}
            ORDER BY ${orderClause}
            LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
@@ -162,18 +208,16 @@ function normalizeRow(row: any) {
     id:         row.id,
     slug:       row.slug,
     name:       row.name,
-    brand:      row.brand_name    ?? "Unknown",
-    category:   row.category_name ?? "Uncategorized",
-    price:      Number(row.our_price ?? 0),
-    was:        (row.compare_at_price > row.our_price) ? Number(row.compare_at_price)
-              : (row.msrp > row.our_price)             ? Number(row.msrp)
+    brand:      row.brand ?? "Unknown",
+    category:   row.category ?? "Uncategorized",
+    price:      Number(row.price ?? 0),
+    was:        (row.msrp > row.price) ? Number(row.msrp)
               : null,
     mapPrice:   row.map_price ? Number(row.map_price) : null,
     badge:      row.is_new ? "new" : null,
-    inStock:    row.in_stock ?? (row.stock_quantity > 0),
+    inStock:    (row.stock_quantity ?? 0) > 0,
     fitmentIds: null, // populated after ACES import (Phase 5)
-    image:      Array.isArray(row.images) && row.images.length > 0
-                  ? row.images[0]
-                  : null,
+    image:      row.image
+                  ?? (Array.isArray(row.images) && row.images.length > 0 ? row.images[0] : null),
   };
 }
