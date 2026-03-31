@@ -570,16 +570,20 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
   };
 
   const images = (() => {
-    // Accept WPS CDN URLs directly — they work in browser without proxy
     const raw = Array.isArray(product.images) ? product.images.filter(Boolean) : [];
     if (raw.length > 0) {
-      // Serve WPS URLs directly, proxy everything else
-      return raw.map(url => isWpsCdn(url) ? url : `/api/image-proxy?url=${encodeURIComponent(url)}`);
+      // Proxy CDN URLs that need referer/auth; leave other direct URLs alone.
+      return raw.map(url => isWpsCdn(url) ? `/api/image-proxy?url=${encodeURIComponent(url)}` : url);
     }
     // Fallback to getProductImage
     const fallback = getProductImage(product);
     return [fallback];
   })();
+
+  const toProxySrc = (src) =>
+    typeof src === "string" && src.startsWith("http") && isWpsCdn(src)
+      ? `/api/image-proxy?url=${encodeURIComponent(src)}`
+      : src;
 
   // Lightweight inline notify button for related cards
   function RelatedNotifyButton({ sku, productName, vendor }) {
@@ -617,7 +621,7 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
   }
 
   function RelatedCardImage({ product }) {
-    const src = primaryImage(product.images);
+    const src = toProxySrc(primaryImage(product.images));
     const isPlaceholder = src === "/placeholder-product.png" || src === "/images/placeholder.jpg";
 
     return (
@@ -681,7 +685,7 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
               </span>
             )}
             <img
-              src={images[activeImg]}
+              src={toProxySrc(images[activeImg])}
               alt={product.name}
               style={{ width:"100%", height:"100%", objectFit:"contain", position:"relative", zIndex:1 }}
             />
@@ -693,7 +697,7 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
               {images.map((img, i) => (
                 <Image
                   key={i}
-                  src={img}
+                  src={toProxySrc(img)}
                   alt={`${product.name} ${i}`}
                   width={80}
                   height={80}

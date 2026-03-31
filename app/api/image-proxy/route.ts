@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 
-const ALLOWED_HOSTS = ['cdn.wpsstatic.com']
+const ALLOWED_HOSTS = ['cdn.wpsstatic.com', 'asset.lemansnet.com']
 
 function isAllowedUrl(url: string): boolean {
   try {
@@ -39,6 +39,7 @@ const HEADER_VARIANTS: Array<Record<string, string>> = [
     'Accept':     '*/*',
   },
   {
+    'Referer':       'https://www.lepartsmartner.com/',
     'Authorization': AUTH_HEADER,
     'User-Agent':    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
     'Accept':        'image/*',

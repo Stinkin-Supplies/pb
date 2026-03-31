@@ -263,6 +263,9 @@ function GridNotifyButton({ sku, productName, vendor }) {
 // ── ProductCard ───────────────────────────────────────────────
 function ProductCard({ product:p, index, view, onAdd }) {
   const imageSrc = getProductImage(p);
+  const proxiedImageSrc = typeof imageSrc === "string" && imageSrc.startsWith("http")
+    ? `/api/image-proxy?url=${encodeURIComponent(imageSrc)}`
+    : imageSrc;
 
   return (
     <Link href={`/shop/${p.slug}`} className="pcard"
@@ -283,7 +286,7 @@ function ProductCard({ product:p, index, view, onAdd }) {
                           "linear-gradient(90deg,rgba(232,98,26,0.04) 1px,transparent 1px)",
           backgroundSize:"16px 16px" }}/>
         <Image
-          src={imageSrc}
+          src={proxiedImageSrc}
           alt={p.name}
           fill
           sizes="(max-width: 768px) 50vw, 25vw"
