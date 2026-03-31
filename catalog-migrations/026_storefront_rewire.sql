@@ -104,7 +104,7 @@ AS $$
               FROM public.vendor_offers vo
               WHERE vo.catalog_product_id = cp.id
                 AND vo.is_active = true
-                AND COALESCE(vo.total_qty, 0) > 0
+                AND COALESCE(cp.stock_quantity, 0) > 0
             )
           )
         GROUP BY cp.category
@@ -126,7 +126,7 @@ AS $$
               FROM public.vendor_offers vo
               WHERE vo.catalog_product_id = cp.id
                 AND vo.is_active = true
-                AND COALESCE(vo.total_qty, 0) > 0
+                AND COALESCE(cp.stock_quantity, 0) > 0
             )
           )
         GROUP BY cp.brand
@@ -143,11 +143,11 @@ AS $$
         AND (
           p_in_stock IS NULL OR p_in_stock = false OR EXISTS (
             SELECT 1
-            FROM public.vendor_offers vo
-            WHERE vo.catalog_product_id = cp.id
-              AND vo.is_active = true
-              AND COALESCE(vo.total_qty, 0) > 0
-          )
+          FROM public.vendor_offers vo
+          WHERE vo.catalog_product_id = cp.id
+            AND vo.is_active = true
+            AND COALESCE(cp.stock_quantity, 0) > 0
+        )
         )
         AND price > 0
     ), json_build_object('min', 0, 'max', 0))
