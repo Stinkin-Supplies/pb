@@ -19,7 +19,7 @@ const NODE = {
 export function getAdminClient() {
   return new Typesense.Client({
     nodes:          [NODE],
-    apiKey:         process.env.TYPESENSE_API_KEY!,
+    apiKey:         process.env.TYPESENSE_ADMIN_API_KEY ?? process.env.TYPESENSE_API_KEY!,
     connectionTimeoutSeconds: 60,
   })
 }
