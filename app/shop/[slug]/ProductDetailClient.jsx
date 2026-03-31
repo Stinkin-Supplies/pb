@@ -508,7 +508,7 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
         .from("wishlists")
         .select("user_id")
         .eq("user_id", user.id)
-        .eq("product_id", product.id)
+        .eq("product_sku", product.sku)
         .maybeSingle();
       if (!mounted) return;
       if (!error && data?.user_id) setWishlisted(true);
@@ -533,7 +533,7 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
           .from("wishlists")
           .delete()
           .eq("user_id", user.id)
-          .eq("product_id", product.id);
+          .eq("product_sku", product.sku);
         if (!error) {
           setWishlisted(false);
           showWishlistToast("Removed from wishlist");
@@ -546,7 +546,8 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
           .from("wishlists")
           .insert({
             user_id: user.id,
-            product_id: product.id,
+            product_sku: product.sku,
+            product_name: product.name,
             notify_in_stock: !product.inStock,
           });
         if (!error) {
