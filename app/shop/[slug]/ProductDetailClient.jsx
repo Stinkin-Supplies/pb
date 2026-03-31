@@ -785,7 +785,7 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
               <NotifyMeButton
                 sku={product.sku}
                 productName={product.name}
-                vendor={product.vendor_slug ?? "wps"}
+                vendor={product.vendor ?? "wps"}
                 source="pdp"
               />
             )}
@@ -872,7 +872,7 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
                     }
                   </div>
                   {!p.inStock && (
-                    <RelatedNotifyButton sku={p.sku} productName={p.name} vendor={p.vendor_slug ?? "wps"} />
+                    <RelatedNotifyButton sku={p.sku} productName={p.name} vendor={p.vendor ?? "wps"} />
                   )}
                 </div>
               </div>
