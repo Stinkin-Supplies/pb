@@ -12,7 +12,7 @@ export async function GET(
   try {
     const { rows } = await catalogDb.query(
       `SELECT id, name, slug, logo_url, is_featured, sort_order
-       FROM public.brands
+       FROM public.catalog_brands
        WHERE slug = $1
        LIMIT 1`,
       [slug]
