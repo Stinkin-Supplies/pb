@@ -42,7 +42,7 @@ export async function GET(req: Request) {
   const filters: string[] = ['is_active:=true']
   if (category) filters.push(`category:=${JSON.stringify(category)}`)
   if (brand)    filters.push(`brand:=${JSON.stringify(brand)}`)
-  if (inStock)  filters.push('is_active:=true')
+  if (inStock)  filters.push('in_stock:=true')
   if (minPrice || maxPrice) {
     const min = minPrice ? Number(minPrice) : 0
     const max = maxPrice ? Number(maxPrice) : 999999
@@ -86,7 +86,7 @@ export async function GET(req: Request) {
         was:        d.msrp > d.price ? d.msrp : null,
         mapPrice:   d.map_price ?? null,
         badge:      null,
-        inStock:    d.is_active,
+        inStock:    Boolean(d.in_stock ?? Number(d.stock_quantity ?? 0) > 0),
         fitmentIds: null,
         image:      d.image ?? null,
       }
