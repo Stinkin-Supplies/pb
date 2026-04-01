@@ -290,7 +290,7 @@ function ProductCard({ product:p, index, view, onAdd }) {
           alt={p.name}
           fill
           sizes="(max-width: 768px) 50vw, 25vw"
-          style={{ objectFit:"cover", zIndex:1 }}
+          style={{ objectFit:"contain", padding:"10px", zIndex:1 }}
           priority={index < 6}
           unoptimized
         />
@@ -427,6 +427,7 @@ export default function ShopClient({
     if (page > 0)                 params.set("page",     String(page));
     const qs = params.toString();
     router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }, [filters, sort, page, pathname, router]);
 
   const fetchProducts = useCallback(async (f, s, p) => {
@@ -469,6 +470,7 @@ export default function ShopClient({
 
   const setFilter = useCallback((key, val) => {
     setFilters(prev => ({ ...prev, [key]: val }));
+    window.scrollTo({ top: 0, behavior: "smooth" });
     setPage(0);
   }, []);
 
