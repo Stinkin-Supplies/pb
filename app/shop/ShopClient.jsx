@@ -108,6 +108,24 @@ const css = `
   .page-btn.active { background:#e8621a; border-color:#e8621a; color:#0a0909; }
   .page-btn:disabled { opacity:0.3; cursor:default; }
 
+  .product-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .pcard-body {
+    padding: 8px;
+  }
+
+  @media (min-width:640px) {
+    .pcard-body { padding: 16px; }
+  }
+  @media (min-width:768px) {
+    .product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+  @media (min-width:1024px) {
+    .product-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  }
   @media (max-width:700px) {
     .shop-layout { grid-template-columns:1fr !important; }
     .shop-sidebar { display:none; }
@@ -312,7 +330,7 @@ function ProductCard({ product:p, index, view, onAdd }) {
       </div>
 
       {/* Body */}
-      <div style={{ padding:"11px 13px",
+      <div className="pcard-body" style={{
         display:view==="list"?"flex":"block", alignItems:view==="list"?"center":undefined,
         gap:view==="list"?16:undefined, flex:view==="list"?1:undefined }}>
         <div style={{ flex:view==="list"?1:undefined }}>
@@ -654,9 +672,8 @@ export default function ShopClient({
                 )}
               </div>
             ) : (
-              <div style={{ display:"grid",
-                gridTemplateColumns:view==="list"?"1fr":"repeat(auto-fill,minmax(200px,1fr))",
-                gap:12, opacity:loading?0.5:1, transition:"opacity 0.2s" }}>
+              <div className={view==="list" ? "" : "product-grid"}
+                style={view==="list" ? { display:"grid", gridTemplateColumns:"1fr", gap:12, opacity:loading?0.5:1, transition:"opacity 0.2s" } : { opacity:loading?0.5:1, transition:"opacity 0.2s" }}>
                 {products.map((p,i) => (
                   <ProductCard key={p.id} product={p} index={i} view={view}
                     onAdd={() => addItem(p)}/>

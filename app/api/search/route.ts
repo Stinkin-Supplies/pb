@@ -50,6 +50,8 @@ export async function GET(req: Request) {
   }
 
   const sortBy     = SORT_MAP[sort] ?? SORT_MAP.newest
+  const stockSort  = 'in_stock:desc,our_price:asc'
+  const resolvedSortBy = sortBy ? `${stockSort},${sortBy}` : stockSort
   const filterBy   = filters.join(' && ')
   const perPage    = pageSize
   const typesensePage = page + 1 // Typesense is 1-indexed
@@ -62,7 +64,7 @@ export async function GET(req: Request) {
       query_by:          'name,brand,category,sku,description',
       query_by_weights:  '4,2,2,1,1',
       filter_by:         filterBy,
-      sort_by:           sortBy,
+      sort_by:           resolvedSortBy,
       facet_by:          'category,brand,price',
       max_facet_values:  100,
       per_page:          perPage,

@@ -752,11 +752,13 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
           <div className="stock-row">
             <div className={`stock-dot ${product.inStock?"in":"out"}`}/>
             <span className={`stock-label ${product.inStock?"in":"out"}`}>
-              {product.inStock ? "IN STOCK" : "OUT OF STOCK"}
+              {(() => {
+                const stock = Number(product.stockQty ?? 0);
+                if (!product.inStock || stock <= 0) return "OUT OF STOCK";
+                if (stock > 5) return "IN STOCK";
+                return `ONLY ${stock} LEFT`;
+              })()}
             </span>
-            {product.inStock && product.stockQty && product.stockQty <= 10 && (
-              <span className="stock-qty">— ONLY {product.stockQty} LEFT</span>
-            )}
           </div>
 
           {/* Qty + Add to Cart */}
@@ -764,7 +766,7 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
             <div className="qty-wrap">
               <button className="qty-btn" onClick={() => setQty(q => Math.max(1, q-1))} disabled={qty<=1}>−</button>
               <div className="qty-val">{qty}</div>
-              <button className="qty-btn" onClick={() => setQty(q => Math.min(product.stockQty||10, q+1))} disabled={!product.inStock}>+</button>
+              <button className="qty-btn" onClick={() => setQty(q => Math.min(Number(product.stockQty ?? 10), q+1))} disabled={!product.inStock}>+</button>
             </div>
 
             {product.inStock ? (
