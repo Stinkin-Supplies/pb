@@ -42,7 +42,7 @@ const css = `
     --orange:#e8621a; --orange2:#c94f0f; --gold:#c9a84c;
     --red:#b91c1c; --green:#22c55e;
   }
-  body { background:var(--black); color:var(--cream); font-family:'Barlow Condensed',sans-serif; }
+  body { background:var(--black); color:var(--cream); font-family:var(--font-stencil),sans-serif; }
   ::-webkit-scrollbar { width:4px; height:4px; }
   ::-webkit-scrollbar-thumb { background:var(--orange); }
   @keyframes fadeUp  { from{opacity:0;transform:translateY(7px)} to{opacity:1;transform:translateY(0)} }
@@ -77,14 +77,14 @@ const css = `
     animation:spin 0.7s linear infinite;
   }
   .facet-count {
-    font-family:'Share Tech Mono',monospace; font-size:8px; color:#8a8784;
+    font-family:var(--font-stencil),monospace; font-size:8px; color:#8a8784;
     background:#1a1919; border:1px solid #2a2828;
     padding:1px 5px; border-radius:1px;
     min-width:32px; text-align:center; transition:color 0.2s;
   }
   .facet-count.dim { color:#3a3838; }
   .chip {
-    font-family:'Share Tech Mono',monospace; font-size:8px;
+    font-family:var(--font-stencil),monospace; font-size:8px;
     background:rgba(232,98,26,0.1); border:1px solid rgba(232,98,26,0.25);
     border-radius:2px; padding:2px 8px; color:#e8621a;
     letter-spacing:0.1em; cursor:pointer; user-select:none; transition:all 0.15s;
@@ -92,14 +92,14 @@ const css = `
   .chip:hover { background:rgba(232,98,26,0.18); }
   .price-input {
     background:#1a1919; border:1px solid #2a2828; color:#f0ebe3;
-    font-family:'Barlow Condensed',sans-serif; font-size:13px;
+    font-family:var(--font-stencil),sans-serif; font-size:13px;
     padding:6px 9px; border-radius:2px; outline:none; width:100%;
     transition:border-color 0.15s;
   }
   .price-input:focus { border-color:rgba(232,98,26,0.4); }
   .price-input::placeholder { color:#3a3838; }
   .page-btn {
-    font-family:'Share Tech Mono',monospace; font-size:10px; letter-spacing:0.08em;
+    font-family:var(--font-stencil),monospace; font-size:10px; letter-spacing:0.08em;
     background:#111010; border:1px solid #2a2828; color:#8a8784;
     padding:7px 13px; border-radius:2px; cursor:pointer;
     transition:all 0.15s; min-width:36px; text-align:center;
@@ -132,8 +132,8 @@ const css = `
   }
 `;
 
-const S = s => ({ fontFamily:"'Share Tech Mono',monospace", ...s });
-const B = s => ({ fontFamily:"'Bebas Neue',sans-serif",     ...s });
+const S = s => ({ fontFamily:"var(--font-stencil),monospace", ...s });
+const B = s => ({ fontFamily:"var(--font-caesar),sans-serif",     ...s });
 
 function buildQS(filters, sort, page) {
   const p = new URLSearchParams();
@@ -268,7 +268,7 @@ function GridNotifyButton({ sku, productName, vendor }) {
         width: "100%", padding: "5px 8px",
         background: cfg.bg, border: `1px solid ${cfg.border}`,
         color: cfg.color, borderRadius: 2, cursor: state === "done" ? "default" : "pointer",
-        fontFamily: "'Share Tech Mono', monospace",
+        fontFamily: "var(--font-stencil), monospace",
         fontSize: 8, letterSpacing: "0.1em",
         transition: "all 0.15s",
       }}
@@ -349,7 +349,7 @@ function ProductCard({ product:p, index, view, onAdd }) {
           <div>
             {p.was && (
               <div style={{ fontSize:11, color:"#8a8784", textDecoration:"line-through",
-                            fontFamily:"'Barlow Condensed',sans-serif" }}>
+                            fontFamily:"var(--font-stencil),sans-serif" }}>
                 ${p.was.toFixed(2)}
               </div>
             )}
@@ -531,7 +531,7 @@ export default function ShopClient({
 
   return (
     <div style={{ background:"#0a0909", minHeight:"100vh", color:"#f0ebe3",
-                  fontFamily:"'Barlow Condensed',sans-serif" }}>
+                  fontFamily:"var(--font-stencil),sans-serif" }}>
       <style>{css}</style>
       <NavBar activePage="shop"/>
 
@@ -563,7 +563,7 @@ export default function ShopClient({
           <select value={sort}
             onChange={e => { setSort(e.target.value); setPage(0); }}
             style={{ background:"#1a1919", border:"1px solid #2a2828", color:"#f0ebe3",
-                     fontFamily:"'Barlow Condensed',sans-serif", fontSize:13,
+                     fontFamily:"var(--font-stencil),sans-serif", fontSize:13,
                      padding:"5px 9px", borderRadius:2, outline:"none" }}>
             {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>

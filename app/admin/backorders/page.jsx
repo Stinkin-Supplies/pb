@@ -16,7 +16,7 @@ const css = `
 
   .bo-wrap {
     background: #0a0909; min-height: 100vh;
-    color: #f0ebe3; font-family: 'Barlow Condensed', sans-serif;
+    color: #f0ebe3; font-family: var(--font-stencil), sans-serif;
   }
 
   /* ── HEADER ── */
@@ -26,12 +26,12 @@ const css = `
     justify-content: space-between; gap: 16px; flex-wrap: wrap;
   }
   .bo-title {
-    font-family: 'Bebas Neue', sans-serif;
+    font-family: var(--font-caesar), sans-serif;
     font-size: 28px; letter-spacing: 0.05em;
   }
   .bo-title span { color: #e8621a; }
   .bo-subtitle {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 9px; color: #8a8784; letter-spacing: 0.15em; margin-top: 2px;
   }
 
@@ -44,7 +44,7 @@ const css = `
     background: #111010; padding: 18px 24px;
   }
   .bo-stat-val {
-    font-family: 'Bebas Neue', sans-serif;
+    font-family: var(--font-caesar), sans-serif;
     font-size: 32px; line-height: 1; letter-spacing: 0.03em;
   }
   .bo-stat-val.orange { color: #e8621a; }
@@ -52,7 +52,7 @@ const css = `
   .bo-stat-val.green  { color: #22c55e; }
   .bo-stat-val.grey   { color: #8a8784; }
   .bo-stat-label {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 8px; color: #8a8784; letter-spacing: 0.15em; margin-top: 4px;
   }
 
@@ -65,7 +65,7 @@ const css = `
   .bo-search {
     background: #1a1919; border: 1px solid #2a2828;
     color: #f0ebe3; padding: 8px 12px; border-radius: 2px;
-    font-family: 'Share Tech Mono', monospace; font-size: 11px;
+    font-family: var(--font-stencil), monospace; font-size: 11px;
     letter-spacing: 0.06em; width: 260px; outline: none;
     transition: border-color 0.15s;
   }
@@ -74,14 +74,14 @@ const css = `
   .bo-filter {
     background: none; border: 1px solid #2a2828; color: #8a8784;
     padding: 7px 14px; border-radius: 2px; cursor: pointer;
-    font-family: 'Share Tech Mono', monospace; font-size: 9px;
+    font-family: var(--font-stencil), monospace; font-size: 9px;
     letter-spacing: 0.1em; transition: all 0.15s;
   }
   .bo-filter:hover  { border-color: #e8621a; color: #e8621a; }
   .bo-filter.active { border-color: #e8621a; color: #e8621a; background: rgba(232,98,26,0.08); }
   .bo-toolbar-right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
   .bo-count {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 9px; color: #8a8784; letter-spacing: 0.1em;
   }
 
@@ -92,7 +92,7 @@ const css = `
     width: 100%; border-collapse: collapse; font-size: 13px;
   }
   .bo-table th {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 8px; color: #8a8784; letter-spacing: 0.15em;
     padding: 10px 14px; text-align: left;
     border-bottom: 1px solid #2a2828;
@@ -105,28 +105,28 @@ const css = `
   .bo-table tr:hover td { background: rgba(255,255,255,0.01); }
 
   .sku-mono {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 10px; color: #8a8784; letter-spacing: 0.08em;
   }
   .product-name { font-weight: 600; color: #f0ebe3; }
   .product-name small {
-    display: block; font-family: 'Share Tech Mono', monospace;
+    display: block; font-family: var(--font-stencil), monospace;
     font-size: 8px; color: #8a8784; letter-spacing: 0.1em;
     font-weight: 400; margin-top: 2px;
   }
   .email-cell {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 10px; color: #c4c0bc; letter-spacing: 0.04em;
   }
   .date-cell {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 9px; color: #8a8784; letter-spacing: 0.06em;
     white-space: nowrap;
   }
 
   .source-pill {
     display: inline-block;
-    font-family: 'Share Tech Mono', monospace; font-size: 8px;
+    font-family: var(--font-stencil), monospace; font-size: 8px;
     letter-spacing: 0.1em; padding: 3px 8px; border-radius: 1px; border: 1px solid;
   }
   .source-pill.pdp      { color: #3b82f6; border-color: rgba(59,130,246,0.3);  background: rgba(59,130,246,0.06); }
@@ -135,7 +135,7 @@ const css = `
 
   .status-pill {
     display: inline-block;
-    font-family: 'Share Tech Mono', monospace; font-size: 8px;
+    font-family: var(--font-stencil), monospace; font-size: 8px;
     letter-spacing: 0.1em; padding: 3px 8px; border-radius: 1px; border: 1px solid;
   }
   .status-pill.waiting          { color: #c9a84c; border-color: rgba(201,168,76,0.3);  background: rgba(201,168,76,0.06); }
@@ -145,7 +145,7 @@ const css = `
 
   .vendor-pill {
     display: inline-block;
-    font-family: 'Share Tech Mono', monospace; font-size: 8px;
+    font-family: var(--font-stencil), monospace; font-size: 8px;
     letter-spacing: 0.12em; padding: 3px 8px; border-radius: 1px; border: 1px solid;
   }
   .vendor-pill.wps { color: #3b82f6; border-color: rgba(59,130,246,0.3); background: rgba(59,130,246,0.06); }
@@ -153,7 +153,7 @@ const css = `
 
   .cancel-btn {
     background: none; border: 1px solid #2a2828; color: #8a8784;
-    font-family: 'Share Tech Mono', monospace; font-size: 8px;
+    font-family: var(--font-stencil), monospace; font-size: 8px;
     letter-spacing: 0.1em; padding: 4px 10px; border-radius: 2px;
     cursor: pointer; transition: all 0.15s;
   }
@@ -162,13 +162,13 @@ const css = `
   /* ── EMPTY / LOADING ── */
   .bo-empty {
     text-align: center; padding: 80px 20px;
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 10px; color: #3a3838; letter-spacing: 0.15em;
   }
   .bo-loading {
     display: flex; align-items: center; justify-content: center;
     padding: 80px; gap: 12px;
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 9px; color: #8a8784; letter-spacing: 0.12em;
   }
   .spinner {
@@ -185,7 +185,7 @@ const css = `
     border-top: 1px solid #2a2828; flex-wrap: wrap; gap: 12px;
   }
   .page-btn {
-    font-family: 'Share Tech Mono', monospace; font-size: 9px;
+    font-family: var(--font-stencil), monospace; font-size: 9px;
     letter-spacing: 0.08em; background: #111010;
     border: 1px solid #2a2828; color: #8a8784;
     padding: 6px 12px; border-radius: 2px; cursor: pointer; transition: all 0.15s;
@@ -297,7 +297,7 @@ export default function BackordersPage() {
           onClick={load}
           style={{
             background: "none", border: "1px solid #2a2828", color: "#8a8784",
-            fontFamily: "'Share Tech Mono', monospace", fontSize: 9,
+            fontFamily: "var(--font-stencil), monospace", fontSize: 9,
             letterSpacing: "0.12em", padding: "8px 16px", borderRadius: 2,
             cursor: "pointer", transition: "all 0.15s",
           }}
@@ -471,7 +471,7 @@ export default function BackordersPage() {
             {totalPages > 1 && (
               <div className="bo-pagination">
                 <span style={{
-                  fontFamily: "'Share Tech Mono', monospace", fontSize: 9,
+                  fontFamily: "var(--font-stencil), monospace", fontSize: 9,
                   color: "#8a8784", letterSpacing: "0.1em",
                 }}>
                   SHOWING {(page * PAGE_SIZE + 1).toLocaleString()}–

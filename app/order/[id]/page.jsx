@@ -21,7 +21,7 @@ const css = `
     background: #0a0909;
     min-height: 100vh;
     color: #f0ebe3;
-    font-family: 'Barlow Condensed', sans-serif;
+    font-family: var(--font-stencil), sans-serif;
     padding-bottom: 80px;
   }
   .order-wrap::before {
@@ -71,7 +71,7 @@ const css = `
     justify-content: space-between;
   }
   .card-title {
-    font-family: 'Bebas Neue', sans-serif;
+    font-family: var(--font-caesar), sans-serif;
     font-size: 18px; letter-spacing: 0.07em;
   }
   .card-title span { color: #e8621a; }
@@ -80,7 +80,7 @@ const css = `
   .status-pill {
     display: inline-flex; align-items: center; gap: 7px;
     padding: 5px 12px; border-radius: 2px;
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 9px; letter-spacing: 0.18em;
   }
   .status-dot {
@@ -105,7 +105,7 @@ const css = `
     background: #1a1919; border: 1px solid #2a2828; border-radius: 2px;
     display: flex; align-items: center; justify-content: center;
     position: relative; overflow: hidden; flex-shrink: 0;
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 7px; color: #3a3838; letter-spacing: 0.05em;
   }
   .item-thumb::before {
@@ -125,18 +125,18 @@ const css = `
     background: rgba(232,98,26,0.08);
     border: 1px solid rgba(232,98,26,0.15);
     border-radius: 2px; padding: 2px 8px;
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 8px; color: #e8621a; letter-spacing: 0.12em;
   }
   .item-price {
     text-align: right;
   }
   .item-price-main {
-    font-family: 'Bebas Neue', sans-serif;
+    font-family: var(--font-caesar), sans-serif;
     font-size: 20px; color: #f0ebe3; letter-spacing: 0.04em;
   }
   .item-price-unit {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 8px; color: #8a8784; letter-spacing: 0.08em; margin-top: 2px;
   }
 
@@ -144,7 +144,7 @@ const css = `
   .summary-row {
     display: flex; justify-content: space-between; align-items: center;
     padding: 10px 20px;
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 10px; letter-spacing: 0.1em; color: #8a8784;
     border-bottom: 1px solid rgba(255,255,255,0.03);
   }
@@ -209,14 +209,14 @@ const css = `
 
   .timeline-content { padding-top: 0; }
   .timeline-label {
-    font-family: 'Bebas Neue', sans-serif;
+    font-family: var(--font-caesar), sans-serif;
     font-size: 16px; letter-spacing: 0.06em;
     color: #f0ebe3; line-height: 1;
     margin-bottom: 3px;
   }
   .timeline-label.pending-text { color: #3a3838; }
   .timeline-time {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 8px; color: #8a8784; letter-spacing: 0.1em;
   }
 
@@ -229,7 +229,7 @@ const css = `
     background: rgba(59,130,246,0.03);
   }
   .tracking-number {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 11px; color: #3b82f6;
     letter-spacing: 0.12em;
   }
@@ -247,13 +247,13 @@ const css = `
   }
   .addr-card-head {
     padding: 10px 16px; border-bottom: 1px solid #1a1919;
-    font-family: 'Bebas Neue', sans-serif;
+    font-family: var(--font-caesar), sans-serif;
     font-size: 15px; letter-spacing: 0.07em;
   }
   .addr-card-head span { color: #e8621a; }
   .addr-card-body {
     padding: 12px 16px;
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 9px; color: #8a8784;
     letter-spacing: 0.1em; line-height: 1.8;
   }
@@ -329,7 +329,7 @@ export default async function OrderPage({ params }) {
 
   if (error || !order) {
     return (
-      <div style={{ background: "#0a0909", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "#8a8784", fontFamily: "'Share Tech Mono', monospace", letterSpacing: "0.15em" }}>
+      <div style={{ background: "#0a0909", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "#8a8784", fontFamily: "var(--font-stencil), monospace", letterSpacing: "0.15em" }}>
         ORDER NOT FOUND
       </div>
     );
@@ -343,8 +343,8 @@ export default async function OrderPage({ params }) {
   const billAddr     = order.billing_address;
   const billDiffers  = !addrEqual(shipAddr, billAddr);
 
-  const B = (s) => ({ fontFamily: "'Bebas Neue', sans-serif", ...s });
-  const M = (s) => ({ fontFamily: "'Share Tech Mono', monospace", ...s });
+  const B = (s) => ({ fontFamily: "var(--font-caesar), sans-serif", ...s });
+  const M = (s) => ({ fontFamily: "var(--font-stencil), monospace", ...s });
 
   // Build timeline — dedupe steps by checking status progression
   const timelineSteps = [

@@ -31,7 +31,7 @@ html {
 body {
   background: var(--black);
   color: var(--cream);
-  font-family: 'Barlow Condensed', sans-serif;
+  font-family: var(--font-stencil), sans-serif;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
 }
@@ -53,9 +53,20 @@ body::before {
 ::-webkit-scrollbar-thumb { background: var(--orange); border-radius: 2px; }
 
 /* Utility font classes — used by all pages */
-.font-mono    { font-family: 'Share Tech Mono', monospace; }
-.font-display { font-family: 'Bebas Neue', sans-serif; }
-.font-body    { font-family: 'Barlow Condensed', sans-serif; }
+.font-caesar  { font-family: var(--font-caesar); }
+.font-stencil { font-family: var(--font-stencil); }
+
+@utility font-caesar {
+  font-family: var(--font-caesar);
+}
+
+@utility font-stencil {
+  font-family: var(--font-stencil);
+}
+
+.font-mono    { font-family: var(--font-stencil), monospace; }
+.font-display { font-family: var(--font-caesar), sans-serif; }
+.font-body    { font-family: var(--font-stencil), sans-serif; }
 
 /* Shared button resets */
 button { cursor: pointer; }

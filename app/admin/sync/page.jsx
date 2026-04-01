@@ -15,12 +15,12 @@ const css = `
   @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
   @keyframes spin { to { transform:rotate(360deg); } }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-  .sync-wrap { background:#0a0909; min-height:100vh; color:#f0ebe3; font-family:'Barlow Condensed',sans-serif; }
+  .sync-wrap { background:#0a0909; min-height:100vh; color:#f0ebe3; font-family:var(--font-stencil),sans-serif; }
   .sync-header { background:#111010;border-bottom:1px solid #2a2828;padding:28px 24px; }
   .sync-body { max-width:960px;margin:0 auto;padding:28px 24px; }
   .card { background:#111010;border:1px solid #2a2828;border-radius:3px;margin-bottom:16px;overflow:hidden;animation:fadeUp 0.25s ease both; }
   .card-head { padding:14px 20px;border-bottom:1px solid #2a2828;display:flex;align-items:center;justify-content:space-between;gap:12px; }
-  .card-title { font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:0.05em; }
+  .card-title { font-family:var(--font-caesar),sans-serif;font-size:20px;letter-spacing:0.05em; }
   .card-title span { color:#e8621a; }
   .card-body { padding:20px; }
   .stat-grid { display:grid;grid-template-columns:repeat(4,1fr);gap:10px; }
@@ -28,43 +28,43 @@ const css = `
   .stat-box.highlight { border-color:rgba(232,98,26,0.3);background:rgba(232,98,26,0.04); }
   .stat-box.green { border-color:rgba(34,197,94,0.25);background:rgba(34,197,94,0.04); }
   .stat-box.red { border-color:rgba(185,28,28,0.25);background:rgba(185,28,28,0.04); }
-  .stat-val { font-family:'Bebas Neue',sans-serif;font-size:30px;letter-spacing:0.04em;line-height:1;margin-bottom:4px; }
-  .stat-label { font-family:'Share Tech Mono',monospace;font-size:8px;color:#8a8784;letter-spacing:0.12em; }
+  .stat-val { font-family:var(--font-caesar),sans-serif;font-size:30px;letter-spacing:0.04em;line-height:1;margin-bottom:4px; }
+  .stat-label { font-family:var(--font-stencil),monospace;font-size:8px;color:#8a8784;letter-spacing:0.12em; }
 
   /* Tabs */
   .tabs { display:flex;gap:0;border-bottom:1px solid #2a2828;margin-bottom:24px; }
-  .tab { font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:0.08em;padding:12px 24px;cursor:pointer;border-bottom:2px solid transparent;color:#8a8784;transition:all 0.15s;background:none;border-top:none;border-left:none;border-right:none; }
+  .tab { font-family:var(--font-caesar),sans-serif;font-size:17px;letter-spacing:0.08em;padding:12px 24px;cursor:pointer;border-bottom:2px solid transparent;color:#8a8784;transition:all 0.15s;background:none;border-top:none;border-left:none;border-right:none; }
   .tab:hover { color:#f0ebe3; }
   .tab.active { color:#e8621a;border-bottom-color:#e8621a; }
-  .tab-badge { display:inline-block;background:#2a2828;color:#8a8784;font-family:'Share Tech Mono',monospace;font-size:8px;padding:2px 6px;border-radius:1px;margin-left:8px;vertical-align:middle; }
+  .tab-badge { display:inline-block;background:#2a2828;color:#8a8784;font-family:var(--font-stencil),monospace;font-size:8px;padding:2px 6px;border-radius:1px;margin-left:8px;vertical-align:middle; }
   .tab.active .tab-badge { background:rgba(232,98,26,0.12);color:#e8621a; }
 
   /* Cooldown bar */
   .cooldown-wrap { margin-bottom:20px; }
-  .cooldown-bar-labels { display:flex;justify-content:space-between;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:0.1em;margin-bottom:6px; }
+  .cooldown-bar-labels { display:flex;justify-content:space-between;font-family:var(--font-stencil),monospace;font-size:9px;letter-spacing:0.1em;margin-bottom:6px; }
   .cooldown-bar-track { height:6px;background:#2a2828;border-radius:3px;overflow:hidden; }
   .cooldown-bar-fill { height:100%;border-radius:3px;transition:width 0.5s ease; }
 
   /* Sync button */
-  .sync-btn { background:#e8621a;border:none;color:#0a0909;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:0.1em;padding:12px 32px;border-radius:2px;cursor:pointer;transition:all 0.2s;white-space:nowrap; }
+  .sync-btn { background:#e8621a;border:none;color:#0a0909;font-family:var(--font-caesar),sans-serif;font-size:18px;letter-spacing:0.1em;padding:12px 32px;border-radius:2px;cursor:pointer;transition:all 0.2s;white-space:nowrap; }
   .sync-btn:hover:not(:disabled) { background:#c94f0f; transform:translateY(-1px); }
   .sync-btn:disabled { opacity:0.35;cursor:not-allowed;transform:none; }
   .sync-btn.blocked { background:#2a2828;color:#8a8784; }
-  .force-btn { background:transparent;border:1px solid rgba(185,28,28,0.35);color:#ef4444;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:0.12em;padding:7px 14px;border-radius:2px;cursor:pointer;transition:all 0.2s; }
+  .force-btn { background:transparent;border:1px solid rgba(185,28,28,0.35);color:#ef4444;font-family:var(--font-stencil),monospace;font-size:9px;letter-spacing:0.12em;padding:7px 14px;border-radius:2px;cursor:pointer;transition:all 0.2s; }
   .force-btn:hover { background:rgba(185,28,28,0.08); }
   .spinner { width:14px;height:14px;border-radius:50%;border:2px solid rgba(10,9,9,0.3);border-top-color:#0a0909;animation:spin 0.7s linear infinite;display:inline-block;vertical-align:middle;margin-right:8px; }
 
   /* Log table */
   .log-table { width:100%;border-collapse:collapse; }
-  .log-table th { font-family:'Share Tech Mono',monospace;font-size:8px;color:#8a8784;letter-spacing:0.12em;padding:8px 12px;text-align:left;border-bottom:1px solid #2a2828; }
+  .log-table th { font-family:var(--font-stencil),monospace;font-size:8px;color:#8a8784;letter-spacing:0.12em;padding:8px 12px;text-align:left;border-bottom:1px solid #2a2828; }
   .log-table td { padding:10px 12px;border-bottom:1px solid #1a1919;font-size:13px;font-weight:500; }
   .log-table tr:last-child td { border-bottom:none; }
-  .badge { font-family:'Share Tech Mono',monospace;font-size:8px;letter-spacing:0.1em;padding:2px 8px;border-radius:1px; }
+  .badge { font-family:var(--font-stencil),monospace;font-size:8px;letter-spacing:0.1em;padding:2px 8px;border-radius:1px; }
   .badge-success { background:rgba(34,197,94,0.1);color:#22c55e;border:1px solid rgba(34,197,94,0.2); }
   .badge-error { background:rgba(185,28,28,0.1);color:#ef4444;border:1px solid rgba(185,28,28,0.2); }
 
   /* Live log */
-  .live-log { background:#0a0909;border:1px solid #2a2828;border-radius:2px;padding:14px;font-family:'Share Tech Mono',monospace;font-size:10px;color:#8a8784;letter-spacing:0.06em;line-height:1.8;max-height:240px;overflow-y:auto; }
+  .live-log { background:#0a0909;border:1px solid #2a2828;border-radius:2px;padding:14px;font-family:var(--font-stencil),monospace;font-size:10px;color:#8a8784;letter-spacing:0.06em;line-height:1.8;max-height:240px;overflow-y:auto; }
   .live-log .log-success { color:#22c55e; }
   .live-log .log-error { color:#ef4444; }
   .live-log .log-warn { color:#c9a84c; }
@@ -84,8 +84,8 @@ const css = `
 const PU_COOLDOWN = 10;
 
 // ── Helper styles ─────────────────────────────────────────────
-const B = (s) => ({ fontFamily: "'Bebas Neue',sans-serif", ...s });
-const M = (s) => ({ fontFamily: "'Share Tech Mono',monospace", ...s });
+const B = (s) => ({ fontFamily: "var(--font-caesar),sans-serif", ...s });
+const M = (s) => ({ fontFamily: "var(--font-stencil),monospace", ...s });
 
 // ============================================================
 // PU PANEL — unchanged from original
@@ -677,7 +677,7 @@ function SyncLogViewer() {
             placeholder="SEARCH LOGS..."
             style={{
               background:"#0a0909", border:"1px solid #2a2828", color:"#f0ebe3",
-              fontFamily:"'Share Tech Mono',monospace", fontSize:11,
+              fontFamily:"var(--font-stencil),monospace", fontSize:11,
               letterSpacing:"0.06em", padding:"7px 12px", borderRadius:2,
               outline:"none", width:220,
             }}
@@ -689,7 +689,7 @@ function SyncLogViewer() {
                 background: vendorFilter===v ? "rgba(232,98,26,0.08)" : "none",
                 border: `1px solid ${vendorFilter===v ? "#e8621a" : "#2a2828"}`,
                 color: vendorFilter===v ? "#e8621a" : "#8a8784",
-                fontFamily:"'Share Tech Mono',monospace", fontSize:9,
+                fontFamily:"var(--font-stencil),monospace", fontSize:9,
                 letterSpacing:"0.1em", padding:"6px 12px", borderRadius:2,
                 cursor:"pointer", transition:"all 0.15s",
               }}>
@@ -704,7 +704,7 @@ function SyncLogViewer() {
                 background: statusFilter===s ? "rgba(232,98,26,0.08)" : "none",
                 border: `1px solid ${statusFilter===s ? "#e8621a" : "#2a2828"}`,
                 color: statusFilter===s ? "#e8621a" : "#8a8784",
-                fontFamily:"'Share Tech Mono',monospace", fontSize:9,
+                fontFamily:"var(--font-stencil),monospace", fontSize:9,
                 letterSpacing:"0.1em", padding:"6px 12px", borderRadius:2,
                 cursor:"pointer", transition:"all 0.15s",
               }}>
@@ -716,7 +716,7 @@ function SyncLogViewer() {
             style={{
               marginLeft:"auto", background:"none",
               border:"1px solid #2a2828", color:"#8a8784",
-              fontFamily:"'Share Tech Mono',monospace", fontSize:9,
+              fontFamily:"var(--font-stencil),monospace", fontSize:9,
               letterSpacing:"0.1em", padding:"6px 12px", borderRadius:2,
               cursor:"pointer", transition:"all 0.15s",
             }}>
@@ -756,7 +756,7 @@ function SyncLogViewer() {
                     </td>
                     <td>
                       <span style={{
-                        fontFamily:"'Share Tech Mono',monospace", fontSize:8,
+                        fontFamily:"var(--font-stencil),monospace", fontSize:8,
                         letterSpacing:"0.12em", padding:"2px 8px", borderRadius:1,
                         border:"1px solid",
                         color:      log.vendor==="wps" ? "#3b82f6" : "#c9a84c",
@@ -797,13 +797,13 @@ function SyncLogViewer() {
               <button
                 disabled={page === 0}
                 onClick={() => setPage(p => p - 1)}
-                style={{background:"#111010", border:"1px solid #2a2828", color: page===0 ? "#3a3838" : "#8a8784", fontFamily:"'Share Tech Mono',monospace", fontSize:9, letterSpacing:"0.08em", padding:"5px 12px", borderRadius:2, cursor: page===0 ? "default" : "pointer"}}>
+                style={{background:"#111010", border:"1px solid #2a2828", color: page===0 ? "#3a3838" : "#8a8784", fontFamily:"var(--font-stencil),monospace", fontSize:9, letterSpacing:"0.08em", padding:"5px 12px", borderRadius:2, cursor: page===0 ? "default" : "pointer"}}>
                 ← PREV
               </button>
               <button
                 disabled={page >= totalPages - 1}
                 onClick={() => setPage(p => p + 1)}
-                style={{background:"#111010", border:"1px solid #2a2828", color: page>=totalPages-1 ? "#3a3838" : "#8a8784", fontFamily:"'Share Tech Mono',monospace", fontSize:9, letterSpacing:"0.08em", padding:"5px 12px", borderRadius:2, cursor: page>=totalPages-1 ? "default" : "pointer"}}>
+                style={{background:"#111010", border:"1px solid #2a2828", color: page>=totalPages-1 ? "#3a3838" : "#8a8784", fontFamily:"var(--font-stencil),monospace", fontSize:9, letterSpacing:"0.08em", padding:"5px 12px", borderRadius:2, cursor: page>=totalPages-1 ? "default" : "pointer"}}>
                 NEXT →
               </button>
             </div>

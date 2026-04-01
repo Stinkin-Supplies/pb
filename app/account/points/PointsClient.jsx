@@ -12,43 +12,43 @@ const css = `
   ::-webkit-scrollbar { width:4px; } ::-webkit-scrollbar-thumb { background:#e8621a; }
   @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
   @keyframes fillBar { from{width:0} to{width:var(--w)} }
-  .pts-wrap { background:#0a0909; min-height:100vh; color:#f0ebe3; font-family:'Barlow Condensed',sans-serif; }
+  .pts-wrap { background:#0a0909; min-height:100vh; color:#f0ebe3; font-family:var(--font-stencil),sans-serif; }
   .pts-hero { background:#111010;border-bottom:1px solid #2a2828;padding:32px 24px; }
   .pts-hero-inner { max-width:900px;margin:0 auto; }
   .pts-balance-row { display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-top:24px; }
   .pts-stat { background:#0a0909;border:1px solid #2a2828;border-radius:3px;padding:16px 20px; }
   .pts-stat.gold { border-color:rgba(201,168,76,0.25);background:rgba(201,168,76,0.04); }
-  .pts-stat-val { font-family:'Bebas Neue',sans-serif;font-size:36px;color:#f0ebe3;letter-spacing:0.04em;line-height:1;margin-bottom:4px; }
+  .pts-stat-val { font-family:var(--font-caesar),sans-serif;font-size:36px;color:#f0ebe3;letter-spacing:0.04em;line-height:1;margin-bottom:4px; }
   .pts-stat.gold .pts-stat-val { color:#c9a84c; }
-  .pts-stat-label { font-family:'Share Tech Mono',monospace;font-size:8px;color:#8a8784;letter-spacing:0.15em; }
+  .pts-stat-label { font-family:var(--font-stencil),monospace;font-size:8px;color:#8a8784;letter-spacing:0.15em; }
   .pts-body { max-width:900px;margin:0 auto;padding:28px 24px; }
   .pts-section { background:#111010;border:1px solid #2a2828;border-radius:3px;margin-bottom:16px;overflow:hidden;animation:fadeUp 0.25s ease both; }
   .pts-section-head { padding:16px 20px;border-bottom:1px solid #2a2828; }
-  .pts-section-title { font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:0.05em; }
+  .pts-section-title { font-family:var(--font-caesar),sans-serif;font-size:20px;letter-spacing:0.05em; }
   .pts-section-title span { color:#e8621a; }
   .pts-section-body { padding:20px; }
   .pts-how-grid { display:grid;grid-template-columns:1fr 1fr;gap:10px; }
   .pts-how-card { background:#1a1919;border:1px solid #2a2828;border-radius:2px;padding:14px 16px; }
-  .pts-how-rate { font-family:'Bebas Neue',sans-serif;font-size:28px;color:#e8621a;letter-spacing:0.04em;line-height:1;margin-bottom:4px; }
+  .pts-how-rate { font-family:var(--font-caesar),sans-serif;font-size:28px;color:#e8621a;letter-spacing:0.04em;line-height:1;margin-bottom:4px; }
   .pts-how-desc { font-size:13px;font-weight:500;color:#8a8784;line-height:1.4; }
   .tier-bar-wrap { margin-top:4px; }
   .tier-bar-track { height:6px;background:#2a2828;border-radius:3px;overflow:hidden;margin:10px 0 6px; }
   .tier-bar-fill { height:100%;background:linear-gradient(90deg,#e8621a,#c9a84c);border-radius:3px;animation:fillBar 1s ease forwards;transition:width 0.5s; }
-  .tier-labels { display:flex;justify-content:space-between;font-family:'Share Tech Mono',monospace;font-size:8px;color:#8a8784;letter-spacing:0.1em; }
+  .tier-labels { display:flex;justify-content:space-between;font-family:var(--font-stencil),monospace;font-size:8px;color:#8a8784;letter-spacing:0.1em; }
   .ledger-table { width:100%;border-collapse:collapse; }
-  .ledger-table th { font-family:'Share Tech Mono',monospace;font-size:8px;color:#8a8784;letter-spacing:0.15em;padding:8px 12px;text-align:left;border-bottom:1px solid #2a2828; }
+  .ledger-table th { font-family:var(--font-stencil),monospace;font-size:8px;color:#8a8784;letter-spacing:0.15em;padding:8px 12px;text-align:left;border-bottom:1px solid #2a2828; }
   .ledger-table td { padding:12px;border-bottom:1px solid #1a1919;font-size:13px;font-weight:500; }
   .ledger-table tr:last-child td { border-bottom:none; }
   .pts-type-earn { color:#22c55e; }
   .pts-type-redeem { color:#e8621a; }
   .pts-type-expire { color:#8a8784; }
   .pts-type-adjust { color:#c9a84c; }
-  .ledger-empty { padding:40px;text-align:center;font-family:'Share Tech Mono',monospace;font-size:9px;color:#8a8784;letter-spacing:0.12em; }
+  .ledger-empty { padding:40px;text-align:center;font-family:var(--font-stencil),monospace;font-size:9px;color:#8a8784;letter-spacing:0.12em; }
   .redeem-info { background:rgba(232,98,26,0.06);border:1px solid rgba(232,98,26,0.15);border-radius:2px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap; }
   .redeem-info-text { font-size:14px;font-weight:500;color:#f0ebe3;line-height:1.4; }
   .redeem-info-text span { color:#e8621a; }
-  .redeem-note { font-family:'Share Tech Mono',monospace;font-size:8px;color:#8a8784;letter-spacing:0.1em;margin-top:4px;display:block; }
-  .shop-btn { background:#e8621a;border:none;color:#0a0909;font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:0.1em;padding:10px 20px;border-radius:2px;cursor:pointer;white-space:nowrap; }
+  .redeem-note { font-family:var(--font-stencil),monospace;font-size:8px;color:#8a8784;letter-spacing:0.1em;margin-top:4px;display:block; }
+  .shop-btn { background:#e8621a;border:none;color:#0a0909;font-family:var(--font-caesar),sans-serif;font-size:16px;letter-spacing:0.1em;padding:10px 20px;border-radius:2px;cursor:pointer;white-space:nowrap; }
 `;
 
 const TIER_THRESHOLDS = [
@@ -78,8 +78,8 @@ export default function PointsClient({ user, points, lifetimeSpend, orderCount, 
     ? Math.min(100, ((points - tier.min) / (nextTier.min - tier.min)) * 100)
     : 100;
 
-  const B = s => ({ fontFamily:"'Bebas Neue',sans-serif",     ...s });
-  const M = s => ({ fontFamily:"'Share Tech Mono',monospace", ...s });
+  const B = s => ({ fontFamily:"var(--font-caesar),sans-serif",     ...s });
+  const M = s => ({ fontFamily:"var(--font-stencil),monospace", ...s });
 
   return (
     <div className="pts-wrap">
@@ -211,21 +211,21 @@ export default function PointsClient({ user, points, lifetimeSpend, orderCount, 
               <tbody>
                 {ledger.map(row => (
                   <tr key={row.id}>
-                    <td style={{fontFamily:"'Share Tech Mono',monospace", fontSize:10, color:"#8a8784"}}>
+                    <td style={{fontFamily:"var(--font-stencil),monospace", fontSize:10, color:"#8a8784"}}>
                       {new Date(row.created_at).toLocaleDateString("en-US", {month:"short", day:"numeric", year:"numeric"})}
                     </td>
                     <td style={{color:"#f0ebe3"}}>{row.description ?? "—"}</td>
                     <td>
-                      <span className={getLedgerColor(row.type)} style={{fontFamily:"'Share Tech Mono',monospace", fontSize:9, letterSpacing:"0.1em"}}>
+                      <span className={getLedgerColor(row.type)} style={{fontFamily:"var(--font-stencil),monospace", fontSize:9, letterSpacing:"0.1em"}}>
                         {row.type?.toUpperCase() ?? "—"}
                       </span>
                     </td>
-                    <td style={{textAlign:"right", fontFamily:"'Bebas Neue',sans-serif", fontSize:18, letterSpacing:"0.04em"}}>
+                    <td style={{textAlign:"right", fontFamily:"var(--font-caesar),sans-serif", fontSize:18, letterSpacing:"0.04em"}}>
                       <span className={row.points > 0 ? "pts-type-earn" : "pts-type-redeem"}>
                         {row.points > 0 ? "+" : ""}{row.points.toLocaleString()}
                       </span>
                     </td>
-                    <td style={{fontFamily:"'Share Tech Mono',monospace", fontSize:9, color:"#8a8784"}}>
+                    <td style={{fontFamily:"var(--font-stencil),monospace", fontSize:9, color:"#8a8784"}}>
                       {row.expires_at ? new Date(row.expires_at).toLocaleDateString("en-US", {month:"short", year:"numeric"}) : "NEVER"}
                     </td>
                   </tr>

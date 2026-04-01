@@ -12,7 +12,7 @@ const css = `
     min-height: 100vh;
     background: #0a0909;
     color: #f0ebe3;
-    font-family: 'Barlow Condensed', sans-serif;
+    font-family: var(--font-stencil), sans-serif;
   }
 
   /* ── SIDEBAR ── */
@@ -32,7 +32,7 @@ const css = `
     border-bottom: 1px solid #1a1919;
   }
   .sidebar-logo-title {
-    font-family: 'Bebas Neue', sans-serif;
+    font-family: var(--font-caesar), sans-serif;
     font-size: 18px;
     letter-spacing: 0.08em;
     color: #f0ebe3;
@@ -40,7 +40,7 @@ const css = `
   }
   .sidebar-logo-title span { color: #e8621a; }
   .sidebar-logo-sub {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 8px;
     color: #e8621a;
     letter-spacing: 0.2em;
@@ -51,7 +51,7 @@ const css = `
     padding: 16px 0 4px;
   }
   .sidebar-section-label {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 8px;
     color: #3a3838;
     letter-spacing: 0.2em;
@@ -64,7 +64,7 @@ const css = `
     align-items: center;
     gap: 10px;
     padding: 9px 18px;
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 10px;
     letter-spacing: 0.12em;
     color: #8a8784;
@@ -96,7 +96,7 @@ const css = `
     border-top: 1px solid #1a1919;
   }
   .sidebar-footer-email {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 8px;
     color: #3a3838;
     letter-spacing: 0.1em;
@@ -107,7 +107,7 @@ const css = `
   }
   .sidebar-footer-link {
     display: block;
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 9px;
     color: #8a8784;
     letter-spacing: 0.12em;
@@ -135,7 +135,7 @@ const css = `
     z-index: 10;
   }
   .topbar-breadcrumb {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 9px;
     color: #8a8784;
     letter-spacing: 0.15em;
@@ -150,7 +150,7 @@ const css = `
     gap: 10px;
   }
   .topbar-store-link {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 9px;
     color: #8a8784;
     letter-spacing: 0.12em;

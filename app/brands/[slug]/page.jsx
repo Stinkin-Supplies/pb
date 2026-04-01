@@ -22,7 +22,7 @@ const css = `
   @keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:0.8} }
   @keyframes spin { to{transform:rotate(360deg)} }
 
-  .wrap { background:#0a0909; min-height:100vh; color:#f0ebe3; font-family:'Barlow Condensed',sans-serif; }
+  .wrap { background:#0a0909; min-height:100vh; color:#f0ebe3; font-family:var(--font-stencil),sans-serif; }
 
   /* HERO */
   .brand-hero { background:#111010; border-bottom:1px solid #2a2828; padding:48px 24px; }
@@ -30,15 +30,15 @@ const css = `
   .brand-logo-wrap { width:120px; height:60px; flex-shrink:0; display:flex; align-items:center; justify-content:center;
     background:#1a1919; border:1px solid #2a2828; border-radius:2px; padding:12px; }
   .brand-logo { width:100%; height:100%; object-fit:contain; filter:brightness(0) invert(1); opacity:0.85; }
-  .brand-logo-placeholder { font-family:'Bebas Neue',sans-serif; font-size:28px; letter-spacing:0.08em; color:#3a3838; }
-  .brand-eyebrow { font-family:'Share Tech Mono',monospace; font-size:9px; color:#e8621a; letter-spacing:0.25em; margin-bottom:8px; }
-  .brand-name { font-family:'Bebas Neue',sans-serif; font-size:52px; letter-spacing:0.04em; line-height:1; margin-bottom:8px; }
-  .brand-meta { font-family:'Share Tech Mono',monospace; font-size:9px; color:#8a8784; letter-spacing:0.15em; display:flex; gap:16px; }
+  .brand-logo-placeholder { font-family:var(--font-caesar),sans-serif; font-size:28px; letter-spacing:0.08em; color:#3a3838; }
+  .brand-eyebrow { font-family:var(--font-stencil),monospace; font-size:9px; color:#e8621a; letter-spacing:0.25em; margin-bottom:8px; }
+  .brand-name { font-family:var(--font-caesar),sans-serif; font-size:52px; letter-spacing:0.04em; line-height:1; margin-bottom:8px; }
+  .brand-meta { font-family:var(--font-stencil),monospace; font-size:9px; color:#8a8784; letter-spacing:0.15em; display:flex; gap:16px; }
   .brand-meta span { color:#e8621a; }
 
   /* BREADCRUMB */
   .breadcrumb { background:#111010; border-bottom:1px solid #1a1919; padding:10px 24px;
-    font-family:'Share Tech Mono',monospace; font-size:9px; color:#8a8784; letter-spacing:0.15em;
+    font-family:var(--font-stencil),monospace; font-size:9px; color:#8a8784; letter-spacing:0.15em;
     display:flex; align-items:center; gap:6px; }
   .breadcrumb a { color:#8a8784; text-decoration:none; transition:color 0.2s; }
   .breadcrumb a:hover { color:#e8621a; }
@@ -48,10 +48,10 @@ const css = `
   .toolbar { background:#0a0909; border-bottom:1px solid #2a2828; padding:10px 24px;
     display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
     position:sticky; top:54px; z-index:40; }
-  .result-count { font-family:'Share Tech Mono',monospace; font-size:10px; color:#8a8784; letter-spacing:0.1em; }
+  .result-count { font-family:var(--font-stencil),monospace; font-size:10px; color:#8a8784; letter-spacing:0.1em; }
   .result-count span { color:#e8621a; }
   .sort-select { background:#1a1919; border:1px solid #2a2828; color:#f0ebe3;
-    font-family:'Barlow Condensed',sans-serif; font-size:13px;
+    font-family:var(--font-stencil),sans-serif; font-size:13px;
     padding:5px 9px; border-radius:2px; outline:none; }
 
   /* GRID */
@@ -69,11 +69,11 @@ const css = `
     linear-gradient(90deg,rgba(232,98,26,0.04) 1px,transparent 1px);
     background-size:16px 16px; }
   .pcard-body { padding:11px 13px; }
-  .pcard-brand { font-family:'Share Tech Mono',monospace; font-size:9px; color:#e8621a; letter-spacing:0.14em; margin-bottom:3px; }
+  .pcard-brand { font-family:var(--font-stencil),monospace; font-size:9px; color:#e8621a; letter-spacing:0.14em; margin-bottom:3px; }
   .pcard-name { font-size:13px; font-weight:700; color:#f0ebe3; line-height:1.3; margin-bottom:9px; }
   .pcard-footer { display:flex; justify-content:space-between; align-items:center; }
-  .pcard-price { font-family:'Bebas Neue',sans-serif; font-size:20px; color:#f0ebe3; letter-spacing:0.04em; }
-  .add-btn { background:#e8621a; border:none; color:#0a0909; font-family:'Bebas Neue',sans-serif;
+  .pcard-price { font-family:var(--font-caesar),sans-serif; font-size:20px; color:#f0ebe3; letter-spacing:0.04em; }
+  .add-btn { background:#e8621a; border:none; color:#0a0909; font-family:var(--font-caesar),sans-serif;
     font-size:13px; letter-spacing:0.1em; padding:5px 12px; border-radius:2px; cursor:pointer;
     transition:background 0.2s; }
   .add-btn:hover:not(:disabled) { background:#c94f0f; }
@@ -89,7 +89,7 @@ const css = `
 
   /* PAGINATION */
   .pagination { display:flex; align-items:center; justify-content:center; gap:8px; padding:32px 0; flex-wrap:wrap; }
-  .page-btn { font-family:'Share Tech Mono',monospace; font-size:10px; letter-spacing:0.08em;
+  .page-btn { font-family:var(--font-stencil),monospace; font-size:10px; letter-spacing:0.08em;
     background:#111010; border:1px solid #2a2828; color:#8a8784; padding:7px 13px;
     border-radius:2px; cursor:pointer; transition:all 0.15s; }
   .page-btn:hover:not(:disabled) { border-color:#e8621a; color:#e8621a; }
@@ -98,8 +98,8 @@ const css = `
 
   /* EMPTY */
   .empty { padding:80px 24px; text-align:center; }
-  .empty-title { font-family:'Bebas Neue',sans-serif; font-size:32px; color:#3a3838; letter-spacing:0.05em; margin-bottom:8px; }
-  .empty-sub { font-family:'Share Tech Mono',monospace; font-size:9px; color:#8a8784; letter-spacing:0.12em; }
+  .empty-title { font-family:var(--font-caesar),sans-serif; font-size:32px; color:#3a3838; letter-spacing:0.05em; margin-bottom:8px; }
+  .empty-sub { font-family:var(--font-stencil),monospace; font-size:9px; color:#8a8784; letter-spacing:0.12em; }
 `;
 
 const SORT_OPTIONS = [
@@ -225,7 +225,7 @@ export default function BrandDetailPage({ params }) {
       <div className="grid-wrap">
         {error && (
           <div style={{ padding: 40, textAlign: "center", color: "#e8621a",
-            fontFamily: "'Share Tech Mono',monospace", fontSize: 11, letterSpacing: "0.1em" }}>
+            fontFamily: "var(--font-stencil),monospace", fontSize: 11, letterSpacing: "0.1em" }}>
             {error.toUpperCase()}
           </div>
         )}
@@ -267,7 +267,7 @@ export default function BrandDetailPage({ params }) {
                     {!p.inStock && (
                       <span style={{
                         position: "absolute", bottom: 7, left: 7, zIndex: 2,
-                        fontFamily: "'Share Tech Mono',monospace", fontSize: 7,
+                        fontFamily: "var(--font-stencil),monospace", fontSize: 7,
                         color: "#8a8784", background: "rgba(0,0,0,0.7)",
                         padding: "2px 6px", borderRadius: 1, letterSpacing: "0.1em"
                       }}>OUT OF STOCK</span>

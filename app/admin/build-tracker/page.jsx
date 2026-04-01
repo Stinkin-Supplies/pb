@@ -143,7 +143,7 @@ export default function BuildTrackerPage() {
   return (
     <div style={{
       background: "#0a0909", minHeight: "100vh", color: "#f0ebe3",
-      fontFamily: "'Barlow Condensed', sans-serif", padding: "0 0 80px",
+      fontFamily: "var(--font-stencil), sans-serif", padding: "0 0 80px",
     }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@300;400;500;600&family=Share+Tech+Mono&display=swap');
@@ -155,12 +155,12 @@ export default function BuildTrackerPage() {
           justify-content: space-between; gap: 24px; flex-wrap: wrap;
         }
         .bt-title {
-          font-family: 'Bebas Neue', sans-serif;
+          font-family: var(--font-caesar), sans-serif;
           font-size: 28px; letter-spacing: 0.05em; color: #f0ebe3;
         }
         .bt-title span { color: #e8621a; }
         .bt-version {
-          font-family: 'Share Tech Mono', monospace;
+          font-family: var(--font-stencil), monospace;
           font-size: 9px; color: #8a8784; letter-spacing: 0.15em; margin-top: 2px;
         }
 
@@ -169,14 +169,14 @@ export default function BuildTrackerPage() {
         }
         .bt-stat { text-align: center; }
         .bt-stat-val {
-          font-family: 'Bebas Neue', sans-serif;
+          font-family: var(--font-caesar), sans-serif;
           font-size: 28px; line-height: 1; color: #f0ebe3;
         }
         .bt-stat-val.orange { color: #e8621a; }
         .bt-stat-val.green  { color: #22c55e; }
         .bt-stat-val.gold   { color: #c9a84c; }
         .bt-stat-label {
-          font-family: 'Share Tech Mono', monospace;
+          font-family: var(--font-stencil), monospace;
           font-size: 8px; color: #8a8784; letter-spacing: 0.12em;
         }
 
@@ -197,7 +197,7 @@ export default function BuildTrackerPage() {
         .bt-search {
           background: #1a1919; border: 1px solid #2a2828;
           color: #f0ebe3; padding: 7px 12px; border-radius: 2px;
-          font-family: 'Share Tech Mono', monospace; font-size: 11px;
+          font-family: var(--font-stencil), monospace; font-size: 11px;
           letter-spacing: 0.08em; width: 260px; outline: none;
         }
         .bt-search:focus { border-color: #e8621a; }
@@ -206,7 +206,7 @@ export default function BuildTrackerPage() {
         .bt-filter-btn {
           background: none; border: 1px solid #2a2828; color: #8a8784;
           padding: 6px 14px; border-radius: 2px; cursor: pointer;
-          font-family: 'Share Tech Mono', monospace; font-size: 9px;
+          font-family: var(--font-stencil), monospace; font-size: 9px;
           letter-spacing: 0.12em; transition: all 0.15s;
         }
         .bt-filter-btn:hover  { border-color: #e8621a; color: #e8621a; }
@@ -221,21 +221,21 @@ export default function BuildTrackerPage() {
           border-bottom: 1px solid #2a2828;
         }
         .bt-phase-name {
-          font-family: 'Bebas Neue', sans-serif;
+          font-family: var(--font-caesar), sans-serif;
           font-size: 22px; letter-spacing: 0.05em; color: #e8621a;
         }
         .bt-phase-label {
-          font-family: 'Share Tech Mono', monospace;
+          font-family: var(--font-stencil), monospace;
           font-size: 9px; color: #8a8784; letter-spacing: 0.15em;
         }
         .bt-phase-count {
           margin-left: auto;
-          font-family: 'Share Tech Mono', monospace;
+          font-family: var(--font-stencil), monospace;
           font-size: 9px; color: #8a8784; letter-spacing: 0.1em;
         }
 
         .bt-section-label {
-          font-family: 'Share Tech Mono', monospace;
+          font-family: var(--font-stencil), monospace;
           font-size: 8px; color: #3a3838; letter-spacing: 0.18em;
           text-transform: uppercase; padding: 10px 0 4px;
         }
@@ -272,14 +272,14 @@ export default function BuildTrackerPage() {
         .bt-item.done .bt-item-title { text-decoration: line-through; color: #8a8784; }
 
         .bt-item-note {
-          font-family: 'Share Tech Mono', monospace;
+          font-family: var(--font-stencil), monospace;
           font-size: 9px; color: #8a8784; letter-spacing: 0.05em;
           margin-top: 4px; line-height: 1.5;
         }
         .bt-note-input {
           background: #1a1919; border: 1px solid #e8621a;
           color: #f0ebe3; padding: 5px 8px; border-radius: 2px;
-          font-family: 'Share Tech Mono', monospace; font-size: 10px;
+          font-family: var(--font-stencil), monospace; font-size: 10px;
           width: 100%; margin-top: 6px; outline: none; letter-spacing: 0.05em;
         }
         .bt-note-actions {
@@ -288,7 +288,7 @@ export default function BuildTrackerPage() {
         .bt-note-btn {
           background: none; border: 1px solid #2a2828; color: #8a8784;
           padding: 3px 10px; border-radius: 2px; cursor: pointer;
-          font-family: 'Share Tech Mono', monospace; font-size: 8px;
+          font-family: var(--font-stencil), monospace; font-size: 8px;
           letter-spacing: 0.1em; transition: all 0.15s;
         }
         .bt-note-btn.save  { border-color: #e8621a; color: #e8621a; }
@@ -299,7 +299,7 @@ export default function BuildTrackerPage() {
           display: flex; align-items: center; gap: 8px; margin-left: auto; flex-shrink: 0;
         }
         .bt-status-pill {
-          font-family: 'Share Tech Mono', monospace;
+          font-family: var(--font-stencil), monospace;
           font-size: 8px; letter-spacing: 0.1em;
           padding: 2px 7px; border-radius: 1px; border: 1px solid;
         }
@@ -311,7 +311,7 @@ export default function BuildTrackerPage() {
         .bt-saving { width: 14px; height: 14px; }
 
         .bt-empty {
-          font-family: 'Share Tech Mono', monospace;
+          font-family: var(--font-stencil), monospace;
           font-size: 10px; color: #3a3838; letter-spacing: 0.12em;
           padding: 20px 12px; text-align: center;
         }
@@ -385,7 +385,7 @@ export default function BuildTrackerPage() {
             border: "1px solid rgba(185,28,28,0.35)",
             background: "rgba(185,28,28,0.08)",
             color: "#ef4444",
-            fontFamily: "'Share Tech Mono', monospace",
+            fontFamily: "var(--font-stencil), monospace",
             fontSize: 10,
             letterSpacing: "0.08em",
           }}>

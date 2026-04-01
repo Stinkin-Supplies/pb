@@ -23,7 +23,7 @@ const css = `
 
   .map-wrap {
     background: var(--black); min-height: 100vh;
-    color: var(--cream); font-family: 'Barlow Condensed', sans-serif;
+    color: var(--cream); font-family: var(--font-stencil), sans-serif;
   }
 
   /* ── HEADER ── */
@@ -33,17 +33,17 @@ const css = `
     justify-content: space-between; gap: 16px; flex-wrap: wrap;
   }
   .map-header-left h1 {
-    font-family: 'Bebas Neue', sans-serif;
+    font-family: var(--font-caesar), sans-serif;
     font-size: 28px; letter-spacing: 0.05em;
   }
   .map-header-left h1 span { color: var(--orange); }
   .map-subtitle {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 9px; color: var(--chrome); letter-spacing: 0.15em; margin-top: 2px;
   }
   .map-header-actions { display: flex; gap: 8px; align-items: center; }
   .map-btn {
-    font-family: 'Share Tech Mono', monospace; font-size: 9px;
+    font-family: var(--font-stencil), monospace; font-size: 9px;
     letter-spacing: 0.12em; padding: 8px 16px; border-radius: 2px;
     cursor: pointer; transition: all 0.15s; border: 1px solid;
   }
@@ -58,7 +58,7 @@ const css = `
     padding: 0 32px; display: flex; gap: 0;
   }
   .map-tab {
-    font-family: 'Share Tech Mono', monospace; font-size: 10px;
+    font-family: var(--font-stencil), monospace; font-size: 10px;
     letter-spacing: 0.12em; padding: 14px 20px;
     cursor: pointer; border-bottom: 2px solid transparent;
     color: var(--chrome); transition: all 0.15s; background: none; border-top: none;
@@ -76,7 +76,7 @@ const css = `
     background: var(--coal); padding: 20px 24px;
   }
   .stat-val {
-    font-family: 'Bebas Neue', sans-serif;
+    font-family: var(--font-caesar), sans-serif;
     font-size: 36px; line-height: 1; letter-spacing: 0.03em;
   }
   .stat-val.red    { color: var(--red); }
@@ -84,7 +84,7 @@ const css = `
   .stat-val.green  { color: var(--green); }
   .stat-val.gold   { color: var(--gold); }
   .stat-label {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 8px; color: var(--chrome); letter-spacing: 0.15em; margin-top: 4px;
   }
 
@@ -97,7 +97,7 @@ const css = `
   .map-search {
     background: var(--iron); border: 1px solid var(--steel);
     color: var(--cream); padding: 8px 12px; border-radius: 2px;
-    font-family: 'Share Tech Mono', monospace; font-size: 11px;
+    font-family: var(--font-stencil), monospace; font-size: 11px;
     letter-spacing: 0.06em; width: 280px; outline: none;
     transition: border-color 0.15s;
   }
@@ -106,7 +106,7 @@ const css = `
   .map-filter-btn {
     background: none; border: 1px solid var(--steel); color: var(--chrome);
     padding: 7px 14px; border-radius: 2px; cursor: pointer;
-    font-family: 'Share Tech Mono', monospace; font-size: 9px;
+    font-family: var(--font-stencil), monospace; font-size: 9px;
     letter-spacing: 0.1em; transition: all 0.15s;
   }
   .map-filter-btn:hover  { border-color: var(--orange); color: var(--orange); }
@@ -121,7 +121,7 @@ const css = `
     font-size: 13px;
   }
   .map-table th {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 8px; color: var(--chrome); letter-spacing: 0.15em;
     padding: 10px 14px; text-align: left;
     border-bottom: 1px solid var(--steel);
@@ -136,23 +136,23 @@ const css = `
   .map-table tr:hover td { background: rgba(255,255,255,0.01); }
 
   .sku-cell {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 10px; color: var(--chrome); letter-spacing: 0.08em;
   }
   .name-cell { font-weight: 600; color: var(--cream); max-width: 220px; }
   .name-cell small {
-    display: block; font-family: 'Share Tech Mono', monospace;
+    display: block; font-family: var(--font-stencil), monospace;
     font-size: 8px; color: var(--chrome); letter-spacing: 0.1em;
     font-weight: 400; margin-top: 2px;
   }
   .price-cell {
-    font-family: 'Bebas Neue', sans-serif;
+    font-family: var(--font-caesar), sans-serif;
     font-size: 18px; letter-spacing: 0.04em; white-space: nowrap;
   }
   .price-cell.violation { color: var(--red); }
   .price-cell.ok        { color: var(--green); }
   .price-delta {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 9px; letter-spacing: 0.08em; margin-top: 2px;
   }
   .price-delta.under { color: var(--red); }
@@ -160,7 +160,7 @@ const css = `
 
   .vendor-pill {
     display: inline-block;
-    font-family: 'Share Tech Mono', monospace; font-size: 8px;
+    font-family: var(--font-stencil), monospace; font-size: 8px;
     letter-spacing: 0.12em; padding: 3px 8px; border-radius: 1px;
     border: 1px solid;
   }
@@ -169,7 +169,7 @@ const css = `
 
   .status-pill {
     display: inline-block;
-    font-family: 'Share Tech Mono', monospace; font-size: 8px;
+    font-family: var(--font-stencil), monospace; font-size: 8px;
     letter-spacing: 0.1em; padding: 3px 8px; border-radius: 1px; border: 1px solid;
   }
   .status-pill.violation { color: var(--red);    border-color: rgba(185,28,28,0.3);  background: rgba(185,28,28,0.06); }
@@ -178,31 +178,31 @@ const css = `
   .status-pill.sync      { color: var(--chrome); border-color: var(--steel);         background: var(--iron); }
 
   .trigger-pill {
-    font-family: 'Share Tech Mono', monospace; font-size: 8px;
+    font-family: var(--font-stencil), monospace; font-size: 8px;
     letter-spacing: 0.08em; color: var(--chrome);
   }
 
   .date-cell {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 9px; color: var(--chrome); letter-spacing: 0.06em;
     white-space: nowrap;
   }
 
   .count-badge {
-    font-family: 'Bebas Neue', sans-serif; font-size: 16px;
+    font-family: var(--font-caesar), sans-serif; font-size: 16px;
     color: var(--orange);
   }
 
   /* ── EMPTY / LOADING ── */
   .map-empty {
     text-align: center; padding: 80px 20px;
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 10px; color: #3a3838; letter-spacing: 0.15em;
   }
   .map-loading {
     display: flex; align-items: center; justify-content: center;
     padding: 80px; gap: 12px;
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 9px; color: var(--chrome); letter-spacing: 0.12em;
   }
   .spinner {
@@ -219,7 +219,7 @@ const css = `
     border-top: 1px solid var(--steel); flex-wrap: wrap; gap: 12px;
   }
   .page-btn {
-    font-family: 'Share Tech Mono', monospace; font-size: 9px; letter-spacing: 0.08em;
+    font-family: var(--font-stencil), monospace; font-size: 9px; letter-spacing: 0.08em;
     background: var(--coal); border: 1px solid var(--steel); color: var(--chrome);
     padding: 6px 12px; border-radius: 2px; cursor: pointer; transition: all 0.15s;
   }
@@ -428,7 +428,7 @@ export default function MapAdminPage() {
         ))}
         <div className="map-toolbar-right">
           <span style={{
-            fontFamily: "'Share Tech Mono', monospace", fontSize: 9,
+            fontFamily: "var(--font-stencil), monospace", fontSize: 9,
             color: "var(--chrome)", letterSpacing: "0.1em",
             display: "flex", alignItems: "center",
           }}>
@@ -525,7 +525,7 @@ export default function MapAdminPage() {
                         </td>
                         {tab === "audit" && (
                           <td style={{
-                            fontFamily: "'Barlow Condensed', sans-serif",
+                            fontFamily: "var(--font-stencil), sans-serif",
                             fontSize: 12, color: "var(--chrome)",
                             maxWidth: 200,
                           }}>
@@ -543,7 +543,7 @@ export default function MapAdminPage() {
             {totalPages > 1 && (
               <div className="map-pagination">
                 <span style={{
-                  fontFamily: "'Share Tech Mono', monospace", fontSize: 9,
+                  fontFamily: "var(--font-stencil), monospace", fontSize: 9,
                   color: "var(--chrome)", letterSpacing: "0.1em",
                 }}>
                   SHOWING {(page * PAGE_SIZE + 1).toLocaleString()}–

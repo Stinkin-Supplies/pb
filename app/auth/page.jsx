@@ -58,7 +58,7 @@ const css = `
     pointer-events: none;
   }
   .auth-logo {
-    font-family: 'Bebas Neue', sans-serif;
+    font-family: var(--font-caesar), sans-serif;
     font-size: 32px; letter-spacing: 0.08em;
     color: #f0ebe3; position: relative; z-index: 1;
   }
@@ -67,7 +67,7 @@ const css = `
     position: relative; z-index: 1;
   }
   .auth-hero-title {
-    font-family: 'Bebas Neue', sans-serif;
+    font-family: var(--font-caesar), sans-serif;
     font-size: clamp(52px, 6vw, 80px);
     line-height: 0.92; letter-spacing: 0.02em;
     color: #f0ebe3; margin-bottom: 20px;
@@ -94,7 +94,7 @@ const css = `
     box-shadow: 0 0 6px rgba(232,98,26,0.5);
   }
   .auth-perk-text {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 10px; color: #8a8784; letter-spacing: 0.14em;
   }
   .auth-perk-text strong { color: #f0ebe3; }
@@ -113,7 +113,7 @@ const css = `
   }
   .auth-tab {
     padding: 12px; text-align: center; cursor: pointer;
-    font-family: 'Bebas Neue', sans-serif;
+    font-family: var(--font-caesar), sans-serif;
     font-size: 18px; letter-spacing: 0.08em;
     color: #8a8784; background: #111010;
     border: none; transition: all 0.2s;
@@ -127,13 +127,13 @@ const css = `
   .auth-form { display: flex; flex-direction: column; gap: 14px; }
   .auth-field { display: flex; flex-direction: column; gap: 6px; }
   .auth-label {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 9px; color: #8a8784; letter-spacing: 0.18em;
   }
   .auth-input {
     height: 48px;
     background: #111010; border: 1px solid #2a2828;
-    color: #f0ebe3; font-family: 'Barlow Condensed', sans-serif;
+    color: #f0ebe3; font-family: var(--font-stencil), sans-serif;
     font-size: 16px; font-weight: 500;
     padding: 0 16px; border-radius: 2px; outline: none;
     transition: border-color 0.2s;
@@ -158,7 +158,7 @@ const css = `
   .auth-submit {
     height: 50px; width: 100%;
     background: #e8621a; border: none;
-    color: #0a0909; font-family: 'Bebas Neue', sans-serif;
+    color: #0a0909; font-family: var(--font-caesar), sans-serif;
     font-size: 22px; letter-spacing: 0.1em;
     border-radius: 2px; cursor: pointer;
     transition: all 0.2s; margin-top: 6px;
@@ -181,7 +181,7 @@ const css = `
   }
   .auth-divider-line { flex: 1; height: 1px; background: #2a2828; }
   .auth-divider-text {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 9px; color: #8a8784; letter-spacing: 0.15em;
   }
 
@@ -189,7 +189,7 @@ const css = `
   .magic-btn {
     height: 48px; width: 100%;
     background: transparent; border: 1px solid #2a2828;
-    color: #8a8784; font-family: 'Bebas Neue', sans-serif;
+    color: #8a8784; font-family: var(--font-caesar), sans-serif;
     font-size: 17px; letter-spacing: 0.08em;
     border-radius: 2px; cursor: pointer;
     transition: all 0.2s;
@@ -201,7 +201,7 @@ const css = `
     background: rgba(185,28,28,0.08);
     border: 1px solid rgba(185,28,28,0.25);
     border-radius: 2px; padding: 10px 14px;
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 9px; color: #ef4444; letter-spacing: 0.1em;
     line-height: 1.5;
   }
@@ -209,7 +209,7 @@ const css = `
     background: rgba(34,197,94,0.08);
     border: 1px solid rgba(34,197,94,0.25);
     border-radius: 2px; padding: 14px;
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 9px; color: #22c55e; letter-spacing: 0.1em;
     line-height: 1.6; text-align: center;
   }
@@ -218,7 +218,7 @@ const css = `
   /* footer link */
   .auth-footer {
     margin-top: 20px; text-align: center;
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 9px; color: #8a8784; letter-spacing: 0.1em;
   }
   .auth-footer a {
@@ -320,8 +320,8 @@ export default function AuthPage() {
     else        { setMagicSent(true); }
   };
 
-  const B = s => ({ fontFamily:"'Bebas Neue',sans-serif",     ...s });
-  const M = s => ({ fontFamily:"'Share Tech Mono',monospace", ...s });
+  const B = s => ({ fontFamily:"var(--font-caesar),sans-serif",     ...s });
+  const M = s => ({ fontFamily:"var(--font-stencil),monospace", ...s });
 
   return (
     <div className="auth-wrap">

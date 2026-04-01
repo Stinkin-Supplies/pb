@@ -1,9 +1,22 @@
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import CartRoot from "@/components/CartRoot";
+import { Caesar_Dressing, Stardos_Stencil } from "next/font/google";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
+
+const caesarDressing = Caesar_Dressing({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-caesar",
+});
+
+const stardosStencil = Stardos_Stencil({
+  weight: ["400", "700"],
+  subsets: ["latin"],
+  variable: "--font-stencil",
+});
 
 export const metadata: Metadata = {
   title: "Stinkin' Supplies | Powersports Parts & Accessories",
@@ -17,20 +30,10 @@ export default function RootLayout({
   children: ReactNode;
 }) {
   return (
-    <html lang="en">
-      <head>
-        {/* Google Fonts — must be in <head>, not in a <style> tag */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;500;600;700&family=Share+Tech+Mono&display=swap"
-          rel="stylesheet"
-        />
-      </head>
+    <html
+      lang="en"
+      className={`${caesarDressing.variable} ${stardosStencil.variable}`}
+    >
       <body>
         <CartRoot>
           {children}

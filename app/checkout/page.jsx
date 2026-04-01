@@ -303,7 +303,7 @@ export default function CheckoutPage() {
       min-height: 100vh;
       background: #0a0909;
       color: #f0ebe3;
-      font-family: 'Barlow Condensed', sans-serif;
+      font-family: var(--font-stencil), sans-serif;
       position: relative;
       overflow: hidden;
     }
@@ -328,7 +328,7 @@ export default function CheckoutPage() {
       z-index: 1;
     }
     .checkout-title {
-      font-family: 'Bebas Neue', sans-serif;
+      font-family: var(--font-caesar), sans-serif;
       font-size: 38px;
       letter-spacing: 0.06em;
       margin-bottom: 16px;
@@ -345,7 +345,7 @@ export default function CheckoutPage() {
       box-shadow: 0 18px 40px rgba(0,0,0,0.45);
     }
     .card-title {
-      font-family: 'Bebas Neue', sans-serif;
+      font-family: var(--font-caesar), sans-serif;
       font-size: 22px;
       letter-spacing: 0.05em;
       margin-bottom: 12px;
@@ -355,7 +355,7 @@ export default function CheckoutPage() {
       letter-spacing: 0.08em;
     }
     .label {
-      font-family: 'Share Tech Mono', monospace;
+      font-family: var(--font-stencil), monospace;
       font-size: 9px;
       letter-spacing: 0.14em;
       color: #8a8784;
@@ -367,7 +367,7 @@ export default function CheckoutPage() {
       background: #1a1919;
       border: 1px solid #2a2828;
       color: #f0ebe3;
-      font-family: 'Barlow Condensed', sans-serif;
+      font-family: var(--font-stencil), sans-serif;
       font-size: 16px;
       padding: 0 12px;
       border-radius: 2px;
@@ -380,7 +380,7 @@ export default function CheckoutPage() {
       background: #1a1919;
       border: 1px solid #2a2828;
       color: #f0ebe3;
-      font-family: 'Barlow Condensed', sans-serif;
+      font-family: var(--font-stencil), sans-serif;
       font-size: 16px;
       padding: 0 10px;
       border-radius: 2px;
@@ -389,7 +389,7 @@ export default function CheckoutPage() {
     }
     .select:focus { border-color: #e8621a; }
     .muted {
-      font-family: 'Share Tech Mono', monospace;
+      font-family: var(--font-stencil), monospace;
       font-size: 9px;
       letter-spacing: 0.12em;
       color: #8a8784;
@@ -400,7 +400,7 @@ export default function CheckoutPage() {
       justify-content: space-between;
       align-items: center;
       margin-bottom: 10px;
-      font-family: 'Share Tech Mono', monospace;
+      font-family: var(--font-stencil), monospace;
       font-size: 11px;
       letter-spacing: 0.1em;
       color: #f0ebe3;
@@ -415,7 +415,7 @@ export default function CheckoutPage() {
       display: flex;
       justify-content: space-between;
       align-items: baseline;
-      font-family: 'Bebas Neue', sans-serif;
+      font-family: var(--font-caesar), sans-serif;
       font-size: 28px;
       letter-spacing: 0.05em;
       margin-top: 6px;
@@ -430,7 +430,7 @@ export default function CheckoutPage() {
       background: #e8621a;
       border: none;
       color: #0a0909;
-      font-family: 'Bebas Neue', sans-serif;
+      font-family: var(--font-caesar), sans-serif;
       font-size: 20px;
       letter-spacing: 0.1em;
       border-radius: 2px;

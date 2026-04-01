@@ -64,12 +64,12 @@ const css = `
     flex-shrink: 0;
   }
   .drawer-title {
-    font-family: 'Bebas Neue', sans-serif;
+    font-family: var(--font-caesar), sans-serif;
     font-size: 24px; letter-spacing: 0.06em; color: #f0ebe3;
   }
   .drawer-title span { color: #e8621a; }
   .drawer-count {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 9px; color: #8a8784; letter-spacing: 0.15em;
     margin-top: 2px;
   }
@@ -91,7 +91,7 @@ const css = `
     flex-shrink: 0;
   }
   .shipping-bar-label {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 9px; color: #8a8784; letter-spacing: 0.12em;
     margin-bottom: 6px; display: flex;
     justify-content: space-between;
@@ -152,14 +152,14 @@ const css = `
   }
   .item-img img { width: 100%; height: 100%; object-fit: cover; }
   .item-img-placeholder {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 7px; color: #3a3838; letter-spacing: 0.08em;
     position: relative; z-index: 1;
   }
 
   .item-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
   .item-brand {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 8px; color: #e8621a; letter-spacing: 0.14em;
   }
   .item-name {
@@ -169,7 +169,7 @@ const css = `
   }
   .item-price-row { margin-top: 4px; }
   .item-price {
-    font-family: 'Bebas Neue', sans-serif;
+    font-family: var(--font-caesar), sans-serif;
     font-size: 18px; color: #f0ebe3; letter-spacing: 0.04em;
     white-space: nowrap;
   }
@@ -188,18 +188,18 @@ const css = `
   }
   .item-qty-btn:hover { border-color: #e8621a; color: #e8621a; }
   .item-qty-val {
-    font-family: 'Bebas Neue', sans-serif;
+    font-family: var(--font-caesar), sans-serif;
     font-size: 16px; color: #f0ebe3; min-width: 20px; text-align: center;
   }
   .item-remove {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 8px; color: #8a8784; letter-spacing: 0.1em;
     background: none; border: none; cursor: pointer;
     transition: color 0.15s; padding: 0; margin-left: 4px;
   }
   .item-remove:hover { color: #b91c1c; }
   .item-map-note {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 7px; color: #c9a84c; letter-spacing: 0.1em; margin-top: 2px;
   }
 
@@ -211,16 +211,16 @@ const css = `
   }
   .drawer-empty-icon { font-size: 40px; opacity: 0.3; }
   .drawer-empty-title {
-    font-family: 'Bebas Neue', sans-serif;
+    font-family: var(--font-caesar), sans-serif;
     font-size: 24px; letter-spacing: 0.05em; color: #3a3838;
   }
   .drawer-empty-sub {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 9px; color: #8a8784; letter-spacing: 0.12em;
   }
   .drawer-empty-btn {
     margin-top: 8px; background: #e8621a; border: none;
-    color: #0a0909; font-family: 'Bebas Neue', sans-serif;
+    color: #0a0909; font-family: var(--font-caesar), sans-serif;
     font-size: 16px; letter-spacing: 0.1em;
     padding: 10px 24px; border-radius: 2px; cursor: pointer;
     transition: background 0.2s;
@@ -240,12 +240,12 @@ const css = `
     justify-content: space-between; margin-bottom: 8px;
   }
   .points-label {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 9px; color: #c9a84c; letter-spacing: 0.16em;
     display: flex; align-items: center; gap: 6px;
   }
   .points-balance {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 9px; color: #8a8784; letter-spacing: 0.1em;
   }
   .points-toggle {
@@ -261,7 +261,7 @@ const css = `
   }
   .points-toggle.on .points-thumb { left: 16px; }
   .points-detail {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 8px; color: #8a8784; letter-spacing: 0.1em;
     line-height: 1.5;
   }
@@ -280,11 +280,11 @@ const css = `
     align-items: center; margin-bottom: 8px;
   }
   .summary-label {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 9px; color: #8a8784; letter-spacing: 0.12em;
   }
   .summary-value {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 10px; color: #f0ebe3; letter-spacing: 0.1em;
     white-space: nowrap; text-align: right; min-width: 90px;
     font-variant-numeric: tabular-nums;
@@ -300,11 +300,11 @@ const css = `
     margin-bottom: 16px;
   }
   .summary-total-label {
-    font-family: 'Bebas Neue', sans-serif;
+    font-family: var(--font-caesar), sans-serif;
     font-size: 18px; letter-spacing: 0.06em; color: #f0ebe3;
   }
   .summary-total-value {
-    font-family: 'Bebas Neue', sans-serif;
+    font-family: var(--font-caesar), sans-serif;
     font-size: 28px; color: #f0ebe3; letter-spacing: 0.04em;
     white-space: nowrap; text-align: right; min-width: 140px;
     font-variant-numeric: tabular-nums;
@@ -314,7 +314,7 @@ const css = `
   .checkout-btn {
     width: 100%; height: 50px;
     background: #e8621a; border: none;
-    color: #0a0909; font-family: 'Bebas Neue', sans-serif;
+    color: #0a0909; font-family: var(--font-caesar), sans-serif;
     font-size: 22px; letter-spacing: 0.1em;
     border-radius: 2px; cursor: pointer;
     transition: all 0.2s;
@@ -329,7 +329,7 @@ const css = `
   .continue-btn {
     width: 100%; height: 38px;
     background: transparent; border: 1px solid #2a2828;
-    color: #8a8784; font-family: 'Bebas Neue', sans-serif;
+    color: #8a8784; font-family: var(--font-caesar), sans-serif;
     font-size: 15px; letter-spacing: 0.1em;
     border-radius: 2px; cursor: pointer; transition: all 0.2s;
   }
@@ -341,7 +341,7 @@ const css = `
     padding: 8px 20px;
     background: rgba(201,168,76,0.04);
     border-top: 1px solid rgba(201,168,76,0.08);
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 8px; color: #c9a84c; letter-spacing: 0.12em;
     flex-shrink: 0;
   }
@@ -406,8 +406,8 @@ export default function CartDrawer({ isOpen, onClose, cartItems, onUpdateQty, on
 
   const itemCount = cartItems.reduce((sum, i) => sum + i.qty, 0);
 
-  const M = s => ({ fontFamily:"'Share Tech Mono',monospace", ...s });
-  const B = s => ({ fontFamily:"'Bebas Neue',sans-serif",     ...s });
+  const M = s => ({ fontFamily:"var(--font-stencil),monospace", ...s });
+  const B = s => ({ fontFamily:"var(--font-caesar),sans-serif",     ...s });
 
   if (!isOpen) return null;
 

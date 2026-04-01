@@ -22,7 +22,7 @@ const css = `
     border-radius:2px;
     background:#1a1919;
     border:1px solid #2a2828;
-    font-family:'Barlow Condensed',sans-serif;
+    font-family:var(--font-stencil),sans-serif;
     font-size:15px;
     font-weight:500;
     color:#f0ebe3;
