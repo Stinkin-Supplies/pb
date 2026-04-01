@@ -38,8 +38,8 @@ const css = `
     backdrop-filter: blur(10px);
   }
   .ss-nav-logo {
-    color: #f0ebe3; text-decoration: none; flex: 1;
-    white-space: nowrap;
+    color: #f0ebe3; text-decoration: none; flex: none;
+    white-space: nowrap; max-width: none;
   }
   .ss-nav-logo span { color: #e8621a; }
   .ss-nav-links { display: flex; gap: 20px; margin-right: 8px; }
@@ -141,10 +141,10 @@ export default function NavBar({ activePage = "", cartCount, onCartClick }) {
         {/* Logo */}
         <Link href="/" className="ss-nav-logo">
           <span
-            className="text-2xl tracking-widest text-white whitespace-nowrap"
+            className="font-caesar text-4xl tracking-wider text-orange-500 whitespace-nowrap max-w-none"
             style={{ fontFamily: "var(--font-caesar)" }}
           >
-            Stinkin<span className="text-orange-500">&apos;</span> Supplies
+            STINKIN&apos; SUPPLIES
           </span>
         </Link>
 
