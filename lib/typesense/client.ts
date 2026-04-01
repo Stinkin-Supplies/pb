@@ -45,9 +45,11 @@ export const SCHEMA = {
     { name: 'brand',        type: 'string' as const, facet: true  },
     { name: 'category',     type: 'string' as const, facet: true  },
     { name: 'price',        type: 'float'  as const, facet: true  },
+    { name: 'our_price',    type: 'float'  as const, facet: true  },
     { name: 'map_price',    type: 'float'  as const, optional: true },
     { name: 'msrp',         type: 'float'  as const, optional: true },
     { name: 'is_active',    type: 'bool'   as const, facet: true  },
+    { name: 'in_stock',     type: 'bool'   as const, facet: true  },
     { name: 'image',        type: 'string' as const, optional: true, index: false },
     { name: 'description',  type: 'string' as const, optional: true },
     { name: 'vendor_codes', type: 'string[]' as const, facet: true, optional: true },
@@ -66,9 +68,11 @@ export type ProductDocument = {
   brand:        string
   category:     string
   price:        number
+  our_price:    number
   map_price?:   number
   msrp?:        number
   is_active:    boolean
+  in_stock:     boolean
   image?:       string
   description?: string
   vendor_codes?: string[]
