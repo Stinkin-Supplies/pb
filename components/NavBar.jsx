@@ -40,8 +40,14 @@ const css = `
   .ss-nav-logo {
     color: #f0ebe3; text-decoration: none; flex: none;
     white-space: nowrap; max-width: none;
+    height: 23px;
+    display: flex; align-items: center;
   }
-  .ss-nav-logo span { color: #e8621a; }
+  .ss-nav-logo span {
+    color: #e8621a;
+    height: 100%;
+    font-size: 25px;
+  }
   .ss-nav-links { display: flex; gap: 20px; margin-right: 8px; }
   .ss-nav-link {
     color: #8a8784; text-decoration: none;
@@ -141,7 +147,7 @@ export default function NavBar({ activePage = "", cartCount, onCartClick }) {
         {/* Logo */}
         <Link href="/" className="ss-nav-logo">
           <span
-            className="font-caesar text-4xl tracking-wider text-orange-500 whitespace-nowrap max-w-none"
+            className="font-caesar tracking-wider text-orange-500 whitespace-nowrap max-w-none"
             style={{ fontFamily: "var(--font-caesar)" }}
           >
             STINKIN&apos; SUPPLIES
