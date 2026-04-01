@@ -277,8 +277,8 @@ function ProductCard({ product:p, index, view, onAdd }) {
                textDecoration:"none", color:"inherit" }}>
 
       {/* Image */}
-      <div style={{ width:"100%", aspectRatio:view==="list"?"unset":"4/3",
-                    minHeight:view==="list"?110:0, background:"#1a1919",
+      <div style={{ width:"100%", aspectRatio:view==="list"?"unset":"1/1",
+                    minHeight:view==="list"?110:0, background:"#ffffff",
                     display:"flex", alignItems:"center", justifyContent:"center",
                     position:"relative", overflow:"hidden" }}>
         <div style={{ position:"absolute", inset:0,
