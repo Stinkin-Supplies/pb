@@ -26,7 +26,7 @@ const SCHEMA = {
     { name: 'msrp',         type: 'float',   optional: true },
     { name: 'is_active',    type: 'bool',    facet: true  },
     { name: 'stock_quantity', type: 'int64',  facet: true  },
-    { name: 'in_stock',     type: 'int64',   facet: true  },
+    { name: 'in_stock',     type: 'int32',   facet: true, sort: true },
     { name: 'image',        type: 'string',  optional: true, index: false },
     { name: 'description',  type: 'string',  optional: true },
     { name: 'vendor_codes', type: 'string[]',facet: true, optional: true },
