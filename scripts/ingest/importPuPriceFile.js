@@ -63,6 +63,16 @@ function buildAuth() {
 
 function fetchPriceFileZip() {
   return new Promise((resolve, reject) => {
+    if (!fs.existsSync(TMP_DIR)) fs.mkdirSync(TMP_DIR, { recursive: true });
+
+    const today = new Date().toISOString().slice(0, 10); // "2026-04-01"
+    const cachedZip = path.join(TMP_DIR, `pu_pricefile_${today}.zip`);
+
+    if (fs.existsSync(cachedZip)) {
+      log(`   Using cached file from today (${today})`);
+      return resolve(fs.readFileSync(cachedZip));
+    }
+
     log('📥  Requesting price file from Parts Unlimited API...');
 
     const body = JSON.stringify({
@@ -90,7 +100,11 @@ function fetchPriceFileZip() {
         return reject(new Error(`PU API returned HTTP ${res.statusCode}`));
       }
       res.on('data', chunk => chunks.push(chunk));
-      res.on('end', () => resolve(Buffer.concat(chunks)));
+      res.on('end', () => {
+        const zipBuffer = Buffer.concat(chunks);
+        fs.writeFileSync(cachedZip, zipBuffer);
+        resolve(zipBuffer);
+      });
     });
 
     req.on('error', reject);
@@ -179,7 +193,8 @@ function mapRowToProduct(row) {
   if (!sku) return null;
 
   const nationalAvail = parseInt(row['National Availability'] || '0', 10);
-  const ourPrice      = parseFloat(row['Your Dealer Price'] || '0');
+  const ourPrice      = parseFloat(row['Your Dealer Price'] || '0') ||
+                        parseFloat(row['Base Dealer Price'] || '0');
   const msrp          = parseFloat(row['Current Suggested Retail'] || '0');
   const weight        = parseFloat(row['Weight'] || '0');
   const dropshipFee   = parseFloat(row['Dropship Fee'] || '0');
@@ -194,10 +209,11 @@ function mapRowToProduct(row) {
   const isWatercraft = catalogFlag(row['Watercraft Catalog Code']);
 
   return {
-    sku,
-    our_price:      isNaN(ourPrice)    ? null : ourPrice,
+    mfr_sku:        sku,
+    best_price:     isNaN(ourPrice) || ourPrice === 0 ? null : ourPrice,
     msrp:           isNaN(msrp) || msrp === 0 ? null : msrp,
-    stock_quantity: isNaN(nationalAvail) ? 0 : nationalAvail,
+    total_qty:      isNaN(nationalAvail) ? 0 : nationalAvail,
+    in_stock:       nationalAvail > 0,
     hazardous_code: hazardous || null,
     no_ship_ca:     noShipCa,
     is_atv:         isAtv,
@@ -218,7 +234,7 @@ async function upsertBatch(batch) {
     const urlObj = new URL(url);
     const options = {
       hostname: urlObj.hostname,
-      path: urlObj.pathname + '?on_conflict=sku',
+      path: urlObj.pathname + '?on_conflict=mfr_sku',
       method: 'POST',
       headers: {
         'apikey': SUPABASE_KEY,
