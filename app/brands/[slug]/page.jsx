@@ -62,7 +62,7 @@ const css = `
   .pcard { background:#111010; border:1px solid #2a2828; border-radius:2px; overflow:hidden;
     text-decoration:none; color:inherit; display:block; transition:all 0.22s; animation:fadeUp 0.3s ease both; }
   .pcard:hover { border-color:rgba(232,98,26,0.45); transform:translateY(-3px); box-shadow:0 10px 36px rgba(0,0,0,0.5); }
-  .pcard-img { width:100%; aspect-ratio:4/3; background:#1a1919; display:flex; align-items:center;
+  .pcard-img { width:100%; aspect-ratio:1/1; background:#ffffff; display:flex; align-items:center;
     justify-content:center; position:relative; overflow:hidden; }
   .pcard-img::before { content:''; position:absolute; inset:0;
     background-image:linear-gradient(rgba(232,98,26,0.04) 1px,transparent 1px),

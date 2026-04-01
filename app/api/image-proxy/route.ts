@@ -72,21 +72,26 @@ export async function GET(req: NextRequest) {
     if (hostname === 'asset.lemansnet.com' || hostname.endsWith('.lemansnet.com')) {
       try {
         const upstream = await fetchFollowingRedirects(url, LEMANS_HEADERS)
+        const contentType = upstream.headers.get('content-type') ?? ''
+
+        if (contentType.includes('zip') || contentType.includes('octet-stream')) {
+          return NextResponse.redirect(new URL('/images/placeholder.jpg', req.url))
+        }
 
         if (!upstream.ok) {
           console.warn(`[image-proxy] LeMans final status ${upstream.status} for ${url}`)
           return NextResponse.redirect(new URL('/images/placeholder.jpg', req.url))
         }
 
-        const contentType = upstream.headers.get('Content-Type') ?? 'image/jpeg'
+        const responseContentType = contentType || 'image/jpeg'
         const blob = await upstream.arrayBuffer()
 
-        console.log(`[image-proxy] LeMans success — ${blob.byteLength} bytes, type: ${contentType}`)
+        console.log(`[image-proxy] LeMans success — ${blob.byteLength} bytes, type: ${responseContentType}`)
 
         return new NextResponse(blob, {
           status: 200,
           headers: {
-            'Content-Type':  contentType.startsWith('image/') ? contentType : 'image/jpeg',
+            'Content-Type':  responseContentType.startsWith('image/') ? responseContentType : 'image/jpeg',
             'Cache-Control': 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400',
             'Content-Length': blob.byteLength.toString(),
           },
