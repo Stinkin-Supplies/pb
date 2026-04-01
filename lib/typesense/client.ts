@@ -50,7 +50,7 @@ export const SCHEMA = {
     { name: 'msrp',         type: 'float'  as const, optional: true },
     { name: 'is_active',    type: 'bool'   as const, facet: true  },
     { name: 'stock_quantity', type: 'int64' as const, facet: true  },
-    { name: 'in_stock',     type: 'bool'   as const, facet: true  },
+    { name: 'in_stock',     type: 'int64'  as const, facet: true  },
     { name: 'image',        type: 'string' as const, optional: true, index: false },
     { name: 'description',  type: 'string' as const, optional: true },
     { name: 'vendor_codes', type: 'string[]' as const, facet: true, optional: true },
@@ -74,7 +74,7 @@ export type ProductDocument = {
   msrp?:        number
   is_active:    boolean
   stock_quantity: number
-  in_stock:     boolean
+  in_stock:     number
   image?:       string
   description?: string
   vendor_codes?: string[]
