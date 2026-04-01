@@ -12,12 +12,12 @@
   },
   "crons": [
     {
-      "path": "/api/cron/restock-notify",
-      "schedule": "0 9 * * *"
+      "path": "/api/admin/pu-price-sync",
+      "schedule": "0 7 * * *"
     },
     {
       "path": "/api/admin/reindex",
-      "schedule": "0 3 * * *"
+      "schedule": "0 8 * * *"
     }
   ]
 }
