@@ -67,6 +67,46 @@ function buildAuth() {
   return 'Basic ' + Buffer.from(raw).toString('base64');
 }
 
+function buildPricefileBody(auxillaryColumns) {
+  return JSON.stringify({
+    dealerCodes: [DEALER],
+    headersPrepended: true,
+    auxillaryColumns,
+  });
+}
+
+async function requestPriceFileZip(body) {
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: 'dealer.parts-unlimited.com',
+      path: '/api/quotes/v2/pricefile',
+      method: 'POST',
+      headers: {
+        'Authorization': buildAuth(),
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
+      },
+    };
+
+    const chunks = [];
+    const req = https.request(options, (res) => {
+      log(`   HTTP ${res.statusCode}`);
+      res.on('data', chunk => chunks.push(chunk));
+      res.on('end', () => {
+        const zipBuffer = Buffer.concat(chunks);
+        if (res.statusCode !== 200) {
+          return reject(new Error(`PU API returned HTTP ${res.statusCode}: ${zipBuffer.toString('utf8')}`));
+        }
+        resolve(zipBuffer);
+      });
+    });
+
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
+
 function fetchPriceFileZip() {
   if (INPUT_ZIP) {
     if (!fs.existsSync(INPUT_ZIP)) {
@@ -91,10 +131,8 @@ function fetchPriceFileZip() {
 
     log('📥  Requesting price file from Parts Unlimited API...');
 
-    const body = JSON.stringify({
-      dealerCodes: [DEALER],
-      headersPrepended: true,
-      auxillaryColumns: [
+    const requestVariants = [
+      buildPricefileBody([
         'UPC_CODE',
         'BRAND_NAME',
         'COUNTRY_OF_ORIGIN',
@@ -109,48 +147,36 @@ function fetchPriceFileZip() {
         'WIDTH',
         'PFAS',
         'HARMONIZED_US',
-      ],
-      attachingCatalogs: [
-        'STREET',
-        'ATV',
-        'OFFROAD',
-        'SNOW',
-        'WATERCRAFT',
-        'FATBOOK',
-        'HELMET_AND_APPAREL',
-        'TIRE',
-        'STREET_MIDYEAR',
-      ],
-    });
+        'COMMODITY_CODE',
+      ]),
+      buildPricefileBody([
+        'BRAND_NAME',
+        'WEIGHT',
+        'COUNTRY_OF_ORIGIN',
+        'UPC_CODE',
+        'COMMODITY_CODE',
+        'DRAG_PART',
+        'CLOSEOUT_CATALOG_INDICATOR',
+      ]),
+    ];
 
-    const options = {
-      hostname: 'dealer.parts-unlimited.com',
-      path: '/api/quotes/v2/pricefile',
-      method: 'POST',
-      headers: {
-        'Authorization': buildAuth(),
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(body),
-      },
-    };
-
-    const chunks = [];
-    const req = https.request(options, (res) => {
-      log(`   HTTP ${res.statusCode}`);
-      if (res.statusCode !== 200) {
-        return reject(new Error(`PU API returned HTTP ${res.statusCode}`));
+    (async () => {
+      let lastError = null;
+      for (let i = 0; i < requestVariants.length; i++) {
+        try {
+          if (i > 0) {
+            log('   Retrying with known-good minimal columns...');
+          }
+          const zipBuffer = await requestPriceFileZip(requestVariants[i]);
+          fs.writeFileSync(cachedZip, zipBuffer);
+          return resolve(zipBuffer);
+        } catch (err) {
+          lastError = err;
+          log(`   Attempt ${i + 1} failed: ${err.message}`);
+        }
       }
-      res.on('data', chunk => chunks.push(chunk));
-      res.on('end', () => {
-        const zipBuffer = Buffer.concat(chunks);
-        fs.writeFileSync(cachedZip, zipBuffer);
-        resolve(zipBuffer);
-      });
-    });
-
-    req.on('error', reject);
-    req.write(body);
-    req.end();
+      return reject(lastError ?? new Error('PU API request failed'));
+    })();
   });
 }
 
