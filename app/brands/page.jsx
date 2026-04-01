@@ -15,23 +15,23 @@ const css = `
   @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
   @keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:0.8} }
 
-  .brands-wrap { background:#0a0909; min-height:100vh; color:#f0ebe3; font-family:'Barlow Condensed',sans-serif; }
+  .brands-wrap { background:#0a0909; min-height:100vh; color:#f0ebe3; font-family:var(--font-stencil),sans-serif; }
 
   .brands-hero { background:#111010;border-bottom:1px solid #2a2828;padding:36px 24px; }
   .brands-hero-inner { max-width:1100px;margin:0 auto; }
-  .hero-eyebrow { font-family:'Share Tech Mono',monospace;font-size:9px;color:#e8621a;letter-spacing:0.25em;margin-bottom:8px; }
-  .hero-title { font-family:'Bebas Neue',sans-serif;font-size:48px;letter-spacing:0.04em;line-height:1;margin-bottom:8px; }
+  .hero-eyebrow { font-family:var(--font-stencil),monospace;font-size:9px;color:#e8621a;letter-spacing:0.25em;margin-bottom:8px; }
+  .hero-title { font-family:var(--font-caesar),sans-serif;font-size:48px;letter-spacing:0.04em;line-height:1;margin-bottom:8px; }
   .hero-title span { color:#e8621a; }
   .hero-sub { font-size:15px;font-weight:500;color:#8a8784;max-width:500px; }
 
   .brands-toolbar { background:#0a0909;border-bottom:1px solid #2a2828;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;position:sticky;top:54px;z-index:40; }
   .brands-toolbar-left { display:flex;align-items:center;gap:8px;flex-wrap:wrap; }
-  .cat-filter { font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:0.12em;padding:5px 12px;border-radius:2px;cursor:pointer;transition:all 0.15s;border:1px solid #2a2828;background:transparent;color:#8a8784; }
+  .cat-filter { font-family:var(--font-stencil),monospace;font-size:9px;letter-spacing:0.12em;padding:5px 12px;border-radius:2px;cursor:pointer;transition:all 0.15s;border:1px solid #2a2828;background:transparent;color:#8a8784; }
   .cat-filter:hover { border-color:rgba(232,98,26,0.3);color:#f0ebe3; }
   .cat-filter.active { background:rgba(232,98,26,0.1);border-color:rgba(232,98,26,0.35);color:#e8621a; }
-  .brand-count { font-family:'Share Tech Mono',monospace;font-size:9px;color:#8a8784;letter-spacing:0.12em; }
+  .brand-count { font-family:var(--font-stencil),monospace;font-size:9px;color:#8a8784;letter-spacing:0.12em; }
   .brand-count span { color:#e8621a; }
-  .brand-search { background:#111010;border:1px solid #2a2828;color:#f0ebe3;font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:500;padding:7px 14px;border-radius:2px;outline:none;width:220px;transition:border-color 0.2s; }
+  .brand-search { background:#111010;border:1px solid #2a2828;color:#f0ebe3;font-family:var(--font-stencil),sans-serif;font-size:15px;font-weight:500;padding:7px 14px;border-radius:2px;outline:none;width:220px;transition:border-color 0.2s; }
   .brand-search:focus { border-color:#e8621a; }
   .brand-search::placeholder { color:#3a3838; }
 
@@ -43,7 +43,7 @@ const css = `
 
   /* FEATURED */
   .featured-section { margin-bottom:36px; }
-  .section-label { font-family:'Share Tech Mono',monospace;font-size:9px;color:#8a8784;letter-spacing:0.2em;margin-bottom:14px;display:flex;align-items:center;gap:10px; }
+  .section-label { font-family:var(--font-stencil),monospace;font-size:9px;color:#8a8784;letter-spacing:0.2em;margin-bottom:14px;display:flex;align-items:center;gap:10px; }
   .section-label::after { content:'';flex:1;height:1px;background:#2a2828; }
   .featured-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px; }
 
@@ -52,28 +52,28 @@ const css = `
   .featured-card:hover::before { opacity:1; }
   .featured-card:hover { border-color:rgba(232,98,26,0.4);transform:translateY(-2px);box-shadow:0 8px 28px rgba(0,0,0,0.4); }
   .featured-logo { width:80px;height:40px;object-fit:contain;margin-bottom:10px;filter:brightness(0) invert(1);opacity:0.8; }
-  .featured-badge { font-family:'Share Tech Mono',monospace;font-size:7px;color:#c9a84c;letter-spacing:0.15em;border:1px solid rgba(201,168,76,0.25);padding:2px 7px;border-radius:1px;display:inline-block;margin-bottom:10px; }
-  .featured-name { font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:0.05em;color:#f0ebe3;margin-bottom:14px;line-height:1; }
-  .featured-cta { font-family:'Share Tech Mono',monospace;font-size:9px;color:#e8621a;letter-spacing:0.12em;display:flex;align-items:center;gap:6px; }
+  .featured-badge { font-family:var(--font-stencil),monospace;font-size:7px;color:#c9a84c;letter-spacing:0.15em;border:1px solid rgba(201,168,76,0.25);padding:2px 7px;border-radius:1px;display:inline-block;margin-bottom:10px; }
+  .featured-name { font-family:var(--font-caesar),sans-serif;font-size:26px;letter-spacing:0.05em;color:#f0ebe3;margin-bottom:14px;line-height:1; }
+  .featured-cta { font-family:var(--font-stencil),monospace;font-size:9px;color:#e8621a;letter-spacing:0.12em;display:flex;align-items:center;gap:6px; }
 
   /* ALL BRANDS GRID */
   .all-brands-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px; }
   .brand-pill-card { background:#111010;border:1px solid #2a2828;border-radius:2px;padding:14px 16px;cursor:pointer;transition:all 0.18s;display:flex;flex-direction:column;gap:4px;animation:fadeUp 0.25s ease both; }
   .brand-pill-card:hover { border-color:rgba(232,98,26,0.35);background:#151414; }
   .brand-pill-logo { width:60px;height:28px;object-fit:contain;filter:brightness(0) invert(1);opacity:0.6;margin-bottom:4px; }
-  .brand-pill-name { font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:0.06em;color:#f0ebe3;line-height:1; }
-  .brand-pill-arrow { font-family:'Share Tech Mono',monospace;font-size:8px;color:#3a3838;margin-top:6px;transition:color 0.15s; }
+  .brand-pill-name { font-family:var(--font-caesar),sans-serif;font-size:18px;letter-spacing:0.06em;color:#f0ebe3;line-height:1; }
+  .brand-pill-arrow { font-family:var(--font-stencil),monospace;font-size:8px;color:#3a3838;margin-top:6px;transition:color 0.15s; }
   .brand-pill-card:hover .brand-pill-arrow { color:#e8621a; }
 
   /* ERROR */
   .brands-error { padding:60px;text-align:center; }
-  .brands-error-title { font-family:'Bebas Neue',sans-serif;font-size:28px;color:#e8621a;letter-spacing:0.05em;margin-bottom:8px; }
-  .brands-error-sub { font-family:'Share Tech Mono',monospace;font-size:9px;color:#8a8784;letter-spacing:0.12em; }
+  .brands-error-title { font-family:var(--font-caesar),sans-serif;font-size:28px;color:#e8621a;letter-spacing:0.05em;margin-bottom:8px; }
+  .brands-error-sub { font-family:var(--font-stencil),monospace;font-size:9px;color:#8a8784;letter-spacing:0.12em; }
 
   /* EMPTY */
   .brands-empty { padding:60px;text-align:center; }
-  .brands-empty-title { font-family:'Bebas Neue',sans-serif;font-size:28px;color:#3a3838;letter-spacing:0.05em;margin-bottom:8px; }
-  .brands-empty-sub { font-family:'Share Tech Mono',monospace;font-size:9px;color:#8a8784;letter-spacing:0.12em; }
+  .brands-empty-title { font-family:var(--font-caesar),sans-serif;font-size:28px;color:#3a3838;letter-spacing:0.05em;margin-bottom:8px; }
+  .brands-empty-sub { font-family:var(--font-stencil),monospace;font-size:9px;color:#8a8784;letter-spacing:0.12em; }
 `;
 
 export default function BrandsPage() {

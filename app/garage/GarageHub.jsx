@@ -52,26 +52,26 @@ const css = `
   @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
   @keyframes spin { to{transform:rotate(360deg)} }
 
-  .gh-wrap { background:#0a0909; min-height:100vh; color:#f0ebe3; font-family:'Barlow Condensed',sans-serif; }
+  .gh-wrap { background:#0a0909; min-height:100vh; color:#f0ebe3; font-family:var(--font-stencil),sans-serif; }
 
   /* HERO HEADER */
   .gh-header { background:#111010;border-bottom:1px solid #2a2828;padding:24px 24px 0;position:relative;overflow:hidden; }
   .gh-header::before { content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(232,98,26,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(232,98,26,0.03) 1px,transparent 1px);background-size:32px 32px; }
   .gh-header-inner { max-width:1100px;margin:0 auto;position:relative;z-index:1; }
   .gh-header-top { display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:16px; }
-  .gh-eyebrow { font-family:'Share Tech Mono',monospace;font-size:9px;color:#e8621a;letter-spacing:0.25em;margin-bottom:6px; }
-  .gh-name { font-family:'Bebas Neue',sans-serif;font-size:44px;letter-spacing:0.04em;line-height:1; }
+  .gh-eyebrow { font-family:var(--font-stencil),monospace;font-size:9px;color:#e8621a;letter-spacing:0.25em;margin-bottom:6px; }
+  .gh-name { font-family:var(--font-caesar),sans-serif;font-size:44px;letter-spacing:0.04em;line-height:1; }
   .gh-name span { color:#e8621a; }
   .gh-email { font-size:13px;color:#8a8784;margin-top:4px; }
   .gh-stats { display:flex;gap:24px;flex-wrap:wrap; }
   .gh-stat { text-align:right; }
-  .gh-stat-val { font-family:'Bebas Neue',sans-serif;font-size:28px;color:#e8621a;letter-spacing:0.04em;line-height:1; }
-  .gh-stat-label { font-family:'Share Tech Mono',monospace;font-size:8px;color:#8a8784;letter-spacing:0.12em; }
+  .gh-stat-val { font-family:var(--font-caesar),sans-serif;font-size:28px;color:#e8621a;letter-spacing:0.04em;line-height:1; }
+  .gh-stat-label { font-family:var(--font-stencil),monospace;font-size:8px;color:#8a8784;letter-spacing:0.12em; }
 
   /* TABS */
   .gh-tabs { display:flex;gap:0;overflow-x:auto;border-bottom:1px solid #1a1919; }
   .gh-tabs::-webkit-scrollbar { height:2px; }
-  .gh-tab { font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:0.15em;padding:14px 22px;cursor:pointer;color:#8a8784;border-bottom:2px solid transparent;transition:all 0.2s;white-space:nowrap;background:none;border-left:none;border-right:none;border-top:none; }
+  .gh-tab { font-family:var(--font-stencil),monospace;font-size:10px;letter-spacing:0.15em;padding:14px 22px;cursor:pointer;color:#8a8784;border-bottom:2px solid transparent;transition:all 0.2s;white-space:nowrap;background:none;border-left:none;border-right:none;border-top:none; }
   .gh-tab.active { color:#e8621a;border-bottom-color:#e8621a; }
   .gh-tab:hover:not(.active) { color:#f0ebe3; }
 
@@ -81,18 +81,18 @@ const css = `
   /* CARDS */
   .gh-card { background:#111010;border:1px solid #2a2828;border-radius:3px;margin-bottom:14px;overflow:hidden; }
   .gh-card-head { padding:14px 18px;border-bottom:1px solid #2a2828;display:flex;align-items:center;justify-content:space-between; }
-  .gh-card-title { font-family:'Bebas Neue',sans-serif;font-size:19px;letter-spacing:0.05em; }
+  .gh-card-title { font-family:var(--font-caesar),sans-serif;font-size:19px;letter-spacing:0.05em; }
   .gh-card-title span { color:#e8621a; }
   .gh-card-body { padding:18px; }
 
   /* FORM ELEMENTS */
   .gh-field { display:flex;flex-direction:column;gap:5px; }
-  .gh-label { font-family:'Share Tech Mono',monospace;font-size:8px;color:#8a8784;letter-spacing:0.15em; }
-  .gh-input { background:#1a1919;border:1px solid #2a2828;color:#f0ebe3;font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:500;padding:9px 12px;border-radius:2px;outline:none;width:100%;transition:border-color 0.2s; }
+  .gh-label { font-family:var(--font-stencil),monospace;font-size:8px;color:#8a8784;letter-spacing:0.15em; }
+  .gh-input { background:#1a1919;border:1px solid #2a2828;color:#f0ebe3;font-family:var(--font-stencil),sans-serif;font-size:15px;font-weight:500;padding:9px 12px;border-radius:2px;outline:none;width:100%;transition:border-color 0.2s; }
   .gh-input:focus { border-color:#e8621a; }
   .gh-input:disabled { opacity:0.5;cursor:not-allowed; }
   .gh-input::placeholder { color:#3a3838; }
-  .gh-select { background:#1a1919;border:1px solid #2a2828;color:#f0ebe3;font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:500;padding:9px 12px;border-radius:2px;outline:none;appearance:none;cursor:pointer;width:100%;transition:border-color 0.2s; }
+  .gh-select { background:#1a1919;border:1px solid #2a2828;color:#f0ebe3;font-family:var(--font-stencil),sans-serif;font-size:15px;font-weight:500;padding:9px 12px;border-radius:2px;outline:none;appearance:none;cursor:pointer;width:100%;transition:border-color 0.2s; }
   .gh-select:focus { border-color:#e8621a; }
   .gh-select:disabled { opacity:0.4;cursor:not-allowed; }
   .gh-grid-2 { display:grid;grid-template-columns:1fr 1fr;gap:12px; }
@@ -101,12 +101,12 @@ const css = `
   .gh-full { grid-column:1/-1; }
 
   /* BUTTONS */
-  .btn-orange { background:#e8621a;border:none;color:#0a0909;font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:0.1em;padding:9px 20px;border-radius:2px;cursor:pointer;transition:background 0.2s;white-space:nowrap; }
+  .btn-orange { background:#e8621a;border:none;color:#0a0909;font-family:var(--font-caesar),sans-serif;font-size:16px;letter-spacing:0.1em;padding:9px 20px;border-radius:2px;cursor:pointer;transition:background 0.2s;white-space:nowrap; }
   .btn-orange:hover { background:#c94f0f; }
   .btn-orange:disabled { opacity:0.4;cursor:not-allowed; }
-  .btn-ghost { background:transparent;border:1px solid #2a2828;color:#8a8784;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:0.12em;padding:7px 14px;border-radius:2px;cursor:pointer;transition:all 0.2s;white-space:nowrap; }
+  .btn-ghost { background:transparent;border:1px solid #2a2828;color:#8a8784;font-family:var(--font-stencil),monospace;font-size:9px;letter-spacing:0.12em;padding:7px 14px;border-radius:2px;cursor:pointer;transition:all 0.2s;white-space:nowrap; }
   .btn-ghost:hover { border-color:#e8621a;color:#e8621a; }
-  .btn-danger { background:transparent;border:1px solid rgba(185,28,28,0.3);color:#ef4444;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:0.12em;padding:7px 14px;border-radius:2px;cursor:pointer;transition:all 0.2s;white-space:nowrap; }
+  .btn-danger { background:transparent;border:1px solid rgba(185,28,28,0.3);color:#ef4444;font-family:var(--font-stencil),monospace;font-size:9px;letter-spacing:0.12em;padding:7px 14px;border-radius:2px;cursor:pointer;transition:all 0.2s;white-space:nowrap; }
   .btn-danger:hover { background:rgba(185,28,28,0.08);border-color:#b91c1c; }
 
   /* TOGGLE */
@@ -122,17 +122,17 @@ const css = `
   .bike-card { background:#111010;border:1px solid #2a2828;border-left:3px solid #2a2828;border-radius:0 3px 3px 0;padding:16px;transition:all 0.2s; }
   .bike-card.primary { border-left-color:#e8621a; }
   .bike-card:hover { background:#151414;border-color:rgba(232,98,26,0.25);border-left-color:#e8621a; }
-  .bike-year { font-family:'Bebas Neue',sans-serif;font-size:34px;letter-spacing:0.04em;line-height:1; }
+  .bike-year { font-family:var(--font-caesar),sans-serif;font-size:34px;letter-spacing:0.04em;line-height:1; }
   .bike-card.primary .bike-year { color:#e8621a; }
   .bike-card:not(.primary) .bike-year { color:#3a3838; }
-  .bike-name { font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:0.04em;color:#f0ebe3;line-height:1.2;margin-bottom:3px; }
-  .bike-meta { font-family:'Share Tech Mono',monospace;font-size:8px;color:#8a8784;letter-spacing:0.1em;margin-bottom:10px; }
+  .bike-name { font-family:var(--font-caesar),sans-serif;font-size:17px;letter-spacing:0.04em;color:#f0ebe3;line-height:1.2;margin-bottom:3px; }
+  .bike-meta { font-family:var(--font-stencil),monospace;font-size:8px;color:#8a8784;letter-spacing:0.1em;margin-bottom:10px; }
   .bike-actions { display:flex;gap:7px;flex-wrap:wrap; }
 
   /* ADDRESS CARDS */
   .addr-card { background:#1a1919;border:1px solid #2a2828;border-radius:2px;padding:14px 16px;margin-bottom:10px; }
   .addr-card.default { border-color:rgba(232,98,26,0.3); }
-  .addr-default-badge { font-family:'Share Tech Mono',monospace;font-size:7px;color:#e8621a;letter-spacing:0.15em;border:1px solid rgba(232,98,26,0.25);padding:1px 6px;border-radius:1px;display:inline-block;margin-bottom:6px; }
+  .addr-default-badge { font-family:var(--font-stencil),monospace;font-size:7px;color:#e8621a;letter-spacing:0.15em;border:1px solid rgba(232,98,26,0.25);padding:1px 6px;border-radius:1px;display:inline-block;margin-bottom:6px; }
   .addr-name { font-size:14px;font-weight:700;color:#f0ebe3;margin-bottom:3px; }
   .addr-text { font-size:13px;color:#8a8784;line-height:1.5; }
   .addr-actions { display:flex;gap:8px;margin-top:10px; }
@@ -141,18 +141,18 @@ const css = `
   .points-grid { display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px; }
   .points-stat { background:#0a0909;border:1px solid #2a2828;border-radius:2px;padding:14px; }
   .points-stat.gold { border-color:rgba(201,168,76,0.25);background:rgba(201,168,76,0.04); }
-  .points-val { font-family:'Bebas Neue',sans-serif;font-size:32px;letter-spacing:0.04em;line-height:1;margin-bottom:3px; }
+  .points-val { font-family:var(--font-caesar),sans-serif;font-size:32px;letter-spacing:0.04em;line-height:1;margin-bottom:3px; }
   .points-stat.gold .points-val { color:#c9a84c; }
-  .points-lbl { font-family:'Share Tech Mono',monospace;font-size:8px;color:#8a8784;letter-spacing:0.12em; }
+  .points-lbl { font-family:var(--font-stencil),monospace;font-size:8px;color:#8a8784;letter-spacing:0.12em; }
   .tier-track { height:5px;background:#2a2828;border-radius:3px;overflow:hidden;margin:10px 0 5px; }
   .tier-fill { height:100%;background:linear-gradient(90deg,#e8621a,#c9a84c);border-radius:3px;transition:width 0.6s ease; }
-  .tier-labels { display:flex;justify-content:space-between;font-family:'Share Tech Mono',monospace;font-size:8px;color:#8a8784;letter-spacing:0.08em; }
+  .tier-labels { display:flex;justify-content:space-between;font-family:var(--font-stencil),monospace;font-size:8px;color:#8a8784;letter-spacing:0.08em; }
   .how-grid { display:grid;grid-template-columns:1fr 1fr;gap:8px; }
   .how-card { background:#1a1919;border:1px solid #2a2828;border-radius:2px;padding:12px 14px; }
-  .how-rate { font-family:'Bebas Neue',sans-serif;font-size:24px;color:#e8621a;letter-spacing:0.04em;line-height:1;margin-bottom:3px; }
+  .how-rate { font-family:var(--font-caesar),sans-serif;font-size:24px;color:#e8621a;letter-spacing:0.04em;line-height:1;margin-bottom:3px; }
   .how-desc { font-size:13px;font-weight:500;color:#8a8784;line-height:1.4; }
   .ledger-table { width:100%;border-collapse:collapse; }
-  .ledger-table th { font-family:'Share Tech Mono',monospace;font-size:8px;color:#8a8784;letter-spacing:0.12em;padding:8px 10px;text-align:left;border-bottom:1px solid #2a2828; }
+  .ledger-table th { font-family:var(--font-stencil),monospace;font-size:8px;color:#8a8784;letter-spacing:0.12em;padding:8px 10px;text-align:left;border-bottom:1px solid #2a2828; }
   .ledger-table td { padding:10px;border-bottom:1px solid #1a1919;font-size:13px;font-weight:500; }
   .ledger-table tr:last-child td { border-bottom:none; }
   .pts-earn { color:#22c55e; } .pts-redeem { color:#e8621a; } .pts-expire { color:#8a8784; }
@@ -164,22 +164,22 @@ const css = `
   .wl-img { width:100%;aspect-ratio:4/3;background:#1a1919;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;cursor:pointer; }
   .wl-img::before { content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(232,98,26,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(232,98,26,0.04) 1px,transparent 1px);background-size:16px 16px; }
   .wl-body { padding:12px; }
-  .wl-brand { font-family:'Share Tech Mono',monospace;font-size:9px;color:#e8621a;letter-spacing:0.12em;margin-bottom:3px; }
+  .wl-brand { font-family:var(--font-stencil),monospace;font-size:9px;color:#e8621a;letter-spacing:0.12em;margin-bottom:3px; }
   .wl-name { font-size:13px;font-weight:700;color:#f0ebe3;line-height:1.3;margin-bottom:7px;cursor:pointer; }
-  .wl-price { font-family:'Bebas Neue',sans-serif;font-size:20px;color:#f0ebe3;letter-spacing:0.04em;margin-bottom:8px; }
-  .wl-stock { font-family:'Share Tech Mono',monospace;font-size:8px;letter-spacing:0.1em;margin-bottom:8px; }
+  .wl-price { font-family:var(--font-caesar),sans-serif;font-size:20px;color:#f0ebe3;letter-spacing:0.04em;margin-bottom:8px; }
+  .wl-stock { font-family:var(--font-stencil),monospace;font-size:8px;letter-spacing:0.1em;margin-bottom:8px; }
   .wl-in { color:#22c55e; } .wl-out { color:#8a8784; }
   .wl-actions { display:flex;gap:7px; }
   .wl-notify { display:flex;align-items:center;gap:7px;margin-top:8px;padding-top:8px;border-top:1px solid #1a1919; }
-  .wl-notify-lbl { font-family:'Share Tech Mono',monospace;font-size:8px;color:#8a8784;letter-spacing:0.08em;flex:1; }
+  .wl-notify-lbl { font-family:var(--font-stencil),monospace;font-size:8px;color:#8a8784;letter-spacing:0.08em;flex:1; }
 
   /* ORDERS */
   .order-row { border:1px solid #2a2828;border-radius:2px;margin-bottom:8px;overflow:hidden; }
   .order-row-head { display:flex;align-items:center;gap:14px;padding:13px 16px;background:#111010;flex-wrap:wrap; }
-  .order-id { font-family:'Share Tech Mono',monospace;font-size:10px;color:#8a8784;letter-spacing:0.1em; }
-  .order-date { font-family:'Share Tech Mono',monospace;font-size:9px;color:#8a8784;letter-spacing:0.08em; }
-  .order-status { font-family:'Share Tech Mono',monospace;font-size:8px;letter-spacing:0.12em;padding:2px 8px;border-radius:1px; }
-  .order-total { font-family:'Bebas Neue',sans-serif;font-size:18px;color:#f0ebe3;letter-spacing:0.04em;margin-left:auto; }
+  .order-id { font-family:var(--font-stencil),monospace;font-size:10px;color:#8a8784;letter-spacing:0.1em; }
+  .order-date { font-family:var(--font-stencil),monospace;font-size:9px;color:#8a8784;letter-spacing:0.08em; }
+  .order-status { font-family:var(--font-stencil),monospace;font-size:8px;letter-spacing:0.12em;padding:2px 8px;border-radius:1px; }
+  .order-total { font-family:var(--font-caesar),sans-serif;font-size:18px;color:#f0ebe3;letter-spacing:0.04em;margin-left:auto; }
   .order-items { padding:10px 16px;background:#0a0909;border-top:1px solid #1a1919; }
   .order-item { display:flex;justify-content:space-between;font-size:13px;font-weight:500;color:#8a8784;padding:4px 0; }
   .order-item span:last-child { color:#f0ebe3; }
@@ -187,18 +187,18 @@ const css = `
   /* MODALS */
   .gh-modal-overlay { position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.8);backdrop-filter:blur(4px);display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto; }
   .gh-modal { background:#111010;border:1px solid #2a2828;border-radius:4px;padding:24px;width:100%;max-width:500px;margin:auto;position:relative; }
-  .gh-modal-title { font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:0.05em;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between; }
+  .gh-modal-title { font-family:var(--font-caesar),sans-serif;font-size:22px;letter-spacing:0.05em;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between; }
   .gh-modal-title span { color:#e8621a; }
   .gh-modal-close { background:none;border:none;color:#8a8784;font-size:18px;cursor:pointer;transition:color 0.15s; }
   .gh-modal-close:hover { color:#f0ebe3; }
 
   /* EMPTY STATE */
   .gh-empty { padding:48px;text-align:center; }
-  .gh-empty-title { font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:0.05em;color:#3a3838;margin-bottom:6px; }
-  .gh-empty-sub { font-family:'Share Tech Mono',monospace;font-size:9px;color:#8a8784;letter-spacing:0.12em;margin-bottom:18px; }
+  .gh-empty-title { font-family:var(--font-caesar),sans-serif;font-size:26px;letter-spacing:0.05em;color:#3a3838;margin-bottom:6px; }
+  .gh-empty-sub { font-family:var(--font-stencil),monospace;font-size:9px;color:#8a8784;letter-spacing:0.12em;margin-bottom:18px; }
 
   /* TOAST */
-  .gh-toast { position:fixed;bottom:24px;right:24px;z-index:400;background:#22c55e;color:#0a0909;font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:0.1em;padding:11px 22px;border-radius:2px;box-shadow:0 8px 32px rgba(0,0,0,0.4);animation:fadeUp 0.25s ease; }
+  .gh-toast { position:fixed;bottom:24px;right:24px;z-index:400;background:#22c55e;color:#0a0909;font-family:var(--font-caesar),sans-serif;font-size:15px;letter-spacing:0.1em;padding:11px 22px;border-radius:2px;box-shadow:0 8px 32px rgba(0,0,0,0.4);animation:fadeUp 0.25s ease; }
 
   @media (max-width:700px) {
     .points-grid { grid-template-columns:1fr 1fr; }
@@ -396,8 +396,8 @@ export default function GarageHub({ user, initialAddresses, initialVehicles, led
   const nextTier = TIER_THRESHOLDS[TIER_THRESHOLDS.indexOf(tier) + 1];
   const tierPct  = nextTier ? Math.min(100, ((user.points - tier.min) / (nextTier.min - tier.min)) * 100) : 100;
 
-  const B = s => ({ fontFamily:"'Bebas Neue',sans-serif",     ...s });
-  const M = s => ({ fontFamily:"'Share Tech Mono',monospace", ...s });
+  const B = s => ({ fontFamily:"var(--font-caesar),sans-serif",     ...s });
+  const M = s => ({ fontFamily:"var(--font-stencil),monospace", ...s });
   const Toggle = ({ on, onChange }) => (
     <div className={`gh-toggle ${on?"on":"off"}`} onClick={() => onChange(!on)}>
       <div className="gh-toggle-thumb"/>

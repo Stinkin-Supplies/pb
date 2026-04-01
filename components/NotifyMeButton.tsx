@@ -61,7 +61,7 @@ export default function NotifyMeButton({
     width: "100%",
     padding: "14px 24px",
     borderRadius: "2px",
-    fontFamily: "'Barlow Condensed', sans-serif",
+    fontFamily: "var(--font-stencil), sans-serif",
     fontWeight: 600,
     fontSize: "15px",
     letterSpacing: "0.08em",

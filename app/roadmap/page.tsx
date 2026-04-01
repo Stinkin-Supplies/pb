@@ -122,7 +122,7 @@ export default function Roadmap() {
   const pct = Math.round((doneCount / totalItems) * 100);
 
   return (
-    <div style={{ background:"#0a0909", minHeight:"100vh", fontFamily:"'Barlow Condensed',sans-serif", color:"#f0ebe3", paddingBottom:80 }}>
+    <div style={{ background:"#0a0909", minHeight:"100vh", fontFamily:"var(--font-stencil),sans-serif", color:"#f0ebe3", paddingBottom:80 }}>
       <style>{`
         * { box-sizing:border-box; margin:0; padding:0; }
         ::-webkit-scrollbar { width:4px; }
@@ -136,16 +136,16 @@ export default function Roadmap() {
       {/* Header */}
       <div style={{ background:"#111010", borderBottom:"1px solid #2a2828", padding:"24px 28px", display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:16 }}>
         <div>
-          <div style={{ fontFamily:"'Share Tech Mono',monospace", fontSize:10, color:"#e8621a", letterSpacing:"0.25em", marginBottom:6 }}>STINKIN' SUPPLIES · BUILD TRACKER</div>
-          <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:32, letterSpacing:"0.05em" }}>DEVELOPMENT ROADMAP</div>
+          <div style={{ fontFamily:"var(--font-stencil),monospace", fontSize:10, color:"#e8621a", letterSpacing:"0.25em", marginBottom:6 }}>STINKIN' SUPPLIES · BUILD TRACKER</div>
+          <div style={{ fontFamily:"var(--font-caesar),sans-serif", fontSize:32, letterSpacing:"0.05em" }}>DEVELOPMENT ROADMAP</div>
         </div>
         <div style={{ textAlign:"right" }}>
-          <div style={{ fontFamily:"'Share Tech Mono',monospace", fontSize:9, color:"#8a8784", letterSpacing:"0.15em", marginBottom:6 }}>OVERALL PROGRESS</div>
-          <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:44, color:"#e8621a", lineHeight:1 }}>{pct}%</div>
+          <div style={{ fontFamily:"var(--font-stencil),monospace", fontSize:9, color:"#8a8784", letterSpacing:"0.15em", marginBottom:6 }}>OVERALL PROGRESS</div>
+          <div style={{ fontFamily:"var(--font-caesar),sans-serif", fontSize:44, color:"#e8621a", lineHeight:1 }}>{pct}%</div>
           <div style={{ width:160, height:3, background:"#2a2828", borderRadius:2, marginTop:8 }}>
             <div style={{ width:`${pct}%`, height:"100%", background:"#e8621a", borderRadius:2, transition:"width 0.4s" }}/>
           </div>
-          <div style={{ fontFamily:"'Share Tech Mono',monospace", fontSize:9, color:"#8a8784", marginTop:6, letterSpacing:"0.1em" }}>{doneCount} / {totalItems} TASKS COMPLETE</div>
+          <div style={{ fontFamily:"var(--font-stencil),monospace", fontSize:9, color:"#8a8784", marginTop:6, letterSpacing:"0.1em" }}>{doneCount} / {totalItems} TASKS COMPLETE</div>
         </div>
       </div>
 
@@ -153,18 +153,18 @@ export default function Roadmap() {
 
         {/* BUILD NEXT */}
         <div style={{ background:"rgba(232,98,26,0.06)", border:"1px solid rgba(232,98,26,0.3)", borderRadius:4, padding:"18px 22px", marginBottom:28, position:"relative" }}>
-          <div style={{ position:"absolute", top:-1, left:18, background:"#e8621a", color:"#0a0909", fontFamily:"'Share Tech Mono',monospace", fontSize:10, letterSpacing:"0.2em", padding:"3px 10px" }}>BUILD NEXT</div>
-          <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:20, letterSpacing:"0.05em", marginTop:10, marginBottom:12 }}>READY TO BUILD — START HERE</div>
+          <div style={{ position:"absolute", top:-1, left:18, background:"#e8621a", color:"#0a0909", fontFamily:"var(--font-stencil),monospace", fontSize:10, letterSpacing:"0.2em", padding:"3px 10px" }}>BUILD NEXT</div>
+          <div style={{ fontFamily:"var(--font-caesar),sans-serif", fontSize:20, letterSpacing:"0.05em", marginTop:10, marginBottom:12 }}>READY TO BUILD — START HERE</div>
           {NEXT_UP.map((item, i) => (
             <div key={i} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"9px 0", borderTop:i===0?"none":"1px solid #1a1919", gap:12, flexWrap:"wrap" }}>
               <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                <div style={{ fontFamily:"'Share Tech Mono',monospace", fontSize:9, background:"#1a1919", color:"#e8621a", padding:"2px 8px", borderRadius:2, letterSpacing:"0.1em", whiteSpace:"nowrap" }}>STEP {i+1}</div>
+                <div style={{ fontFamily:"var(--font-stencil),monospace", fontSize:9, background:"#1a1919", color:"#e8621a", padding:"2px 8px", borderRadius:2, letterSpacing:"0.1em", whiteSpace:"nowrap" }}>STEP {i+1}</div>
                 <div>
-                  <div style={{ fontFamily:"'Share Tech Mono',monospace", fontSize:11, color:"#f0ebe3" }}>{item.file}</div>
+                  <div style={{ fontFamily:"var(--font-stencil),monospace", fontSize:11, color:"#f0ebe3" }}>{item.file}</div>
                   <div style={{ fontSize:12, color:"#8a8784", marginTop:2 }}>{item.desc}</div>
                 </div>
               </div>
-              <button className="copy-btn" onClick={() => copy(item.file, i)} style={{ background:copied===i?"#22c55e":"#1a1919", border:`1px solid ${copied===i?"#22c55e":"#2a2828"}`, color:copied===i?"#0a0909":"#8a8784", fontFamily:"'Share Tech Mono',monospace", fontSize:9, letterSpacing:"0.1em", padding:"5px 12px", borderRadius:2, cursor:"pointer", whiteSpace:"nowrap", transition:"all 0.2s" }}>
+              <button className="copy-btn" onClick={() => copy(item.file, i)} style={{ background:copied===i?"#22c55e":"#1a1919", border:`1px solid ${copied===i?"#22c55e":"#2a2828"}`, color:copied===i?"#0a0909":"#8a8784", fontFamily:"var(--font-stencil),monospace", fontSize:9, letterSpacing:"0.1em", padding:"5px 12px", borderRadius:2, cursor:"pointer", whiteSpace:"nowrap", transition:"all 0.2s" }}>
                 {copied===i ? "✓ COPIED" : "COPY PATH"}
               </button>
             </div>
@@ -187,13 +187,13 @@ export default function Roadmap() {
                     border:phase.status==="upcoming"?"1px solid #8a8784":"none",
                     boxShadow:phase.status==="current"?"0 0 8px #e8621a88":"none",
                   }}/>
-                  <div style={{ fontFamily:"'Share Tech Mono',monospace", fontSize:9, color:phase.color, letterSpacing:"0.2em", width:62, flexShrink:0 }}>{phase.label}</div>
-                  <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:20, letterSpacing:"0.05em", flex:1 }}>
+                  <div style={{ fontFamily:"var(--font-stencil),monospace", fontSize:9, color:phase.color, letterSpacing:"0.2em", width:62, flexShrink:0 }}>{phase.label}</div>
+                  <div style={{ fontFamily:"var(--font-caesar),sans-serif", fontSize:20, letterSpacing:"0.05em", flex:1 }}>
                     {phase.title}
-                    {phase.status==="current" && <span style={{ fontFamily:"'Share Tech Mono',monospace", fontSize:8, color:"#e8621a", marginLeft:10, letterSpacing:"0.15em", verticalAlign:"middle" }}>← IN PROGRESS</span>}
+                    {phase.status==="current" && <span style={{ fontFamily:"var(--font-stencil),monospace", fontSize:8, color:"#e8621a", marginLeft:10, letterSpacing:"0.15em", verticalAlign:"middle" }}>← IN PROGRESS</span>}
                   </div>
                   <div style={{ display:"flex", alignItems:"center", gap:8, flexShrink:0 }}>
-                    <div style={{ fontFamily:"'Share Tech Mono',monospace", fontSize:10, color:phase.color }}>{doneInPhase}/{phase.items.length}</div>
+                    <div style={{ fontFamily:"var(--font-stencil),monospace", fontSize:10, color:phase.color }}>{doneInPhase}/{phase.items.length}</div>
                     <div style={{ width:52, height:2, background:"#2a2828", borderRadius:1 }}>
                       <div style={{ width:`${phasePct}%`, height:"100%", background:phase.color, borderRadius:1, transition:"width 0.3s" }}/>
                     </div>
@@ -212,8 +212,8 @@ export default function Roadmap() {
                           </div>
                           <div style={{ flex:1 }}>
                             <div style={{ fontSize:14, fontWeight:600, color:isDone?"#555":"#f0ebe3", textDecoration:isDone?"line-through":"none", letterSpacing:"0.02em" }}>{item.name}</div>
-                            {item.note && <div style={{ fontFamily:"'Share Tech Mono',monospace", fontSize:9, color:"#8a8784", marginTop:3, letterSpacing:"0.08em" }}>{item.note}</div>}
-                            {item.file && <div style={{ fontFamily:"'Share Tech Mono',monospace", fontSize:9, color:phase.color, marginTop:3, letterSpacing:"0.1em", opacity:0.7 }}>→ {item.file}</div>}
+                            {item.note && <div style={{ fontFamily:"var(--font-stencil),monospace", fontSize:9, color:"#8a8784", marginTop:3, letterSpacing:"0.08em" }}>{item.note}</div>}
+                            {item.file && <div style={{ fontFamily:"var(--font-stencil),monospace", fontSize:9, color:phase.color, marginTop:3, letterSpacing:"0.1em", opacity:0.7 }}>→ {item.file}</div>}
                           </div>
                         </div>
                       );
@@ -227,11 +227,11 @@ export default function Roadmap() {
 
         {/* Critical path */}
         <div style={{ marginTop:24, padding:"14px 18px", background:"#111010", border:"1px solid #2a2828", borderRadius:3 }}>
-          <div style={{ fontFamily:"'Share Tech Mono',monospace", fontSize:9, color:"#8a8784", letterSpacing:"0.2em", marginBottom:10 }}>CRITICAL PATH — BUILD IN THIS ORDER</div>
+          <div style={{ fontFamily:"var(--font-stencil),monospace", fontSize:9, color:"#8a8784", letterSpacing:"0.2em", marginBottom:10 }}>CRITICAL PATH — BUILD IN THIS ORDER</div>
           <div style={{ display:"flex", alignItems:"center", flexWrap:"wrap", gap:4 }}>
             {["Shop Page","Product Detail","Cart","Auth","Checkout","Stripe","Vendor Sync","Admin","Launch"].map((s,i,a) => (
               <span key={i} style={{ display:"flex", alignItems:"center", gap:4 }}>
-                <span style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:13, letterSpacing:"0.08em", color:i<2?"#e8621a":"#555", padding:"3px 9px", background:i<2?"rgba(232,98,26,0.1)":"transparent", border:i<2?"1px solid rgba(232,98,26,0.2)":"none", borderRadius:2 }}>{s}</span>
+                <span style={{ fontFamily:"var(--font-caesar),sans-serif", fontSize:13, letterSpacing:"0.08em", color:i<2?"#e8621a":"#555", padding:"3px 9px", background:i<2?"rgba(232,98,26,0.1)":"transparent", border:i<2?"1px solid rgba(232,98,26,0.2)":"none", borderRadius:2 }}>{s}</span>
                 {i<a.length-1 && <span style={{ color:"#2a2828", fontSize:10 }}>→</span>}
               </span>
             ))}

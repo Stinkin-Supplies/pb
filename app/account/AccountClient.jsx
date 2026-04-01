@@ -11,36 +11,36 @@ const css = `
   *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
   ::-webkit-scrollbar { width:4px; } ::-webkit-scrollbar-thumb { background:#e8621a; }
   @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
-  .acc-wrap { background:#0a0909; min-height:100vh; color:#f0ebe3; font-family:'Barlow Condensed',sans-serif; }
+  .acc-wrap { background:#0a0909; min-height:100vh; color:#f0ebe3; font-family:var(--font-stencil),sans-serif; }
   .acc-header { background:#111010;border-bottom:1px solid #2a2828;padding:28px 24px; }
   .acc-header-inner { max-width:900px;margin:0 auto;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap; }
   .acc-tabs { background:#0a0909;border-bottom:1px solid #2a2828;padding:0 24px;display:flex;gap:0;overflow-x:auto; }
-  .acc-tab { font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:0.15em;padding:14px 20px;cursor:pointer;color:#8a8784;border-bottom:2px solid transparent;transition:all 0.2s;white-space:nowrap;background:none;border-left:none;border-right:none;border-top:none; }
+  .acc-tab { font-family:var(--font-stencil),monospace;font-size:10px;letter-spacing:0.15em;padding:14px 20px;cursor:pointer;color:#8a8784;border-bottom:2px solid transparent;transition:all 0.2s;white-space:nowrap;background:none;border-left:none;border-right:none;border-top:none; }
   .acc-tab.active { color:#e8621a;border-bottom-color:#e8621a; }
   .acc-tab:hover:not(.active) { color:#f0ebe3; }
   .acc-body { max-width:900px;margin:0 auto;padding:28px 24px; }
   .acc-section { background:#111010;border:1px solid #2a2828;border-radius:3px;margin-bottom:16px;overflow:hidden;animation:fadeUp 0.25s ease both; }
   .acc-section-head { padding:16px 20px;border-bottom:1px solid #2a2828;display:flex;align-items:center;justify-content:space-between; }
-  .acc-section-title { font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:0.05em; }
+  .acc-section-title { font-family:var(--font-caesar),sans-serif;font-size:20px;letter-spacing:0.05em; }
   .acc-section-title span { color:#e8621a; }
   .acc-section-body { padding:20px; }
   .field-grid { display:grid;grid-template-columns:1fr 1fr;gap:14px; }
   .field-full { grid-column:1/-1; }
-  .field-label { font-family:'Share Tech Mono',monospace;font-size:8px;color:#8a8784;letter-spacing:0.15em;display:block;margin-bottom:5px; }
-  .field-input { background:#1a1919;border:1px solid #2a2828;color:#f0ebe3;font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:500;padding:10px 12px;border-radius:2px;outline:none;width:100%;transition:border-color 0.2s; }
+  .field-label { font-family:var(--font-stencil),monospace;font-size:8px;color:#8a8784;letter-spacing:0.15em;display:block;margin-bottom:5px; }
+  .field-input { background:#1a1919;border:1px solid #2a2828;color:#f0ebe3;font-family:var(--font-stencil),sans-serif;font-size:15px;font-weight:500;padding:10px 12px;border-radius:2px;outline:none;width:100%;transition:border-color 0.2s; }
   .field-input:focus { border-color:#e8621a; }
   .field-input:disabled { opacity:0.5;cursor:not-allowed; }
   .field-value { font-size:15px;font-weight:600;color:#f0ebe3;padding:10px 0; }
-  .save-btn { background:#e8621a;border:none;color:#0a0909;font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:0.1em;padding:10px 24px;border-radius:2px;cursor:pointer;transition:background 0.2s; }
+  .save-btn { background:#e8621a;border:none;color:#0a0909;font-family:var(--font-caesar),sans-serif;font-size:16px;letter-spacing:0.1em;padding:10px 24px;border-radius:2px;cursor:pointer;transition:background 0.2s; }
   .save-btn:hover { background:#c94f0f; }
   .save-btn:disabled { opacity:0.4;cursor:not-allowed; }
-  .edit-btn { background:transparent;border:1px solid #2a2828;color:#8a8784;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:0.12em;padding:6px 14px;border-radius:2px;cursor:pointer;transition:all 0.2s; }
+  .edit-btn { background:transparent;border:1px solid #2a2828;color:#8a8784;font-family:var(--font-stencil),monospace;font-size:9px;letter-spacing:0.12em;padding:6px 14px;border-radius:2px;cursor:pointer;transition:all 0.2s; }
   .edit-btn:hover { border-color:#e8621a;color:#e8621a; }
-  .danger-btn { background:transparent;border:1px solid rgba(185,28,28,0.3);color:#ef4444;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:0.12em;padding:6px 14px;border-radius:2px;cursor:pointer;transition:all 0.2s; }
+  .danger-btn { background:transparent;border:1px solid rgba(185,28,28,0.3);color:#ef4444;font-family:var(--font-stencil),monospace;font-size:9px;letter-spacing:0.12em;padding:6px 14px;border-radius:2px;cursor:pointer;transition:all 0.2s; }
   .danger-btn:hover { background:rgba(185,28,28,0.08);border-color:#b91c1c; }
   .address-card { background:#1a1919;border:1px solid #2a2828;border-radius:2px;padding:14px 16px;margin-bottom:10px;position:relative; }
   .address-card.default { border-color:rgba(232,98,26,0.3); }
-  .address-default-badge { font-family:'Share Tech Mono',monospace;font-size:7px;color:#e8621a;letter-spacing:0.15em;border:1px solid rgba(232,98,26,0.25);padding:1px 6px;border-radius:1px;display:inline-block;margin-bottom:6px; }
+  .address-default-badge { font-family:var(--font-stencil),monospace;font-size:7px;color:#e8621a;letter-spacing:0.15em;border:1px solid rgba(232,98,26,0.25);padding:1px 6px;border-radius:1px;display:inline-block;margin-bottom:6px; }
   .address-name { font-size:14px;font-weight:700;color:#f0ebe3;margin-bottom:3px; }
   .address-text { font-size:13px;color:#8a8784;line-height:1.5; }
   .address-actions { display:flex;gap:8px;margin-top:10px; }
@@ -48,10 +48,10 @@ const css = `
   .quick-link { background:#1a1919;border:1px solid #2a2828;border-radius:2px;padding:16px;cursor:pointer;transition:all 0.2s;text-decoration:none;display:block; }
   .quick-link:hover { border-color:rgba(232,98,26,0.3);background:#151414; }
   .ql-icon { font-size:20px;margin-bottom:8px;display:block; }
-  .ql-title { font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:0.06em;color:#f0ebe3;display:block;margin-bottom:3px; }
-  .ql-sub { font-family:'Share Tech Mono',monospace;font-size:8px;color:#8a8784;letter-spacing:0.1em; }
+  .ql-title { font-family:var(--font-caesar),sans-serif;font-size:16px;letter-spacing:0.06em;color:#f0ebe3;display:block;margin-bottom:3px; }
+  .ql-sub { font-family:var(--font-stencil),monospace;font-size:8px;color:#8a8784;letter-spacing:0.1em; }
   .signout-row { padding:20px;border-top:1px solid #2a2828;display:flex;justify-content:flex-end; }
-  .toast { position:fixed;bottom:24px;right:24px;z-index:200;background:#22c55e;color:#0a0909;font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:0.1em;padding:11px 22px;border-radius:2px;box-shadow:0 8px 32px rgba(0,0,0,0.4);animation:fadeUp 0.25s ease; }
+  .toast { position:fixed;bottom:24px;right:24px;z-index:200;background:#22c55e;color:#0a0909;font-family:var(--font-caesar),sans-serif;font-size:15px;letter-spacing:0.1em;padding:11px 22px;border-radius:2px;box-shadow:0 8px 32px rgba(0,0,0,0.4);animation:fadeUp 0.25s ease; }
 `;
 
 const blankAddress = () => ({
@@ -129,8 +129,8 @@ export default function AccountClient({ user, initialAddresses }) {
 
   const memberYear = new Date(user.memberSince).getFullYear();
 
-  const B = s => ({ fontFamily:"'Bebas Neue',sans-serif",     ...s });
-  const M = s => ({ fontFamily:"'Share Tech Mono',monospace", ...s });
+  const B = s => ({ fontFamily:"var(--font-caesar),sans-serif",     ...s });
+  const M = s => ({ fontFamily:"var(--font-stencil),monospace", ...s });
 
   return (
     <div className="acc-wrap">
@@ -301,7 +301,7 @@ export default function AccountClient({ user, initialAddresses }) {
                   }}>
                     {/* Header */}
                     <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20}}>
-                      <div style={{fontFamily:"'Bebas Neue',sans-serif", fontSize:22, letterSpacing:"0.05em"}}>
+                      <div style={{fontFamily:"var(--font-caesar),sans-serif", fontSize:22, letterSpacing:"0.05em"}}>
                         ADD <span style={{color:"#e8621a"}}>ADDRESS</span>
                       </div>
                       <button onClick={() => setShowAddAddr(false)} style={{background:"none", border:"none", color:"#8a8784", fontSize:18, cursor:"pointer"}}>✕</button>
@@ -372,7 +372,7 @@ export default function AccountClient({ user, initialAddresses }) {
 
                     {/* Default toggle */}
                     <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 0", borderTop:"1px solid #1a1919", marginBottom:16}}>
-                      <span style={{fontFamily:"'Share Tech Mono',monospace", fontSize:9, color:"#8a8784", letterSpacing:"0.12em"}}>SET AS DEFAULT ADDRESS</span>
+                      <span style={{fontFamily:"var(--font-stencil),monospace", fontSize:9, color:"#8a8784", letterSpacing:"0.12em"}}>SET AS DEFAULT ADDRESS</span>
                       <div
                         onClick={() => setNewAddr(a => ({...a, is_default: !a.is_default}))}
                         style={{width:32, height:18, borderRadius:9, background: newAddr.is_default?"#e8621a":"#2a2828", position:"relative", cursor:"pointer", transition:"background 0.2s"}}
@@ -383,13 +383,13 @@ export default function AccountClient({ user, initialAddresses }) {
 
                     {/* Actions */}
                     <div style={{display:"flex", gap:10}}>
-                      <button onClick={() => setShowAddAddr(false)} style={{flex:1, background:"transparent", border:"1px solid #2a2828", color:"#8a8784", fontFamily:"'Bebas Neue',sans-serif", fontSize:16, letterSpacing:"0.1em", padding:"10px", borderRadius:2, cursor:"pointer"}}>
+                      <button onClick={() => setShowAddAddr(false)} style={{flex:1, background:"transparent", border:"1px solid #2a2828", color:"#8a8784", fontFamily:"var(--font-caesar),sans-serif", fontSize:16, letterSpacing:"0.1em", padding:"10px", borderRadius:2, cursor:"pointer"}}>
                         CANCEL
                       </button>
                       <button
                         onClick={handleSaveAddress}
                         disabled={savingAddr || !newAddr.address_line1 || !newAddr.city}
-                        style={{flex:2, background:"#e8621a", border:"none", color:"#0a0909", fontFamily:"'Bebas Neue',sans-serif", fontSize:16, letterSpacing:"0.1em", padding:"10px", borderRadius:2, cursor:"pointer", opacity: savingAddr?"0.5":1}}
+                        style={{flex:2, background:"#e8621a", border:"none", color:"#0a0909", fontFamily:"var(--font-caesar),sans-serif", fontSize:16, letterSpacing:"0.1em", padding:"10px", borderRadius:2, cursor:"pointer", opacity: savingAddr?"0.5":1}}
                       >
                         {savingAddr ? "SAVING..." : "SAVE ADDRESS"}
                       </button>
