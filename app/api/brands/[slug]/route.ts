@@ -1,22 +1,30 @@
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import getCatalogDb from "@/lib/db/catalog";
 import { NextResponse } from "next/server";
 
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ slug: string }> }
 ) {
-  const supabase = await createServerSupabaseClient();
   const { slug } = await params;
 
-  const { data, error } = await supabase
-    .from("brands")
-    .select("id, name, slug, logo_url, is_featured, sort_order")
-    .eq("slug", slug)
-    .single();
+  const catalogDb = getCatalogDb();
 
-  if (error || !data) {
+  try {
+    const { rows } = await catalogDb.query(
+      `SELECT id, name, slug, logo_url, is_featured, sort_order
+       FROM public.brands
+       WHERE slug = $1
+       LIMIT 1`,
+      [slug]
+    );
+
+    if (!rows[0]) {
+      return NextResponse.json({ error: "Brand not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ brand: rows[0] });
+  } catch (error) {
+    console.error("[brands] fetch error:", error);
     return NextResponse.json({ error: "Brand not found" }, { status: 404 });
   }
-
-  return NextResponse.json({ brand: data });
 }

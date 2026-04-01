@@ -1,19 +1,19 @@
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import getCatalogDb from "@/lib/db/catalog";
 import { NextResponse } from "next/server";
 
 export async function GET() {
-  const supabase = await createServerSupabaseClient();
+  const catalogDb = getCatalogDb();
 
-  const { data, error } = await supabase
-    .from("brands")
-    .select("id, name, slug, logo_url, is_featured, sort_order")
-    .order("sort_order", { ascending: true })
-    .order("name", { ascending: true });
+  try {
+    const { rows } = await catalogDb.query(
+      `SELECT id, name, slug, logo_url, is_featured, sort_order
+       FROM public.brands
+       ORDER BY sort_order ASC NULLS LAST, name ASC`
+    );
 
-  if (error) {
+    return NextResponse.json({ brands: rows ?? [] });
+  } catch (error) {
     console.error("[brands] fetch error:", error);
     return NextResponse.json({ brands: [] }, { status: 500 });
   }
-
-  return NextResponse.json({ brands: data ?? [] });
 }
