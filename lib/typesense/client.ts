@@ -49,6 +49,7 @@ export const SCHEMA = {
     { name: 'map_price',    type: 'float'  as const, optional: true },
     { name: 'msrp',         type: 'float'  as const, optional: true },
     { name: 'is_active',    type: 'bool'   as const, facet: true  },
+    { name: 'stock_quantity', type: 'int64' as const, facet: true  },
     { name: 'in_stock',     type: 'bool'   as const, facet: true  },
     { name: 'image',        type: 'string' as const, optional: true, index: false },
     { name: 'description',  type: 'string' as const, optional: true },
@@ -72,6 +73,7 @@ export type ProductDocument = {
   map_price?:   number
   msrp?:        number
   is_active:    boolean
+  stock_quantity: number
   in_stock:     boolean
   image?:       string
   description?: string
