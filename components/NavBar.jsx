@@ -36,19 +36,14 @@ const css = `
     display: flex; align-items: center;
     padding: 0 24px; gap: 14px;
     backdrop-filter: blur(10px);
-    font-family: 'Barlow Condensed', sans-serif;
   }
   .ss-nav-logo {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 22px; letter-spacing: 0.08em;
     color: #f0ebe3; text-decoration: none; flex: 1;
     white-space: nowrap;
   }
   .ss-nav-logo span { color: #e8621a; }
   .ss-nav-links { display: flex; gap: 20px; margin-right: 8px; }
   .ss-nav-link {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 10px; letter-spacing: 0.12em;
     color: #8a8784; text-decoration: none;
     transition: color 0.2s; white-space: nowrap;
   }
@@ -59,8 +54,6 @@ const css = `
     background: transparent;
     border: 1px solid rgba(232,98,26,0.3);
     color: #f0ebe3;
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 10px; letter-spacing: 0.1em;
     padding: 5px 12px; border-radius: 2px;
     cursor: pointer; transition: all 0.2s;
     text-decoration: none; white-space: nowrap;
@@ -69,8 +62,6 @@ const css = `
   .ss-nav-garage {
     background: #e8621a; border: none;
     color: #0a0909;
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 14px; letter-spacing: 0.1em;
     padding: 5px 14px; border-radius: 2px;
     cursor: pointer; transition: background 0.2s;
     text-decoration: none; white-space: nowrap;
@@ -86,7 +77,6 @@ const css = `
   .ss-cart-badge {
     position: absolute; top: -5px; right: -7px;
     background: #e8621a; color: #0a0909;
-    font-family: 'Share Tech Mono', monospace;
     font-size: 7px; width: 14px; height: 14px;
     border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
@@ -112,7 +102,6 @@ const css = `
     padding: 20px 28px; gap: 14px; z-index: 101;
   }
   .ss-mobile-menu a {
-    font-family: 'Share Tech Mono', monospace;
     letter-spacing: 0.12em; color: #f0ebe3;
     text-transform: uppercase;
   }
@@ -151,7 +140,12 @@ export default function NavBar({ activePage = "", cartCount, onCartClick }) {
 
         {/* Logo */}
         <Link href="/" className="ss-nav-logo">
-          STINKIN<span>'</span> SUPPLIES
+          <span
+            className="text-2xl tracking-widest text-white whitespace-nowrap"
+            style={{ fontFamily: "var(--font-caesar)" }}
+          >
+            Stinkin<span className="text-orange-500">&apos;</span> Supplies
+          </span>
         </Link>
 
         {/* Desktop links */}
@@ -160,10 +154,11 @@ export default function NavBar({ activePage = "", cartCount, onCartClick }) {
             <Link
               key={label}
               href={href}
-              className={`ss-nav-link ${activePage === label.toLowerCase() ? "active" : ""}`}
+              className={`ss-nav-link text-xs tracking-widest uppercase ${activePage === label.toLowerCase() ? "active" : ""}`}
+              style={{ fontFamily: "var(--font-stencil)" }}
               onClick={() => setMobileMenuOpen(false)}
             >
-              {label.toUpperCase()}
+              {label}
             </Link>
           ))}
         </div>
@@ -181,23 +176,23 @@ export default function NavBar({ activePage = "", cartCount, onCartClick }) {
           {isSignedIn ? (
             <Link
               href="/account"
-              style={{
-                fontFamily: "'Share Tech Mono', monospace",
-                fontSize: 10, letterSpacing: "0.1em",
-                color: "#8a8784", textDecoration: "none",
-                padding: "5px 12px", borderRadius: 2,
-                border: "1px solid rgba(232,98,26,0.3)",
-                transition: "all 0.2s", whiteSpace: "nowrap",
-              }}
+              className="text-xs tracking-widest uppercase ss-nav-signin"
+              style={{ fontFamily: "var(--font-stencil)" }}
             >
-              ACCOUNT
+              Account
             </Link>
           ) : (
             <Link href="/auth" className="ss-nav-signin">
               SIGN IN
             </Link>
           )}
-          <Link href="/garage" className="ss-nav-garage">MY GARAGE</Link>
+          <Link
+            href="/garage"
+            className="ss-nav-garage text-lg bg-orange-500 text-white px-5 py-2 whitespace-nowrap"
+            style={{ fontFamily: "var(--font-caesar)" }}
+          >
+            My Garage
+          </Link>
           <button className="ss-nav-cart" onClick={handleCartClick} aria-label="Cart">
             🛒
             {displayCount > 0 && (
@@ -220,18 +215,20 @@ export default function NavBar({ activePage = "", cartCount, onCartClick }) {
             <Link
               key={label}
               href={href}
-              className={`ss-nav-link ${activePage === label.toLowerCase() ? "active" : ""}`}
+              className={`ss-nav-link text-xs tracking-widest uppercase ${activePage === label.toLowerCase() ? "active" : ""}`}
+              style={{ fontFamily: "var(--font-stencil)" }}
               onClick={() => setMobileMenuOpen(false)}
             >
-              {label.toUpperCase()}
+              {label}
             </Link>
           ))}
           <Link
             href="/garage"
-            className="ss-nav-garage"
+            className="ss-nav-garage text-lg bg-orange-500 text-white px-5 py-2 whitespace-nowrap"
+            style={{ fontFamily: "var(--font-caesar)" }}
             onClick={() => setMobileMenuOpen(false)}
           >
-            MY GARAGE
+            My Garage
           </Link>
         </div>
       )}

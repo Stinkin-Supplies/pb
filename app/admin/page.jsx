@@ -49,18 +49,18 @@ const css = `
     background: rgba(232,98,26,0.03);
   }
   .stat-label {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 8px; color: #8a8784;
     letter-spacing: 0.18em; margin-bottom: 8px;
   }
   .stat-value {
-    font-family: 'Bebas Neue', sans-serif;
+    font-family: var(--font-caesar), sans-serif;
     font-size: 34px; letter-spacing: 0.04em;
     color: #f0ebe3; line-height: 1;
   }
   .stat-card.highlight .stat-value { color: #e8621a; }
   .stat-sub {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 8px; color: #8a8784;
     letter-spacing: 0.1em; margin-top: 5px;
   }
@@ -90,12 +90,12 @@ const css = `
     justify-content: space-between;
   }
   .card-title {
-    font-family: 'Bebas Neue', sans-serif;
+    font-family: var(--font-caesar), sans-serif;
     font-size: 17px; letter-spacing: 0.07em;
   }
   .card-title span { color: #e8621a; }
   .card-link {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 8px; color: #8a8784;
     letter-spacing: 0.12em; text-decoration: none;
     transition: color 0.15s;
@@ -105,7 +105,7 @@ const css = `
   /* RECENT ORDERS TABLE */
   .mini-table { width: 100%; border-collapse: collapse; }
   .mini-table th {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 7px; color: #8a8784;
     letter-spacing: 0.15em; padding: 8px 14px;
     text-align: left; border-bottom: 1px solid #1a1919;
@@ -122,7 +122,7 @@ const css = `
   .status-chip {
     display: inline-flex; align-items: center; gap: 5px;
     padding: 2px 8px; border-radius: 2px;
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 7px; letter-spacing: 0.12em;
   }
   .status-dot { width: 5px; height: 5px; border-radius: 50%; }
@@ -150,11 +150,11 @@ const css = `
     display: flex; align-items: center; justify-content: center;
   }
   .quick-btn-label {
-    font-family: 'Bebas Neue', sans-serif;
+    font-family: var(--font-caesar), sans-serif;
     font-size: 15px; letter-spacing: 0.06em;
   }
   .quick-btn-sub {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 7px; color: #8a8784; letter-spacing: 0.1em;
     margin-top: 1px;
   }
@@ -212,8 +212,8 @@ export default async function AdminDashboard() {
 
   const totalRevenue = (revRow ?? []).reduce((sum, o) => sum + (o.total ?? 0), 0);
 
-  const B = (s) => ({ fontFamily: "'Bebas Neue', sans-serif", ...s });
-  const M = (s) => ({ fontFamily: "'Share Tech Mono', monospace", ...s });
+  const B = (s) => ({ fontFamily: "var(--font-caesar), sans-serif", ...s });
+  const M = (s) => ({ fontFamily: "var(--font-stencil), monospace", ...s });
 
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long", month: "long", day: "numeric", year: "numeric",

@@ -17,7 +17,7 @@ const css = `
     background: #0a0909;
     min-height: 100vh;
     color: #f0ebe3;
-    font-family: 'Barlow Condensed', sans-serif;
+    font-family: var(--font-stencil), sans-serif;
   }
   .orders-wrap::before {
     content: '';
@@ -77,19 +77,19 @@ const css = `
     border-bottom: 1px solid #1a1919;
   }
   .order-num {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 11px; color: #f0ebe3;
     letter-spacing: 0.12em;
   }
   .order-date {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 9px; color: #8a8784;
     letter-spacing: 0.1em;
   }
   .order-status-pill {
     display: inline-flex; align-items: center; gap: 6px;
     padding: 4px 10px; border-radius: 2px;
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 8px; letter-spacing: 0.15em;
     white-space: nowrap;
   }
@@ -97,7 +97,7 @@ const css = `
     width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
   }
   .order-total {
-    font-family: 'Bebas Neue', sans-serif;
+    font-family: var(--font-caesar), sans-serif;
     font-size: 22px; letter-spacing: 0.04em;
     color: #f0ebe3; white-space: nowrap;
     text-align: right;
@@ -117,7 +117,7 @@ const css = `
     color: #c4c0bc;
   }
   .preview-more {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 8px; color: #e8621a;
     letter-spacing: 0.1em;
     background: rgba(232,98,26,0.08);
@@ -125,7 +125,7 @@ const css = `
     padding: 2px 7px; border-radius: 2px;
   }
   .order-arrow {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-stencil), monospace;
     font-size: 9px; color: #3a3838;
     letter-spacing: 0.1em; padding: 0 20px 12px;
     transition: color 0.15s;
@@ -176,8 +176,8 @@ export default async function OrdersPage() {
     .order("created_at", { ascending: false })
     .limit(50);
 
-  const B = (s) => ({ fontFamily: "'Bebas Neue', sans-serif", ...s });
-  const M = (s) => ({ fontFamily: "'Share Tech Mono', monospace", ...s });
+  const B = (s) => ({ fontFamily: "var(--font-caesar), sans-serif", ...s });
+  const M = (s) => ({ fontFamily: "var(--font-stencil), monospace", ...s });
 
   return (
     <div className="orders-wrap">
