@@ -6,7 +6,7 @@ export default function DealsPage() {
         Coming Soon
       </p>
       <p className="text-gray-400 max-w-md">
-        We're putting together exclusive deals on top powersports brands. Check back soon.
+        We&#39;re putting together exclusive deals on top powersports brands. Check back soon.
       </p>
     </div>
   );
