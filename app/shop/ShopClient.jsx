@@ -426,7 +426,8 @@ export default function ShopClient({
     if (sort !== "newest")        params.set("sort",     sort);
     if (page > 0)                 params.set("page",     String(page));
     const qs = params.toString();
-    router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
+    const newUrl = `${pathname}${qs ? `?${qs}` : ""}`;
+    router.replace(newUrl, { scroll: false });
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [filters, sort, page, pathname, router]);
 
