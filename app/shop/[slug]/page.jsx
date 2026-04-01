@@ -66,6 +66,12 @@ export default async function ProductDetailPage({ params }) {
 //   images[]        → images array
 //   weight          → weight
 function normalizeProductRow(row) {
+  const price = Number(row.price ?? row.our_price ?? 0);
+  const rawWas = row.msrp != null ? Number(row.msrp)
+    : row.compare_at_price != null ? Number(row.compare_at_price)
+    : (row.was != null ? Number(row.was) : null);
+  const was = rawWas != null && rawWas > price ? rawWas : null;
+
   return {
     id:          row.id,
     slug:        row.slug,
@@ -75,10 +81,8 @@ function normalizeProductRow(row) {
     brand:       row.brand         ?? row.brand_name ?? "Unknown",
     category:    row.category      ?? row.category_name ?? "Uncategorized",
 
-    price:       Number(row.price ?? row.our_price ?? 0),
-    was:         row.msrp != null ? Number(row.msrp)
-               : row.compare_at_price != null ? Number(row.compare_at_price)
-               : (row.was != null ? Number(row.was) : null),
+    price,
+    was,
     mapPrice:    row.map_price != null ? Number(row.map_price) : null,
 
     badge:       row.is_new   ? "new"
@@ -86,7 +90,7 @@ function normalizeProductRow(row) {
                : (row.badge   ?? null),
 
     inStock:     Number(row.stock_quantity ?? 0) > 0,
-    stockQty:    row.stock_quantity  ?? null,
+    stockQty:    Number(row.stock_quantity ?? 0),
     fitmentIds:  row.fitment_ids     ?? null,
 
     // images is a text[] column; primary_image_url is a virtual alias
