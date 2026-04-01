@@ -79,7 +79,7 @@ const css = `
   /* PRODUCT CARD */
   .s-card { background:#111010;border:1px solid #2a2828;border-radius:2px;overflow:hidden;cursor:pointer;transition:all 0.22s;animation:fadeUp 0.25s ease both; }
   .s-card:hover { border-color:rgba(232,98,26,0.4);transform:translateY(-3px);box-shadow:0 10px 32px rgba(0,0,0,0.45); }
-  .s-card-img { width:100%;aspect-ratio:4/3;background:#1a1919;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden; }
+  .s-card-img { width:100%;aspect-ratio:1/1;background:#ffffff;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden; }
   .s-card-img::before { content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(232,98,26,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(232,98,26,0.04) 1px,transparent 1px);background-size:16px 16px; }
   .s-badge { position:absolute;top:7px;left:7px;font-family:'Share Tech Mono',monospace;font-size:8px;font-weight:700;letter-spacing:0.1em;padding:2px 6px;border-radius:1px; }
   .s-badge.sale { background:#b91c1c;color:#fff; }
