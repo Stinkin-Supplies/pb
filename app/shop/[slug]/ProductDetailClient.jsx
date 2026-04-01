@@ -67,7 +67,7 @@ const css = `
   .gallery-main {
     width: 100%;
     aspect-ratio: 1;
-    background: #1a1919;
+    background: #ffffff;
     border: 1px solid #2a2828;
     border-radius: 2px;
     display: flex; align-items: center; justify-content: center;
@@ -83,7 +83,7 @@ const css = `
     background-size: 24px 24px;
   }
   .gallery-main img {
-    width: 100%; height: 100%; object-fit: cover; position: relative; z-index: 1;
+    width: 100%; height: 100%; object-fit: contain; position: relative; z-index: 1;
   }
   .gallery-placeholder {
     font-family: 'Share Tech Mono', monospace;
@@ -298,14 +298,6 @@ const css = `
   .pdp-divider {
     border: none; border-top: 1px solid #2a2828;
     margin: 20px 0;
-  }
-
-  /* description */
-  .pdp-description {
-    font-size: 15px; font-weight: 500;
-    color: #c4c0bc; line-height: 1.6;
-    letter-spacing: 0.02em;
-    margin-bottom: 0;
   }
 
   /* ── SPECS TABLE ── */
@@ -837,7 +829,10 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
 
           {/* Description */}
           {product.description && (
-            <p className="pdp-description">{product.description}</p>
+            <div
+              className="prose prose-invert max-w-none text-sm text-gray-300"
+              dangerouslySetInnerHTML={{ __html: product.description }}
+            />
           )}
         </div>
       </div>
