@@ -102,24 +102,31 @@ const css = `
     .ss-nav-garage { display: none; }
   }
   .ss-mobile-menu {
-    position: fixed; inset: 54px 0 0;
-    background: rgba(10,9,9,0.95);
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    width: 100%;
+    background: #1a1919;
+    border-top: 1px solid #2a2828;
     display: flex; flex-direction: column;
-    padding: 20px 28px; gap: 14px; z-index: 101;
+    z-index: 101;
+    overflow: hidden;
   }
   .ss-mobile-menu a {
-    letter-spacing: 0.12em; color: #f0ebe3;
+    width: 100%;
+    padding: 16px 24px;
+    letter-spacing: 0.12em;
+    color: #f0ebe3;
     text-transform: uppercase;
+    border-bottom: 1px solid #2a2828;
+    font-size: 15px;
   }
+  .ss-mobile-menu a:hover { background: #242222; color: #e8621a; }
   .ss-mobile-menu a.active { color: #e8621a; }
   .ss-mobile-menu .ss-nav-garage {
     display: inline-flex; align-items: center;
     justify-content: center; width: max-content;
-  }
-  .ss-mobile-menu-close {
-    align-self: flex-end; background: none;
-    border: none; color: #8a8784;
-    font-size: 20px; cursor: pointer;
   }
 `;
 
@@ -206,38 +213,38 @@ export default function NavBar({ activePage = "", cartCount, onCartClick }) {
             )}
           </button>
         </div>
-      </nav>
 
-      {/* Mobile menu */}
-      {mobileMenuOpen && (
-        <div className="ss-mobile-menu">
-          <button
-            className="ss-mobile-menu-close"
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            ✕
-          </button>
-          {NAV_LINKS.map(({ label, href }) => (
+        {/* Mobile menu */}
+        {mobileMenuOpen && (
+          <div className="ss-mobile-menu">
+            {NAV_LINKS.map(({ label, href }) => (
+              <Link
+                key={label}
+                href={href}
+                className={`${activePage === label.toLowerCase() ? "active" : ""}`}
+                style={{ fontFamily: "var(--font-stencil)" }}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                {label}
+              </Link>
+            ))}
             <Link
-              key={label}
-              href={href}
-              className={`ss-nav-link text-xs tracking-widest uppercase ${activePage === label.toLowerCase() ? "active" : ""}`}
+              href="/account"
               style={{ fontFamily: "var(--font-stencil)" }}
               onClick={() => setMobileMenuOpen(false)}
             >
-              {label}
+              Account
             </Link>
-          ))}
-          <Link
-            href="/garage"
-            className="ss-nav-garage text-lg bg-orange-500 text-white px-5 py-2 whitespace-nowrap"
-            style={{ fontFamily: "var(--font-caesar)" }}
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            My Garage
-          </Link>
-        </div>
-      )}
+            <Link
+              href="/garage"
+              style={{ fontFamily: "var(--font-caesar)", fontSize: "18px", color: "#e8621a" }}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              My Garage
+            </Link>
+          </div>
+        )}
+      </nav>
     </>
   );
 }
