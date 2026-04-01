@@ -40,9 +40,12 @@ const SKIP_REINDEX = process.argv.includes('--skip-reindex');
 const ZIP_ARG      = process.argv.find(arg => arg.startsWith('--zip='));
 const INPUT_ZIP    = ZIP_ARG ? ZIP_ARG.slice('--zip='.length) : null;
 const BATCH_SIZE   = 500;
-const CACHE_DIR    = path.join(__dirname, '../data');
+const TMP_DIR      = path.join(__dirname, '../data');
 const WORK_DIR     = path.join(__dirname, '../tmp');
 const pool         = new Pool({ connectionString: CATALOG_DATABASE_URL });
+pool.on('connect', async (client) => {
+  await client.query('SET search_path TO vendor, public');
+});
 
 let SOURCE_FILE = null;
 
@@ -118,10 +121,10 @@ function fetchPriceFileZip() {
   }
 
   return new Promise((resolve, reject) => {
-    if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
+    if (!fs.existsSync(TMP_DIR)) fs.mkdirSync(TMP_DIR, { recursive: true });
 
     const today = new Date().toISOString().slice(0, 10); // "2026-04-01"
-    const cachedZip = path.join(CACHE_DIR, `pu_pricefile_${today}.zip`);
+    const cachedZip = path.join(TMP_DIR, `pu_pricefile_${today}.zip`);
     SOURCE_FILE = path.basename(cachedZip);
 
     if (fs.existsSync(cachedZip)) {
@@ -396,7 +399,7 @@ async function upsertStagingBatch(batch) {
 
   const updateColumns = columns.filter((col) => !['mfr_sku', 'imported_at'].includes(col));
   const { text, values } = buildBatchUpsertSql(
-    'vendor.pu_pricefile_staging',
+    'pu_pricefile_staging',
     columns,
     'mfr_sku',
     updateColumns,
@@ -463,7 +466,7 @@ async function mergeVendorBatch(batch) {
 
   const updateColumns = columns.filter((col) => !['vendor_code', 'vendor_part_number', 'created_at'].includes(col));
   const { text, values } = buildBatchUpsertSql(
-    'vendor.vendor_products',
+    'vendor_products',
     columns,
     'vendor_part_number',
     updateColumns,
