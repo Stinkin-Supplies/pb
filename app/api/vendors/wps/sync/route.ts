@@ -321,7 +321,7 @@ export async function POST(req: Request) {
         try {
           const i = item as any;
           await catalogDb.query(
-            `INSERT INTO products (
+            `INSERT INTO catalog_products (
               sku, part_number, name, slug, vendor_id, vendor_sku,
               brand_id, brand_name, category_name, description,
               our_price, compare_at_price, map_price, map_floor,
