@@ -129,6 +129,9 @@ const css = `
   @media (max-width:700px) {
     .shop-layout { grid-template-columns:1fr !important; }
     .shop-sidebar { display:none; }
+    .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+    .pcard-body { padding: 8px !important; }
+    .pcard img { aspect-ratio: 1/1; }
   }
 `;
 
