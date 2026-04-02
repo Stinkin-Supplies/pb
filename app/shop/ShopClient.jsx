@@ -112,6 +112,55 @@ const css = `
     display: grid;
     grid-template-columns: 215px 1fr;
   }
+  .mobile-filter-btn-wrap { display: none; }
+
+  .mobile-filter-btn {
+    font-family: var(--font-stencil), monospace;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    background: #1a1919;
+    color: #f0ebe3;
+    border: 1px solid #2a2828;
+    padding: 10px 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .filter-badge {
+    background: #e8621a;
+    color: #fff;
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 10px;
+  }
+
+  .filter-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 200;
+  }
+
+  .filter-close-wrap {
+    display: none;
+    padding: 12px 14px;
+    border-bottom: 1px solid #2a2828;
+  }
+
+  .filter-close-btn {
+    font-family: var(--font-stencil), monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    background: transparent;
+    color: #8a8784;
+    border: none;
+    cursor: pointer;
+    text-transform: uppercase;
+  }
   .product-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -131,8 +180,33 @@ const css = `
     .product-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   }
   @media (max-width:700px) {
-    .shop-layout { grid-template-columns:1fr !important; }
-    .shop-sidebar { display:none; }
+    .mobile-filter-btn-wrap { display: block; }
+
+    .shop-sidebar {
+      position: fixed !important;
+      top: 0 !important;
+      left: -280px;
+      width: 280px;
+      max-height: 100vh !important;
+      height: 100vh;
+      z-index: 201;
+      transition: left 0.25s ease;
+      overflow-y: auto;
+    }
+
+    .shop-sidebar.filter-open {
+      left: 0;
+    }
+
+    .filter-close-wrap { display: block; }
+
+    .shop-layout { grid-template-columns: 1fr !important; }
+
+    .shop-sidebar:not(.filter-open) {
+      display: block;
+      position:fixed;
+      left: -280px;
+    }
     .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
     .pcard-body { padding: 8px !important; }
     .pcard img { aspect-ratio: 1/1; }
@@ -433,6 +507,7 @@ export default function ShopClient({
   const [sort,     setSort]     = useState(urlSort);
   const [page,     setPage]     = useState(isNaN(urlPage) ? 0 : urlPage);
   const [view,     setView]     = useState("grid");
+  const [filterOpen, setFilterOpen] = useState(false);
 
   const { addItem } = useCartSafe();
   const router   = useRouter();
@@ -535,6 +610,7 @@ export default function ShopClient({
   };
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
+  const activeFilterCount = Object.values(filters).filter(Boolean).length;
 
   return (
     <div style={{ background:"#0a0909", minHeight:"100vh", color:"#f0ebe3",
@@ -587,22 +663,51 @@ export default function ShopClient({
         </div>
       </div>
 
-  {/* ── BODY ── */}
+      {/* Mobile filter button — add above the shop-layout div */}
+      <div className="mobile-filter-btn-wrap">
+        <button
+          className="mobile-filter-btn"
+          onClick={() => setFilterOpen(v => !v)}
+        >
+          ☰ FILTERS {activeFilterCount > 0 && (
+            <span className="filter-badge">{activeFilterCount}</span>
+          )}
+        </button>
+      </div>
+
+      {/* ── BODY ── */}
       <div className="shop-layout">
+        {filterOpen && (
+          <div
+            className="filter-overlay"
+            onClick={() => setFilterOpen(false)}
+          />
+        )}
 
         {/* ── SIDEBAR ── */}
-        <aside className="shop-sidebar"
+        <aside className={`shop-sidebar ${filterOpen ? "filter-open" : ""}`}
           style={{ background:"#111010", borderRight:"1px solid #2a2828",
                    overflowY:"auto", maxHeight:"calc(100vh - 100px)",
                    position:"sticky", top:54, alignSelf:"start" }}>
+          <div className="filter-close-wrap">
+            <button className="filter-close-btn" onClick={() => setFilterOpen(false)}>
+              ✕ CLOSE
+            </button>
+          </div>
 
           <FacetSection label="CATEGORY" items={facets.categories}
             selected={filters.category} loading={loading}
-            onSelect={val => setFilter("category", filters.category===val ? null : val)}/>
+            onSelect={val => {
+              setFilter("category", filters.category===val ? null : val);
+              setFilterOpen(false);
+            }}/>
 
           <FacetSection label="BRAND" items={facets.brands}
             selected={filters.brand} loading={loading}
-            onSelect={val => setFilter("brand", filters.brand===val ? null : val)}/>
+            onSelect={val => {
+              setFilter("brand", filters.brand===val ? null : val);
+              setFilterOpen(false);
+            }}/>
 
           {/* Price */}
           <div>
@@ -618,12 +723,25 @@ export default function ShopClient({
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6, marginBottom:8 }}>
                 <input className="price-input" placeholder="Min $" type="number"
                   value={minInput} onChange={e => setMinInput(e.target.value)}
-                  onKeyDown={e => e.key==="Enter" && applyPrice()}/>
+                  onKeyDown={e => {
+                    if (e.key === "Enter") {
+                      applyPrice();
+                      setFilterOpen(false);
+                    }
+                  }}/>
                 <input className="price-input" placeholder="Max $" type="number"
                   value={maxInput} onChange={e => setMaxInput(e.target.value)}
-                  onKeyDown={e => e.key==="Enter" && applyPrice()}/>
+                  onKeyDown={e => {
+                    if (e.key === "Enter") {
+                      applyPrice();
+                      setFilterOpen(false);
+                    }
+                  }}/>
               </div>
-              <button onClick={applyPrice}
+              <button onClick={() => {
+                applyPrice();
+                setFilterOpen(false);
+              }}
                 style={{ width:"100%", background:"#e8621a", border:"none", color:"#0a0909",
                          ...B({fontSize:14,letterSpacing:"0.08em",padding:"7px",
                          borderRadius:2,cursor:"pointer"}) }}>APPLY</button>
