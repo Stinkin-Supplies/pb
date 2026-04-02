@@ -47,8 +47,6 @@ export async function importRaw(folder, table) {
     const filePath = path.join(folder, file);
     try {
       const raw  = fs.readFileSync(filePath, 'utf8');
-      const size = Buffer.byteLength(raw, 'utf8');
-
       // Store as JSON string — postgres JSONB will accept a JSON string payload
       // or a raw text payload wrapped in quotes. We normalise to a JSON-safe string.
       let payload;
@@ -63,17 +61,16 @@ export async function importRaw(folder, table) {
       }
 
       await sql`
-        INSERT INTO ${sql(table)} (payload, source_file, file_size_bytes, imported_at)
-        VALUES (${payload}::jsonb, ${file}, ${size}, NOW())
+        INSERT INTO ${sql(table)} (payload, source_file, imported_at)
+        VALUES (${payload}::jsonb, ${file}, NOW())
         ON CONFLICT (source_file) DO UPDATE
           SET payload         = EXCLUDED.payload,
-              file_size_bytes = EXCLUDED.file_size_bytes,
               imported_at     = NOW()
       `;
 
       imported++;
       if (imported % 10 === 0 || files.length <= 10) {
-        console.log(`[Stage0] ${table} — ${imported}/${files.length} | ${file} (${(size / 1024).toFixed(1)} KB)`);
+        console.log(`[Stage0] ${table} — ${imported}/${files.length} | ${file}`);
       }
     } catch (err) {
       console.error(`[Stage0] Failed ${file}: ${err.message}`);

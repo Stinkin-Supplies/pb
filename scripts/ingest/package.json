@@ -9,7 +9,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "dependencies": {
     "@xmldom/xmldom": "^0.9.9",
     "dotenv": "^17.3.1",
