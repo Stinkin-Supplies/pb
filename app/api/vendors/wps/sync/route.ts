@@ -367,6 +367,7 @@ export async function POST(req: Request) {
               i.is_map ?? false,
               true,
               i.condition ?? 'standard',
+              null,
               'wps',
               i.status ?? 'active',
             ]
