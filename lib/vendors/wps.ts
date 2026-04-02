@@ -440,8 +440,12 @@ export function mapWpsItemToProduct(
   const retail   = item.list_price            ?? pricing?.retail      ?? 0;
   const isMap    = item.has_map_policy        ?? pricing?.is_map      ?? false;
   const mapPrice = item.mapp_price            ?? pricing?.map_price   ?? null;
-  const rawPrice = cost > 0 ? cost * 1.25 : retail * 0.65; // fallback margin
-  const ourPrice = isMap && mapPrice ? Math.max(rawPrice, mapPrice) : rawPrice;
+  const rawPrice = cost > 0
+    ? Math.max(cost * 1.35, retail * 0.70)  // protect margin when pricing engine is missing
+    : retail * 0.75;
+  const ourPrice = isMap && mapPrice && mapPrice > 0
+    ? Math.max(rawPrice, mapPrice)
+    : rawPrice;
 
   const inv = (item.inventory as any)?.data ?? {};
   const caQty = inv.ca_warehouse ?? 0;

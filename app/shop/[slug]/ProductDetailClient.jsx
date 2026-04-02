@@ -743,9 +743,11 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
             {product.mapPrice && (
               <div className="price-map-note">MAP PRICE: ${product.mapPrice.toFixed(2)}</div>
             )}
-            <div className="price-points">
-              ★ EARN {product.pointsEarned.toLocaleString()} POINTS ON THIS ORDER
-            </div>
+            {product.pointsEarned > 0 && (
+              <div className="price-points">
+                ★ EARN {product.pointsEarned.toLocaleString()} POINTS ON THIS ORDER
+              </div>
+            )}
           </div>
 
           {/* Stock */}
@@ -818,13 +820,15 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
                 BEST PRICE GUARANTEED
               </div>
             </div>
-            <div className="perk">
-              <span className="perk-icon">★</span>
-              <div className="perk-text">
-                <strong>{product.pointsEarned.toLocaleString()} POINTS</strong>
-                EARNED ON THIS ORDER
+            {product.pointsEarned > 0 && (
+              <div className="perk">
+                <span className="perk-icon">★</span>
+                <div className="perk-text">
+                  <strong>{product.pointsEarned.toLocaleString()} POINTS</strong>
+                  EARNED ON THIS ORDER
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           <hr className="pdp-divider"/>
