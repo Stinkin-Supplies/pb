@@ -53,7 +53,7 @@ export default async function ShopPage({ searchParams }) {
                 cp.name,
                 cp.brand,
                 cp.category,
-                cp.price,
+                COALESCE(cp.computed_price, cp.price, cp.msrp) AS price,
                 cp.msrp,
                 cp.map_price,
                 cp.weight,
