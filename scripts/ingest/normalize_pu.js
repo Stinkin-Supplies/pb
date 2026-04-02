@@ -50,7 +50,7 @@ function mapPuCsvRow(row) {
     if (row[wh] !== undefined) warehouseJson[wh.toLowerCase()] = Number(row[wh]) || 0;
   }
   const totalQty = Object.values(warehouseJson).reduce((s, v) => s + v, 0)
-    || toNum(row['Stock'] ?? row['stock_quantity'] ?? row['qty']) ?? 0;
+    || (toNum(row['Stock'] ?? row['stock_quantity'] ?? row['qty']) ?? 0);
 
   if (!sku) return null;
 
