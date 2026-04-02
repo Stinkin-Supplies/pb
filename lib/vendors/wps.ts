@@ -437,9 +437,15 @@ export function mapWpsItemToProduct(
   const rawPrice = cost > 0 ? cost * 1.25 : retail * 0.65; // fallback margin
   const ourPrice = isMap && mapPrice ? Math.max(rawPrice, mapPrice) : rawPrice;
 
-  const inventory = Array.isArray(item.inventory) ? item.inventory : [];
-  const totalStock = inventory.reduce(
-    (sum, w) => sum + (w.availability ?? 0), 0
+  const inv = (item.inventory as any)?.data ?? {};
+  const totalStock = inv.total ?? (
+    (inv.ca_warehouse ?? 0) +
+    (inv.ga_warehouse ?? 0) +
+    (inv.id_warehouse ?? 0) +
+    (inv.in_warehouse ?? 0) +
+    (inv.pa_warehouse ?? 0) +
+    (inv.pa2_warehouse ?? 0) +
+    (inv.tx_warehouse ?? 0)
   );
 
   const images = item.images ? sortedImageUrls(item.images) : [];
