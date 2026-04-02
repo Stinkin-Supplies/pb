@@ -391,11 +391,17 @@ export async function POST(req: Request) {
         p.in_stock ?? false,
         p.our_price ?? 0,
         p.stock_quantity ?? 0,
+        p.ca_qty ?? 0,
+        p.ga_qty ?? 0,
+        p.id_qty ?? 0,
+        p.in_qty ?? 0,
+        p.pa_qty ?? 0,
+        p.tx_qty ?? 0,
       ]);
 
       if (offerParams.length > 0) {
         const offerValues = validBatch
-          .map((_, i) => `($${i * 4 + 1}, $${i * 4 + 2}::boolean, $${i * 4 + 3}::numeric, $${i * 4 + 4}::integer)`)
+          .map((_, i) => `($${i * 10 + 1}, $${i * 10 + 2}::boolean, $${i * 10 + 3}::numeric, $${i * 10 + 4}::integer, $${i * 10 + 5}::integer, $${i * 10 + 6}::integer, $${i * 10 + 7}::integer, $${i * 10 + 8}::integer, $${i * 10 + 9}::integer, $${i * 10 + 10}::integer)`)
           .join(", ");
 
         await catalogDb.query(
@@ -405,9 +411,18 @@ export async function POST(req: Request) {
             total_qty       = data.total_qty,
             in_stock        = data.in_stock,
             our_price       = data.our_price,
+            ca_qty          = data.ca_qty,
+            ga_qty          = data.ga_qty,
+            id_qty          = data.id_qty,
+            in_qty          = data.in_qty,
+            pa_qty          = data.pa_qty,
+            tx_qty          = data.tx_qty,
             last_stock_sync = NOW()
           FROM (
-            SELECT * FROM (VALUES ${offerValues}) AS v(sku, in_stock, our_price, total_qty)
+            SELECT * FROM (VALUES ${offerValues}) AS v(
+              sku, in_stock, our_price, total_qty,
+              ca_qty, ga_qty, id_qty, in_qty, pa_qty, tx_qty
+            )
           ) AS data
           WHERE vo.vendor_code = 'wps'
             AND vo.vendor_part_number = data.sku

@@ -87,6 +87,26 @@ const PU_COOLDOWN = 10;
 const B = (s) => ({ fontFamily: "var(--font-caesar),sans-serif", ...s });
 const M = (s) => ({ fontFamily: "var(--font-stencil),monospace", ...s });
 
+async function readJsonResponse(res, context) {
+  const text = await res.text();
+  if (!text.trim()) {
+    return null;
+  }
+
+  const contentType = res.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json") && !contentType.includes("+json")) {
+    throw new Error(
+      `${context} returned non-JSON (${contentType || "unknown"}): ${text.slice(0, 200)}`
+    );
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`${context} returned invalid JSON: ${text.slice(0, 200)}`);
+  }
+}
+
 // ============================================================
 // PU PANEL — unchanged from original
 // ============================================================
@@ -104,9 +124,11 @@ function PuPanel() {
   const fetchStatus = useCallback(async () => {
     try {
       const res  = await fetch("/api/admin/parts-unlimited/sync");
-      const data = await res.json();
+      const data = await readJsonResponse(res, "Parts Unlimited status");
       setDbStatus(data);
-    } catch {}
+    } catch (err) {
+      console.warn("[PU Sync]", err?.message ?? err);
+    }
   }, []);
 
   useEffect(() => {
@@ -132,7 +154,7 @@ function PuPanel() {
 
     try {
       const res  = await fetch("/api/admin/parts-unlimited/sync", { method: "POST", headers });
-      const data = await res.json();
+      const data = await readJsonResponse(res, "Parts Unlimited sync");
 
       if (res.status === 429) {
         addLog(`Blocked: ${data.error}`, "error");
@@ -401,9 +423,11 @@ function WpsPanel() {
   const fetchStatus = useCallback(async () => {
     try {
       const res  = await fetch("/api/admin/wps/sync");
-      const data = await res.json();
+      const data = await readJsonResponse(res, "WPS status");
       setDbStatus(data);
-    } catch {}
+    } catch (err) {
+      console.warn("[WPS Sync]", err?.message ?? err);
+    }
   }, []);
 
   useEffect(() => {
@@ -426,7 +450,7 @@ function WpsPanel() {
           "Content-Type": "application/json",
         },
       });
-      const data = await res.json();
+      const data = await readJsonResponse(res, "WPS sync");
 
       if (!res.ok || !data.success) {
         addLog(`Sync failed: ${data.error ?? "Unknown error"}`, "error");
@@ -636,7 +660,7 @@ function SyncLogViewer() {
         limit:  String(PAGE_SIZE),
       });
       const res  = await fetch(`/api/admin/sync-log?${params}`);
-      const data = await res.json();
+      const data = await readJsonResponse(res, "Sync log");
       setLogs(data.logs  ?? []);
       setTotal(data.total ?? 0);
     } catch (e) {

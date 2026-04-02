@@ -405,6 +405,12 @@ export interface WpsMappedProduct {
   stock_quantity:   number;
   in_stock:         boolean;
   status:           string;
+  ca_qty:           number;
+  ga_qty:           number;
+  id_qty:           number;
+  in_qty:           number;
+  pa_qty:           number;
+  tx_qty:           number;
   weight_lbs:       number | null;
   upc_code:         string | null;
   country_of_origin: string | null;
@@ -438,14 +444,20 @@ export function mapWpsItemToProduct(
   const ourPrice = isMap && mapPrice ? Math.max(rawPrice, mapPrice) : rawPrice;
 
   const inv = (item.inventory as any)?.data ?? {};
+  const caQty = inv.ca_warehouse ?? 0;
+  const gaQty = inv.ga_warehouse ?? 0;
+  const idQty = inv.id_warehouse ?? 0;
+  const inQty = inv.in_warehouse ?? 0;
+  const paQty = inv.pa_warehouse ?? 0;
+  const txQty = inv.tx_warehouse ?? 0;
   const totalStock = inv.total ?? (
-    (inv.ca_warehouse ?? 0) +
-    (inv.ga_warehouse ?? 0) +
-    (inv.id_warehouse ?? 0) +
-    (inv.in_warehouse ?? 0) +
-    (inv.pa_warehouse ?? 0) +
+    caQty +
+    gaQty +
+    idQty +
+    inQty +
+    paQty +
     (inv.pa2_warehouse ?? 0) +
-    (inv.tx_warehouse ?? 0)
+    txQty
   );
 
   const images = item.images ? sortedImageUrls(item.images) : [];
@@ -468,6 +480,12 @@ export function mapWpsItemToProduct(
     stock_quantity:    totalStock,
     in_stock:          totalStock > 0,
     status:            WPS_STATUS_MAP[item.status] ?? "active",
+    ca_qty:            caQty,
+    ga_qty:            gaQty,
+    id_qty:            idQty,
+    in_qty:            inQty,
+    pa_qty:            paQty,
+    tx_qty:            txQty,
     weight_lbs:        item.weight ?? null,
     upc_code:          item.upc ?? null,
     country_of_origin: item.country_code ?? null,
