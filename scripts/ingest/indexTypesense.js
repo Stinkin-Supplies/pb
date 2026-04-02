@@ -62,7 +62,15 @@ async function run() {
 
   // ── 2. Count active products ────────────────────────────────
   const { rows: [{ total }] } = await db.query(
-    `SELECT COUNT(*) AS total FROM public.catalog_products WHERE is_active = true`
+    `SELECT COUNT(*) AS total FROM public.catalog_products cp
+     WHERE cp.is_active = true
+       AND cp.price > 0
+       AND EXISTS (
+         SELECT 1
+         FROM public.catalog_images ci
+         WHERE ci.catalog_product_id = cp.id
+           AND ci.is_primary = true
+       )`
   );
   const totalNum = Number(total);
   console.log(`   Products to index: ${totalNum.toLocaleString()}\n`);
@@ -103,6 +111,12 @@ async function run() {
         )                                              AS vendor_codes
       FROM public.catalog_products cp
       WHERE cp.is_active = true
+        AND cp.price > 0
+        AND EXISTS (
+          SELECT 1
+          FROM public.catalog_images ci
+          WHERE ci.catalog_product_id = cp.id
+        )
       ORDER BY cp.id
       LIMIT $1 OFFSET $2
     `, [BATCH, offset]);
