@@ -103,7 +103,7 @@ const css = `
   }
   .ss-mobile-menu {
     position: fixed; inset: 54px 0 0;
-    background: rgba(10,9,9,0.95);
+    background: #111010;
     display: flex;
     flex-direction: column;
     padding: 20px 28px;
