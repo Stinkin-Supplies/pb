@@ -92,13 +92,14 @@ function mapWpsProduct(item, inventoryMap) {
   const mapPrice = item.map   ?? item.map_price      ?? null;
 
   return {
-    product: { sku, name, brand, manufacturer_part_number: mpn, slug, description: desc, category, weight_lbs: weight, ...sportFlags },
+    product: { sku, name, brand, manufacturer_part_number: mpn, slug, description: desc, category, weight, stock_quantity: Number(totalQty) || 0, ...sportFlags },
     images,
     specs,
     variants,
     offer: {
-      vendor:       'wps',
-      cost:         cost   ? Number(cost)   : null,
+      vendor_code:  'wps',
+      vendor_part_number: sku,
+      wholesale_cost: cost   ? Number(cost)   : null,
       msrp:         msrp   ? Number(msrp)   : null,
       map_price:    mapPrice ? Number(mapPrice) : null,
       total_qty:    Number(totalQty) || 0,
@@ -114,11 +115,11 @@ async function upsertProduct(p) {
   const rows = await sql`
     INSERT INTO catalog_products
       (sku, name, brand, manufacturer_part_number, slug, description, category,
-       weight_lbs, is_atv, is_offroad, is_snow, is_street, is_watercraft, is_bicycle,
+       weight, stock_quantity, is_atv, is_offroad, is_snow, is_street, is_watercraft, is_bicycle,
        is_active, updated_at)
     VALUES
       (${p.sku}, ${p.name}, ${p.brand}, ${p.manufacturer_part_number}, ${p.slug},
-       ${p.description}, ${p.category}, ${p.weight_lbs},
+       ${p.description}, ${p.category}, ${p.weight}, ${p.stock_quantity},
        ${p.is_atv}, ${p.is_offroad}, ${p.is_snow}, ${p.is_street},
        ${p.is_watercraft}, ${p.is_bicycle}, true, NOW())
     ON CONFLICT (sku) DO UPDATE SET
@@ -127,7 +128,8 @@ async function upsertProduct(p) {
       manufacturer_part_number = EXCLUDED.manufacturer_part_number,
       description             = COALESCE(EXCLUDED.description, catalog_products.description),
       category                = COALESCE(EXCLUDED.category,    catalog_products.category),
-      weight_lbs              = COALESCE(EXCLUDED.weight_lbs,  catalog_products.weight_lbs),
+      weight                  = COALESCE(EXCLUDED.weight,      catalog_products.weight),
+      stock_quantity          = COALESCE(EXCLUDED.stock_quantity, catalog_products.stock_quantity),
       is_atv                  = EXCLUDED.is_atv,
       is_offroad              = EXCLUDED.is_offroad,
       is_snow                 = EXCLUDED.is_snow,
@@ -144,12 +146,14 @@ async function upsertProduct(p) {
 async function upsertOffer(productId, offer) {
   await sql`
     INSERT INTO vendor_offers
-      (product_id, vendor, cost, msrp, map_price, total_qty, warehouse_json, wps_item_id, updated_at)
+      (catalog_product_id, vendor_code, vendor_part_number, manufacturer_part_number, wholesale_cost, msrp, map_price, total_qty, warehouse_json, wps_item_id, updated_at)
     VALUES
-      (${productId}, ${offer.vendor}, ${offer.cost}, ${offer.msrp}, ${offer.map_price},
+      (${productId}, ${offer.vendor_code}, ${offer.vendor_part_number}, ${offer.vendor_part_number}, ${offer.wholesale_cost}, ${offer.msrp}, ${offer.map_price},
        ${offer.total_qty}, ${JSON.stringify(offer.warehouse_json)}, ${offer.wps_item_id}, NOW())
-    ON CONFLICT (product_id, vendor) DO UPDATE SET
-      cost           = COALESCE(EXCLUDED.cost,      vendor_offers.cost),
+    ON CONFLICT (catalog_product_id, vendor_code) DO UPDATE SET
+      vendor_part_number = COALESCE(EXCLUDED.vendor_part_number, vendor_offers.vendor_part_number),
+      manufacturer_part_number = COALESCE(EXCLUDED.manufacturer_part_number, vendor_offers.manufacturer_part_number),
+      wholesale_cost = COALESCE(EXCLUDED.wholesale_cost, vendor_offers.wholesale_cost),
       msrp           = COALESCE(EXCLUDED.msrp,      vendor_offers.msrp),
       map_price      = COALESCE(EXCLUDED.map_price, vendor_offers.map_price),
       total_qty      = EXCLUDED.total_qty,
@@ -161,11 +165,11 @@ async function upsertOffer(productId, offer) {
 
 async function replaceMedia(productId, images) {
   if (!images.length) return;
-  await sql`DELETE FROM catalog_media WHERE product_id = ${productId} AND vendor = 'wps'`;
+  await sql`DELETE FROM catalog_media WHERE product_id = ${productId}`;
   for (const img of images) {
     await sql`
-      INSERT INTO catalog_media (product_id, url, media_type, priority, vendor)
-      VALUES (${productId}, ${img.url}, ${img.media_type}, ${img.priority}, 'wps')
+      INSERT INTO catalog_media (product_id, url, media_type, priority)
+      VALUES (${productId}, ${img.url}, ${img.media_type}, ${img.priority})
       ON CONFLICT DO NOTHING
     `;
   }
@@ -173,11 +177,11 @@ async function replaceMedia(productId, images) {
 
 async function replaceSpecs(productId, specs) {
   if (!specs.length) return;
-  await sql`DELETE FROM catalog_specs WHERE product_id = ${productId} AND vendor = 'wps'`;
+  await sql`DELETE FROM catalog_specs WHERE product_id = ${productId}`;
   for (const s of specs) {
     await sql`
-      INSERT INTO catalog_specs (product_id, attribute, value, vendor)
-      VALUES (${productId}, ${s.attribute}, ${s.value}, 'wps')
+      INSERT INTO catalog_specs (product_id, attribute, value)
+      VALUES (${productId}, ${s.attribute}, ${s.value})
       ON CONFLICT DO NOTHING
     `;
   }
@@ -185,12 +189,11 @@ async function replaceSpecs(productId, specs) {
 
 async function replaceVariants(productId, variants) {
   if (!variants.length) return;
-  // Variants are additive across vendors — only clear WPS ones
-  await sql`DELETE FROM catalog_variants WHERE product_id = ${productId} AND vendor = 'wps'`;
+  await sql`DELETE FROM catalog_variants WHERE product_id = ${productId}`;
   for (const v of variants) {
     await sql`
-      INSERT INTO catalog_variants (product_id, option_name, option_value, vendor)
-      VALUES (${productId}, ${v.option_name}, ${v.option_value}, 'wps')
+      INSERT INTO catalog_variants (product_id, option_name, option_value)
+      VALUES (${productId}, ${v.option_name}, ${v.option_value})
       ON CONFLICT DO NOTHING
     `;
   }
