@@ -475,7 +475,7 @@ export function mapWpsItemToProduct(
     part_number:       item.sku,
     slug:              slugifyWps(item.name, item.sku),
     vendor_sku:        item.sku,
-    name:              item.product?.data?.name ?? item.name,
+    name:              productData.name ?? item.name,
     brand_name:        brandName || "WPS",
     category_name:     "General",          // enriched by Typesense/taxonomy later
     description:       productData.description ?? item.description ?? null,

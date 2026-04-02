@@ -834,11 +834,17 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
           <hr className="pdp-divider"/>
 
           {/* Description */}
-          {product.description && (
+          {product.description ? (
             <div
               className="prose prose-invert max-w-none text-sm text-gray-300"
               dangerouslySetInnerHTML={{ __html: product.description }}
             />
+          ) : (
+            <div style={{ fontFamily:"var(--font-stencil),monospace", fontSize:12, color:"#8a8784", letterSpacing:"0.05em", lineHeight:1.8 }}>
+              <p>{product.name} by {product.brand}.</p>
+              {product.weight && <p style={{marginTop:8}}>WEIGHT: {product.weight} LBS</p>}
+              <p style={{marginTop:8}}>CATEGORY: {product.category?.toUpperCase()}</p>
+            </div>
           )}
         </div>
       </div>
