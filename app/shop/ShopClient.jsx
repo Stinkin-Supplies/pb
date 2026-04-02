@@ -447,7 +447,6 @@ export default function ShopClient({
     const newUrl = `${pathname}${qs ? `?${qs}` : ""}`;
     router.replace(newUrl, { scroll: false });
     window.scrollTo({ top: 0, behavior: "smooth" });
-    window.scrollTo({ top: 0, behavior: "smooth" });
   }, [filters, sort, page, pathname, router]);
 
   const fetchProducts = useCallback(async (f, s, p) => {
@@ -673,7 +672,7 @@ export default function ShopClient({
                 )}
               </div>
             ) : (
-              <div className={view==="list" ? "" : "product-grid"}
+              <div className={view==="list" ? "" : "grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3"}
                 style={view==="list" ? { display:"grid", gridTemplateColumns:"1fr", gap:12, opacity:loading?0.5:1, transition:"opacity 0.2s" } : { opacity:loading?0.5:1, transition:"opacity 0.2s" }}>
                 {products.map((p,i) => (
                   <ProductCard key={p.id} product={p} index={i} view={view}

@@ -226,7 +226,12 @@ export class WpsClient {
           lastErr = new Error(`WPS API ${res.status} on GET ${path}: ${text}`);
           continue;
         }
-        return res.json() as Promise<T>;
+        const text = await res.text();
+        try {
+          return JSON.parse(text) as T;
+        } catch {
+          throw new Error(`WPS API returned invalid JSON on GET ${path}: ${text.slice(0, 200)}`);
+        }
       } catch (err: unknown) {
         // Network-level error (fetch failed, ECONNRESET, etc.) — retry
         lastErr = err instanceof Error ? err : new Error(String(err));
@@ -250,8 +255,12 @@ export class WpsClient {
       const text = await res.text();
       throw new Error(`WPS API ${res.status} on POST ${path}: ${text}`);
     }
-
-    return res.json() as Promise<T>;
+    const text = await res.text();
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      throw new Error(`WPS API returned invalid JSON on POST ${path}: ${text.slice(0, 200)}`);
+    }
   }
 
   async delete(path: string): Promise<void> {
@@ -513,9 +522,21 @@ export async function downloadPricingData(
 ): Promise<WpsDealerPricingEntry[]> {
   const res = await fetch(downloadUrl);
   if (!res.ok) throw new Error(`Failed to download WPS pricing data: ${res.status}`);
-  const json = await res.json();
+  let pricingData: unknown;
+  try {
+    const text = await res.text();
+    if (text && text.trim()) {
+      pricingData = JSON.parse(text);
+    } else {
+      throw new Error("Empty response");
+    }
+  } catch (err) {
+    console.log("[WPS Sync] Pricing job failed, using retail fallback");
+    return [];
+  }
+
   // WPS returns either { data: [...] } or a raw array
-  return Array.isArray(json) ? json : (json.data ?? []);
+  return Array.isArray(pricingData) ? pricingData : ((pricingData as any).data ?? []);
 }
 
 /** Builds a sku → pricing entry lookup map */
