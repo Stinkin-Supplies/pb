@@ -108,6 +108,10 @@ const css = `
   .page-btn.active { background:#e8621a; border-color:#e8621a; color:#0a0909; }
   .page-btn:disabled { opacity:0.3; cursor:default; }
 
+  .shop-layout {
+    display: grid;
+    grid-template-columns: 215px 1fr;
+  }
   .product-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -583,9 +587,8 @@ export default function ShopClient({
         </div>
       </div>
 
-      {/* ── BODY ── */}
-      <div className="shop-layout"
-        style={{ display:"grid", gridTemplateColumns:"215px 1fr" }}>
+  {/* ── BODY ── */}
+      <div className="shop-layout">
 
         {/* ── SIDEBAR ── */}
         <aside className="shop-sidebar"
