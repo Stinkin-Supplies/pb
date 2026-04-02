@@ -124,7 +124,6 @@ async function run() {
       stock_quantity: Number(r.stock_quantity || 0),
       in_stock:     (Number(r.stock_quantity || 0) > 0 ? 1 : 0),
       ...(r.image       ? { image:       r.image       } : {}),
-      ...(r.description ? { description: r.description } : {}),
       ...(r.weight != null ? { weight: Number(r.weight) } : {}),
       vendor_codes: r.vendor_codes || [],
       created_at:   Number(r.created_at || 0),
