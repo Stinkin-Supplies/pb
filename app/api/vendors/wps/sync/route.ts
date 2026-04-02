@@ -112,8 +112,8 @@ async function checkRestockNotifications(
   try {
     const { data, error } = await supabase
       .from("stock_notifications")
-      .select("sku, customer_email, restock_date")
-      .in("sku", skus);
+      .select("product_sku, email, notified_at")
+      .in("product_sku", skus);
 
     if (error) {
       console.warn("[WPS Sync] Restock notification lookup failed:", error.message);
