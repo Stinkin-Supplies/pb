@@ -396,6 +396,8 @@ export interface WpsMappedProduct {
   brand_name:       string;
   category_name:    string;
   description:      string | null;
+  alternate_name:   string | null;
+  care_instructions: string | null;
   our_price:        number;
   compare_at_price: number | null;
   map_price:        number | null;
@@ -466,6 +468,8 @@ export function mapWpsItemToProduct(
 
   const images = item.images ? sortedImageUrls(item.images) : [];
 
+  const productData = (item.product as any)?.data ?? (item.product as any) ?? {};
+
   return {
     sku:               item.sku,
     part_number:       item.sku,
@@ -474,7 +478,9 @@ export function mapWpsItemToProduct(
     name:              item.product?.data?.name ?? item.name,
     brand_name:        brandName || "WPS",
     category_name:     "General",          // enriched by Typesense/taxonomy later
-    description:       item.product?.data?.description ?? item.product?.description ?? item.description ?? null,
+    description:       productData.description ?? item.description ?? null,
+    alternate_name:    productData.alternate_name ?? null,
+    care_instructions: productData.care_instructions ?? null,
     our_price:         parseFloat(ourPrice.toFixed(2)),
     compare_at_price:  retail > 0 ? retail : null,
     map_price:         mapPrice,
