@@ -74,7 +74,85 @@ const css = `
 
   /* RESULTS GRID */
   .search-body { max-width:1200px;margin:0 auto;padding:24px; }
-  .results-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px; }
+  .shop-layout {
+    display: grid;
+    grid-template-columns: 215px 1fr;
+  }
+  .shop-sidebar {
+    background:#111010;
+    border-right:1px solid #2a2828;
+    overflow-y:auto;
+    max-height:calc(100vh - 100px);
+    position:sticky;
+    top:54px;
+    align-self:start;
+  }
+  .shop-main { padding:18px 20px; }
+  .chip {
+    font-family:var(--font-stencil),monospace;font-size:8px;
+    background:rgba(232,98,26,0.1); border:1px solid rgba(232,98,26,0.25);
+    border-radius:2px; padding:2px 8px; color:#e8621a;
+    letter-spacing:0.1em; cursor:pointer; user-select:none; transition:all 0.15s;
+  }
+  .chip:hover { background:rgba(232,98,26,0.18); }
+  .facet-count {
+    font-family:var(--font-stencil),monospace; font-size:8px; color:#8a8784;
+    background:#1a1919; border:1px solid #2a2828;
+    padding:1px 5px; border-radius:1px;
+    min-width:32px; text-align:center; transition:color 0.2s;
+  }
+  .facet-count.dim { color:#3a3838; }
+  .price-input {
+    background:#1a1919; border:1px solid #2a2828; color:#f0ebe3;
+    font-family:var(--font-stencil),sans-serif; font-size:13px;
+    padding:6px 9px; border-radius:2px; outline:none; width:100%;
+    transition:border-color 0.15s;
+  }
+  .price-input:focus { border-color:rgba(232,98,26,0.4); }
+  .price-input::placeholder { color:#3a3838; }
+  .page-btn {
+    font-family:var(--font-stencil),monospace; font-size:10px; letter-spacing:0.08em;
+    background:#111010; border:1px solid #2a2828; color:#8a8784;
+    padding:7px 13px; border-radius:2px; cursor:pointer;
+    transition:all 0.15s; min-width:36px; text-align:center;
+  }
+  .page-btn:hover:not(:disabled) { border-color:#e8621a; color:#e8621a; }
+  .page-btn.active { background:#e8621a; border-color:#e8621a; color:#0a0909; }
+  .page-btn:disabled { opacity:0.3; cursor:default; }
+
+  .sidebar-section-title {
+    font-family:var(--font-stencil),monospace;font-size:9px;color:#e8621a;letter-spacing:0.2em;
+    padding:12px 14px 8px; display:block;
+  }
+  .sidebar-section-body {
+    padding:0 10px 14px;
+    border-bottom:1px solid #1a1919;
+  }
+  .sidebar-row {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:5px 6px; border-radius:2px; cursor:pointer;
+    transition:background 0.15s;
+  }
+  .sidebar-row:hover { background:rgba(232,98,26,0.05); }
+  .sidebar-row-inner {
+    display:flex; align-items:center; gap:7px; min-width:0;
+  }
+  .sidebar-check {
+    width:12px; height:12px; border-radius:2px; flex-shrink:0;
+    border:1px solid #3a3838; display:flex; align-items:center;
+    justify-content:center; font-size:8px; color:#0a0909;
+    transition:all 0.15s;
+  }
+  .sidebar-check.on { border-color:#e8621a; background:#e8621a; }
+  .sidebar-label {
+    font-size:12px; font-weight:500; color:#c4c0bc;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .product-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
 
   /* PRODUCT CARD */
   .s-card { background:#111010;border:1px solid #2a2828;border-radius:2px;overflow:hidden;cursor:pointer;transition:all 0.22s;animation:fadeUp 0.25s ease both; }
@@ -110,6 +188,19 @@ const css = `
   .cat-pills { display:flex;flex-wrap:wrap;gap:8px;margin-bottom:36px; }
   .cat-pill { background:#111010;border:1px solid #2a2828;border-radius:2px;padding:10px 18px;cursor:pointer;transition:all 0.2s;font-family:var(--font-caesar),sans-serif;font-size:16px;letter-spacing:0.07em;color:#8a8784; }
   .cat-pill:hover { border-color:#e8621a;color:#f0ebe3;background:rgba(232,98,26,0.05); }
+
+  @media (max-width:700px) {
+    .shop-layout { grid-template-columns:1fr; }
+    .shop-sidebar { display:none; }
+    .shop-main { padding:12px 16px; }
+  }
+
+  @media (min-width:768px) {
+    .product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+  @media (min-width:1024px) {
+    .product-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  }
 `;
 
 // Highlight matching text in search results
@@ -123,6 +214,104 @@ function highlight(text, query) {
       <mark className="s-highlight">{text.slice(idx, idx + query.length)}</mark>
       {text.slice(idx + query.length)}
     </>
+  );
+}
+
+function FacetSection({ label, items, selected, loading, onSelect }) {
+  const [showAll, setShowAll] = useState(false);
+  const visible = showAll ? items : items.slice(0, 10);
+  const hasMore = items.length > 10;
+
+  return (
+    <div>
+      <div className="sidebar-section-title">{label}</div>
+      <div className="sidebar-section-body">
+        {items.length === 0 && loading
+          ? Array.from({ length: 5 }).map((_, i) => (
+              <div
+                key={i}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  padding: "5px 6px",
+                  marginBottom: 2,
+                  gap: 8,
+                }}
+              >
+                <div style={{ height: 10, flex: 1, background: "#1a1919", borderRadius: 2 }} />
+                <div style={{ height: 10, width: 28, background: "#1a1919", borderRadius: 2 }} />
+              </div>
+            ))
+          : <>
+              {visible.map((item) => {
+                const on = selected === item.name;
+                return (
+                  <div key={item.name} className="sidebar-row" onClick={() => onSelect(item.name)}>
+                    <div className="sidebar-row-inner">
+                      <div className={`sidebar-check ${on ? "on" : ""}`}>
+                        {on ? "✓" : ""}
+                      </div>
+                      <span className="sidebar-label">{item.name}</span>
+                    </div>
+                    <span className={`facet-count ${loading ? "dim" : ""}`}>
+                      {item.count.toLocaleString()}
+                    </span>
+                  </div>
+                );
+              })}
+              {hasMore && (
+                <button
+                  onClick={() => setShowAll((s) => !s)}
+                  style={{
+                    fontFamily: "var(--font-stencil),monospace",
+                    fontSize: 8,
+                    color: "#8a8784",
+                    letterSpacing: "0.1em",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    marginTop: 6,
+                    padding: "0 6px",
+                  }}
+                >
+                  {showAll ? "SHOW LESS ▴" : `+${items.length - 10} MORE ▾`}
+                </button>
+              )}
+            </>
+        }
+      </div>
+    </div>
+  );
+}
+
+function Toggle({ on, onChange }) {
+  return (
+    <div
+      onClick={() => onChange(!on)}
+      style={{
+        width: 32,
+        height: 18,
+        borderRadius: 9,
+        background: on ? "#e8621a" : "#2a2828",
+        position: "relative",
+        cursor: "pointer",
+        transition: "background 0.2s",
+        flexShrink: 0,
+      }}
+    >
+      <div
+        style={{
+          position: "absolute",
+          top: 2,
+          left: on ? 14 : 2,
+          width: 14,
+          height: 14,
+          borderRadius: "50%",
+          background: "#f0ebe3",
+          transition: "left 0.2s",
+        }}
+      />
+    </div>
   );
 }
 
@@ -178,6 +367,10 @@ export default function SearchClient({ initialQuery = "" }) {
   const [results,      setResults]      = useState([]);
   const [total,        setTotal]        = useState(0);
   const [loading,      setLoading]      = useState(false);
+  const [facets,       setFacets]       = useState({ categories: [], brands: [], priceRange: { min: 0, max: 0 } });
+  const [filters,      setFilters]      = useState({ category: null, brand: null, minPrice: null, maxPrice: null, inStock: false });
+  const [minInput,     setMinInput]     = useState("");
+  const [maxInput,     setMaxInput]     = useState("");
   const [saleProducts, setSaleProducts] = useState([]);
   const inputRef = useRef(null);
   const abortRef = useRef(null);
@@ -195,6 +388,21 @@ export default function SearchClient({ initialQuery = "" }) {
       .catch(() => {});
   }, []);
 
+  // Keep category/brand filters in sync with the current URL if present.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    setFilters({
+      category: params.get("category"),
+      brand: params.get("brand"),
+      minPrice: params.get("minPrice") ? Number(params.get("minPrice")) : null,
+      maxPrice: params.get("maxPrice") ? Number(params.get("maxPrice")) : null,
+      inStock: params.get("inStock") === "true",
+    });
+    setMinInput(params.get("minPrice") ?? "");
+    setMaxInput(params.get("maxPrice") ?? "");
+  }, []);
+
   // Debounced search
   const fetchResults = useCallback(async (q, s) => {
     if (!q.trim()) { setResults([]); setTotal(0); return; }
@@ -202,15 +410,22 @@ export default function SearchClient({ initialQuery = "" }) {
     abortRef.current = new AbortController();
     setLoading(true);
     try {
-      const sortParam = s === "relevance" ? "" : `&sort=${s.replace("-","_")}`;
-      const res  = await fetch(
-        `/api/search?search=${encodeURIComponent(q)}&pageSize=48${sortParam}`,
-        { signal: abortRef.current.signal }
-      );
+      const params = new URLSearchParams({
+        search: q,
+        pageSize: "48",
+        ...(filters.category && { category: filters.category }),
+        ...(filters.brand && { brand: filters.brand }),
+        ...(filters.minPrice != null && { minPrice: String(filters.minPrice) }),
+        ...(filters.maxPrice != null && { maxPrice: String(filters.maxPrice) }),
+        ...(filters.inStock && { inStock: "true" }),
+        ...(s !== "relevance" && { sort: s }),
+      });
+      const res  = await fetch(`/api/search?${params}`, { signal: abortRef.current.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setResults(data.products ?? []);
       setTotal(data.total ?? 0);
+      setFacets(data.facets ?? { categories: [], brands: [], priceRange: { min: 0, max: 0 } });
     } catch (err) {
       if (err.name !== "AbortError") {
         console.error("[Search]", err.message);
@@ -219,18 +434,57 @@ export default function SearchClient({ initialQuery = "" }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filters]);
 
   useEffect(() => {
     const t = setTimeout(() => fetchResults(query, sort), DEBOUNCE_MS);
     return () => clearTimeout(t);
-  }, [query, sort, fetchResults]);
+  }, [query, sort, filters, fetchResults]);
 
   const doSearch = (q) => {
     setQuery(q);
     setInput(q);
     const url = q ? `/search?q=${encodeURIComponent(q)}` : "/search";
     window.history.replaceState(null, "", url);
+  };
+
+  const setFilter = useCallback((key, val) => {
+    setFilters((prev) => ({ ...prev, [key]: val }));
+    setQuery((prev) => prev);
+  }, []);
+
+  const applyPrice = useCallback(() => {
+    setFilters((prev) => ({
+      ...prev,
+      minPrice: minInput ? Number(minInput) : null,
+      maxPrice: maxInput ? Number(maxInput) : null,
+    }));
+  }, [minInput, maxInput]);
+
+  const clearAll = useCallback(() => {
+    setFilters({ category: null, brand: null, minPrice: null, maxPrice: null, inStock: false });
+    setMinInput("");
+    setMaxInput("");
+  }, []);
+
+  const chips = [
+    filters.category && { key: "category", label: filters.category },
+    filters.brand && { key: "brand", label: filters.brand },
+    filters.minPrice != null && { key: "minPrice", label: `$${filters.minPrice}+` },
+    filters.maxPrice != null && { key: "maxPrice", label: `≤$${filters.maxPrice}` },
+    filters.inStock && { key: "inStock", label: "In Stock" },
+  ].filter(Boolean);
+
+  const removeChip = (key) => {
+    if (key === "minPrice" || key === "maxPrice") {
+      setFilters((prev) => ({ ...prev, minPrice: null, maxPrice: null }));
+      setMinInput("");
+      setMaxInput("");
+    } else if (key === "inStock") {
+      setFilters((prev) => ({ ...prev, inStock: false }));
+    } else {
+      setFilters((prev) => ({ ...prev, [key]: null }));
+    }
   };
 
   const handleSubmit = (e) => {
@@ -301,37 +555,143 @@ export default function SearchClient({ initialQuery = "" }) {
             </select>
           </div>
 
-          <div className="search-body">
-            {loading ? (
-              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))", gap:12 }}>
-                {Array.from({length:8}).map((_,i) => (
-                  <div key={i} className="s-card" style={{opacity:0.4}}>
-                    <div className="s-card-img"/>
-                    <div className="s-card-body">
-                      <div style={{height:8, background:"#2a2828", borderRadius:2, marginBottom:8, width:"60%"}}/>
-                      <div style={{height:12, background:"#2a2828", borderRadius:2, marginBottom:8}}/>
-                      <div style={{height:8, background:"#2a2828", borderRadius:2, width:"40%"}}/>
+          <div className="shop-layout">
+            <aside className="shop-sidebar">
+              <FacetSection
+                label="CATEGORY"
+                items={facets.categories}
+                selected={filters.category}
+                loading={loading}
+                onSelect={(val) => setFilters((prev) => ({ ...prev, category: prev.category === val ? null : val }))}
+              />
+
+              <FacetSection
+                label="BRAND"
+                items={facets.brands}
+                selected={filters.brand}
+                loading={loading}
+                onSelect={(val) => setFilters((prev) => ({ ...prev, brand: prev.brand === val ? null : val }))}
+              />
+
+              <div>
+                <div className="sidebar-section-title">PRICE RANGE</div>
+                <div className="sidebar-section-body">
+                  {facets.priceRange?.max > 0 && (
+                    <div style={{ fontFamily: "var(--font-stencil),monospace", fontSize: 8, color: "#8a8784", letterSpacing: "0.08em", marginBottom: 8 }}>
+                      ${Math.floor(facets.priceRange.min).toLocaleString()} – ${Math.ceil(facets.priceRange.max).toLocaleString()}
                     </div>
+                  )}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 8 }}>
+                    <input
+                      className="price-input"
+                      placeholder="Min $"
+                      type="number"
+                      value={minInput}
+                      onChange={(e) => setMinInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          applyPrice();
+                        }
+                      }}
+                    />
+                    <input
+                      className="price-input"
+                      placeholder="Max $"
+                      type="number"
+                      value={maxInput}
+                      onChange={(e) => setMaxInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          applyPrice();
+                        }
+                      }}
+                    />
                   </div>
-                ))}
-              </div>
-            ) : results.length === 0 ? (
-              <div className="search-empty">
-                <div className="search-empty-title">NO RESULTS FOR "{query.toUpperCase()}"</div>
-                <div className="search-empty-sub">TRY A DIFFERENT SEARCH TERM OR BROWSE BY CATEGORY</div>
-                <div className="search-suggestions">
-                  {POPULAR.map(p => (
-                    <button key={p} className="popular-chip" onClick={() => doSearch(p)}>{p}</button>
-                  ))}
+                  <button
+                    onClick={applyPrice}
+                    style={{
+                      width: "100%",
+                      background: "#e8621a",
+                      border: "none",
+                      color: "#0a0909",
+                      fontFamily: "var(--font-caesar),sans-serif",
+                      fontSize: 14,
+                      letterSpacing: "0.08em",
+                      padding: "7px",
+                      borderRadius: 2,
+                      cursor: "pointer",
+                    }}
+                  >
+                    APPLY
+                  </button>
                 </div>
               </div>
-            ) : (
-              <div className="results-grid">
-                {results.map((p, i) => (
-                  <ResultCard key={p.id} p={p} i={i} query={query} onAdd={() => addItem(p)} />
-                ))}
+
+              <div>
+                <div className="sidebar-section-title">AVAILABILITY</div>
+                <div className="sidebar-section-body" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: "#c4c0bc" }}>In Stock Only</span>
+                  <Toggle on={filters.inStock} onChange={(val) => setFilters((prev) => ({ ...prev, inStock: val }))} />
+                </div>
               </div>
-            )}
+            </aside>
+
+            <div className="shop-main">
+              {chips.length > 0 && (
+                <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap", marginBottom: 14 }}>
+                  {chips.map((f) => (
+                    <span key={f.key} className="chip" onClick={() => removeChip(f.key)}>
+                      {f.label} ×
+                    </span>
+                  ))}
+                  <button
+                    onClick={clearAll}
+                    style={{
+                      fontFamily: "var(--font-stencil),monospace",
+                      fontSize: 8,
+                      letterSpacing: "0.1em",
+                      color: "#8a8784",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                    }}
+                  >
+                    CLEAR ALL
+                  </button>
+                </div>
+              )}
+
+              {loading ? (
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))", gap:12 }}>
+                  {Array.from({length:8}).map((_,i) => (
+                    <div key={i} className="s-card" style={{opacity:0.4}}>
+                      <div className="s-card-img"/>
+                      <div className="s-card-body">
+                        <div style={{height:8, background:"#2a2828", borderRadius:2, marginBottom:8, width:"60%"}}/>
+                        <div style={{height:12, background:"#2a2828", borderRadius:2, marginBottom:8}}/>
+                        <div style={{height:8, background:"#2a2828", borderRadius:2, width:"40%"}}/>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : results.length === 0 ? (
+                <div className="search-empty">
+                  <div className="search-empty-title">NO RESULTS FOR "{query.toUpperCase()}"</div>
+                  <div className="search-empty-sub">TRY A DIFFERENT SEARCH TERM OR BROWSE BY CATEGORY</div>
+                  <div className="search-suggestions">
+                    {POPULAR.map(p => (
+                      <button key={p} className="popular-chip" onClick={() => doSearch(p)}>{p}</button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className={results.length ? "product-grid" : ""}>
+                  {results.map((p, i) => (
+                    <ResultCard key={p.id} p={p} i={i} query={query} onAdd={() => addItem(p)} />
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </>
       ) : (
@@ -350,7 +710,7 @@ export default function SearchClient({ initialQuery = "" }) {
           {saleProducts.length > 0 && (
             <>
               <div className="landing-section-title">ON <span>SALE NOW</span></div>
-              <div className="results-grid">
+              <div className="product-grid">
                 {saleProducts.map((p, i) => (
                   <ResultCard key={p.id} p={p} i={i} query="" onAdd={() => addItem(p)} />
                 ))}
