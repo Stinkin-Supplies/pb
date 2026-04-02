@@ -447,6 +447,7 @@ export default function ShopClient({
     const newUrl = `${pathname}${qs ? `?${qs}` : ""}`;
     router.replace(newUrl, { scroll: false });
     window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }, [filters, sort, page, pathname, router]);
 
   const fetchProducts = useCallback(async (f, s, p) => {
