@@ -95,8 +95,18 @@ async function run() {
         cp.map_price::float                            AS map_price,
         cp.msrp::float                                 AS msrp,
         cp.is_active,
-        COALESCE(cp.stock_quantity, 0)::bigint         AS stock_quantity,
-        CASE WHEN COALESCE(cp.stock_quantity, 0) > 0 THEN 1 ELSE 0 END AS in_stock,
+        COALESCE((
+          SELECT SUM(vo.total_qty)
+          FROM public.vendor_offers vo
+          WHERE vo.catalog_product_id = cp.id
+            AND vo.is_active = true
+        ), 0)::bigint                               AS stock_quantity,
+        CASE WHEN COALESCE((
+          SELECT SUM(vo.total_qty)
+          FROM public.vendor_offers vo
+          WHERE vo.catalog_product_id = cp.id
+            AND vo.is_active = true
+        ), 0) > 0 THEN 1 ELSE 0 END AS in_stock,
         cp.description,
         cp.weight::float                               AS weight,
         EXTRACT(EPOCH FROM cp.created_at)::bigint      AS created_at,
