@@ -471,10 +471,10 @@ export function mapWpsItemToProduct(
     part_number:       item.sku,
     slug:              slugifyWps(item.name, item.sku),
     vendor_sku:        item.sku,
-    name:              item.name,
+    name:              item.product?.data?.name ?? item.name,
     brand_name:        brandName || "WPS",
     category_name:     "General",          // enriched by Typesense/taxonomy later
-    description:       item.product?.description ?? item.description ?? null,
+    description:       item.product?.data?.description ?? item.product?.description ?? item.description ?? null,
     our_price:         parseFloat(ourPrice.toFixed(2)),
     compare_at_price:  retail > 0 ? retail : null,
     map_price:         mapPrice,
