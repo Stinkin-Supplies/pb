@@ -60,7 +60,7 @@ export const db = {
               AND vo.is_active = true
           ), '{}'::text[]) AS vendor_codes,
           COALESCE((
-            SELECT COUNT(*) FILTER (WHERE vo.is_active = true)
+            SELECT SUM(vo.total_qty)
             FROM public.vendor_offers vo
             WHERE vo.catalog_product_id = cp.id
               AND vo.is_active = true
@@ -146,7 +146,7 @@ export const db = {
                 WHERE ci.catalog_product_id = cp.id
               ), '{}'::text[]) AS images,
               COALESCE((
-                SELECT COUNT(*) FILTER (WHERE vo.is_active = true)
+                SELECT SUM(vo.total_qty)
                 FROM public.vendor_offers vo
                 WHERE vo.catalog_product_id = cp.id
                   AND vo.is_active = true
