@@ -330,7 +330,7 @@ function ProductCard({ product:p, index, view, onAdd }) {
       </div>
 
       {/* Body */}
-      <div className="pcard-body" style={{
+      <div className="pcard-body p-2 sm:p-4" style={{
         display:view==="list"?"flex":"block", alignItems:view==="list"?"center":undefined,
         gap:view==="list"?16:undefined, flex:view==="list"?1:undefined }}>
         <div style={{ flex:view==="list"?1:undefined }}>
