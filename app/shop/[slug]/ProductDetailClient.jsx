@@ -745,7 +745,7 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
             )}
             {product.pointsEarned > 0 && (
               <div className="price-points">
-                ★ EARN {product.pointsEarned.toLocaleString()} POINTS ON THIS ORDER
+                EARN {product.pointsEarned.toLocaleString()} POINTS ON THIS ORDER
               </div>
             )}
           </div>
@@ -767,7 +767,7 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
           <div className="purchase-row">
             <div className="qty-wrap">
               <button className="qty-btn" onClick={() => setQty(q => Math.max(1, q-1))} disabled={qty<=1}>−</button>
-              <div className="qty-val">{qty}</div>
+              <div className="qty-val">QTY: {qty}</div>
               <button className="qty-btn" onClick={() => setQty(q => Math.min(Number(product.stockQty ?? 10), q+1))} disabled={!product.inStock}>+</button>
             </div>
 
