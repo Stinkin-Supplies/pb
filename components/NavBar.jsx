@@ -104,11 +104,17 @@ const css = `
   .ss-mobile-menu {
     position: fixed; inset: 54px 0 0;
     background: #111010;
+    background-color: #111010;
+    opacity: 1;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    min-height: calc(100vh - 54px);
     display: flex;
     flex-direction: column;
     padding: 20px 28px;
     gap: 14px;
     z-index: 101;
+    overflow-y: auto;
   }
   .ss-mobile-menu a {
     letter-spacing: 0.12em;
