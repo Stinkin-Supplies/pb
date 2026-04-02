@@ -326,15 +326,15 @@ export async function POST(req: Request) {
               name, slug, description,
               brand, category,
               price, cost, map_price, msrp,
-              weight, drop_ship_eligible,
+              stock_quantity, weight, drop_ship_eligible,
               has_map_policy, is_active,
               product_type, upc,
               source_vendor, status,
               created_at, updated_at
             ) VALUES (
               $1,$2,$3,$4,$5,$6,$7,
-              $8,$9,$10,$11,$12,$13,
-              $14,$15,$16,$17,$18,$19,
+              $8,$9,$10,$11,$12,$13,$14,
+              $15,$16,$17,$18,$19,$20,
               NOW(), NOW()
             )
             ON CONFLICT (sku) DO UPDATE SET
@@ -345,6 +345,7 @@ export async function POST(req: Request) {
               cost               = COALESCE(EXCLUDED.cost, catalog_products.cost),
               map_price          = COALESCE(EXCLUDED.map_price, catalog_products.map_price),
               msrp               = COALESCE(EXCLUDED.msrp, catalog_products.msrp),
+              stock_quantity     = EXCLUDED.stock_quantity,
               weight             = COALESCE(EXCLUDED.weight, catalog_products.weight),
               drop_ship_eligible = EXCLUDED.drop_ship_eligible,
               has_map_policy     = EXCLUDED.has_map_policy,
@@ -362,6 +363,7 @@ export async function POST(req: Request) {
               null,
               i.map_price,
               i.compare_at_price,
+              i.stock_quantity,
               i.weight_lbs,
               i.is_drag_specialties ? false : true,
               i.is_map ?? false,
