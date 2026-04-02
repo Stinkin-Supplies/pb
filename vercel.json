@@ -12,16 +12,16 @@
   },
   "crons": [
     {
+      "path": "/api/admin/run-pricing",
+      "schedule": "0 3 * * *"
+    },
+    {
       "path": "/api/admin/pu-price-sync",
       "schedule": "0 4 * * *"
     },
     {
       "path": "/api/admin/reindex",
-      "schedule": "0 4 * * *"
-    },
-    {
-      "path": "/api/admin/run-pricing",
-      "schedule": "0 3 * * *"
+      "schedule": "0 5 * * *"
     }
   ]
 }
