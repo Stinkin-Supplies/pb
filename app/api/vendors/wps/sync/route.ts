@@ -377,6 +377,36 @@ export async function POST(req: Request) {
         }
       }
 
+      const offerParams = validBatch.flatMap((p) => [
+        p.sku,
+        p.in_stock ?? false,
+        p.our_price ?? 0,
+        p.stock_quantity ?? 0,
+      ]);
+
+      if (offerParams.length > 0) {
+        const offerValues = validBatch
+          .map((_, i) => `($${i * 4 + 1}, $${i * 4 + 2}::boolean, $${i * 4 + 3}::numeric, $${i * 4 + 4}::integer)`)
+          .join(", ");
+
+        await catalogDb.query(
+          `
+          UPDATE vendor_offers vo
+          SET
+            total_qty       = data.total_qty,
+            in_stock        = data.in_stock,
+            our_price       = data.our_price,
+            last_stock_sync = NOW()
+          FROM (
+            SELECT * FROM (VALUES ${offerValues}) AS v(sku, in_stock, our_price, total_qty)
+          ) AS data
+          WHERE vo.vendor_code = 'wps'
+            AND vo.vendor_part_number = data.sku
+          `,
+          offerParams
+        );
+      }
+
       const skuStockList = validBatch.map((p) => ({ sku: p.sku, in_stock: p.in_stock ?? false }));
       await checkRestockNotifications(supabase, skuStockList);
 
