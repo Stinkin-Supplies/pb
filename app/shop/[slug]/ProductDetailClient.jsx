@@ -128,7 +128,7 @@ const css = `
     margin-bottom: 8px;
   }
   .info-name {
-    font-family: var(--font-caesar), sans-serif;
+    font-family: var(--font-stencil), monospace;
     font-size: 38px; line-height: 0.95; letter-spacing: 0.03em;
     color: #f0ebe3; margin-bottom: 14px;
   }
@@ -176,7 +176,7 @@ const css = `
     text-decoration: line-through; margin-bottom: 2px;
   }
   .price-main {
-    font-family: var(--font-caesar), sans-serif;
+    font-family: var(--font-stencil), monospace;
     font-size: 52px; color: #f0ebe3;
     letter-spacing: 0.03em; line-height: 1;
   }
@@ -236,7 +236,7 @@ const css = `
   .qty-val {
     width: 44px; height: 48px;
     background: #111010; border: none;
-    color: #f0ebe3; font-family: var(--font-caesar), sans-serif;
+    color: #f0ebe3; font-family: var(--font-stencil), monospace;
     font-size: 20px; letter-spacing: 0.05em;
     text-align: center; outline: none;
     display: flex; align-items: center; justify-content: center;
@@ -303,7 +303,7 @@ const css = `
   /* ── SPECS TABLE ── */
   .specs-section { margin-top: 48px; }
   .specs-title {
-    font-family: var(--font-caesar), sans-serif;
+    font-family: var(--font-stencil), monospace;
     font-size: 26px; letter-spacing: 0.05em;
     color: #f0ebe3; margin-bottom: 16px;
     padding-bottom: 10px;
@@ -338,7 +338,7 @@ const css = `
     padding-bottom: 14px; margin-bottom: 20px;
   }
   .related-title {
-    font-family: var(--font-caesar), sans-serif;
+    font-family: var(--font-stencil), monospace;
     font-size: 30px; letter-spacing: 0.05em;
   }
   .related-title span { color: #e8621a; }
@@ -388,7 +388,7 @@ const css = `
   }
   .related-footer { display: flex; justify-content: space-between; align-items: center; }
   .related-price {
-    font-family: var(--font-caesar), sans-serif;
+    font-family: var(--font-stencil), monospace;
     font-size: 20px; color: #f0ebe3; letter-spacing: 0.04em;
   }
   .related-oos-badge {
