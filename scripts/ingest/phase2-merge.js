@@ -123,7 +123,7 @@ async function upsertCatalogProduct(client, mpn, rows) {
       $19, $20, $21,
       NOW(), NOW()
     )
-    ON CONFLICT (manufacturer_part_number) DO UPDATE SET
+    ON CONFLICT (sku) DO UPDATE SET
       name                = COALESCE(EXCLUDED.name, catalog_products.name),
       description         = COALESCE(EXCLUDED.description, catalog_products.description),
       brand               = COALESCE(EXCLUDED.brand, catalog_products.brand),
