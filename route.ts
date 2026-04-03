@@ -1,105 +1,137 @@
-// app/api/image-proxy/route.ts
-// Proxies CDN images which block direct browser hotlinking.
+// app/api/search/route.ts
+// ─────────────────────────────────────────────────────────────
+// Typesense-powered search endpoint
+//
+// GET /api/search?q=helmet&brand=FLY+RACING&category=Helmets
+//               &minPrice=50&maxPrice=300&inStock=true
+//               &sort=price_asc&page=0&pageSize=48
+//
+// Returns same shape as /api/products so ShopClient needs
+// zero changes to switch over.
+// ─────────────────────────────────────────────────────────────
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { getSearchClient, COLLECTION } from '@/lib/typesense/client'
 
-const ALLOWED_HOSTS = ['cdn.wpsstatic.com', 'asset.lemansnet.com']
+const PAGE_SIZE_DEFAULT = 48
+const PAGE_SIZE_MAX     = 96
 
-function isAllowedUrl(url: string): boolean {
-  try {
-    const { hostname } = new URL(url)
-    return ALLOWED_HOSTS.some(h => hostname === h || hostname.endsWith(`.${h}`))
-  } catch {
-    return false
+// Sort map — uses correct Typesense v2 field names
+const SORT_MAP: Record<string, string> = {
+  newest:     'id:desc',
+  price_asc:  'computed_price:asc',
+  price_desc: 'computed_price:desc',
+  name_asc:   'name:asc',
+}
+
+export async function GET(req: Request) {
+  const url      = new URL(req.url)
+  const q        = url.searchParams.get('q')?.trim()        || '*'
+  const category = url.searchParams.get('category')         || ''
+  const brand    = url.searchParams.get('brand')            || ''
+  const minPrice = url.searchParams.get('minPrice')         || ''
+  const maxPrice = url.searchParams.get('maxPrice')         || ''
+  const inStock  = url.searchParams.get('inStock') === 'true'
+  const sort     = url.searchParams.get('sort')             || 'newest'
+  const page     = Math.max(0, parseInt(url.searchParams.get('page') || '0', 10))
+  const pageSize = Math.min(
+    PAGE_SIZE_MAX,
+    parseInt(url.searchParams.get('pageSize') || String(PAGE_SIZE_DEFAULT), 10)
+  )
+
+  // ── Build filter_by ─────────────────────────────────────────
+  const filters: string[] = ['is_active:=true']
+  if (category) filters.push(`category:=${JSON.stringify(category)}`)
+  if (brand)    filters.push(`brand:=${JSON.stringify(brand)}`)
+  if (inStock)  filters.push('in_stock:=true')
+  if (minPrice || maxPrice) {
+    const min = minPrice ? Number(minPrice) : 0
+    const max = maxPrice ? Number(maxPrice) : 999999
+    filters.push(`computed_price:[${min}..${max}]`)
   }
-}
 
-// WPS CDN serves images directly in the browser — redirect, no proxy needed
-const WPS_DIRECT = ['cdn.wpsstatic.com']
+  // Sort — in-stock products first, then user's chosen sort
+  const primarySort  = 'in_stock:desc'
+  const secondarySort = SORT_MAP[sort] ?? SORT_MAP.newest
+  const resolvedSortBy = `${primarySort},${secondarySort}`
+  const filterBy   = filters.join(' && ')
+  const typesensePage = page + 1 // Typesense is 1-indexed
 
-// LeMans requires the lepartsmartner.com referer and manual redirect following
-const LEMANS_HEADERS = {
-  'Referer':    'https://www.lepartsmartner.com/',
-  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-  'Accept':     'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
-}
+  try {
+    const client = getSearchClient()
 
-async function fetchFollowingRedirects(url: string, headers: Record<string, string>, maxRedirects = 5): Promise<Response> {
-  let currentUrl = url
-  let hops = 0
-
-  while (hops < maxRedirects) {
-    const res = await fetch(currentUrl, {
-      headers,
-      cache: 'no-store',
-      redirect: 'manual',
+    const result = await client.collections(COLLECTION).documents().search({
+      q,
+      // v2 field names + correct weights: name:10, brand:5, sku:3, specs_blob:2, search_blob:1
+      query_by:              'name,brand,sku,specs_blob,search_blob',
+      query_by_weights:      '10,5,3,2,1',
+      filter_by:             filterBy,
+      sort_by:               resolvedSortBy,
+      facet_by:              'category,brand,in_stock',
+      max_facet_values:      100,
+      per_page:              pageSize,
+      page:                  typesensePage,
+      highlight_full_fields: 'name',
+      // Don't penalise longer documents
+      exhaustive_search:     false,
     })
 
-    if (res.status === 301 || res.status === 302 || res.status === 307 || res.status === 308) {
-      const location = res.headers.get('location')
-      if (!location) break
-
-      // Resolve relative URLs
-      currentUrl = location.startsWith('http')
-        ? location
-        : new URL(location, currentUrl).toString()
-
-      console.log(`[image-proxy] redirect ${hops + 1}: ${currentUrl}`)
-      hops++
-      continue
-    }
-
-    return res
-  }
-
-  throw new Error(`Too many redirects for ${url}`)
-}
-
-export async function GET(req: NextRequest) {
-  const url = req.nextUrl.searchParams.get('url')
-  if (!url)               return new NextResponse('Missing url param', { status: 400 })
-  if (!isAllowedUrl(url)) return new NextResponse('Forbidden',         { status: 403 })
-
-  try {
-    const { hostname } = new URL(url)
-
-    // WPS: redirect directly to CDN — browser loads it fine
-    if (WPS_DIRECT.some(h => hostname === h || hostname.endsWith(`.${h}`))) {
-      return NextResponse.redirect(url, { status: 302 })
-    }
-
-    // LeMans: proxy with manual redirect following + referer header
-    if (hostname === 'asset.lemansnet.com' || hostname.endsWith('.lemansnet.com')) {
-      try {
-        const upstream = await fetchFollowingRedirects(url, LEMANS_HEADERS)
-
-        if (!upstream.ok) {
-          console.warn(`[image-proxy] LeMans final status ${upstream.status} for ${url}`)
-          return NextResponse.redirect(new URL('/images/placeholder.jpg', req.url))
-        }
-
-        const contentType = upstream.headers.get('Content-Type') ?? 'image/jpeg'
-        const blob = await upstream.arrayBuffer()
-
-        console.log(`[image-proxy] LeMans success — ${blob.byteLength} bytes, type: ${contentType}`)
-
-        return new NextResponse(blob, {
-          status: 200,
-          headers: {
-            'Content-Type':  contentType.startsWith('image/') ? contentType : 'image/jpeg',
-            'Cache-Control': 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400',
-            'Content-Length': blob.byteLength.toString(),
-          },
-        })
-      } catch (err: any) {
-        console.error(`[image-proxy] LeMans error for ${url}:`, err.message)
-        return NextResponse.redirect(new URL('/images/placeholder.jpg', req.url))
+    // ── Map documents to NormalizedProduct shape ──────────────
+    const products = (result.hits ?? []).map((hit: any) => {
+      const d = hit.document
+      return {
+        id:         Number(d.id),
+        slug:       d.slug,
+        sku:        d.sku,
+        name:       d.name,
+        brand:      d.brand,
+        category:   d.category   ?? null,
+        price:      d.computed_price ?? null,
+        was:        null,                      // msrp not in v2 schema yet
+        mapPrice:   null,                      // map_price not in v2 schema yet
+        badge:      null,
+        inStock:    d.in_stock === true,
+        fitmentIds: d.fitment_make?.length ? d.fitment_make : null,
+        image:      d.primary_image ?? null,
       }
+    })
+
+    // ── Map facets ────────────────────────────────────────────
+    const facetMap: Record<string, any[]> = {}
+    for (const fc of result.facet_counts ?? []) {
+      facetMap[fc.field_name] = fc.counts.map((c: any) => ({
+        name:  c.value,
+        count: c.count,
+      }))
     }
+
+    // Price range — derived from result stats since we removed price facet
+    const priceValues = (result.hits ?? [])
+      .map((h: any) => h.document.computed_price)
+      .filter((p: any) => p != null)
+      .map(Number)
+
+    const priceRange = priceValues.length
+      ? { min: Math.min(...priceValues), max: Math.max(...priceValues) }
+      : { min: 0, max: 0 }
+
+    return NextResponse.json({
+      products,
+      total:    result.found,
+      page,
+      pageSize,
+      facets: {
+        categories: facetMap['category'] ?? [],
+        brands:     facetMap['brand']    ?? [],
+        priceRange,
+      },
+    })
 
   } catch (err: any) {
-    console.error(`[image-proxy] error:`, err.message)
+    console.error('[/api/search]', err.message)
+    return NextResponse.json(
+      { error: err.message ?? 'Search failed' },
+      { status: 500 }
+    )
   }
-
-  return NextResponse.redirect(new URL('/images/placeholder.jpg', req.url))
 }

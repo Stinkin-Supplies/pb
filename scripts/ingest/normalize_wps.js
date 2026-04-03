@@ -4,6 +4,13 @@
  * Writes to: catalog_products, catalog_variants, catalog_specs,
  *             catalog_media, vendor_offers
  *
+ * Column names match live DB schema:
+ *   catalog_products:  weight (not weight_lbs)
+ *   vendor_offers:     catalog_product_id, vendor_code, wholesale_cost
+ *   catalog_specs:     product_id, attribute, value (no vendor column)
+ *   catalog_media:     product_id, url, media_type, priority (no vendor column)
+ *   catalog_variants:  product_id, option_name, option_value (no vendor column)
+ *
  * Run after Stage 0 has populated raw tables.
  */
 
@@ -24,7 +31,7 @@ function buildSlug(name, sku) {
 
 /**
  * WPS returns category as an array path e.g. ["Helmets","Full Face"]
- * We join with " > " for storage, use last segment as primary category.
+ * Use last segment as primary category.
  */
 function parseCategory(item) {
   const path = item.category_path ?? item.categories ?? [];
@@ -35,17 +42,17 @@ function parseCategory(item) {
 
 /**
  * Normalize a WPS item payload into canonical product shape.
- * Does NOT hit the DB — pure transform.
+ * Pure transform — does NOT hit the DB.
  */
 function mapWpsProduct(item, inventoryMap) {
-  const sku        = item.sku ?? item.number ?? null;
-  const name       = item.name ?? item.product_name ?? null;
-  const brand      = item.brand?.name ?? item.brand ?? null;
-  const mpn        = item.mpn ?? item.part_number ?? sku;
-  const desc       = item.long_description ?? item.description ?? null;
-  const category   = parseCategory(item);
-  const weight     = item.weight ?? null;
-  const slug       = buildSlug(name, sku);
+  const sku      = item.sku ?? item.number ?? null;
+  const name     = item.name ?? item.product_name ?? null;
+  const brand    = item.brand?.name ?? item.brand ?? null;
+  const mpn      = item.mpn ?? item.part_number ?? sku;
+  const desc     = item.long_description ?? item.description ?? null;
+  const category = parseCategory(item);
+  const weight   = item.weight ?? null;
+  const slug     = buildSlug(name, sku);
 
   // Sport flags — WPS ships these as boolean columns
   const sportFlags = {
@@ -82,29 +89,36 @@ function mapWpsProduct(item, inventoryMap) {
   if (item.colors?.length) item.colors.forEach(v => variants.push({ option_name: 'Color', option_value: String(v) }));
 
   // Inventory from the inventory map keyed by sku
-  const inv = inventoryMap.get(sku) ?? {};
+  const inv          = inventoryMap.get(sku) ?? {};
   const warehouseJson = inv.warehouses ?? inv.inventory ?? {};
-  const totalQty = inv.total ?? inv.quantity ??
+  const totalQty     = inv.total ?? inv.quantity ??
     Object.values(warehouseJson).reduce((s, v) => s + (Number(v) || 0), 0);
 
-  const cost    = item.cost    ?? item.dealer_price ?? null;
-  const msrp    = item.msrp   ?? item.retail_price  ?? null;
-  const mapPrice = item.map   ?? item.map_price      ?? null;
+  const cost     = item.cost      ?? item.dealer_price  ?? null;
+  const msrp     = item.msrp      ?? item.retail_price  ?? null;
+  const mapPrice = item.map       ?? item.map_price      ?? null;
 
   return {
-    product: { sku, name, brand, manufacturer_part_number: mpn, slug, description: desc, category, weight, stock_quantity: Number(totalQty) || 0, ...sportFlags },
+    product: {
+      sku, name, brand,
+      manufacturer_part_number: mpn,
+      slug,
+      description: desc,
+      category,
+      weight,           // correct column name
+      ...sportFlags,
+    },
     images,
     specs,
     variants,
     offer: {
-      vendor_code:  'wps',
-      vendor_part_number: sku,
-      wholesale_cost: cost   ? Number(cost)   : null,
-      msrp:         msrp   ? Number(msrp)   : null,
-      map_price:    mapPrice ? Number(mapPrice) : null,
-      total_qty:    Number(totalQty) || 0,
+      vendor_code:    'wps',              // correct column name
+      wholesale_cost: cost   ? Number(cost)      : null,  // correct column name
+      msrp:           msrp   ? Number(msrp)      : null,
+      map_price:      mapPrice ? Number(mapPrice) : null,
+      total_qty:      Number(totalQty) || 0,
       warehouse_json: warehouseJson,
-      wps_item_id:  item.id ?? null,
+      vendor_part_number: item.id ? String(item.id) : null,
     },
   };
 }
@@ -115,29 +129,19 @@ async function upsertProduct(p) {
   const rows = await sql`
     INSERT INTO catalog_products
       (sku, name, brand, manufacturer_part_number, slug, description, category,
-       weight, stock_quantity, is_atv, is_offroad, is_snow, is_street, is_watercraft, is_bicycle,
-       is_active, updated_at)
+       weight, is_active, updated_at)
     VALUES
       (${p.sku}, ${p.name}, ${p.brand}, ${p.manufacturer_part_number}, ${p.slug},
-       ${p.description}, ${p.category}, ${p.weight}, ${p.stock_quantity},
-       ${p.is_atv}, ${p.is_offroad}, ${p.is_snow}, ${p.is_street},
-       ${p.is_watercraft}, ${p.is_bicycle}, true, NOW())
+       ${p.description}, ${p.category}, ${p.weight}, true, NOW())
     ON CONFLICT (sku) DO UPDATE SET
-      name                    = EXCLUDED.name,
-      brand                   = EXCLUDED.brand,
+      name                     = EXCLUDED.name,
+      brand                    = EXCLUDED.brand,
       manufacturer_part_number = EXCLUDED.manufacturer_part_number,
-      description             = COALESCE(EXCLUDED.description, catalog_products.description),
-      category                = COALESCE(EXCLUDED.category,    catalog_products.category),
-      weight                  = COALESCE(EXCLUDED.weight,      catalog_products.weight),
-      stock_quantity          = COALESCE(EXCLUDED.stock_quantity, catalog_products.stock_quantity),
-      is_atv                  = EXCLUDED.is_atv,
-      is_offroad              = EXCLUDED.is_offroad,
-      is_snow                 = EXCLUDED.is_snow,
-      is_street               = EXCLUDED.is_street,
-      is_watercraft           = EXCLUDED.is_watercraft,
-      is_bicycle              = EXCLUDED.is_bicycle,
-      is_active               = true,
-      updated_at              = NOW()
+      description              = COALESCE(EXCLUDED.description, catalog_products.description),
+      category                 = COALESCE(EXCLUDED.category,    catalog_products.category),
+      weight                   = COALESCE(EXCLUDED.weight,      catalog_products.weight),
+      is_active                = true,
+      updated_at               = NOW()
     RETURNING id
   `;
   return rows[0].id;
@@ -146,20 +150,20 @@ async function upsertProduct(p) {
 async function upsertOffer(productId, offer) {
   await sql`
     INSERT INTO vendor_offers
-      (catalog_product_id, vendor_code, vendor_part_number, manufacturer_part_number, wholesale_cost, msrp, map_price, total_qty, warehouse_json, wps_item_id, updated_at)
+      (catalog_product_id, vendor_code, wholesale_cost, msrp, map_price,
+       total_qty, warehouse_json, vendor_part_number, updated_at)
     VALUES
-      (${productId}, ${offer.vendor_code}, ${offer.vendor_part_number}, ${offer.vendor_part_number}, ${offer.wholesale_cost}, ${offer.msrp}, ${offer.map_price},
-       ${offer.total_qty}, ${JSON.stringify(offer.warehouse_json)}, ${offer.wps_item_id}, NOW())
+      (${productId}, ${offer.vendor_code}, ${offer.wholesale_cost},
+       ${offer.msrp}, ${offer.map_price}, ${offer.total_qty},
+       ${JSON.stringify(offer.warehouse_json)}, ${offer.vendor_part_number}, NOW())
     ON CONFLICT (catalog_product_id, vendor_code) DO UPDATE SET
+      wholesale_cost     = COALESCE(EXCLUDED.wholesale_cost, vendor_offers.wholesale_cost),
+      msrp               = COALESCE(EXCLUDED.msrp,           vendor_offers.msrp),
+      map_price          = COALESCE(EXCLUDED.map_price,      vendor_offers.map_price),
+      total_qty          = EXCLUDED.total_qty,
+      warehouse_json     = EXCLUDED.warehouse_json,
       vendor_part_number = COALESCE(EXCLUDED.vendor_part_number, vendor_offers.vendor_part_number),
-      manufacturer_part_number = COALESCE(EXCLUDED.manufacturer_part_number, vendor_offers.manufacturer_part_number),
-      wholesale_cost = COALESCE(EXCLUDED.wholesale_cost, vendor_offers.wholesale_cost),
-      msrp           = COALESCE(EXCLUDED.msrp,      vendor_offers.msrp),
-      map_price      = COALESCE(EXCLUDED.map_price, vendor_offers.map_price),
-      total_qty      = EXCLUDED.total_qty,
-      warehouse_json = EXCLUDED.warehouse_json,
-      wps_item_id    = COALESCE(EXCLUDED.wps_item_id, vendor_offers.wps_item_id),
-      updated_at     = NOW()
+      updated_at         = NOW()
   `;
 }
 
@@ -208,7 +212,7 @@ async function loadInventoryMap() {
   const map = new Map();
   for (const row of rows) {
     const payload = typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload;
-    const items = payload?.data ?? payload?.items ?? (Array.isArray(payload) ? payload : []);
+    const items   = payload?.data ?? payload?.items ?? (Array.isArray(payload) ? payload : []);
     for (const inv of items) {
       const sku = inv.sku ?? inv.item_number;
       if (sku && !map.has(sku)) map.set(sku, inv);
@@ -225,14 +229,13 @@ export async function normalizeWps({ batchSize = 500 } = {}) {
 
   const inventoryMap = await loadInventoryMap();
 
-  // Count raw rows
   const [{ count }] = await sql`SELECT COUNT(*) FROM raw_vendor_wps_products`;
   const total = Number(count);
   console.log(`[Stage1-WPS] ${total} raw WPS product rows to process`);
 
-  let offset = 0;
+  let offset   = 0;
   let upserted = 0;
-  let failed = 0;
+  let failed   = 0;
 
   while (offset < total) {
     const rows = await sql`
@@ -242,16 +245,15 @@ export async function normalizeWps({ batchSize = 500 } = {}) {
 
     for (const row of rows) {
       const payload = typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload;
-      // WPS raw rows can be a single item or wrapped in data[]
-      const items = Array.isArray(payload) ? payload
+      const items   = Array.isArray(payload) ? payload
         : payload?.data ? payload.data
         : [payload];
 
       for (const item of items) {
         if (!item.sku && !item.number) { failed++; continue; }
         try {
-          const mapped     = mapWpsProduct(item, inventoryMap);
-          const productId  = await upsertProduct(mapped.product);
+          const mapped    = mapWpsProduct(item, inventoryMap);
+          const productId = await upsertProduct(mapped.product);
           await Promise.all([
             upsertOffer(productId, mapped.offer),
             replaceMedia(productId, mapped.images),
