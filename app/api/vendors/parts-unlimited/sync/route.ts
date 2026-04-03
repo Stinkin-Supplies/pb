@@ -28,6 +28,7 @@ import fs from "fs";
 import path from "path";
 import { db } from "@/lib/supabase/admin";
 import getCatalogDb from "@/lib/db/catalog";
+import { writeSyncLog } from "@/lib/syncLog";
 import {
   buildPUAuthHeader,
   parseCSV,
@@ -70,20 +71,6 @@ async function getLastSuccessfulSync(
     .limit(1)
     .maybeSingle();
   return data ?? null;
-}
-
-async function writeSyncLog(supabase: any, entry: Record<string, unknown>) {
-  try {
-    await (supabase as any)
-      .from("sync_log")
-      .insert({
-        vendor:       "parts-unlimited",
-        completed_at: new Date().toISOString(),
-        ...entry,
-      });
-  } catch (e: any) {
-    console.warn("[PU Sync] Failed to write sync log:", e.message);
-  }
 }
 
 // ── POST: run the sync ────────────────────────────────────────
@@ -199,6 +186,7 @@ export async function POST(req: Request) {
         console.error("[PU Sync] API error:", puResponse.status, errText);
 
         await writeSyncLog(supabase as any, {
+          vendor:        "parts-unlimited",
           status:        "error",
           total_parts:   0,
           upserted:      0,
@@ -485,6 +473,7 @@ export async function POST(req: Request) {
 
     // ── Step 6: Write success to sync log ────────────────────
     await writeSyncLog(supabase as any, {
+      vendor:        "parts-unlimited",
       status:       "success",
       total_parts:  result.totalParts,
       upserted:     result.upserted,
@@ -501,6 +490,7 @@ export async function POST(req: Request) {
     console.error("[PU Sync] Fatal error:", err);
 
     await writeSyncLog(supabase as any, {
+      vendor:        "parts-unlimited",
       status:        "error",
       total_parts:   0,
       upserted:      0,
