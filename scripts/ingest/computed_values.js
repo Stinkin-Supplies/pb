@@ -2,14 +2,14 @@
  * Stage 2 — Computed Values
  * Reads:  catalog_products, vendor_offers
  * Writes: vendor_offers.our_price, vendor_offers.computed_at
- *         catalog_products.computed_price, stock_quantity, in_stock,
+ *         catalog_products.computed_price, stock_quantity,
  *                          is_active, is_discontinued
  *
  * Column names match live DB schema:
  *   vendor_offers:     catalog_product_id, vendor_code, wholesale_cost,
- *                      our_price, map_price, msrp, total_qty, in_stock,
+ *                      our_price, map_price, msrp, total_qty,
  *                      computed_at, updated_at
- *   catalog_products:  computed_price, stock_quantity, in_stock,
+ *   catalog_products:  computed_price, stock_quantity,
  *                      is_active, is_discontinued, updated_at
  *
  * Pricing rules (MAP-safe):
@@ -151,14 +151,6 @@ export async function runComputedValues({ batchSize = CONFIG.batchSize, resume =
          WHERE catalog_product_id = cp.id),
         0
       ),
-      in_stock = (
-        COALESCE(
-          (SELECT SUM(total_qty)
-           FROM vendor_offers
-           WHERE catalog_product_id = cp.id),
-          0
-        ) > 0
-      ),
       updated_at = NOW()
     WHERE EXISTS (
       SELECT 1 FROM vendor_offers WHERE catalog_product_id = cp.id
@@ -169,7 +161,7 @@ export async function runComputedValues({ batchSize = CONFIG.batchSize, resume =
     SELECT COUNT(*) FROM catalog_products WHERE computed_price IS NOT NULL
   `;
   const [{ count: inStock }] = await sql`
-    SELECT COUNT(*) FROM catalog_products WHERE in_stock = true
+    SELECT COUNT(*) FROM catalog_products WHERE stock_quantity > 0
   `;
   console.log(`[Stage2] computed_price set: ${priced} | in_stock: ${inStock}`);
 
