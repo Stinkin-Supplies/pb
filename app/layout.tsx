@@ -1,22 +1,15 @@
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import CartRoot from "@/components/CartRoot";
-import { Caesar_Dressing, Stardos_Stencil } from "next/font/google";
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import "./globals.css";
 
-const caesarDressing = Caesar_Dressing({
-  weight: "400",
-  subsets: ["latin"],
-  variable: "--font-caesar",
-});
-
-const stardosStencil = Stardos_Stencil({
-  weight: ["400", "700"],
-  subsets: ["latin"],
-  variable: "--font-stencil",
-});
+const fontVariables = {
+  // Keep the existing CSS variable contract, but avoid network font fetches during build.
+  "--font-caesar": '"Trebuchet MS"',
+  "--font-stencil": '"Courier New"',
+} as CSSProperties & Record<`--${string}`, string>;
 
 export const metadata: Metadata = {
   title: "Stinkin' Supplies | Powersports Parts & Accessories",
@@ -30,10 +23,7 @@ export default function RootLayout({
   children: ReactNode;
 }) {
   return (
-    <html
-      lang="en"
-      className={`${caesarDressing.variable} ${stardosStencil.variable}`}
-    >
+    <html lang="en" style={fontVariables}>
       <body>
         <CartRoot>
           {children}

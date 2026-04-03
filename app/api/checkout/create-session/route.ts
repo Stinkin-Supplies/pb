@@ -24,7 +24,7 @@ const VENDOR_ADAPTERS = [wpsAdapter, puAdapter];
 // resolveCart — call before stripe.checkout.sessions.create()
 // ---------------------------------------------------------------------------
 
-export async function resolveCart(items: CartItem[]): Promise<ResolvedCart> {
+async function resolveCart(items: CartItem[]): Promise<ResolvedCart> {
   const skus = items.map((i) => i.sku);
   const retailPrices = Object.fromEntries(items.map((i) => [i.sku, i.retailPrice]));
 
@@ -111,7 +111,7 @@ export async function resolveCart(items: CartItem[]): Promise<ResolvedCart> {
 // buildStripeMetadata — call with resolvedCart before session.create()
 // ---------------------------------------------------------------------------
 
-export function buildStripeMetadata(cart: ResolvedCart): StripeRoutingMetadata {
+function buildStripeMetadata(cart: ResolvedCart): StripeRoutingMetadata {
   // Stripe metadata values max 500 chars — truncate results if large cart
   const resultsJson = JSON.stringify(cart.results);
   const truncated = resultsJson.length > 450
