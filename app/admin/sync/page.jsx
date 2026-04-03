@@ -659,7 +659,9 @@ function SyncLogViewer() {
         page:   String(page),
         limit:  String(PAGE_SIZE),
       });
-      const res  = await fetch(`/api/admin/sync-log?${params}`);
+      const res  = await fetch(`/api/admin/sync-log?${params}`, {
+        headers: { 'x-sync-secret': process.env.NEXT_PUBLIC_SYNC_SECRET ?? '' }
+      });
       const data = await readJsonResponse(res, "Sync log");
       setLogs(data.logs  ?? []);
       setTotal(data.total ?? 0);
