@@ -75,7 +75,7 @@ function computeOurPrice(offer) {
 
 // ─── main ─────────────────────────────────────────────────────────────────────
 
-export async function runComputedValues({ batchSize = CONFIG.batchSize } = {}) {
+export async function runComputedValues({ batchSize = CONFIG.batchSize, resume = true } = {}) {
   console.log('[Stage2] Starting computed values pass...');
 
   // ── Step 1: compute our_price per vendor offer ────────────────────────────
@@ -83,19 +83,31 @@ export async function runComputedValues({ batchSize = CONFIG.batchSize } = {}) {
 
   const [{ count: offerCount }] = await sql`SELECT COUNT(*) FROM vendor_offers`;
   const totalOffers = Number(offerCount);
-  console.log(`[Stage2] ${totalOffers} vendor offers to price`);
 
-  let offset     = 0;
-  let offersDone = 0;
+  // Resume: check how many already have computed_at set
+  const [{ count: alreadyDone }] = await sql`SELECT COUNT(*) FROM vendor_offers WHERE computed_at IS NOT NULL`;
+  const resumeCount = resume ? Number(alreadyDone) : 0;
+
+  if (resume && resumeCount > 0) {
+    console.log(`[Stage2] ⚡ Resuming — ${resumeCount} offers already priced, ${totalOffers - resumeCount} remaining`);
+  } else {
+    console.log(`[Stage2] ${totalOffers} vendor offers to price`);
+  }
+
+  let offersDone = resumeCount;
   let offersNull = 0;
 
-  while (offset < totalOffers) {
+  while (true) {
+    // Fetch only unpriced offers — computed_at IS NULL is the checkpoint
     const offers = await sql`
       SELECT id, vendor_code, wholesale_cost, msrp, map_price, total_qty
       FROM vendor_offers
+      WHERE computed_at IS NULL
       ORDER BY id
-      LIMIT ${batchSize} OFFSET ${offset}
+      LIMIT ${batchSize}
     `;
+
+    if (!offers.length) break;
 
     for (const offer of offers) {
       const ourPrice = computeOurPrice(offer);
@@ -109,8 +121,10 @@ export async function runComputedValues({ batchSize = CONFIG.batchSize } = {}) {
       offersDone++;
     }
 
-    offset += batchSize;
-    console.log(`[Stage2] Offers: ${Math.min(offset, totalOffers)} / ${totalOffers} | priced: ${offersDone - offersNull} | no price: ${offersNull}`);
+    const pct2    = Math.min(offersDone, totalOffers) / totalOffers;
+    const filled2 = Math.round(pct2 * 26);
+    const bar2    = '█'.repeat(filled2) + '░'.repeat(26 - filled2);
+    console.log(`[Stage2] Offers │${bar2}│ ${(pct2 * 100).toFixed(1).padStart(5)}% (${offersDone}/${totalOffers}) priced: ${offersDone - offersNull} no-price: ${offersNull}`);
   }
 
   // ── Step 2: roll up computed_price + stock to catalog_products ────────────

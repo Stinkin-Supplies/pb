@@ -1,5 +1,7 @@
 import Stripe from "stripe";
 import { NextRequest, NextResponse } from "next/server";
+import { routeCart } from "@/lib/routing/loadCartLines";
+import { sql } from "@/lib/db";
 import type {
   PurchaseOrder,
   POLineItem,
@@ -68,6 +70,35 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     console.error("[webhook] failed to parse routing_results");
   }
 
+  // Re-route from DB offer data at checkout-complete time to pick vendor(s)
+  // using latest inventory/pricing, independent of Stripe metadata staleness.
+  const cartItems = routingResults.map((r) => ({
+    sku: r.sku,
+    qty: 1,
+    retailPrice: Number(r.winner?.offer.retailPrice ?? 0),
+    name: r.sku,
+  }));
+
+  let resolvedCartVendor: VendorId | null = null;
+  let resolvedIsSplitCart = false;
+  let resolvedVendors: VendorId[] = [];
+  if (cartItems.length > 0) {
+    try {
+      const routing = await routeCart(cartItems, sql);
+      resolvedCartVendor = routing.cartVendor;
+      resolvedIsSplitCart = routing.isSplitCart;
+      resolvedVendors = Array.from(
+        new Set(
+          routing.lines
+            .map((line) => line.winner?.offer.vendor)
+            .filter(Boolean) as VendorId[],
+        ),
+      );
+    } catch (err) {
+      console.error("[webhook] routeCart failed, falling back to metadata routing:", err);
+    }
+  }
+
   // Build cost map from routing results
   const costMap = new Map<string, { cost: number; name: string }>();
   routingResults.forEach((r) => {
@@ -100,9 +131,13 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   // ---------------------------------------------------------------------------
   const poResults = [];
 
-  const vendorsToSubmit: VendorId[] = [];
-  if (vendorPrimary !== "none") vendorsToSubmit.push(vendorPrimary);
-  if (vendorSecondary !== "none") vendorsToSubmit.push(vendorSecondary);
+  const vendorsToSubmit: VendorId[] =
+    resolvedVendors.length > 0
+      ? resolvedVendors
+      : [
+          ...(vendorPrimary !== "none" ? [vendorPrimary] : []),
+          ...(vendorSecondary !== "none" ? [vendorSecondary] : []),
+        ];
 
   for (const vendorId of vendorsToSubmit) {
     const adapter = VENDOR_ADAPTERS.find((a) => a.vendorId === vendorId);
@@ -146,6 +181,8 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       metadata: {
         stripe_session_id: session.id,
         routing_strategy: strategy,
+        routing_cart_vendor: resolvedCartVendor ?? "none",
+        routing_is_split_cart: String(resolvedIsSplitCart),
       },
     };
 
