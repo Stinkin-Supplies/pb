@@ -99,7 +99,7 @@ function buildDocument(product, { specs, fitment, media, offers }) {
   // stock_quantity is the correct column name
   const price        = product.computed_price ? Number(product.computed_price) : null;
   const stock        = Number(product.stock_quantity ?? 0);
-  const inStock      = stock > 0;
+  const inStock      = stock > 0; // derived — no in_stock column on catalog_products
   const freeShipping = price !== null && price >= 99;
 
   // Primary image — lowest priority, skip ZIP URLs
@@ -176,29 +176,61 @@ async function recreateCollection(client) {
 
 // ─── main ─────────────────────────────────────────────────────────────────────
 
-export async function buildTypesenseIndex({ recreate = true } = {}) {
+// ─── checkpoint helpers ──────────────────────────────────────────────────────
+
+import { createRequire } from 'module';
+import { writeFileSync, readFileSync, existsSync } from 'fs';
+
+const CHECKPOINT_FILE = './.stage3_checkpoint.json';
+
+function saveCheckpoint(offset, indexed, failed) {
+  writeFileSync(CHECKPOINT_FILE, JSON.stringify({ offset, indexed, failed, savedAt: new Date().toISOString() }));
+}
+
+function loadCheckpoint() {
+  if (!existsSync(CHECKPOINT_FILE)) return null;
+  try {
+    const c = JSON.parse(readFileSync(CHECKPOINT_FILE, 'utf8'));
+    console.log(`[Stage3] ⚡ Checkpoint found — resuming from offset ${c.offset} (${c.indexed} already indexed)`);
+    return c;
+  } catch { return null; }
+}
+
+function clearCheckpoint() {
+  try { writeFileSync(CHECKPOINT_FILE, ''); } catch {}
+}
+
+export async function buildTypesenseIndex({ recreate = true, resume = true } = {}) {
   console.log('[Stage3] Starting Typesense v2 index assembly...');
 
   const client = getClient();
-  if (recreate) await recreateCollection(client);
+
+  // Load checkpoint if resuming
+  const checkpoint = resume ? loadCheckpoint() : null;
+
+  // Only recreate collection if not resuming from checkpoint
+  if (!checkpoint) {
+    if (recreate) await recreateCollection(client);
+  } else {
+    console.log('[Stage3] Skipping collection recreate — resuming into existing collection');
+  }
 
   const [{ count }] = await sql`
     SELECT COUNT(*) FROM catalog_products
     WHERE is_active = true AND is_discontinued = false
   `;
   const total = Number(count);
-  console.log(`[Stage3] Indexing ${total} active products...`);
+  console.log(`[Stage3] ${total} active products total`);
 
-  let offset    = 0;
-  let indexed   = 0;
-  let failed    = 0;
+  let offset    = checkpoint?.offset  ?? 0;
+  let indexed   = checkpoint?.indexed ?? 0;
+  let failed    = checkpoint?.failed  ?? 0;
   const startTime = Date.now();
 
   while (offset < total) {
     const products = await sql`
       SELECT id, sku, slug, name, brand, manufacturer_part_number, description,
-             category, computed_price, stock_quantity, in_stock,
-             is_atv, is_offroad, is_snow, is_street, is_watercraft, is_bicycle
+             category, computed_price, stock_quantity
       FROM catalog_products
       WHERE is_active = true AND is_discontinued = false
       ORDER BY id
@@ -269,10 +301,17 @@ export async function buildTypesenseIndex({ recreate = true } = {}) {
     }
 
     offset += BATCH_SIZE;
+    const pct3    = Math.min(offset, total) / total;
+    const filled3 = Math.round(pct3 * 26);
+    const bar3    = '█'.repeat(filled3) + '░'.repeat(26 - filled3);
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.log(`[Stage3] ${Math.min(offset, total)} / ${total} | indexed: ${indexed} | failed: ${failed} | ${elapsed}s`);
+    console.log(`[Stage3] │${bar3}│ ${(pct3 * 100).toFixed(1).padStart(5)}% (${Math.min(offset, total)}/${total}) indexed: ${indexed} failed: ${failed} | ${elapsed}s`);
+
+    // Save checkpoint after every batch
+    saveCheckpoint(offset, indexed, failed);
   }
 
+  clearCheckpoint();
   const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
   console.log(`[Stage3] Done. Indexed: ${indexed} | Failed: ${failed} | Time: ${totalTime}s`);
   return { indexed, failed, totalTime };
