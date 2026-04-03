@@ -12,6 +12,7 @@ import type {
 import { createClient } from "@supabase/supabase-js";
 import { wpsAdapter } from "@/lib/vendors/wps/adapter";
 import { puAdapter } from "@/lib/vendors/pu/adapter";
+import { writeSyncLog } from "@/lib/syncLog";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
@@ -190,15 +191,16 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     poResults.push({ vendorId, ...result });
 
     // Log to Supabase sync_log
-    await supabase.from("sync_log").insert({
-      vendor: vendorId,
-      event: "po_submitted",
-      success: result.success,
-      vendor_order_id: result.vendorOrderId,
+    await writeSyncLog(supabase, {
+      vendor:            vendorId.toLowerCase(),
+      event:             "po_submitted",
+      status:            result.success ? "success" : "error",
+      vendor_order_id:   result.vendorOrderId ?? null,
       stripe_session_id: session.id,
-      error: result.error ?? null,
-      raw_response: result.rawResponse ?? null,
-      created_at: placedAt,
+      error_message:     result.error ?? null,
+      raw_response:      result.rawResponse ?? null,
+      completed_at:      placedAt,
+      created_at:        placedAt,
     });
 
     if (!result.success) {

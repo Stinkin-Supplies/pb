@@ -29,6 +29,7 @@ import { createClient }  from "@supabase/supabase-js";
 import { db } from "@/lib/supabase/admin";
 import getCatalogDb from "@/lib/db/catalog";
 import { cleanImageUrls } from "@/lib/images/cleanImageUrls";
+import { writeSyncLog } from "@/lib/syncLog";
 import {
   WpsClient,
   WpsItem,
@@ -139,18 +140,6 @@ async function getLastSync(supabase: any) {
     .limit(1)
     .maybeSingle();
   return data ?? null;
-}
-
-async function writeSyncLog(supabase: any, entry: Record<string, unknown>) {
-  try {
-    await supabase.from("sync_log").insert({
-      vendor:       "wps",
-      completed_at: new Date().toISOString(),
-      ...entry,
-    });
-  } catch (e: any) {
-    console.warn("[WPS Sync] Failed to write sync log:", e.message);
-  }
 }
 
 // ── POST: run full sync ───────────────────────────────────────
@@ -521,6 +510,7 @@ export async function POST(req: Request) {
 
     // ── Step 5: Write sync log ─────────────────────────────
     await writeSyncLog(supabase, {
+      vendor:        "wps",
       status:      "success",
       total_parts: result.totalItems,
       upserted:    result.upserted,
@@ -541,6 +531,7 @@ export async function POST(req: Request) {
 
     result.durationMs = Date.now() - start;
     await writeSyncLog(supabase, {
+      vendor:        "wps",
       status:        "error",
       total_parts:   result.totalItems,
       upserted:      result.upserted,
