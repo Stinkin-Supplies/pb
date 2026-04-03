@@ -24,7 +24,7 @@ import { sql } from '../lib/db.js';
 // ─── config ───────────────────────────────────────────────────────────────────
 
 const COLLECTION = 'products';
-const BATCH_SIZE  = 1000;
+const BATCH_SIZE  = 250;  // reduced to avoid Typesense OOM on large description fields
 
 function getClient() {
   const host     = process.env.TYPESENSE_HOST;
@@ -121,7 +121,7 @@ function buildDocument(product, { specs, fitment, media, offers }) {
   )].sort((a, b) => a - b);
 
   // Specs blob — all attribute:value pairs joined for full-text search
-  const specsBlob = specs.map(s => `${s.attribute}: ${s.value}`).join(' | ');
+  const specsBlob = specs.map(s => `${s.attribute}: ${stripHtml(s.value)}`).join(' | ').slice(0, 500);
 
   // Search blob — catch-all field for broad queries
   const searchBlob = [
@@ -129,9 +129,9 @@ function buildDocument(product, { specs, fitment, media, offers }) {
     product.brand,
     product.sku,
     product.manufacturer_part_number,
-    product.description,
+    stripHtml(product.description),
     product.category,
-  ].filter(Boolean).join(' ');
+  ].filter(Boolean).join(' ').slice(0, 1000);
 
   const sportTypes = buildSportTypes(product);
 
@@ -159,6 +159,19 @@ function buildDocument(product, { specs, fitment, media, offers }) {
     sport_types:    sportTypes.length    ? sportTypes    : undefined,
     vendors:        vendors.length       ? vendors       : undefined,
   };
+}
+
+// ─── HTML stripper ───────────────────────────────────────────────────────────
+
+function stripHtml(str) {
+  if (!str) return '';
+  return str
+    .replace(/<[^>]*>/g, ' ')   // remove tags
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+    .replace(/&nbsp;/g, ' ').replace(/&#\d+;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 500);              // cap at 500 chars — enough for search
 }
 
 // ─── collection management ────────────────────────────────────────────────────
