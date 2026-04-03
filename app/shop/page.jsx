@@ -13,8 +13,8 @@ const PAGE_SIZE = 48;
 
 const ORDER_MAP = {
   newest:     { col: "created_at", dir: "DESC" },
-  price_asc:  { col: "price",      dir: "ASC"  },
-  price_desc: { col: "price",      dir: "DESC" },
+  price_asc:  { col: "computed_price", dir: "ASC"  },
+  price_desc: { col: "computed_price", dir: "DESC" },
   name_asc:   { col: "name",       dir: "ASC"  },
 };
 
