@@ -230,11 +230,14 @@ export async function buildTypesenseIndex({ recreate = true, resume = true } = {
 
   while (offset < total) {
     const products = await sql`
-      SELECT id, sku, slug, name, brand, manufacturer_part_number, description,
-             category, computed_price, stock_quantity
-      FROM catalog_products
-      WHERE is_active = true AND is_discontinued = false
-      ORDER BY id
+      SELECT cp.id, cp.sku, cp.slug, cp.name, cp.brand, cp.manufacturer_part_number,
+             cp.description, cp.category, cp.computed_price, cp.stock_quantity
+      FROM catalog_products cp
+      WHERE cp.is_active = true
+        AND cp.is_discontinued = false
+        AND cp.computed_price IS NOT NULL
+        ${useAllowlist ? sql`AND EXISTS (SELECT 1 FROM catalog_allowlist al WHERE al.sku = cp.sku)` : sql``}
+      ORDER BY cp.id
       LIMIT ${BATCH_SIZE} OFFSET ${offset}
     `;
 
