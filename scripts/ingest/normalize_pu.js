@@ -53,30 +53,123 @@ function asArray(val) {
   return Array.isArray(val) ? val : [val];
 }
 
+// ─── progress (terminal status bar) ───────────────────────────────────────────
+
+function countPuPayloadItems(rows) {
+  let n = 0;
+  for (const row of rows) {
+    try {
+      const payload = typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload;
+      const items = Array.isArray(payload) ? payload : [payload];
+      n += items.length;
+    } catch {
+      n += 1;
+    }
+  }
+  return n;
+}
+
+function writeProgressLine(label, current, total, tail = '') {
+  if (total <= 0) {
+    process.stdout.write(`\r\x1b[K[Stage1-PU] ${label} … ${current}${tail}\n`);
+    return;
+  }
+  const pct = Math.min(100, (current / total) * 100);
+  const w = 26;
+  const filled = Math.round((pct / 100) * w);
+  const bar = '█'.repeat(filled) + '░'.repeat(Math.max(0, w - filled));
+  const extra = tail ? ` ${tail}` : '';
+  process.stdout.write(
+    `\r\x1b[K[Stage1-PU] ${label} │${bar}│ ${pct.toFixed(1)}% (${current}/${total})${extra}`,
+  );
+}
+
+function writeActivityLine(label, detail) {
+  process.stdout.write(`\r\x1b[K[Stage1-PU] ${label} … ${detail}`);
+}
+
+function makeProgressThrottler(minIntervalMs = 200) {
+  let last = 0;
+  return (fn) => {
+    const now = Date.now();
+    if (now - last >= minIntervalMs) {
+      last = now;
+      fn();
+    }
+  };
+}
+
 // ─── CSV row mapper ───────────────────────────────────────────────────────────
 // Handles D00108_PriceFile.csv shape:
 //   Part Number | Punctuated Part Number | Your Dealer Price
 // Extended rows may include: Description, Brand, Category, Stock fields
 
 function mapPuCsvRow(row) {
-  const sku   = row['Part Number'] ?? row['PartNumber'] ?? row['part_number'];
-  const price = toNum(row['Your Dealer Price'] ?? row['dealer_price'] ?? row['price']);
-  const msrp  = toNum(row['MSRP'] ?? row['msrp'] ?? null);
-  const map   = toNum(row['MAP']  ?? row['map']  ?? null);
+  // D00108 price file: Part Number, Your Dealer Price, …
+  // BasePriceFile (stage0-pu-baseprice.cjs): sku, cost, warehouse_wi, …
+  const sku =
+    row['Part Number'] ??
+    row['PartNumber'] ??
+    row['part_number'] ??
+    row.sku ??
+    null;
 
-  const name     = row['Description'] ?? row['description'] ?? row['product_name'] ?? null;
-  const brand    = row['Brand']       ?? row['brand']       ?? 'Parts Unlimited';
-  const category = row['Category']    ?? row['category']    ?? null;
-  const mpn      = row['Manufacturer Part Number'] ?? row['MPN'] ?? row['mpn'] ?? sku;
+  const price = toNum(
+    row['Your Dealer Price'] ??
+      row['dealer_price'] ??
+      row['price'] ??
+      row['cost'] ??
+      row['Base Dealer Price'] ??
+      null,
+  );
+  const msrp = toNum(
+    row['MSRP'] ?? row['msrp'] ?? row['Current Suggested Retail'] ?? null,
+  );
+  const map = toNum(
+    row['MAP'] ?? row['map'] ?? row['map_price'] ?? row['Ad Policy'] ?? null,
+  );
 
-  // Stock — CSV may include warehouse columns
+  const name =
+    row['Description'] ??
+    row['description'] ??
+    row['product_name'] ??
+    row['name'] ??
+    row['Part Description'] ??
+    null;
+  const brand =
+    row['Brand'] ?? row['brand'] ?? row['Brand Name'] ?? 'Parts Unlimited';
+  const category = row['Category'] ?? row['category'] ?? null;
+  const mpn =
+    row['Manufacturer Part Number'] ??
+    row['MPN'] ??
+    row['mpn'] ??
+    row['vendor_part_number'] ??
+    sku;
+
+  // Stock — short codes (D00108) or BasePriceFile warehouse_* / * Availability
   const warehouseJson = {};
   const warehouseCols = ['WI', 'NY', 'TX', 'NV', 'NC'];
+  const prefixedByWh = {
+    WI: row.warehouse_wi ?? row['WI Availability'],
+    NY: row.warehouse_ny ?? row['NY Availability'],
+    TX: row.warehouse_tx ?? row['TX Availability'],
+    NV: row.warehouse_nv ?? row['NV Availability'],
+    NC: row.warehouse_nc ?? row['NC Availability'],
+  };
   for (const wh of warehouseCols) {
-    if (row[wh] !== undefined) warehouseJson[wh.toLowerCase()] = Number(row[wh]) || 0;
+    const lower = wh.toLowerCase();
+    if (row[wh] !== undefined) warehouseJson[lower] = Number(row[wh]) || 0;
+    else {
+      const v = prefixedByWh[wh];
+      if (v !== undefined && v !== null) warehouseJson[lower] = Number(v) || 0;
+    }
   }
-  const totalQty = Object.values(warehouseJson).reduce((s, v) => s + v, 0)
-    || (toNum(row['Stock'] ?? row['stock_quantity'] ?? row['qty']) ?? 0);
+
+  const totalQty =
+    Object.values(warehouseJson).reduce((s, v) => s + v, 0) ||
+    (toNum(row['Stock'] ?? row['stock_quantity'] ?? row['qty']) ?? 0) ||
+    (toNum(row['total_qty']) ?? 0) ||
+    (toNum(row['National Availability']) ?? 0);
 
   if (!sku) return null;
 
@@ -248,25 +341,42 @@ async function applyFitment(fitmentRows) {
 async function runCsvPass() {
   console.log('[Stage1-PU] Pass 1 — CSV price file rows...');
   const rows = await sql`SELECT id, payload FROM raw_vendor_pu ORDER BY id`;
+  const totalItems = countPuPayloadItems(rows);
   let upserted = 0, failed = 0;
+  let done = 0;
+  const tick = makeProgressThrottler(200);
+  writeProgressLine('Pass 1 CSV', 0, totalItems, 'starting');
 
   for (const row of rows) {
     const payload = typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload;
     const items   = Array.isArray(payload) ? payload : [payload];
 
     for (const item of items) {
+      done++;
       const mapped = mapPuCsvRow(item);
-      if (!mapped) { failed++; continue; }
+      if (!mapped) {
+        failed++;
+        tick(() =>
+          writeProgressLine('Pass 1 CSV', done, totalItems, `ok ${upserted} err ${failed}`),
+        );
+        continue;
+      }
       try {
         const productId = await upsertProduct(mapped.product);
         await upsertOffer(productId, mapped.offer);
         upserted++;
       } catch (err) {
-        console.error(`[Stage1-PU] CSV fail SKU ${item['Part Number']}: ${err.message}`);
+        process.stdout.write('\n');
+        if (failed === 0) console.error(`[Stage1-PU] First error:`, err.message);
         failed++;
       }
+      tick(() =>
+        writeProgressLine('Pass 1 CSV', done, totalItems, `ok ${upserted} err ${failed}`),
+      );
     }
   }
+  writeProgressLine('Pass 1 CSV', totalItems, totalItems, `ok ${upserted} err ${failed}`);
+  process.stdout.write('\n');
   console.log(`[Stage1-PU] CSV pass done. Upserted: ${upserted} | Failed: ${failed}`);
 }
 
@@ -276,6 +386,12 @@ async function runPiesPass() {
   console.log('[Stage1-PU] Pass 2 — PIES XML...');
   const rows = await sql`SELECT id, payload FROM raw_vendor_pies ORDER BY id`;
   let applied = 0, failed = 0;
+  const totalFiles = rows.length;
+  let fileIdx = 0;
+  let itemPass = 0;
+  const tick = makeProgressThrottler(250);
+  const tickItems = makeProgressThrottler(300);
+  writeProgressLine('Pass 2 PIES', 0, totalFiles, 'files');
 
   for (const row of rows) {
     try {
@@ -285,10 +401,23 @@ async function runPiesPass() {
 
       const parsed = xmlParser.parse(xmlStr);
       const root   = parsed.PIES ?? parsed.Items ?? parsed.PartsList;
-      if (!root) continue;
+      if (!root) {
+        fileIdx++;
+        tick(() =>
+          writeProgressLine('Pass 2 PIES', fileIdx, totalFiles, `applied ${applied} fail ${failed}`),
+        );
+        continue;
+      }
 
       const items = asArray(root.Item ?? root.Part ?? root.Items?.Item ?? root.Items?.[0]?.Item ?? []);
       for (const item of items) {
+        itemPass++;
+        tickItems(() =>
+          writeActivityLine(
+            'Pass 2 PIES',
+            `file ${fileIdx + 1}/${totalFiles} · items ~${itemPass} · applied ${applied}`,
+          ),
+        );
         const mapped = parsePiesItem(item);
         if (!mapped) { failed++; continue; }
         try {
@@ -302,7 +431,13 @@ async function runPiesPass() {
     } catch (err) {
       console.error(`[Stage1-PU] PIES XML parse error row ${row.id}: ${err.message}`);
     }
+    fileIdx++;
+    tick(() =>
+      writeProgressLine('Pass 2 PIES', fileIdx, totalFiles, `applied ${applied} fail ${failed}`),
+    );
   }
+  writeProgressLine('Pass 2 PIES', totalFiles, totalFiles, `applied ${applied} fail ${failed}`);
+  process.stdout.write('\n');
   console.log(`[Stage1-PU] PIES pass done. Applied: ${applied} | Failed: ${failed}`);
 }
 
@@ -312,6 +447,10 @@ async function runAcesPass() {
   console.log('[Stage1-PU] Pass 3 — ACES fitment XML...');
   const rows = await sql`SELECT id, payload FROM raw_vendor_aces ORDER BY id`;
   let applied = 0, failed = 0;
+  const totalFiles = rows.length;
+  let fileIdx = 0;
+  const tick = makeProgressThrottler(250);
+  writeProgressLine('Pass 3 ACES', 0, totalFiles, 'files');
 
   for (const row of rows) {
     try {
@@ -335,11 +474,23 @@ async function runAcesPass() {
       for (let i = 0; i < fitmentRows.length; i += 500) {
         await applyFitment(fitmentRows.slice(i, i + 500));
         applied += Math.min(500, fitmentRows.length - i);
+        tick(() =>
+          writeActivityLine(
+            'Pass 3 ACES',
+            `file ${fileIdx + 1}/${totalFiles} · fitment rows ${applied} fail ${failed}`,
+          ),
+        );
       }
     } catch (err) {
       console.error(`[Stage1-PU] ACES parse error row ${row.id}: ${err.message}`);
     }
+    fileIdx++;
+    tick(() =>
+      writeProgressLine('Pass 3 ACES', fileIdx, totalFiles, `fitment ${applied} fail ${failed}`),
+    );
   }
+  writeProgressLine('Pass 3 ACES', totalFiles, totalFiles, `fitment ${applied} fail ${failed}`);
+  process.stdout.write('\n');
   console.log(`[Stage1-PU] ACES pass done. Applied: ${applied} | Failed: ${failed}`);
 }
 
