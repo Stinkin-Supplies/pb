@@ -216,12 +216,19 @@ export async function buildTypesenseIndex({ recreate = true, resume = true } = {
     console.log('[Stage3] Skipping collection recreate — resuming into existing collection');
   }
 
-  const [{ count }] = await sql`
-    SELECT COUNT(*) FROM catalog_products
-    WHERE is_active = true AND is_discontinued = false
-  `;
+  // Check if allowlist exists and is populated
+  let useAllowlist = false;
+  try {
+    const [{ count: alCount }] = await sql`SELECT COUNT(DISTINCT sku) FROM catalog_allowlist`;
+    useAllowlist = Number(alCount) > 0;
+    if (useAllowlist) console.log(`[Stage3] Allowlist active — ${alCount} unique SKUs to index`);
+  } catch { console.log('[Stage3] No allowlist — indexing all active products'); }
+
+  const [{ count }] = useAllowlist
+    ? await sql`SELECT COUNT(*) FROM catalog_products WHERE is_active = true AND is_discontinued = false AND computed_price IS NOT NULL AND EXISTS (SELECT 1 FROM catalog_allowlist a WHERE a.sku = catalog_products.sku)`
+    : await sql`SELECT COUNT(*) FROM catalog_products WHERE is_active = true AND is_discontinued = false AND computed_price IS NOT NULL`;
   const total = Number(count);
-  console.log(`[Stage3] ${total} active products total`);
+  console.log(`[Stage3] ${total} products to index...`);
 
   let offset    = checkpoint?.offset  ?? 0;
   let indexed   = checkpoint?.indexed ?? 0;
@@ -236,7 +243,7 @@ export async function buildTypesenseIndex({ recreate = true, resume = true } = {
       WHERE cp.is_active = true
         AND cp.is_discontinued = false
         AND cp.computed_price IS NOT NULL
-        ${useAllowlist ? sql`AND EXISTS (SELECT 1 FROM catalog_allowlist al WHERE al.sku = cp.sku)` : sql``}
+        AND (NOT ${useAllowlist} OR EXISTS (SELECT 1 FROM catalog_allowlist a WHERE a.sku = cp.sku))
       ORDER BY cp.id
       LIMIT ${BATCH_SIZE} OFFSET ${offset}
     `;
