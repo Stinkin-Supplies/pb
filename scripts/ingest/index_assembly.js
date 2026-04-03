@@ -57,7 +57,6 @@ const SCHEMA = {
     { name: 'brand',        type: 'string',   facet: true },
     { name: 'category',     type: 'string',   facet: true, optional: true },
     { name: 'specs_blob',   type: 'string',   optional: true },
-    { name: 'search_blob',  type: 'string',   optional: true },
 
     // Pricing + stock (sort fields)
     { name: 'computed_price', type: 'float',  optional: true, sort: true },
@@ -123,16 +122,6 @@ function buildDocument(product, { specs, fitment, media, offers }) {
   // Specs blob — all attribute:value pairs joined for full-text search
   const specsBlob = specs.map(s => `${s.attribute}: ${stripHtml(s.value)}`).join(' | ').slice(0, 500);
 
-  // Search blob — catch-all field for broad queries
-  const searchBlob = [
-    product.name,
-    product.brand,
-    product.sku,
-    product.manufacturer_part_number,
-    stripHtml(product.description),
-    product.category,
-  ].filter(Boolean).join(' ').slice(0, 1000);
-
   const sportTypes = buildSportTypes(product);
 
   // vendor_code is the correct column name on vendor_offers
@@ -147,7 +136,6 @@ function buildDocument(product, { specs, fitment, media, offers }) {
     brand:          product.brand        ?? '',
     category:       product.category     ?? undefined,
     specs_blob:     specsBlob            || undefined,
-    search_blob:    searchBlob           || undefined,
     computed_price: price                ?? undefined,
     stock_quantity: stock,
     in_stock:       inStock,
