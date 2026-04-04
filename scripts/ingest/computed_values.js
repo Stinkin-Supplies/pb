@@ -264,7 +264,7 @@ async function buildProductSearchCache() {
     specs AS (
       SELECT
         s.product_id,
-        ARRAY_AGG(s.attribute || ': ' || s.value ORDER BY s.attribute, s.value) AS specs
+        (ARRAY_AGG(s.attribute || ': ' || s.value ORDER BY s.attribute, s.value))[1:10] AS specs
       FROM catalog_specs s
       JOIN target_products tp ON tp.id = s.product_id
       GROUP BY s.product_id
@@ -280,7 +280,10 @@ async function buildProductSearchCache() {
       LEFT JOIN LATERAL (
         SELECT generate_series(
           COALESCE(f.year_start, f.year_end),
-          COALESCE(f.year_end, f.year_start)
+          LEAST(
+            COALESCE(f.year_end, f.year_start),
+            COALESCE(f.year_start, f.year_end) + 24
+          )
         ) AS year
       ) y ON true
       GROUP BY f.product_id

@@ -80,6 +80,14 @@ Throughput tuning:
 - Allow each worker to keep multiple Typesense imports in-flight (advanced):
   `INDEX_INFLIGHT=2 node scripts/ingest/index_assembly.js`
 - Flags also work: `node scripts/ingest/index_assembly.js --concurrency 8 --inflight 2 --batch-size 2000`
+- If you see `OUT_OF_MEMORY` rejects from Typesense, lower load:
+  `INDEX_BATCH_SIZE=500 INDEX_CONCURRENCY=2 INDEX_INFLIGHT=1 node scripts/ingest/index_assembly.js`
+
+Low-memory Typesense mode (recommended when OOM persists):
+- Build a lightweight index that disables heavy facets (specs/fitment) entirely:
+  `INDEX_PROFILE=core INDEX_COLLECTION=products_core node scripts/ingest/index_assembly.js --recreate`
+- Then run your app search against `products_core`.
+  Later, you can add a second `products_metadata` collection if you want heavy filters.
 
 ## Catalog Allowlist
 
