@@ -15,6 +15,10 @@ const fs       = require('fs');
 const readline = require('readline');
 const path     = require('path');
 const { Pool } = require('pg');
+const dotenv   = require('dotenv');
+
+// Allow running without an external dotenv CLI wrapper.
+dotenv.config({ path: path.resolve(__dirname, '../../.env.local') });
 
 // ─── config ───────────────────────────────────────────────────────────────────
 
@@ -23,6 +27,11 @@ const BATCH_SIZE = 1000;
 const TABLE      = 'raw_vendor_pu';
 
 // ─── db ───────────────────────────────────────────────────────────────────────
+
+if (!process.env.CATALOG_DATABASE_URL) {
+  console.error('Missing CATALOG_DATABASE_URL');
+  process.exit(1);
+}
 
 const pool = new Pool({ connectionString: process.env.CATALOG_DATABASE_URL });
 

@@ -1,16 +1,29 @@
 import { Pool } from 'pg';
 
-const pool = new Pool({
-  connectionString: process.env.CATALOG_DATABASE_URL,
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
-  ssl: false,
-});
+let pool = null;
 
-pool.on('error', (err) => {
-  console.error('[ScriptsDB] Unexpected pool error:', err.message);
-});
+export function getPool() {
+  if (pool) return pool;
+
+  const connectionString = process.env.CATALOG_DATABASE_URL;
+  if (!connectionString) {
+    throw new Error('Missing CATALOG_DATABASE_URL');
+  }
+
+  pool = new Pool({
+    connectionString,
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000,
+    ssl: false,
+  });
+
+  pool.on('error', (err) => {
+    console.error('[ScriptsDB] Unexpected pool error:', err.message);
+  });
+
+  return pool;
+}
 
 const IDENTIFIER = Symbol('identifier');
 
@@ -46,14 +59,10 @@ function buildQuery(strings, values) {
 export function sql(first, ...rest) {
   if (isTemplateStrings(first)) {
     const { text, values } = buildQuery(first, rest);
-    return pool.query(text, values).then((res) => res.rows);
+    return getPool().query(text, values).then((res) => res.rows);
   }
 
   return { [IDENTIFIER]: true, name: first };
-}
-
-export function getPool() {
-  return pool;
 }
 
 export default sql;

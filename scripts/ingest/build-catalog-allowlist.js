@@ -5,8 +5,12 @@
 
 import dotenv from 'dotenv';
 import { sql } from '../lib/db.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-dotenv.config({ path: '.env.local' });
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, '../../.env.local'), override: true });
 
 function formatEta(seconds) {
   if (!Number.isFinite(seconds) || seconds < 0) return '—';
@@ -180,4 +184,3 @@ buildAllowlist().catch((err) => {
   console.error('❌ Error:', err);
   process.exit(1);
 });
-

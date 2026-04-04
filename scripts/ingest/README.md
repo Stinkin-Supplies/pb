@@ -17,7 +17,7 @@ cd scripts && npm install
 # See: sql/migrations-100-110.sql
 
 # 4. Run the full pipeline
-npx dotenv -e .env.local -- node ingest/pipeline.js --from 0
+node scripts/ingest/pipeline.js --from 0
 ```
 
 ## Pipeline Stages
@@ -26,7 +26,7 @@ npx dotenv -e .env.local -- node ingest/pipeline.js --from 0
 Imports D00108_DealerPrice.csv into `raw_vendor_pu` table as JSONB batches.
 
 ```bash
-npx dotenv -e .env.local -- node ingest/stage0-pu-dealerprice.cjs
+node scripts/ingest/stage0-pu-dealerprice.cjs
 ```
 
 Notes:
@@ -40,13 +40,14 @@ Maps PU fields to canonical schema:
 - `catalog_specs` - Product attributes
 
 ```bash
-npx dotenv -e .env.local -- node ingest/normalize_pu.js
+node scripts/ingest/normalize_pu.js
 ```
 
 Resume safety:
 - Stage 1 writes a checkpoint to `scripts/ingest/.stage1_pu_checkpoint.json` every few seconds.
 - Re-run the same command to resume after a stop/crash.
 - Use `--reset` to discard the checkpoint, or `--no-resume` to ignore it for a single run.
+ - Resume is batch-based (safe boundary): it finishes the current batch transaction, then saves.
 
 ### Stage 2: Computed Values
 Calculates:
@@ -82,17 +83,17 @@ This creates the `catalog_allowlist` table used by Stage 3 to filter the Typesen
 
 ```bash
 # Run all stages
-npx dotenv -e .env.local -- node ingest/pipeline.js
+node scripts/ingest/pipeline.js
 
 # Start from Stage 1
-npx dotenv -e .env.local -- node ingest/pipeline.js --from 1
+node scripts/ingest/pipeline.js --from 1
 
 # Run only Stage 3 (reindex)
-npx dotenv -e .env.local -- node ingest/pipeline.js --stage 3
+node scripts/ingest/pipeline.js --stage 3
 
 # Force clean reindex
 rm .stage3_checkpoint.json
-npx dotenv -e .env.local -- node ingest/pipeline.js --stage 3 --recreate
+node scripts/ingest/pipeline.js --stage 3 --recreate
 ```
 
 ## Data Flow
