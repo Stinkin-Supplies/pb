@@ -7,10 +7,25 @@ import dotenv from 'dotenv';
 import { sql } from '../lib/db.js';
 import fs from 'fs';
 import path from 'path';
+import { getPool } from '../lib/db.js';
+import { fileURLToPath } from 'url';
 
-dotenv.config({ path: '.env.local' });
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, '../../.env.local'), override: true });
 
-const CHECKPOINT_FILE = path.resolve(process.cwd(), 'scripts/ingest/.stage1_pu_checkpoint.json');
+const CHECKPOINT_FILE = path.resolve(__dirname, '.stage1_pu_checkpoint.json');
+
+function logDbTarget() {
+  const v = process.env.CATALOG_DATABASE_URL ?? '';
+  try {
+    const u = new URL(v);
+    const port = u.port || '(default)';
+    console.log(`[Stage1] DB target: ${u.hostname}:${port}${u.pathname}`);
+  } catch {
+    console.log('[Stage1] DB target: (missing or unparseable CATALOG_DATABASE_URL)');
+  }
+}
 
 function formatEta(seconds) {
   if (!Number.isFinite(seconds) || seconds < 0) return '—';
@@ -79,7 +94,7 @@ function calculateStock(item) {
   const avail = item.availability || {};
   let total = 0;
   
-  ['wi', 'ny', 'tx', 'ca', 'nv', 'nc'].forEach(loc => {
+  ['wi', 'ny', 'tx', 'ca', 'nv', 'nc', 'national'].forEach(loc => {
     const val = avail[loc];
     if (val && val !== 'N/A') {
       const num = parseInt(val, 10);
@@ -130,11 +145,10 @@ async function normalizeProducts() {
   }
 
   const cp = !noResume ? loadCheckpoint() : null;
-  const startBatchIndex = cp?.batchIndex ?? 0;
-  const startRowIndex = cp?.rowIndex ?? 0;
+  const startBatchIndex = cp?.nextBatchIndex ?? cp?.batchIndex ?? 0;
   if (cp && !reset) {
     console.log(
-      `[Stage1] Resuming from checkpoint: batch ${startBatchIndex + 1}/${batches.length}, row ${startRowIndex + 1}`
+      `[Stage1] Resuming from checkpoint: batch ${startBatchIndex + 1}/${batches.length}`
     );
   }
 
@@ -143,47 +157,59 @@ async function normalizeProducts() {
   let skipped = cp?.skipped ?? 0;
 
   let currentBatchIndex = 0;
-  let currentRowIndex = 0;
-  let lastCheckpointAt = Date.now();
+  let stopRequested = false;
 
-  const checkpointEveryMs = 3000;
-  const checkpoint = () => {
+  const checkpoint = (nextBatchIndex) => {
     saveCheckpoint({
-      version: 1,
+      version: 2,
       vendor: 'pu',
       stage: 1,
-      batchIndex: currentBatchIndex,
-      rowIndex: currentRowIndex,
+      nextBatchIndex,
       processed,
       inserted,
       skipped,
       totalRows,
       lastSavedAt: new Date().toISOString(),
-      batchSourceFile: batches?.[currentBatchIndex]?.source_file ?? null,
+      nextBatchSourceFile: batches?.[nextBatchIndex]?.source_file ?? null,
     });
   };
 
   const onSigint = () => {
-    console.log('\n[Stage1] Caught SIGINT. Saving checkpoint...');
-    checkpoint();
-    process.exit(130);
+    if (stopRequested) {
+      console.log('\n[Stage1] Forced exit.');
+      process.exit(130);
+    }
+    stopRequested = true;
+    console.log('\n[Stage1] Stop requested. Will checkpoint after current batch...');
   };
   process.once('SIGINT', onSigint);
   process.once('SIGTERM', onSigint);
 
-  for (currentBatchIndex = 0; currentBatchIndex < batches.length; currentBatchIndex++) {
-    const batch = batches[currentBatchIndex];
-    if (currentBatchIndex < startBatchIndex) continue;
-    const items = batch.payload || [];
+  const pool = getPool();
 
-    const startI = currentBatchIndex === startBatchIndex ? startRowIndex : 0;
+  async function withClient(fn) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await fn(client);
+      await client.query('COMMIT');
+      return result;
+    } catch (e) {
+      try { await client.query('ROLLBACK'); } catch {}
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
 
-    for (let i = startI; i < items.length; i++) {
-      currentRowIndex = i;
-      const item = items[i];
+  async function processBatch(client, items) {
+    const products = [];
+    const offers = [];
+    const specs = [];
+
+    for (const item of items) {
       processed++;
-      
-      // Skip if not in target catalogs
+
       if (!isInTargetCatalogs(item)) {
         skipped++;
         continue;
@@ -199,88 +225,218 @@ async function normalizeProducts() {
       const slug = generateSlug(name, sku);
       const brand = item.brand_name?.trim() || '';
       const mpn = item.vendor_part_number?.trim() || sku;
+      const category = inferCategory(item);
+      const weight = item.weight ?? null;
+      const isActive = item.part_status === 'S';
+      const isDiscontinued = item.part_status !== 'S';
 
-      // Upsert product
-      let productId;
-      try {
-        const rows = await sql`
-          INSERT INTO catalog_products
-            (sku, name, brand, manufacturer_part_number, slug, description, category,
-             weight, is_active, is_discontinued, updated_at)
-          VALUES
-            (${sku}, ${name}, ${brand}, ${mpn}, ${slug}, ${null}, ${inferCategory(item)},
-             ${item.weight ?? null}, ${item.part_status === 'S'}, ${item.part_status !== 'S'}, NOW())
-          ON CONFLICT (sku) DO UPDATE SET
-            name                     = EXCLUDED.name,
-            brand                    = EXCLUDED.brand,
-            manufacturer_part_number = EXCLUDED.manufacturer_part_number,
-            slug                     = EXCLUDED.slug,
-            category                 = COALESCE(EXCLUDED.category, catalog_products.category),
-            weight                   = COALESCE(EXCLUDED.weight, catalog_products.weight),
-            is_active                = EXCLUDED.is_active,
-            is_discontinued          = EXCLUDED.is_discontinued,
-            updated_at               = NOW()
-          RETURNING id
-        `;
-        productId = rows?.[0]?.id;
-      } catch (e) {
-        console.error(`Product error for ${sku}:`, e.message);
-        if (Date.now() - lastCheckpointAt >= checkpointEveryMs) {
-          checkpoint();
-          lastCheckpointAt = Date.now();
-        }
-        continue;
-      }
+      products.push({
+        sku,
+        name,
+        brand,
+        mpn,
+        slug,
+        category,
+        weight,
+        isActive,
+        isDiscontinued,
+        vendorPartNumber: item.vendor_part_number ?? null,
+        availability: item.availability ?? {},
+        cost: item.your_dealer_price || item.base_dealer_price || null,
+        msrp: item.current_suggested_retail || null,
+        stockQty: calculateStock(item),
+        raw: item,
+      });
+    }
 
+    if (products.length === 0) return;
+
+    // Bulk upsert products
+    const skuArr = products.map(p => p.sku);
+    const nameArr = products.map(p => p.name);
+    const brandArr = products.map(p => p.brand);
+    const mpnArr = products.map(p => p.mpn);
+    const slugArr = products.map(p => p.slug);
+    const categoryArr = products.map(p => p.category);
+    const weightArr = products.map(p => (p.weight === '' ? null : p.weight));
+    const isActiveArr = products.map(p => p.isActive);
+    const isDiscontinuedArr = products.map(p => p.isDiscontinued);
+
+    const upsertRes = await client.query(
+      `
+      WITH input AS (
+        SELECT * FROM unnest(
+          $1::text[],
+          $2::text[],
+          $3::text[],
+          $4::text[],
+          $5::text[],
+          $6::text[],
+          $7::double precision[],
+          $8::boolean[],
+          $9::boolean[]
+        ) AS t(sku, name, brand, mpn, slug, category, weight, is_active, is_discontinued)
+      ),
+      upserted AS (
+        INSERT INTO catalog_products
+          (sku, name, brand, manufacturer_part_number, slug, description, category,
+           weight, is_active, is_discontinued, updated_at)
+        SELECT
+          sku, name, brand, mpn, slug, NULL, category,
+          weight, is_active, is_discontinued, NOW()
+        FROM input
+        ON CONFLICT (sku) DO UPDATE SET
+          name                     = EXCLUDED.name,
+          brand                    = EXCLUDED.brand,
+          manufacturer_part_number = EXCLUDED.manufacturer_part_number,
+          slug                     = EXCLUDED.slug,
+          category                 = COALESCE(EXCLUDED.category, catalog_products.category),
+          weight                   = COALESCE(EXCLUDED.weight, catalog_products.weight),
+          is_active                = EXCLUDED.is_active,
+          is_discontinued          = EXCLUDED.is_discontinued,
+          updated_at               = NOW()
+        RETURNING id, sku
+      )
+      SELECT id, sku FROM upserted
+      `,
+      [skuArr, nameArr, brandArr, mpnArr, slugArr, categoryArr, weightArr, isActiveArr, isDiscontinuedArr]
+    );
+
+    const idBySku = new Map();
+    for (const r of upsertRes.rows) idBySku.set(r.sku, r.id);
+
+    // Bulk upsert offers
+    const offerProductIds = [];
+    const offerVendorCodes = [];
+    const offerCosts = [];
+    const offerMsrps = [];
+    const offerMapPrices = [];
+    const offerQtys = [];
+    const offerWarehouses = [];
+    const offerVendorPartNums = [];
+
+    for (const p of products) {
+      const productId = idBySku.get(p.sku);
+      if (!productId) continue;
       inserted++;
 
-      // Upsert vendor offer
-      const stockQty = calculateStock(item);
-      const cost = item.your_dealer_price || item.base_dealer_price;
-      const msrp = item.current_suggested_retail;
+      offerProductIds.push(productId);
+      offerVendorCodes.push('pu');
+      offerCosts.push(p.cost);
+      offerMsrps.push(p.msrp);
+      offerMapPrices.push(null);
+      offerQtys.push(p.stockQty);
+      offerWarehouses.push(JSON.stringify(p.availability ?? {}));
+      offerVendorPartNums.push(p.vendorPartNumber);
 
-      if (productId) {
-        try {
-          await sql`
-            INSERT INTO vendor_offers
-              (catalog_product_id, vendor_code, wholesale_cost, msrp, map_price,
-               total_qty, warehouse_json, vendor_part_number, updated_at)
-            VALUES
-              (${productId}, ${'pu'}, ${cost ?? null}, ${msrp ?? null}, ${null},
-               ${stockQty}, ${JSON.stringify(item.availability ?? {})}, ${item.vendor_part_number ?? null}, NOW())
-            ON CONFLICT (catalog_product_id, vendor_code) DO UPDATE SET
-              wholesale_cost     = COALESCE(EXCLUDED.wholesale_cost, vendor_offers.wholesale_cost),
-              msrp               = COALESCE(EXCLUDED.msrp,           vendor_offers.msrp),
-              map_price          = COALESCE(EXCLUDED.map_price,      vendor_offers.map_price),
-              total_qty          = EXCLUDED.total_qty,
-              warehouse_json     = EXCLUDED.warehouse_json,
-              vendor_part_number = COALESCE(EXCLUDED.vendor_part_number, vendor_offers.vendor_part_number),
-              updated_at         = NOW()
-          `;
-
-          await insertSpecs(productId, item);
-        } catch (e) {
-          console.error(`Offer/spec error for ${sku}:`, e.message);
-        }
+      // Specs (managed subset)
+      if (p.raw.weight) specs.push({ productId, attribute: 'Weight', value: `${p.raw.weight} lbs` });
+      if (p.raw.upc_code) specs.push({ productId, attribute: 'UPC', value: String(p.raw.upc_code) });
+      if (p.raw.country_of_origin) specs.push({ productId, attribute: 'Country of Origin', value: String(p.raw.country_of_origin) });
+      if (p.raw.product_code) specs.push({ productId, attribute: 'Product Code', value: String(p.raw.product_code) });
+      if (p.raw.hazardous_code) specs.push({ productId, attribute: 'Hazardous', value: 'Yes' });
+      if (p.raw.dimensions?.height) {
+        specs.push({
+          productId,
+          attribute: 'Dimensions',
+          value: `${p.raw.dimensions.height}"H x ${p.raw.dimensions.length}"L x ${p.raw.dimensions.width}"W`,
+        });
       }
-
-      if (Date.now() - lastCheckpointAt >= checkpointEveryMs) {
-        checkpoint();
-        lastCheckpointAt = Date.now();
-      }
-
-      if (processed % 2000 === 0) {
-        const elapsed = (Date.now() - t0) / 1000;
-        const rate = processed / Math.max(1, elapsed);
-        const pct = totalRows > 0 ? ((processed / totalRows) * 100) : 0;
-        const eta = rate > 0 ? (totalRows - processed) / rate : Infinity;
-        process.stdout.write(
-          `\r  ${processed.toLocaleString()}/${totalRows.toLocaleString()} (${pct.toFixed(1)}%)` +
-          ` | Upserts: ${inserted.toLocaleString()} | Skipped: ${skipped.toLocaleString()}` +
-          ` | ${rate.toFixed(0)}/s | ETA ${formatEta(eta)}`
-        );
-      }
+      if (p.raw.fatbook_catalog) specs.push({ productId, attribute: 'Catalog', value: 'Fatbook' });
+      if (p.raw.tire_catalog) specs.push({ productId, attribute: 'Catalog', value: 'Tire' });
+      if (p.raw.oldbook_catalog) specs.push({ productId, attribute: 'Catalog', value: 'Oldbook' });
     }
+
+    if (offerProductIds.length > 0) {
+      await client.query(
+        `
+        INSERT INTO vendor_offers
+          (catalog_product_id, vendor_code, wholesale_cost, msrp, map_price,
+           total_qty, warehouse_json, vendor_part_number, updated_at)
+        SELECT t.*, NOW() AS updated_at
+        FROM unnest(
+          $1::int[],
+          $2::text[],
+          $3::numeric[],
+          $4::numeric[],
+          $5::numeric[],
+          $6::int[],
+          $7::jsonb[],
+          $8::text[]
+        ) AS t(catalog_product_id, vendor_code, wholesale_cost, msrp, map_price, total_qty, warehouse_json, vendor_part_number)
+        ON CONFLICT (catalog_product_id, vendor_code) DO UPDATE SET
+          wholesale_cost     = COALESCE(EXCLUDED.wholesale_cost, vendor_offers.wholesale_cost),
+          msrp               = COALESCE(EXCLUDED.msrp,           vendor_offers.msrp),
+          map_price          = COALESCE(EXCLUDED.map_price,      vendor_offers.map_price),
+          total_qty          = EXCLUDED.total_qty,
+          warehouse_json     = EXCLUDED.warehouse_json,
+          vendor_part_number = COALESCE(EXCLUDED.vendor_part_number, vendor_offers.vendor_part_number),
+          updated_at         = NOW()
+        `,
+        [
+          offerProductIds,
+          offerVendorCodes,
+          offerCosts,
+          offerMsrps,
+          offerMapPrices,
+          offerQtys,
+          offerWarehouses,
+          offerVendorPartNums,
+        ]
+      );
+    }
+
+    // Replace managed specs in bulk
+    if (specs.length > 0) {
+      const specProductIds = specs.map(s => s.productId);
+      const specAttrs = specs.map(s => s.attribute);
+      const specVals = specs.map(s => s.value);
+      const managedAttrs = ['Weight', 'UPC', 'Country of Origin', 'Product Code', 'Hazardous', 'Dimensions', 'Catalog'];
+
+      await client.query(
+        `DELETE FROM catalog_specs WHERE product_id = ANY($1::int[]) AND attribute = ANY($2::text[])`,
+        [Array.from(new Set(specProductIds)), managedAttrs]
+      );
+
+      await client.query(
+        `
+        INSERT INTO catalog_specs (product_id, attribute, value)
+        SELECT * FROM unnest($1::int[], $2::text[], $3::text[]) AS t(product_id, attribute, value)
+        `,
+        [specProductIds, specAttrs, specVals]
+      );
+    }
+  }
+
+  for (currentBatchIndex = startBatchIndex; currentBatchIndex < batches.length; currentBatchIndex++) {
+    if (stopRequested) {
+      checkpoint(currentBatchIndex);
+      process.exit(130);
+    }
+
+    const batch = batches[currentBatchIndex];
+    const items = batch.payload || [];
+
+    try {
+      await withClient((client) => processBatch(client, items));
+    } catch (e) {
+      console.error(`\n[Stage1] Batch failed (${batch.source_file ?? currentBatchIndex}):`, e?.message ?? e);
+      checkpoint(currentBatchIndex);
+      throw e;
+    }
+
+    // Checkpoint at batch boundary (batch is transactionally complete).
+    checkpoint(currentBatchIndex + 1);
+
+    const elapsed = (Date.now() - t0) / 1000;
+    const rate = processed / Math.max(1, elapsed);
+    const pct = totalRows > 0 ? ((processed / totalRows) * 100) : 0;
+    const eta = rate > 0 ? (totalRows - processed) / rate : Infinity;
+    process.stdout.write(
+      `\r  ${processed.toLocaleString()}/${totalRows.toLocaleString()} (${pct.toFixed(1)}%)` +
+      ` | Upserts: ${inserted.toLocaleString()} | Skipped: ${skipped.toLocaleString()}` +
+      ` | ${rate.toFixed(0)}/s | ETA ${formatEta(eta)}`
+    );
   }
 
   // done
@@ -388,6 +544,7 @@ async function insertSpecs(productId, item) {
  */
 export async function normalizePu() {
   console.log('🚀 Stage 1: Normalizing Parts Unlimited Data\n');
+  logDbTarget();
   
   const startTime = Date.now();
   
