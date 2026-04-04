@@ -5,8 +5,12 @@
 
 import dotenv from 'dotenv';
 import { sql } from '../lib/db.js';
+import fs from 'fs';
+import path from 'path';
 
 dotenv.config({ path: '.env.local' });
+
+const CHECKPOINT_FILE = path.resolve(process.cwd(), 'scripts/ingest/.stage1_pu_checkpoint.json');
 
 function formatEta(seconds) {
   if (!Number.isFinite(seconds) || seconds < 0) return '—';
@@ -15,6 +19,31 @@ function formatEta(seconds) {
   const r = s % 60;
   if (m <= 0) return `${r}s`;
   return `${m}m${String(r).padStart(2, '0')}s`;
+}
+
+function loadCheckpoint() {
+  try {
+    if (!fs.existsSync(CHECKPOINT_FILE)) return null;
+    return JSON.parse(fs.readFileSync(CHECKPOINT_FILE, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function saveCheckpoint(data) {
+  try {
+    fs.writeFileSync(CHECKPOINT_FILE, JSON.stringify(data, null, 2));
+  } catch (e) {
+    console.warn('[Stage1] Failed to write checkpoint:', e?.message ?? e);
+  }
+}
+
+function clearCheckpoint() {
+  try {
+    if (fs.existsSync(CHECKPOINT_FILE)) fs.unlinkSync(CHECKPOINT_FILE);
+  } catch {
+    // ignore
+  }
 }
 
 /**
@@ -79,6 +108,10 @@ async function normalizeProducts() {
   console.log('📦 Pass 1: Normalizing products from dealer price data...');
   const t0 = Date.now();
 
+  const args = process.argv.slice(2);
+  const noResume = args.includes('--no-resume');
+  const reset = args.includes('--reset');
+
   // Get all raw batches
   const batches = await sql`
     SELECT source_file, payload
@@ -92,14 +125,62 @@ async function normalizeProducts() {
   const totalRows = batches.reduce((sum, b) => sum + ((b.payload?.length) || 0), 0);
   console.log(`Total rows: ${totalRows.toLocaleString()}`);
 
-  let processed = 0;
-  let inserted = 0;
-  let skipped = 0;
+  if (reset) {
+    clearCheckpoint();
+  }
 
-  for (const batch of batches) {
+  const cp = !noResume ? loadCheckpoint() : null;
+  const startBatchIndex = cp?.batchIndex ?? 0;
+  const startRowIndex = cp?.rowIndex ?? 0;
+  if (cp && !reset) {
+    console.log(
+      `[Stage1] Resuming from checkpoint: batch ${startBatchIndex + 1}/${batches.length}, row ${startRowIndex + 1}`
+    );
+  }
+
+  let processed = cp?.processed ?? 0;
+  let inserted = cp?.inserted ?? 0;
+  let skipped = cp?.skipped ?? 0;
+
+  let currentBatchIndex = 0;
+  let currentRowIndex = 0;
+  let lastCheckpointAt = Date.now();
+
+  const checkpointEveryMs = 3000;
+  const checkpoint = () => {
+    saveCheckpoint({
+      version: 1,
+      vendor: 'pu',
+      stage: 1,
+      batchIndex: currentBatchIndex,
+      rowIndex: currentRowIndex,
+      processed,
+      inserted,
+      skipped,
+      totalRows,
+      lastSavedAt: new Date().toISOString(),
+      batchSourceFile: batches?.[currentBatchIndex]?.source_file ?? null,
+    });
+  };
+
+  const onSigint = () => {
+    console.log('\n[Stage1] Caught SIGINT. Saving checkpoint...');
+    checkpoint();
+    process.exit(130);
+  };
+  process.once('SIGINT', onSigint);
+  process.once('SIGTERM', onSigint);
+
+  for (currentBatchIndex = 0; currentBatchIndex < batches.length; currentBatchIndex++) {
+    const batch = batches[currentBatchIndex];
+    if (currentBatchIndex < startBatchIndex) continue;
     const items = batch.payload || [];
-    
-    for (const item of items) {
+
+    const startI = currentBatchIndex === startBatchIndex ? startRowIndex : 0;
+
+    for (let i = startI; i < items.length; i++) {
+      currentRowIndex = i;
+      const item = items[i];
       processed++;
       
       // Skip if not in target catalogs
@@ -144,6 +225,10 @@ async function normalizeProducts() {
         productId = rows?.[0]?.id;
       } catch (e) {
         console.error(`Product error for ${sku}:`, e.message);
+        if (Date.now() - lastCheckpointAt >= checkpointEveryMs) {
+          checkpoint();
+          lastCheckpointAt = Date.now();
+        }
         continue;
       }
 
@@ -179,6 +264,11 @@ async function normalizeProducts() {
         }
       }
 
+      if (Date.now() - lastCheckpointAt >= checkpointEveryMs) {
+        checkpoint();
+        lastCheckpointAt = Date.now();
+      }
+
       if (processed % 2000 === 0) {
         const elapsed = (Date.now() - t0) / 1000;
         const rate = processed / Math.max(1, elapsed);
@@ -192,6 +282,9 @@ async function normalizeProducts() {
       }
     }
   }
+
+  // done
+  clearCheckpoint();
 
   console.log('\n✅ Pass 1 Complete!');
   console.log(`  Processed: ${processed}`);
