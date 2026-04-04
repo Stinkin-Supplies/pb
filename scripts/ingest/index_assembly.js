@@ -19,10 +19,16 @@ function getTypesense() {
   if (typesense) return typesense;
 
   const typesenseHost = process.env.TYPESENSE_HOST;
-  const typesenseKey = process.env.TYPESENSE_ADMIN_KEY;
+  // Support multiple common env var names.
+  const typesenseKey =
+    process.env.TYPESENSE_ADMIN_KEY ||
+    process.env.TYPESENSE_ADMIN_API_KEY ||
+    process.env.TYPESENSE_API_KEY;
 
   if (!typesenseHost || !typesenseKey) {
-    throw new Error('Missing Typesense credentials (TYPESENSE_HOST / TYPESENSE_ADMIN_KEY)');
+    throw new Error(
+      'Missing Typesense credentials (need TYPESENSE_HOST and an admin key: TYPESENSE_ADMIN_KEY or TYPESENSE_ADMIN_API_KEY or TYPESENSE_API_KEY)'
+    );
   }
 
   typesense = new Typesense.Client({
@@ -99,10 +105,96 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+function isTypesenseOomError(err) {
+  const msg = String(err?.message ?? err ?? '');
+  return (
+    msg.includes('OUT_OF_MEMORY') ||
+    msg.toLowerCase().includes('running out of resource') ||
+    msg.toLowerCase().includes('out of memory')
+  );
+}
+
+async function withTypesenseOomRetry(fn, label) {
+  const setupDelayMs = parseInt(process.env.INDEX_SETUP_OOM_DELAY_MS || process.env.INDEX_OOM_DELAY_MS || '30000', 10);
+  const safeDelay = Number.isFinite(setupDelayMs) && setupDelayMs > 0 ? setupDelayMs : 30000;
+
+  // Retry forever on OOM during setup; if the node is temporarily overloaded, it will recover.
+  // If it never recovers, the index cannot be built anyway.
+  while (true) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (!isTypesenseOomError(e)) throw e;
+      console.warn(`⚠️  Typesense OOM during ${label}. Cooling down for ${safeDelay}ms then retrying...`);
+      await sleep(safeDelay);
+    }
+  }
+}
+
+function slimDocumentForTypesense(doc, level = 0) {
+  // Level 0: cap arrays and strings.
+  const out = { ...doc };
+
+  const capArray = (v, n) => (Array.isArray(v) ? v.slice(0, n) : v);
+  const capString = (v, n) => (typeof v === 'string' ? v.slice(0, n) : v);
+
+  out.specs = capArray(out.specs, 10);
+  out.fitment_make = capArray(out.fitment_make, 25);
+  out.fitment_model = capArray(out.fitment_model, 25);
+  out.fitment_year = capArray(out.fitment_year, 25);
+  out.search_blob = capString(out.search_blob, 200);
+  out.description = capString(out.description, 4000);
+
+  if (level >= 1) {
+    // Drop the biggest memory offenders first.
+    out.fitment_year = [];
+    out.search_blob = '';
+  }
+
+  if (level >= 2) {
+    out.specs = [];
+    out.fitment_make = [];
+    out.fitment_model = [];
+  }
+
+  if (level >= 3) {
+    // Minimal doc: keep only required/search core fields.
+    return {
+      id: out.id,
+      sku: out.sku,
+      slug: out.slug,
+      brand: out.brand,
+      category: out.category,
+      name: out.name,
+      description: out.description,
+      price: out.price,
+      msrp: out.msrp,
+      stock_quantity: out.stock_quantity,
+      in_stock: out.in_stock,
+      free_shipping: out.free_shipping,
+      image_url: out.image_url,
+      specs: [],
+      fitment_make: [],
+      fitment_model: [],
+      fitment_year: [],
+      search_blob: '',
+    };
+  }
+
+  return out;
+}
+
 async function importWithRetry(typesenseClient, collection, docs, opts = {}) {
   const retries = Number.isFinite(opts.retries) ? opts.retries : 3;
   const baseDelayMs = Number.isFinite(opts.baseDelayMs) ? opts.baseDelayMs : 750;
   const maxDelayMs = Number.isFinite(opts.maxDelayMs) ? opts.maxDelayMs : 10_000;
+  const oomDelayMs = parseInt(process.env.INDEX_OOM_DELAY_MS || '15000', 10);
+  const depth = Number.isFinite(opts.depth) ? opts.depth : 0;
+  const maxSplitDepth = parseInt(process.env.INDEX_MAX_SPLIT_DEPTH || '32', 10);
+  const slimLevel = Number.isFinite(opts.slimLevel) ? opts.slimLevel : 0;
+  const maxSlimLevel = parseInt(process.env.INDEX_MAX_SLIM_LEVEL || '4', 10);
+  const skipOomSingleDoc =
+    String(process.env.INDEX_SKIP_OOM_SINGLE_DOC ?? 'true').toLowerCase() === 'true';
 
   let attempt = 0;
   // Retries are for request-level failures (timeouts, 5xx, network).
@@ -111,6 +203,59 @@ async function importWithRetry(typesenseClient, collection, docs, opts = {}) {
     try {
       return await importBatch(typesenseClient, collection, docs);
     } catch (err) {
+      // Typesense sometimes returns 422 with OUT_OF_MEMORY when it is overloaded.
+      // Treat it as retryable with a longer cool-down, otherwise we'll "complete" batches as failed
+      // and end up with a permanently incomplete index.
+      if (isTypesenseOomError(err)) {
+        const safeMaxDepth = Number.isFinite(maxSplitDepth) && maxSplitDepth > 0 ? maxSplitDepth : 32;
+
+        // Split until single-doc chunks (log2(N) depth). This is the most reliable way to
+        // make progress on memory-constrained Typesense nodes.
+        if (docs.length > 1 && depth < safeMaxDepth) {
+          const mid = Math.floor(docs.length / 2);
+          const left = docs.slice(0, mid);
+          const right = docs.slice(mid);
+
+          console.warn(`⚠️  Typesense OOM reject. Splitting batch ${docs.length} → ${left.length} + ${right.length}`);
+
+          const r1 = await importWithRetry(typesenseClient, collection, left, { ...opts, depth: depth + 1, slimLevel: 0 });
+          const r2 = await importWithRetry(typesenseClient, collection, right, { ...opts, depth: depth + 1, slimLevel: 0 });
+          return {
+            failed: (r1.failed ?? 0) + (r2.failed ?? 0),
+            total: (r1.total ?? 0) + (r2.total ?? 0),
+          };
+        }
+
+        // Single-doc worst case: progressively slim. If it still OOMs, optionally skip it so the run finishes.
+        if (docs.length === 1) {
+          const safeMaxSlim = Number.isFinite(maxSlimLevel) && maxSlimLevel > 0 ? maxSlimLevel : 4;
+          if (slimLevel < safeMaxSlim) {
+            const nextLevel = slimLevel + 1;
+            console.warn(`⚠️  Typesense OOM reject for single doc. Retrying with slim level ${nextLevel}...`);
+            const slimDoc = slimDocumentForTypesense(docs[0], nextLevel);
+            return await importWithRetry(typesenseClient, collection, [slimDoc], { ...opts, slimLevel: nextLevel });
+          }
+
+          if (skipOomSingleDoc) {
+            try {
+              const doc = docs?.[0];
+              const bytes = Buffer.byteLength(JSON.stringify(doc ?? {}), 'utf8');
+              console.log(`Doc size: ${bytes} bytes`);
+              console.log(`Doc id=${doc?.id ?? '(unknown)'} sku=${doc?.sku ?? '(unknown)'}`);
+            } catch {
+              console.log('Doc size: (failed to compute)');
+            }
+            console.error(`❌ Skipping OOM doc id=${docs?.[0]?.id ?? '(unknown)'}`);
+            return { failed: 1, total: 1 };
+          }
+        }
+
+        const delay = Number.isFinite(oomDelayMs) && oomDelayMs > 0 ? oomDelayMs : 15000;
+        console.warn(`⚠️  Typesense OOM reject. Cooling down for ${delay}ms then retrying...`);
+        await sleep(delay);
+        continue;
+      }
+
       if (attempt >= retries) throw err;
       attempt++;
 
@@ -129,54 +274,101 @@ async function importWithRetry(typesenseClient, collection, docs, opts = {}) {
 /**
  * Get or create Typesense collection
  */
-async function setupCollection(recreate = false) {
+async function setupCollection(collectionName, profile, recreate = false) {
   const typesenseClient = getTypesense();
-  const collectionName = 'products';
+  const resolvedName = collectionName || 'products';
+  const resolvedProfile = profile || 'full';
 
   if (recreate) {
     console.log('Deleting existing collection...');
-    try {
-      await typesenseClient.collections(collectionName).delete();
-    } catch (e) {
-      // Collection may not exist
-    }
+    await withTypesenseOomRetry(async () => {
+      try {
+        await typesenseClient.collections(resolvedName).delete();
+      } catch (e) {
+        // Collection may not exist
+      }
+    }, `delete collection ${resolvedName}`);
   }
 
   try {
-    await typesenseClient.collections(collectionName).retrieve();
+    await withTypesenseOomRetry(
+      async () => typesenseClient.collections(resolvedName).retrieve(),
+      `retrieve collection ${resolvedName}`
+    );
     console.log('Using existing collection');
-    return collectionName;
+    return resolvedName;
   } catch (e) {
     console.log('Creating new collection...');
   }
 
+  // Ultra-minimal schema for low-memory nodes (user-defined).
+  // Keep only the essential searchable/sort/filter fields.
+  if (resolvedProfile === 'products_search') {
+    const schema = {
+      name: resolvedName,
+      fields: [
+        { name: 'id', type: 'string' },
+        { name: 'name', type: 'string', index: true },
+        { name: 'sku', type: 'string', index: true },
+        { name: 'brand', type: 'string', facet: true },
+        { name: 'category', type: 'string', facet: true },
+        { name: 'price', type: 'float', sort: true },
+        { name: 'in_stock', type: 'bool', facet: true },
+        { name: 'image_url', type: 'string', index: false, store: true, optional: true },
+      ],
+    };
+
+    await withTypesenseOomRetry(
+      async () => typesenseClient.collections().create(schema),
+      `create collection ${resolvedName}`
+    );
+    console.log('✓ Collection created');
+    return resolvedName;
+  }
+
+  const isSearchOnly = resolvedProfile === 'search';
+
+  const baseFields = [
+    { name: 'id', type: 'string' },
+    { name: 'sku', type: 'string', facet: !isSearchOnly },
+    { name: 'slug', type: 'string' },
+    { name: 'brand', type: 'string', facet: !isSearchOnly },
+    { name: 'category', type: 'string', facet: !isSearchOnly },
+    { name: 'name', type: 'string', locale: 'en' },
+    { name: 'description', type: 'string', optional: true },
+    { name: 'price', type: 'float', facet: !isSearchOnly, sort: !isSearchOnly },
+    { name: 'msrp', type: 'float', optional: true },
+    { name: 'stock_quantity', type: 'int32', facet: !isSearchOnly, sort: !isSearchOnly },
+    { name: 'in_stock', type: 'bool', facet: !isSearchOnly },
+    // Existing Typesense collection schema expects this field.
+    { name: 'free_shipping', type: 'bool', facet: !isSearchOnly, optional: true },
+    // Not searched; keep retrievable but avoid indexing overhead.
+    { name: 'image_url', type: 'string', optional: true, index: false },
+    // Index for search relevance, but don't store on disk to reduce stored payload.
+    { name: 'search_blob', type: 'string', optional: true, store: false },
+  ];
+
+  const heavyFields = [
+    // Heavy arrays: keep searchable/filterable (via exact-match filters), but do not facet them
+    // to avoid huge in-memory facet indexes on constrained Typesense nodes.
+    { name: 'specs', type: 'string[]', facet: false, optional: true },
+    { name: 'fitment_make', type: 'string[]', facet: false, optional: true },
+    { name: 'fitment_model', type: 'string[]', facet: false, optional: true },
+    { name: 'fitment_year', type: 'int32[]', facet: false, optional: true },
+  ];
+
   const schema = {
-    name: collectionName,
-    fields: [
-      { name: 'id', type: 'string' },
-      { name: 'sku', type: 'string', facet: true },
-      { name: 'slug', type: 'string' },
-      { name: 'brand', type: 'string', facet: true },
-      { name: 'category', type: 'string', facet: true },
-      { name: 'name', type: 'string', locale: 'en' },
-      { name: 'description', type: 'string', optional: true },
-      { name: 'price', type: 'float', facet: true, sort: true },
-      { name: 'msrp', type: 'float', optional: true },
-      { name: 'stock_quantity', type: 'int32', facet: true, sort: true },
-      { name: 'in_stock', type: 'bool', facet: true },
-      { name: 'image_url', type: 'string', optional: true },
-      { name: 'specs', type: 'string[]', facet: true, optional: true },
-      { name: 'fitment_make', type: 'string[]', facet: true, optional: true },
-      { name: 'fitment_model', type: 'string[]', facet: true, optional: true },
-      { name: 'fitment_year', type: 'int32[]', facet: true, optional: true },
-      { name: 'search_blob', type: 'string', optional: true }
-    ],
-    default_sorting_field: 'stock_quantity'
+    name: resolvedName,
+    fields: resolvedProfile === 'core' ? baseFields : baseFields.concat(heavyFields),
+    ...(isSearchOnly ? {} : { default_sorting_field: 'stock_quantity' }),
   };
 
-  await typesenseClient.collections().create(schema);
+  await withTypesenseOomRetry(
+    async () => typesenseClient.collections().create(schema),
+    `create collection ${resolvedName}`
+  );
   console.log('✓ Collection created');
-  return collectionName;
+  return resolvedName;
 }
 
 /**
@@ -200,14 +392,38 @@ function saveCheckpoint(checkpoint) {
   fs.writeFileSync(CHECKPOINT_FILE, JSON.stringify(checkpoint, null, 2));
 }
 
-async function buildDocumentsForProducts(products) {
+async function buildDocumentsForProducts(products, opts = {}) {
   if (!products || products.length === 0) return [];
 
   const productIds = products.map((p) => p.id);
   const useCache = await hasSearchCache();
+  const profile = opts.profile || 'full';
+  const queryProfile = profile === 'products_search' ? 'core' : profile;
 
-  const rows = useCache
-    ? await sql`
+  let rows = [];
+  if (useCache) {
+    if (queryProfile === 'core') {
+      rows = await sql`
+        WITH ids AS (
+          SELECT unnest(${productIds}::int[]) AS product_id
+        )
+        SELECT
+          cp.id,
+          ARRAY[]::text[] AS specs,
+          ARRAY[]::text[] AS fitment_make,
+          ARRAY[]::text[] AS fitment_model,
+          ARRAY[]::int[]  AS fitment_year,
+          c.image_url AS image_url,
+          c.search_blob AS search_blob,
+          COALESCE(cp.stock_quantity, 0)::int AS stock_qty,
+          cp.msrp AS msrp
+        FROM ids
+        JOIN catalog_products cp ON cp.id = ids.product_id
+        LEFT JOIN catalog_product_search_cache c
+          ON c.product_id = cp.id
+      `;
+    } else {
+      rows = await sql`
         WITH ids AS (
           SELECT unnest(${productIds}::int[]) AS product_id
         )
@@ -225,8 +441,38 @@ async function buildDocumentsForProducts(products) {
         JOIN catalog_products cp ON cp.id = ids.product_id
         LEFT JOIN catalog_product_search_cache c
           ON c.product_id = cp.id
-      `
-    : await sql`
+      `;
+    }
+  } else {
+    if (queryProfile === 'core') {
+      rows = await sql`
+        WITH ids AS (
+          SELECT unnest(${productIds}::int[]) AS product_id
+        ),
+        media AS (
+          SELECT DISTINCT ON (m.product_id)
+            m.product_id,
+            m.url
+          FROM catalog_media m
+          JOIN ids ON ids.product_id = m.product_id
+          ORDER BY m.product_id, m.priority ASC
+        )
+        SELECT
+          cp.id,
+          ARRAY[]::text[] AS specs,
+          ARRAY[]::text[] AS fitment_make,
+          ARRAY[]::text[] AS fitment_model,
+          ARRAY[]::int[]  AS fitment_year,
+          media.url AS image_url,
+          NULL::text AS search_blob,
+          COALESCE(cp.stock_quantity, 0)::int AS stock_qty,
+          cp.msrp AS msrp
+        FROM ids
+        JOIN catalog_products cp ON cp.id = ids.product_id
+        LEFT JOIN media ON media.product_id = cp.id
+      `;
+    } else {
+      rows = await sql`
         -- Single DB round-trip for the batch (still uses multiple CTEs, but one query).
         WITH ids AS (
           SELECT unnest(${productIds}::int[]) AS product_id
@@ -234,7 +480,7 @@ async function buildDocumentsForProducts(products) {
         specs AS (
           SELECT
             s.product_id,
-            ARRAY_AGG(s.attribute || ': ' || s.value ORDER BY s.attribute, s.value) AS specs
+            (ARRAY_AGG(s.attribute || ': ' || s.value ORDER BY s.attribute, s.value))[1:10] AS specs
           FROM catalog_specs s
           JOIN ids ON ids.product_id = s.product_id
           GROUP BY s.product_id
@@ -250,7 +496,10 @@ async function buildDocumentsForProducts(products) {
           LEFT JOIN LATERAL (
             SELECT generate_series(
               COALESCE(f.year_start, f.year_end),
-              COALESCE(f.year_end, f.year_start)
+              LEAST(
+                COALESCE(f.year_end, f.year_start),
+                COALESCE(f.year_start, f.year_end) + 24
+              )
             ) AS year
           ) y ON true
           GROUP BY f.product_id
@@ -279,15 +528,37 @@ async function buildDocumentsForProducts(products) {
         LEFT JOIN fitment ON fitment.product_id = cp.id
         LEFT JOIN media   ON media.product_id   = cp.id
       `;
+    }
+  }
 
   const rowById = new Map(rows.map((r) => [r.id, r]));
 
   return products.map((product) => {
     const r = rowById.get(product.id);
-    const specs = r?.specs ?? [];
     const imageUrl = r?.image_url ?? null;
     const stockQty = Number(r?.stock_qty ?? 0);
     const msrp = r?.msrp ?? null;
+    const priceNum = Number(product.computed_price ?? 0);
+    const safePrice = Number.isFinite(priceNum) ? priceNum : 0;
+    const msrpNum = msrp === null || msrp === undefined ? null : Number(msrp);
+    const safeMsrp = msrpNum === null ? null : (Number.isFinite(msrpNum) ? msrpNum : null);
+
+    if (profile === 'products_search') {
+      // Emit only the minimal fields requested:
+      // no specs/fitment/search_blob/description/slug/msrp.
+      return {
+        id: product.id.toString(),
+        name: product.name || '',
+        sku: product.sku,
+        brand: product.brand || '',
+        category: product.category || '',
+        price: safePrice,
+        in_stock: stockQty > 0,
+        image_url: imageUrl,
+      };
+    }
+
+    const specs = r?.specs ?? [];
 
     const searchBlob = (r?.search_blob && String(r.search_blob).trim())
       ? String(r.search_blob).toLowerCase()
@@ -302,7 +573,11 @@ async function buildDocumentsForProducts(products) {
           .join(' ')
           .toLowerCase();
 
-    return {
+    const fitmentMake = (r?.fitment_make ?? []).slice(0, 25);
+    const fitmentModel = (r?.fitment_model ?? []).slice(0, 25);
+    const fitmentYear = (r?.fitment_year ?? []).slice(0, 25);
+
+    const baseDoc = {
       id: product.id.toString(),
       sku: product.sku,
       slug: product.slug,
@@ -310,16 +585,25 @@ async function buildDocumentsForProducts(products) {
       category: product.category || '',
       name: product.name || '',
       description: product.description || '',
-      price: product.computed_price || 0,
-      msrp: msrp ? Number(msrp) : null,
+      // Typesense expects true numeric types; Postgres NUMERIC tends to arrive as strings.
+      price: safePrice,
+      msrp: safeMsrp,
       stock_quantity: stockQty,
       in_stock: stockQty > 0,
+      // Typesense schema requires the field; default false until you implement logic.
+      free_shipping: false,
       image_url: imageUrl,
+      search_blob: searchBlob.substring(0, 200),
+    };
+
+    if (profile === 'core') return baseDoc;
+
+    return {
+      ...baseDoc,
       specs,
-      fitment_make: r?.fitment_make ?? [],
-      fitment_model: r?.fitment_model ?? [],
-      fitment_year: r?.fitment_year ?? [],
-      search_blob: searchBlob.substring(0, 1000),
+      fitment_make: fitmentMake,
+      fitment_model: fitmentModel,
+      fitment_year: fitmentYear,
     };
   });
 }
@@ -371,7 +655,18 @@ export async function buildTypesenseIndex(options = {}) {
   const typesenseClient = getTypesense();
   
   const startTime = Date.now();
-  const collection = await setupCollection(recreate);
+  const args = process.argv.slice(2);
+  const profile =
+    (args.find((_, i) => args[i - 1] === '--profile') || process.env.INDEX_PROFILE || 'full')
+      .toLowerCase();
+  const collectionName =
+    (args.find((_, i) => args[i - 1] === '--collection') || process.env.INDEX_COLLECTION || 'products')
+      .trim();
+
+  console.log(`Index profile: ${profile}`);
+  console.log(`Collection: ${collectionName}\n`);
+
+  const collection = await setupCollection(collectionName, profile, recreate);
 
   // Load checkpoint
   let checkpoint = resume ? loadCheckpoint() : { lastOffset: 0, processed: 0, failed: 0 };
@@ -412,7 +707,6 @@ export async function buildTypesenseIndex(options = {}) {
   let processed = checkpoint.processed;
   let failed = checkpoint.failed;
 
-  const args = process.argv.slice(2);
   const batchSizeArg = parseInt(args.find((_, i) => args[i - 1] === '--batch-size') || process.env.INDEX_BATCH_SIZE || '', 10);
   const concurrencyArg = parseInt(args.find((_, i) => args[i - 1] === '--concurrency') || process.env.INDEX_CONCURRENCY || '', 10);
   const inflightArg = parseInt(args.find((_, i) => args[i - 1] === '--inflight') || process.env.INDEX_INFLIGHT || '', 10);
@@ -439,7 +733,7 @@ export async function buildTypesenseIndex(options = {}) {
     if (!products || products.length === 0) {
       return { start, count: 0, documents: [] };
     }
-    const documents = await buildDocumentsForProducts(products);
+    const documents = await buildDocumentsForProducts(products, { profile });
     return { start, count: products.length, documents };
   }
 
