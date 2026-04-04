@@ -171,6 +171,177 @@ async function computeProductPrices() {
 }
 
 /**
+ * Update catalog_products with stock_quantity + msrp derived from active vendor offers.
+ * This is used by the storefront and also lets Stage 3 avoid aggregating vendor_offers.
+ */
+async function computeProductStockAndMsrp() {
+  console.log('\n📦 Computing product stock + MSRP...');
+
+  const updated = await sql`
+    WITH agg AS (
+      SELECT
+        vo.catalog_product_id,
+        SUM(COALESCE(vo.total_qty, 0))::int AS stock_qty,
+        MAX(vo.msrp) AS msrp
+      FROM vendor_offers vo
+      WHERE vo.is_active = true
+      GROUP BY vo.catalog_product_id
+    )
+    UPDATE catalog_products cp
+    SET
+      stock_quantity = COALESCE(agg.stock_qty, 0),
+      msrp           = agg.msrp,
+      updated_at     = NOW()
+    FROM agg
+    WHERE agg.catalog_product_id = cp.id
+    RETURNING cp.id
+  `;
+
+  // Ensure products with no active offers don't retain stale stock.
+  const cleared = await sql`
+    UPDATE catalog_products cp
+    SET stock_quantity = 0, updated_at = NOW()
+    WHERE COALESCE(cp.stock_quantity, 0) <> 0
+      AND NOT EXISTS (
+        SELECT 1
+        FROM vendor_offers vo
+        WHERE vo.catalog_product_id = cp.id
+          AND vo.is_active = true
+      )
+    RETURNING cp.id
+  `;
+
+  console.log(
+    `✓ Stock/MSRP complete (${updated.length.toLocaleString()} updated, ${cleared.length.toLocaleString()} cleared)`
+  );
+}
+
+function isTruthy(v) {
+  return String(v ?? '').toLowerCase() === '1' || String(v ?? '').toLowerCase() === 'true';
+}
+
+async function regclassExists(name) {
+  const rows = await sql`SELECT to_regclass(${name}) AS reg`;
+  return Boolean(rows?.[0]?.reg);
+}
+
+/**
+ * Optional: build a denormalized cache of expensive-to-aggregate fields for Stage 3 indexing.
+ *
+ * Enable with env:
+ *   STAGE2_BUILD_SEARCH_CACHE=1
+ *
+ * Requires migration:
+ *   catalog-migrations/113_catalog_product_search_cache.sql
+ */
+async function buildProductSearchCache() {
+  if (!isTruthy(process.env.STAGE2_BUILD_SEARCH_CACHE)) return;
+
+  const hasCache = await regclassExists('public.catalog_product_search_cache');
+  if (!hasCache) {
+    console.log('ℹ️  Search cache table not found (catalog_product_search_cache). Skipping.');
+    return;
+  }
+
+  const hasAllowlist = await regclassExists('public.catalog_allowlist');
+
+  console.log('\n🧱 Building catalog_product_search_cache (denormalized specs/fitment/media)...');
+
+  // This is a single set-based upsert. If you have a very large catalog and this is slow,
+  // we can switch this to incremental refresh keyed off cp.updated_at / vo.updated_at.
+  await sql`
+    WITH target_products AS (
+      SELECT cp.id, cp.sku, cp.name, cp.brand, cp.category
+      FROM catalog_products cp
+      WHERE cp.is_active = true
+        AND COALESCE(cp.is_discontinued, false) = false
+        AND (
+          ${hasAllowlist} = false OR EXISTS (
+            SELECT 1 FROM catalog_allowlist al WHERE al.sku = cp.sku
+          )
+        )
+    ),
+    specs AS (
+      SELECT
+        s.product_id,
+        ARRAY_AGG(s.attribute || ': ' || s.value ORDER BY s.attribute, s.value) AS specs
+      FROM catalog_specs s
+      JOIN target_products tp ON tp.id = s.product_id
+      GROUP BY s.product_id
+    ),
+    fitment AS (
+      SELECT
+        f.product_id,
+        ARRAY_REMOVE(ARRAY_AGG(DISTINCT f.make), NULL) AS makes,
+        ARRAY_REMOVE(ARRAY_AGG(DISTINCT f.model), NULL) AS models,
+        ARRAY_AGG(DISTINCT y.year)::int[] AS years
+      FROM catalog_fitment f
+      JOIN target_products tp ON tp.id = f.product_id
+      LEFT JOIN LATERAL (
+        SELECT generate_series(
+          COALESCE(f.year_start, f.year_end),
+          COALESCE(f.year_end, f.year_start)
+        ) AS year
+      ) y ON true
+      GROUP BY f.product_id
+    ),
+    media AS (
+      SELECT DISTINCT ON (m.product_id)
+        m.product_id,
+        m.url
+      FROM catalog_media m
+      JOIN target_products tp ON tp.id = m.product_id
+      ORDER BY m.product_id, m.priority ASC
+    )
+    INSERT INTO catalog_product_search_cache (
+      product_id,
+      specs,
+      fitment_make,
+      fitment_model,
+      fitment_year,
+      image_url,
+      search_blob,
+      updated_at
+    )
+    SELECT
+      tp.id AS product_id,
+      COALESCE(s.specs, ARRAY[]::text[]) AS specs,
+      COALESCE(f.makes, ARRAY[]::text[]) AS fitment_make,
+      COALESCE(f.models, ARRAY[]::text[]) AS fitment_model,
+      COALESCE(f.years, ARRAY[]::int[]) AS fitment_year,
+      m.url AS image_url,
+      TRIM(
+        CONCAT_WS(
+          ' ',
+          tp.sku,
+          tp.name,
+          tp.brand,
+          tp.category,
+          ARRAY_TO_STRING(COALESCE(s.specs, ARRAY[]::text[]), ' '),
+          ARRAY_TO_STRING(COALESCE(f.makes, ARRAY[]::text[]), ' '),
+          ARRAY_TO_STRING(COALESCE(f.models, ARRAY[]::text[]), ' ')
+        )
+      ) AS search_blob,
+      NOW() AS updated_at
+    FROM target_products tp
+    LEFT JOIN specs   s ON s.product_id = tp.id
+    LEFT JOIN fitment f ON f.product_id = tp.id
+    LEFT JOIN media   m ON m.product_id = tp.id
+    ON CONFLICT (product_id) DO UPDATE
+    SET
+      specs        = EXCLUDED.specs,
+      fitment_make = EXCLUDED.fitment_make,
+      fitment_model= EXCLUDED.fitment_model,
+      fitment_year = EXCLUDED.fitment_year,
+      image_url    = EXCLUDED.image_url,
+      search_blob  = EXCLUDED.search_blob,
+      updated_at   = EXCLUDED.updated_at
+  `;
+
+  console.log('✓ Search cache refreshed');
+}
+
+/**
  * Mark discontinued products (no vendor offers)
  */
 async function markDiscontinued() {
@@ -200,7 +371,9 @@ export async function runComputedValues() {
   
   await computeVendorPricing();
   await computeProductPrices();
+  await computeProductStockAndMsrp();
   await markDiscontinued();
+  await buildProductSearchCache();
   
   const duration = ((Date.now() - startTime) / 1000).toFixed(1);
   console.log(`\n⏱️  Total time: ${duration}s`);

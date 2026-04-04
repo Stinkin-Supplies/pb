@@ -56,8 +56,14 @@ Calculates:
 - Marks discontinued products
 
 ```bash
-npx dotenv -e .env.local -- node ingest/computed_values.js
+node scripts/ingest/computed_values.js
 ```
+
+Optional denormalization for faster Stage 3 indexing:
+- Stage 2 can also refresh a denormalized cache table (`catalog_product_search_cache`)
+  that precomputes specs/fitment/media blobs used by Stage 3.
+- Enable it with `STAGE2_BUILD_SEARCH_CACHE=1` after applying migration
+  `catalog-migrations/113_catalog_product_search_cache.sql`.
 
 ### Stage 3: Typesense Index
 Builds search index with:
@@ -66,8 +72,14 @@ Builds search index with:
 - Price & stock sorting
 
 ```bash
-npx dotenv -e .env.local -- node ingest/index_assembly.js
+node scripts/ingest/index_assembly.js
 ```
+
+Throughput tuning:
+- Increase worker concurrency: `INDEX_CONCURRENCY=8 node scripts/ingest/index_assembly.js`
+- Allow each worker to keep multiple Typesense imports in-flight (advanced):
+  `INDEX_INFLIGHT=2 node scripts/ingest/index_assembly.js`
+- Flags also work: `node scripts/ingest/index_assembly.js --concurrency 8 --inflight 2 --batch-size 2000`
 
 ## Catalog Allowlist
 
