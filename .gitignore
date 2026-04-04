@@ -32,6 +32,10 @@ tsconfig.tsbuildinfo
 # vercel
 .vercel
 
+# ingest checkpoints (runtime artifacts)
+scripts/ingest/.stage1_pu_checkpoint.json
+.stage3_checkpoint.json
+
 # misc
 *.pem
 *.key
