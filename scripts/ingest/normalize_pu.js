@@ -3,19 +3,19 @@
  * Maps raw_vendor_pu JSONB to canonical catalog schema
  */
 
-import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
+import { sql } from '../lib/db.js';
 
 dotenv.config({ path: '.env.local' });
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Missing Supabase credentials');
+function formatEta(seconds) {
+  if (!Number.isFinite(seconds) || seconds < 0) return '—';
+  const s = Math.round(seconds);
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  if (m <= 0) return `${r}s`;
+  return `${m}m${String(r).padStart(2, '0')}s`;
 }
-
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 /**
  * Check if product is in target catalogs (Tire, Oldbook, Fatbook)
@@ -77,18 +77,20 @@ function generateSlug(name, sku) {
  */
 async function normalizeProducts() {
   console.log('📦 Pass 1: Normalizing products from dealer price data...');
+  const t0 = Date.now();
 
   // Get all raw batches
-  const { data: batches, error: batchError } = await supabase
-    .from('raw_vendor_pu')
-    .select('source_file, payload')
-    .like('source_file', 'dealerprice_batch_%');
-
-  if (batchError) {
-    throw new Error(`Failed to fetch batches: ${batchError.message}`);
-  }
+  const batches = await sql`
+    SELECT source_file, payload
+    FROM raw_vendor_pu
+    WHERE source_file LIKE 'dealerprice_batch_%'
+    ORDER BY source_file
+  `;
 
   console.log(`Found ${batches.length} batches`);
+
+  const totalRows = batches.reduce((sum, b) => sum + ((b.payload?.length) || 0), 0);
+  console.log(`Total rows: ${totalRows.toLocaleString()}`);
 
   let processed = 0;
   let inserted = 0;
@@ -118,25 +120,30 @@ async function normalizeProducts() {
       const mpn = item.vendor_part_number?.trim() || sku;
 
       // Upsert product
-      const { error: prodError } = await supabase
-        .from('catalog_products')
-        .upsert({
-          sku: sku,
-          brand: brand,
-          manufacturer_part_number: mpn,
-          slug: slug,
-          name: name,
-          description: null, // Will be populated from PIES
-          category: inferCategory(item),
-          is_active: item.part_status === 'S',
-          is_discontinued: item.part_status !== 'S',
-          created_at: new Date().toISOString()
-        }, {
-          onConflict: 'sku'
-        });
-
-      if (prodError) {
-        console.error(`Product error for ${sku}:`, prodError.message);
+      let productId;
+      try {
+        const rows = await sql`
+          INSERT INTO catalog_products
+            (sku, name, brand, manufacturer_part_number, slug, description, category,
+             weight, is_active, is_discontinued, updated_at)
+          VALUES
+            (${sku}, ${name}, ${brand}, ${mpn}, ${slug}, ${null}, ${inferCategory(item)},
+             ${item.weight ?? null}, ${item.part_status === 'S'}, ${item.part_status !== 'S'}, NOW())
+          ON CONFLICT (sku) DO UPDATE SET
+            name                     = EXCLUDED.name,
+            brand                    = EXCLUDED.brand,
+            manufacturer_part_number = EXCLUDED.manufacturer_part_number,
+            slug                     = EXCLUDED.slug,
+            category                 = COALESCE(EXCLUDED.category, catalog_products.category),
+            weight                   = COALESCE(EXCLUDED.weight, catalog_products.weight),
+            is_active                = EXCLUDED.is_active,
+            is_discontinued          = EXCLUDED.is_discontinued,
+            updated_at               = NOW()
+          RETURNING id
+        `;
+        productId = rows?.[0]?.id;
+      } catch (e) {
+        console.error(`Product error for ${sku}:`, e.message);
         continue;
       }
 
@@ -147,34 +154,41 @@ async function normalizeProducts() {
       const cost = item.your_dealer_price || item.base_dealer_price;
       const msrp = item.current_suggested_retail;
 
-      // Get product ID
-      const { data: product } = await supabase
-        .from('catalog_products')
-        .select('id')
-        .eq('sku', sku)
-        .single();
+      if (productId) {
+        try {
+          await sql`
+            INSERT INTO vendor_offers
+              (catalog_product_id, vendor_code, wholesale_cost, msrp, map_price,
+               total_qty, warehouse_json, vendor_part_number, updated_at)
+            VALUES
+              (${productId}, ${'pu'}, ${cost ?? null}, ${msrp ?? null}, ${null},
+               ${stockQty}, ${JSON.stringify(item.availability ?? {})}, ${item.vendor_part_number ?? null}, NOW())
+            ON CONFLICT (catalog_product_id, vendor_code) DO UPDATE SET
+              wholesale_cost     = COALESCE(EXCLUDED.wholesale_cost, vendor_offers.wholesale_cost),
+              msrp               = COALESCE(EXCLUDED.msrp,           vendor_offers.msrp),
+              map_price          = COALESCE(EXCLUDED.map_price,      vendor_offers.map_price),
+              total_qty          = EXCLUDED.total_qty,
+              warehouse_json     = EXCLUDED.warehouse_json,
+              vendor_part_number = COALESCE(EXCLUDED.vendor_part_number, vendor_offers.vendor_part_number),
+              updated_at         = NOW()
+          `;
 
-      if (product) {
-        await supabase
-          .from('vendor_offers')
-          .upsert({
-            product_id: product.id,
-            vendor: 'pu',
-            warehouse_json: item.availability || {},
-            cost: cost,
-            msrp: msrp,
-            total_qty: stockQty,
-            updated_at: new Date().toISOString()
-          }, {
-            onConflict: 'product_id,vendor'
-          });
-
-        // Insert specs
-        await insertSpecs(product.id, item);
+          await insertSpecs(productId, item);
+        } catch (e) {
+          console.error(`Offer/spec error for ${sku}:`, e.message);
+        }
       }
 
-      if (processed % 1000 === 0) {
-        process.stdout.write(`\r  Processed: ${processed} | Inserted: ${inserted} | Skipped: ${skipped}`);
+      if (processed % 2000 === 0) {
+        const elapsed = (Date.now() - t0) / 1000;
+        const rate = processed / Math.max(1, elapsed);
+        const pct = totalRows > 0 ? ((processed / totalRows) * 100) : 0;
+        const eta = rate > 0 ? (totalRows - processed) / rate : Infinity;
+        process.stdout.write(
+          `\r  ${processed.toLocaleString()}/${totalRows.toLocaleString()} (${pct.toFixed(1)}%)` +
+          ` | Upserts: ${inserted.toLocaleString()} | Skipped: ${skipped.toLocaleString()}` +
+          ` | ${rate.toFixed(0)}/s | ETA ${formatEta(eta)}`
+        );
       }
     }
   }
@@ -265,14 +279,14 @@ async function insertSpecs(productId, item) {
   }
 
   if (specs.length > 0) {
-    // Delete existing specs first
-    await supabase
-      .from('catalog_specs')
-      .delete()
-      .eq('product_id', productId);
-    
-    // Insert new specs
-    await supabase.from('catalog_specs').insert(specs);
+    await sql`DELETE FROM catalog_specs WHERE product_id = ${productId}`;
+    for (const s of specs) {
+      await sql`
+        INSERT INTO catalog_specs (product_id, attribute, value)
+        VALUES (${s.product_id}, ${s.attribute}, ${s.value})
+        ON CONFLICT DO NOTHING
+      `;
+    }
   }
 }
 

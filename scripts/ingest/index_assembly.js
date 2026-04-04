@@ -4,36 +4,34 @@
  */
 
 import Typesense from 'typesense';
-import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import fs from 'fs';
+import { sql } from '../lib/db.js';
 
 dotenv.config({ path: '.env.local' });
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const typesenseHost = process.env.TYPESENSE_HOST;
-const typesenseKey = process.env.TYPESENSE_ADMIN_KEY;
+let typesense = null;
+function getTypesense() {
+  if (typesense) return typesense;
 
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Missing Supabase credentials');
+  const typesenseHost = process.env.TYPESENSE_HOST;
+  const typesenseKey = process.env.TYPESENSE_ADMIN_KEY;
+
+  if (!typesenseHost || !typesenseKey) {
+    throw new Error('Missing Typesense credentials (TYPESENSE_HOST / TYPESENSE_ADMIN_KEY)');
+  }
+
+  typesense = new Typesense.Client({
+    nodes: [{
+      host: typesenseHost,
+      port: 443,
+      protocol: 'https'
+    }],
+    apiKey: typesenseKey,
+    connectionTimeoutSeconds: 120
+  });
+  return typesense;
 }
-
-if (!typesenseHost || !typesenseKey) {
-  throw new Error('Missing Typesense credentials');
-}
-
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-const typesense = new Typesense.Client({
-  nodes: [{
-    host: typesenseHost,
-    port: 443,
-    protocol: 'https'
-  }],
-  apiKey: typesenseKey,
-  connectionTimeoutSeconds: 120
-});
 
 const CHECKPOINT_FILE = '.stage3_checkpoint.json';
 const BATCH_SIZE = 250;
@@ -42,19 +40,20 @@ const BATCH_SIZE = 250;
  * Get or create Typesense collection
  */
 async function setupCollection(recreate = false) {
+  const typesenseClient = getTypesense();
   const collectionName = 'products';
 
   if (recreate) {
     console.log('Deleting existing collection...');
     try {
-      await typesense.collections(collectionName).delete();
+      await typesenseClient.collections(collectionName).delete();
     } catch (e) {
       // Collection may not exist
     }
   }
 
   try {
-    await typesense.collections(collectionName).retrieve();
+    await typesenseClient.collections(collectionName).retrieve();
     console.log('Using existing collection');
     return collectionName;
   } catch (e) {
@@ -85,7 +84,7 @@ async function setupCollection(recreate = false) {
     default_sorting_field: 'stock_quantity'
   };
 
-  await typesense.collections().create(schema);
+  await typesenseClient.collections().create(schema);
   console.log('✓ Collection created');
   return collectionName;
 }
@@ -115,10 +114,11 @@ function saveCheckpoint(checkpoint) {
  * Get product specs as array
  */
 async function getProductSpecs(productId) {
-  const { data: specs } = await supabase
-    .from('catalog_specs')
-    .select('attribute, value')
-    .eq('product_id', productId);
+  const specs = await sql`
+    SELECT attribute, value
+    FROM catalog_specs
+    WHERE product_id = ${productId}
+  `;
 
   if (!specs || specs.length === 0) return [];
   
@@ -129,10 +129,11 @@ async function getProductSpecs(productId) {
  * Get product fitment
  */
 async function getProductFitment(productId) {
-  const { data: fitment } = await supabase
-    .from('catalog_fitment')
-    .select('make, model, year_start, year_end')
-    .eq('product_id', productId);
+  const fitment = await sql`
+    SELECT make, model, year_start, year_end
+    FROM catalog_fitment
+    WHERE product_id = ${productId}
+  `;
 
   if (!fitment || fitment.length === 0) {
     return { makes: [], models: [], years: [] };
@@ -163,14 +164,14 @@ async function getProductFitment(productId) {
  * Get primary image URL
  */
 async function getProductImage(productId) {
-  const { data: media } = await supabase
-    .from('catalog_media')
-    .select('url')
-    .eq('product_id', productId)
-    .order('priority', { ascending: true })
-    .limit(1);
-
-  return media?.[0]?.url || null;
+  const media = await sql`
+    SELECT url
+    FROM catalog_media
+    WHERE product_id = ${productId}
+    ORDER BY priority ASC
+    LIMIT 1
+  `;
+  return media?.[0]?.url ?? null;
 }
 
 /**
@@ -184,12 +185,12 @@ async function buildDocument(product) {
   ]);
 
   // Get stock from vendor offers
-  const { data: offers } = await supabase
-    .from('vendor_offers')
-    .select('total_qty')
-    .eq('product_id', product.id);
-
-  const stockQty = offers?.reduce((sum, o) => sum + (o.total_qty || 0), 0) || 0;
+  const offers = await sql`
+    SELECT total_qty
+    FROM vendor_offers
+    WHERE catalog_product_id = ${product.id}
+  `;
+  const stockQty = (offers ?? []).reduce((sum, o) => sum + (Number(o.total_qty) || 0), 0);
 
   // Build search blob
   const searchBlob = [
@@ -226,32 +227,39 @@ async function buildDocument(product) {
  */
 async function getProductsToIndex(offset, limit) {
   // Check if allowlist exists and has entries
-  const { count: allowlistCount } = await supabase
-    .from('catalog_allowlist')
-    .select('*', { count: 'exact', head: true });
-
-  const useAllowlist = allowlistCount > 0;
-
-  let query = supabase
-    .from('catalog_products')
-    .select('id, sku, slug, brand, name, description, category, computed_price')
-    .eq('is_active', true)
-    .eq('is_discontinued', false)
-    .not('computed_price', 'is', null)
-    .order('id')
-    .range(offset, offset + limit - 1);
+  const allowlistCount = await sql`SELECT COUNT(*)::int AS count FROM catalog_allowlist`;
+  const useAllowlist = (allowlistCount?.[0]?.count ?? 0) > 0;
 
   if (useAllowlist) {
-    // Join with allowlist
-    const { data: allowlistSkus } = await supabase
-      .from('catalog_allowlist')
-      .select('sku');
-    
-    const skus = allowlistSkus?.map(a => a.sku) || [];
-    query = query.in('sku', skus);
+    return {
+      data: await sql`
+        SELECT cp.id, cp.sku, cp.slug, cp.brand, cp.name, cp.description, cp.category, cp.computed_price
+        FROM catalog_products cp
+        WHERE cp.is_active = true
+          AND cp.is_discontinued = false
+          AND cp.computed_price IS NOT NULL
+          AND EXISTS (SELECT 1 FROM catalog_allowlist al WHERE al.sku = cp.sku)
+        ORDER BY cp.id
+        OFFSET ${offset}
+        LIMIT ${limit}
+      `,
+      error: null,
+    };
   }
 
-  return await query;
+  return {
+    data: await sql`
+      SELECT cp.id, cp.sku, cp.slug, cp.brand, cp.name, cp.description, cp.category, cp.computed_price
+      FROM catalog_products cp
+      WHERE cp.is_active = true
+        AND cp.is_discontinued = false
+        AND cp.computed_price IS NOT NULL
+      ORDER BY cp.id
+      OFFSET ${offset}
+      LIMIT ${limit}
+    `,
+    error: null,
+  };
 }
 
 /**
@@ -261,6 +269,8 @@ export async function buildTypesenseIndex(options = {}) {
   const { recreate = false, resume = true } = options;
   
   console.log('🚀 Stage 3: Building Typesense Index\n');
+  // Validate Typesense config only when running Stage 3.
+  const typesenseClient = getTypesense();
   
   const startTime = Date.now();
   const collection = await setupCollection(recreate);
@@ -275,41 +285,28 @@ export async function buildTypesenseIndex(options = {}) {
   console.log(`Starting from offset: ${checkpoint.lastOffset}`);
 
   // Get total count
-  const { count: allowlistCount } = await supabase
-    .from('catalog_allowlist')
-    .select('sku', { count: 'exact', head: true });
+  const allowlistCount = await sql`SELECT COUNT(*)::int AS count FROM catalog_allowlist`;
+  const useAllowlist = (allowlistCount?.[0]?.count ?? 0) > 0;
+  console.log(`Allowlist entries: ${allowlistCount?.[0]?.count ?? 0}`);
 
-  const useAllowlist = allowlistCount > 0;
-  console.log(`Allowlist entries: ${allowlistCount || 0}`);
+  const totalRes = useAllowlist
+    ? await sql`
+        SELECT COUNT(*)::int AS count
+        FROM catalog_products cp
+        WHERE cp.is_active = true
+          AND cp.is_discontinued = false
+          AND cp.computed_price IS NOT NULL
+          AND EXISTS (SELECT 1 FROM catalog_allowlist al WHERE al.sku = cp.sku)
+      `
+    : await sql`
+        SELECT COUNT(*)::int AS count
+        FROM catalog_products cp
+        WHERE cp.is_active = true
+          AND cp.is_discontinued = false
+          AND cp.computed_price IS NOT NULL
+      `;
 
-  let totalProducts = 0;
-  
-  if (useAllowlist) {
-    const { data: skus } = await supabase
-      .from('catalog_allowlist')
-      .select('sku');
-    
-    const uniqueSkus = [...new Set(skus?.map(s => s.sku) || [])];
-    
-    const { count } = await supabase
-      .from('catalog_products')
-      .select('*', { count: 'exact', head: true })
-      .eq('is_active', true)
-      .eq('is_discontinued', false)
-      .not('computed_price', 'is', null)
-      .in('sku', uniqueSkus);
-    
-    totalProducts = count || 0;
-  } else {
-    const { count } = await supabase
-      .from('catalog_products')
-      .select('*', { count: 'exact', head: true })
-      .eq('is_active', true)
-      .eq('is_discontinued', false)
-      .not('computed_price', 'is', null);
-    
-    totalProducts = count || 0;
-  }
+  const totalProducts = totalRes?.[0]?.count ?? 0;
 
   console.log(`Products to index: ${totalProducts}\n`);
 
@@ -318,10 +315,12 @@ export async function buildTypesenseIndex(options = {}) {
   let failed = checkpoint.failed;
 
   while (offset < totalProducts) {
-    const { data: products, error } = await getProductsToIndex(offset, BATCH_SIZE);
-
-    if (error) {
-      console.error(`Fetch error at offset ${offset}:`, error.message);
+    let products = [];
+    try {
+      const res = await getProductsToIndex(offset, BATCH_SIZE);
+      products = res.data ?? [];
+    } catch (e) {
+      console.error(`Fetch error at offset ${offset}:`, e.message);
       break;
     }
 
@@ -344,7 +343,7 @@ export async function buildTypesenseIndex(options = {}) {
     // Import to Typesense
     if (documents.length > 0) {
       try {
-        await typesense.collections(collection).documents().import(
+        await typesenseClient.collections(collection).documents().import(
           documents.map(d => JSON.stringify(d)).join('\n'),
           { action: 'upsert' }
         );
