@@ -3,20 +3,19 @@
  * Filters products to only include Tire, Oldbook, and Fatbook catalogs
  */
 
-import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
+import { sql } from '../lib/db.js';
 
 dotenv.config({ path: '.env.local' });
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-  console.error('Missing Supabase credentials. Check .env.local');
-  process.exit(1);
+function formatEta(seconds) {
+  if (!Number.isFinite(seconds) || seconds < 0) return '—';
+  const s = Math.round(seconds);
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  if (m <= 0) return `${r}s`;
+  return `${m}m${String(r).padStart(2, '0')}s`;
 }
-
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 /**
  * Check if item has any target catalog
@@ -27,7 +26,7 @@ function hasTargetCatalog(item) {
   const tire = item.tire_catalog?.trim();
   const oldbook = item.oldbook_catalog?.trim();
   const oldbookMid = item.oldbook_midyear_catalog?.trim();
-  
+
   return fatbook || fatbookMid || tire || oldbook || oldbookMid;
 }
 
@@ -36,7 +35,7 @@ function hasTargetCatalog(item) {
  */
 function getCatalogSources(item) {
   const sources = [];
-  
+
   if (item.fatbook_catalog?.trim()) {
     sources.push({ source: 'pu_fatbook', catalog: 'PU Fatbook' });
   }
@@ -52,51 +51,31 @@ function getCatalogSources(item) {
   if (item.oldbook_midyear_catalog?.trim()) {
     sources.push({ source: 'pu_oldbook_midyear', catalog: 'PU Oldbook Mid-Year' });
   }
-  
+
   return sources;
 }
 
 async function buildAllowlist() {
   console.log('🏗️  Building Catalog Allowlist...\n');
   console.log('Target catalogs: Fatbook, Fatbook Mid-Year, Tire, Oldbook, Oldbook Mid-Year\n');
+  const t0 = Date.now();
 
-  // Ensure catalog_allowlist table exists
-  console.log('Creating catalog_allowlist table if not exists...');
-  
-  const { error: tableError } = await supabase.rpc('exec_sql', {
-    sql: `
-      CREATE TABLE IF NOT EXISTS catalog_allowlist (
-        sku TEXT NOT NULL,
-        source TEXT NOT NULL,
-        catalog TEXT NOT NULL,
-        created_at TIMESTAMPTZ DEFAULT NOW(),
-        PRIMARY KEY (sku, source)
-      );
-      CREATE INDEX IF NOT EXISTS idx_allowlist_sku ON catalog_allowlist(sku);
-      CREATE INDEX IF NOT EXISTS idx_allowlist_source ON catalog_allowlist(source);
-    `
-  }).catch(() => {
-    // Fallback: try direct SQL
-    return supabase.from('catalog_allowlist').select('count(*)', { count: 'exact', head: true });
-  });
-
-  // Clear existing allowlist
+  // Clear existing allowlist (table is created in migrations-100-110.sql)
   console.log('Clearing existing allowlist...');
-  await supabase.from('catalog_allowlist').delete().neq('sku', '');
+  await sql`TRUNCATE TABLE catalog_allowlist`;
 
   // Get all dealer price batches
   console.log('Fetching dealer price data...');
-  const { data: batches, error: batchError } = await supabase
-    .from('raw_vendor_pu')
-    .select('source_file, payload')
-    .like('source_file', 'dealerprice_batch_%');
-
-  if (batchError) {
-    console.error('Failed to fetch batches:', batchError.message);
-    process.exit(1);
-  }
+  const batches = await sql`
+    SELECT source_file, payload
+    FROM raw_vendor_pu
+    WHERE source_file LIKE 'dealerprice_batch_%'
+    ORDER BY source_file
+  `;
 
   console.log(`Found ${batches.length} batches to process\n`);
+
+  const totalRows = batches.reduce((sum, b) => sum + (b.payload?.length || 0), 0);
 
   const allowlistEntries = [];
   const skuSet = new Set();
@@ -105,10 +84,10 @@ async function buildAllowlist() {
 
   for (const batch of batches) {
     const items = batch.payload || [];
-    
+
     for (const item of items) {
       processedRows++;
-      
+
       if (!hasTargetCatalog(item)) {
         continue;
       }
@@ -122,15 +101,23 @@ async function buildAllowlist() {
       const sources = getCatalogSources(item);
       for (const src of sources) {
         allowlistEntries.push({
-          sku: sku,
+          sku,
           source: src.source,
-          catalog: src.catalog
+          catalog: src.catalog,
         });
       }
     }
 
-    if (processedRows % 10000 === 0) {
-      process.stdout.write(`\r  Processed: ${processedRows} | Matched: ${matchedRows} | Unique SKUs: ${skuSet.size}`);
+    if (processedRows % 20000 === 0) {
+      const elapsed = (Date.now() - t0) / 1000;
+      const rate = processedRows / Math.max(1, elapsed);
+      const pct = totalRows > 0 ? (processedRows / totalRows) * 100 : 0;
+      const eta = rate > 0 ? (totalRows - processedRows) / rate : Infinity;
+      process.stdout.write(
+        `\r  ${processedRows.toLocaleString()}/${totalRows.toLocaleString()} (${pct.toFixed(1)}%)` +
+          ` | Matched: ${matchedRows.toLocaleString()} | Unique SKUs: ${skuSet.size.toLocaleString()}` +
+          ` | ${rate.toFixed(0)}/s | ETA ${formatEta(eta)}`
+      );
     }
   }
 
@@ -143,27 +130,28 @@ async function buildAllowlist() {
 
   // Insert in batches
   console.log('\nInserting into catalog_allowlist...');
-  
+
   const BATCH_SIZE = 1000;
   let inserted = 0;
   let insertErrors = 0;
 
   for (let i = 0; i < allowlistEntries.length; i += BATCH_SIZE) {
     const batch = allowlistEntries.slice(i, i + BATCH_SIZE);
-    
-    const { error } = await supabase
-      .from('catalog_allowlist')
-      .upsert(batch, {
-        onConflict: 'sku,source',
-        ignoreDuplicates: false
-      });
 
-    if (error) {
-      console.error(`Batch insert error:`, error.message);
-      insertErrors++;
-    } else {
+    try {
+      for (const row of batch) {
+        await sql`
+          INSERT INTO catalog_allowlist (sku, source, catalog, created_at)
+          VALUES (${row.sku}, ${row.source}, ${row.catalog}, NOW())
+          ON CONFLICT (sku, source) DO UPDATE
+            SET catalog = EXCLUDED.catalog, created_at = NOW()
+        `;
+      }
       inserted += batch.length;
       process.stdout.write(`\r  Inserted: ${inserted}/${allowlistEntries.length}`);
+    } catch (e) {
+      console.error(`Batch insert error:`, e.message);
+      insertErrors++;
     }
   }
 
@@ -174,32 +162,22 @@ async function buildAllowlist() {
 
   // Show catalog breakdown
   console.log('\n📊 Catalog Breakdown:');
-  const { data: breakdown } = await supabase
-    .from('catalog_allowlist')
-    .select('catalog, sku', { count: 'exact' });
-
-  if (breakdown) {
-    const counts = {};
-    breakdown.forEach(row => {
-      counts[row.catalog] = (counts[row.catalog] || 0) + 1;
-    });
-    
-    Object.entries(counts)
-      .sort((a, b) => b[1] - a[1])
-      .forEach(([catalog, count]) => {
-        console.log(`  ${catalog}: ${count.toLocaleString()} entries`);
-      });
+  const breakdown = await sql`
+    SELECT catalog, COUNT(*)::int AS count
+    FROM catalog_allowlist
+    GROUP BY catalog
+  `;
+  for (const row of breakdown.sort((a, b) => (b.count ?? 0) - (a.count ?? 0))) {
+    console.log(`  ${row.catalog}: ${Number(row.count).toLocaleString()} entries`);
   }
 
   // Show unique SKU count
-  const { data: uniqueSkus } = await supabase
-    .from('catalog_allowlist')
-    .select('sku', { count: 'exact', head: true });
-
-  console.log(`\n  Total unique SKUs in allowlist: ${uniqueSkus?.length || skuSet.size}`);
+  const unique = await sql`SELECT COUNT(DISTINCT sku)::int AS count FROM catalog_allowlist`;
+  console.log(`\n  Total unique SKUs in allowlist: ${unique?.[0]?.count ?? skuSet.size}`);
 }
 
-buildAllowlist().catch(err => {
+buildAllowlist().catch((err) => {
   console.error('❌ Error:', err);
   process.exit(1);
 });
+
