@@ -2,11 +2,11 @@
   "version": 2,
   "vendor": "pu",
   "stage": 1,
-  "nextBatchIndex": 0,
-  "processed": 1000,
-  "inserted": 1000,
+  "nextBatchIndex": 8,
+  "processed": 8000,
+  "inserted": 8000,
   "skipped": 0,
   "totalRows": 151669,
-  "lastSavedAt": "2026-04-04T15:19:57.004Z",
-  "nextBatchSourceFile": "dealerprice_batch_000001"
+  "lastSavedAt": "2026-04-04T15:37:32.988Z",
+  "nextBatchSourceFile": "dealerprice_batch_000009"
 }
