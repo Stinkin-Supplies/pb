@@ -1,0 +1,21 @@
+{
+  "name": "stinkin-supplies-ingest",
+  "version": "1.0.0",
+  "description": "Catalog ingestion pipeline for Stinkin' Supplies",
+  "type": "module",
+  "scripts": {
+    "stage0": "node ingest/stage0-pu-dealerprice.cjs",
+    "stage1": "node ingest/normalize_pu.js",
+    "stage2": "node ingest/computed_values.js",
+    "stage3": "node ingest/index_assembly.js",
+    "allowlist": "node ingest/build-catalog-allowlist.cjs",
+    "pipeline": "node ingest/pipeline.js",
+    "pipeline:full": "node ingest/pipeline.js --from 0",
+    "reindex": "node ingest/pipeline.js --stage 3 --recreate"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "typesense": "^1.7.2",
+    "dotenv": "^16.3.1"
+  }
+}

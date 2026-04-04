@@ -1,341 +1,393 @@
 /**
- * Stage 3 — Typesense v2 Index Assembly
- * Reads:  catalog_products, catalog_specs, catalog_fitment,
- *         catalog_media, vendor_offers
- * Writes: Typesense 'products' collection
- *
- * Schema v2 features:
- *   - Weighted search: name:10, brand:5, sku:3, specs_blob:2, search_blob:1
- *   - Fitment facets: fitment_make[], fitment_model[], fitment_year[]
- *   - Sport-type facets: sport_types[]
- *   - Sort: stock_quantity:desc, computed_price:asc
- *
- * Column names match live DB schema:
- *   catalog_products:  stock_quantity, computed_price, in_stock
- *   catalog_specs:     product_id, attribute, value
- *   catalog_fitment:   product_id, make, model, year_start, year_end
- *   catalog_media:     product_id, url, priority
- *   vendor_offers:     catalog_product_id, vendor_code
+ * Stage 3: Typesense Index Assembly
+ * Builds search index from normalized catalog data
  */
 
 import Typesense from 'typesense';
-import { sql } from '../lib/db.js';
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+import fs from 'fs';
 
-// ─── config ───────────────────────────────────────────────────────────────────
+dotenv.config({ path: '.env.local' });
 
-const COLLECTION = 'products';
-const BATCH_SIZE  = 250;  // reduced to avoid Typesense OOM on large description fields
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const typesenseHost = process.env.TYPESENSE_HOST;
+const typesenseKey = process.env.TYPESENSE_ADMIN_KEY;
 
-function getClient() {
-  const host     = process.env.TYPESENSE_HOST;
-  const apiKey   = process.env.TYPESENSE_API_KEY;
-  const port     = Number(process.env.TYPESENSE_PORT ?? 443);
-  const protocol = process.env.TYPESENSE_PROTOCOL ?? 'https';
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error('Missing Supabase credentials');
+}
 
-  if (!host || !apiKey) throw new Error('Missing TYPESENSE_HOST or TYPESENSE_API_KEY env vars');
+if (!typesenseHost || !typesenseKey) {
+  throw new Error('Missing Typesense credentials');
+}
 
-  return new Typesense.Client({
-    nodes:                   [{ host, port, protocol }],
-    apiKey,
-    connectionTimeoutSeconds: 60,
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+const typesense = new Typesense.Client({
+  nodes: [{
+    host: typesenseHost,
+    port: 443,
+    protocol: 'https'
+  }],
+  apiKey: typesenseKey,
+  connectionTimeoutSeconds: 120
+});
+
+const CHECKPOINT_FILE = '.stage3_checkpoint.json';
+const BATCH_SIZE = 250;
+
+/**
+ * Get or create Typesense collection
+ */
+async function setupCollection(recreate = false) {
+  const collectionName = 'products';
+
+  if (recreate) {
+    console.log('Deleting existing collection...');
+    try {
+      await typesense.collections(collectionName).delete();
+    } catch (e) {
+      // Collection may not exist
+    }
+  }
+
+  try {
+    await typesense.collections(collectionName).retrieve();
+    console.log('Using existing collection');
+    return collectionName;
+  } catch (e) {
+    console.log('Creating new collection...');
+  }
+
+  const schema = {
+    name: collectionName,
+    fields: [
+      { name: 'id', type: 'string' },
+      { name: 'sku', type: 'string', facet: true },
+      { name: 'slug', type: 'string' },
+      { name: 'brand', type: 'string', facet: true },
+      { name: 'category', type: 'string', facet: true },
+      { name: 'name', type: 'string', locale: 'en' },
+      { name: 'description', type: 'string', optional: true },
+      { name: 'price', type: 'float', facet: true, sort: true },
+      { name: 'msrp', type: 'float', optional: true },
+      { name: 'stock_quantity', type: 'int32', facet: true, sort: true },
+      { name: 'in_stock', type: 'bool', facet: true },
+      { name: 'image_url', type: 'string', optional: true },
+      { name: 'specs', type: 'string[]', facet: true, optional: true },
+      { name: 'fitment_make', type: 'string[]', facet: true, optional: true },
+      { name: 'fitment_model', type: 'string[]', facet: true, optional: true },
+      { name: 'fitment_year', type: 'int32[]', facet: true, optional: true },
+      { name: 'search_blob', type: 'string', optional: true }
+    ],
+    default_sorting_field: 'stock_quantity'
+  };
+
+  await typesense.collections().create(schema);
+  console.log('✓ Collection created');
+  return collectionName;
+}
+
+/**
+ * Load checkpoint for resume
+ */
+function loadCheckpoint() {
+  try {
+    if (fs.existsSync(CHECKPOINT_FILE)) {
+      return JSON.parse(fs.readFileSync(CHECKPOINT_FILE, 'utf8'));
+    }
+  } catch (e) {
+    console.log('No checkpoint found');
+  }
+  return { lastOffset: 0, processed: 0, failed: 0 };
+}
+
+/**
+ * Save checkpoint
+ */
+function saveCheckpoint(checkpoint) {
+  fs.writeFileSync(CHECKPOINT_FILE, JSON.stringify(checkpoint, null, 2));
+}
+
+/**
+ * Get product specs as array
+ */
+async function getProductSpecs(productId) {
+  const { data: specs } = await supabase
+    .from('catalog_specs')
+    .select('attribute, value')
+    .eq('product_id', productId);
+
+  if (!specs || specs.length === 0) return [];
+  
+  return specs.map(s => `${s.attribute}: ${s.value}`);
+}
+
+/**
+ * Get product fitment
+ */
+async function getProductFitment(productId) {
+  const { data: fitment } = await supabase
+    .from('catalog_fitment')
+    .select('make, model, year_start, year_end')
+    .eq('product_id', productId);
+
+  if (!fitment || fitment.length === 0) {
+    return { makes: [], models: [], years: [] };
+  }
+
+  const makes = [...new Set(fitment.map(f => f.make).filter(Boolean))];
+  const models = [...new Set(fitment.map(f => f.model).filter(Boolean))];
+  const years = [];
+  
+  fitment.forEach(f => {
+    if (f.year_start && f.year_end) {
+      for (let y = f.year_start; y <= f.year_end; y++) {
+        years.push(y);
+      }
+    } else if (f.year_start) {
+      years.push(f.year_start);
+    }
   });
-}
-
-// ─── schema ───────────────────────────────────────────────────────────────────
-
-const SCHEMA = {
-  name: COLLECTION,
-  fields: [
-    // Core identifiers
-    { name: 'id',           type: 'string' },
-    { name: 'sku',          type: 'string',   facet: true },
-    { name: 'slug',         type: 'string',   index: true },
-    { name: 'mpn',          type: 'string',   optional: true },
-
-    // Weighted search fields
-    { name: 'name',         type: 'string' },
-    { name: 'brand',        type: 'string',   facet: true },
-    { name: 'category',     type: 'string',   facet: true, optional: true },
-    { name: 'specs_blob',   type: 'string',   optional: true },
-
-    // Pricing + stock (sort fields)
-    { name: 'computed_price', type: 'float',  optional: true, sort: true },
-    { name: 'stock_quantity', type: 'int32',  sort: true },
-    { name: 'in_stock',       type: 'bool',   facet: true },
-    { name: 'free_shipping',  type: 'bool',   facet: true },
-
-    // Images
-    { name: 'primary_image',  type: 'string', optional: true, index: false },
-
-    // Fitment facets
-    { name: 'fitment_make',   type: 'string[]', facet: true, optional: true },
-    { name: 'fitment_model',  type: 'string[]', facet: true, optional: true },
-    { name: 'fitment_year',   type: 'int32[]',  facet: true, optional: true },
-
-    // Sport-type facets
-    { name: 'sport_types',    type: 'string[]', facet: true, optional: true },
-
-    // Vendors
-    { name: 'vendors',        type: 'string[]', facet: true, optional: true },
-  ],
-  default_sorting_field: 'stock_quantity',
-};
-
-// ─── document builder ─────────────────────────────────────────────────────────
-
-function buildSportTypes(product) {
-  const types = [];
-  if (product.is_atv)        types.push('ATV/UTV');
-  if (product.is_offroad)    types.push('Off-Road');
-  if (product.is_snow)       types.push('Snow');
-  if (product.is_street)     types.push('Street');
-  if (product.is_watercraft) types.push('Watercraft');
-  if (product.is_bicycle)    types.push('Bicycle');
-  return types;
-}
-
-function buildDocument(product, { specs, fitment, media, offers }) {
-  // stock_quantity is the correct column name
-  const price        = product.computed_price ? Number(product.computed_price) : null;
-  const stock        = Number(product.stock_quantity ?? 0);
-  const inStock      = stock > 0; // derived — no in_stock column on catalog_products
-  const freeShipping = price !== null && price >= 99;
-
-  // Primary image — lowest priority, skip ZIP URLs
-  const primaryImage = media
-    .filter(m => m.url && !m.url.endsWith('.zip'))
-    .sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99))[0]?.url ?? null;
-
-  // Fitment arrays (deduped, years expanded from ranges)
-  const fitmentMakes  = [...new Set(fitment.map(f => f.make).filter(Boolean))];
-  const fitmentModels = [...new Set(fitment.map(f => f.model).filter(Boolean))];
-  const fitmentYears  = [...new Set(
-    fitment.flatMap(f => {
-      const years = [];
-      const start = Number(f.year_start);
-      const end   = Number(f.year_end ?? f.year_start);
-      for (let y = start; y <= end; y++) years.push(y);
-      return years;
-    }).filter(Boolean)
-  )].sort((a, b) => a - b);
-
-  // Specs blob — all attribute:value pairs joined for full-text search
-  const specsBlob = specs.map(s => `${s.attribute}: ${stripHtml(s.value)}`).join(' | ').slice(0, 500);
-
-  const sportTypes = buildSportTypes(product);
-
-  // vendor_code is the correct column name on vendor_offers
-  const vendors = [...new Set(offers.map(o => o.vendor_code).filter(Boolean))];
 
   return {
-    id:             String(product.id),
-    sku:            product.sku          ?? '',
-    slug:           product.slug         ?? '',
-    mpn:            product.manufacturer_part_number ?? undefined,
-    name:           product.name         ?? '',
-    brand:          product.brand        ?? '',
-    category:       product.category     ?? undefined,
-    specs_blob:     specsBlob            || undefined,
-    computed_price: price                ?? undefined,
-    stock_quantity: stock,
-    in_stock:       inStock,
-    free_shipping:  freeShipping,
-    primary_image:  primaryImage         ?? undefined,
-    fitment_make:   fitmentMakes.length  ? fitmentMakes  : undefined,
-    fitment_model:  fitmentModels.length ? fitmentModels : undefined,
-    fitment_year:   fitmentYears.length  ? fitmentYears  : undefined,
-    sport_types:    sportTypes.length    ? sportTypes    : undefined,
-    vendors:        vendors.length       ? vendors       : undefined,
+    makes: [...new Set(makes)],
+    models: [...new Set(models)],
+    years: [...new Set(years)]
   };
 }
 
-// ─── HTML stripper ───────────────────────────────────────────────────────────
+/**
+ * Get primary image URL
+ */
+async function getProductImage(productId) {
+  const { data: media } = await supabase
+    .from('catalog_media')
+    .select('url')
+    .eq('product_id', productId)
+    .order('priority', { ascending: true })
+    .limit(1);
 
-function stripHtml(str) {
-  if (!str) return '';
-  return str
-    .replace(/<[^>]*>/g, ' ')   // remove tags
-    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
-    .replace(/&nbsp;/g, ' ').replace(/&#\d+;/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 500);              // cap at 500 chars — enough for search
+  return media?.[0]?.url || null;
 }
 
-// ─── collection management ────────────────────────────────────────────────────
+/**
+ * Build search document for a product
+ */
+async function buildDocument(product) {
+  const [specs, fitment, imageUrl] = await Promise.all([
+    getProductSpecs(product.id),
+    getProductFitment(product.id),
+    getProductImage(product.id)
+  ]);
 
-async function recreateCollection(client) {
-  try {
-    await client.collections(COLLECTION).delete();
-    console.log(`[Stage3] Deleted existing '${COLLECTION}' collection`);
-  } catch {
-    // doesn't exist yet — fine
+  // Get stock from vendor offers
+  const { data: offers } = await supabase
+    .from('vendor_offers')
+    .select('total_qty')
+    .eq('product_id', product.id);
+
+  const stockQty = offers?.reduce((sum, o) => sum + (o.total_qty || 0), 0) || 0;
+
+  // Build search blob
+  const searchBlob = [
+    product.name,
+    product.brand,
+    product.sku,
+    product.category,
+    ...specs
+  ].filter(Boolean).join(' ').toLowerCase();
+
+  return {
+    id: product.id.toString(),
+    sku: product.sku,
+    slug: product.slug,
+    brand: product.brand || '',
+    category: product.category || '',
+    name: product.name || '',
+    description: product.description || '',
+    price: product.computed_price || 0,
+    msrp: null, // Will be populated from offers
+    stock_quantity: stockQty,
+    in_stock: stockQty > 0,
+    image_url: imageUrl,
+    specs: specs,
+    fitment_make: fitment.makes,
+    fitment_model: fitment.models,
+    fitment_year: fitment.years,
+    search_blob: searchBlob.substring(0, 1000)
+  };
+}
+
+/**
+ * Get products to index (respecting allowlist)
+ */
+async function getProductsToIndex(offset, limit) {
+  // Check if allowlist exists and has entries
+  const { count: allowlistCount } = await supabase
+    .from('catalog_allowlist')
+    .select('*', { count: 'exact', head: true });
+
+  const useAllowlist = allowlistCount > 0;
+
+  let query = supabase
+    .from('catalog_products')
+    .select('id, sku, slug, brand, name, description, category, computed_price')
+    .eq('is_active', true)
+    .eq('is_discontinued', false)
+    .not('computed_price', 'is', null)
+    .order('id')
+    .range(offset, offset + limit - 1);
+
+  if (useAllowlist) {
+    // Join with allowlist
+    const { data: allowlistSkus } = await supabase
+      .from('catalog_allowlist')
+      .select('sku');
+    
+    const skus = allowlistSkus?.map(a => a.sku) || [];
+    query = query.in('sku', skus);
   }
-  await client.collections().create(SCHEMA);
-  console.log(`[Stage3] Created '${COLLECTION}' collection with v2 schema`);
+
+  return await query;
 }
 
-// ─── main ─────────────────────────────────────────────────────────────────────
-
-// ─── checkpoint helpers ──────────────────────────────────────────────────────
-
-import { createRequire } from 'module';
-import { writeFileSync, readFileSync, existsSync } from 'fs';
-
-const CHECKPOINT_FILE = './.stage3_checkpoint.json';
-
-function saveCheckpoint(offset, indexed, failed) {
-  writeFileSync(CHECKPOINT_FILE, JSON.stringify({ offset, indexed, failed, savedAt: new Date().toISOString() }));
-}
-
-function loadCheckpoint() {
-  if (!existsSync(CHECKPOINT_FILE)) return null;
-  try {
-    const c = JSON.parse(readFileSync(CHECKPOINT_FILE, 'utf8'));
-    console.log(`[Stage3] ⚡ Checkpoint found — resuming from offset ${c.offset} (${c.indexed} already indexed)`);
-    return c;
-  } catch { return null; }
-}
-
-function clearCheckpoint() {
-  try { writeFileSync(CHECKPOINT_FILE, ''); } catch {}
-}
-
-export async function buildTypesenseIndex({ recreate = true, resume = true } = {}) {
-  console.log('[Stage3] Starting Typesense v2 index assembly...');
-
-  const client = getClient();
-
-  // Load checkpoint if resuming
-  const checkpoint = resume ? loadCheckpoint() : null;
-
-  // Only recreate collection if not resuming from checkpoint
-  if (!checkpoint) {
-    if (recreate) await recreateCollection(client);
-  } else {
-    console.log('[Stage3] Skipping collection recreate — resuming into existing collection');
-  }
-
-  // Check if allowlist exists and is populated
-  let useAllowlist = false;
-  try {
-    const [{ count: alCount }] = await sql`SELECT COUNT(DISTINCT sku) FROM catalog_allowlist`;
-    useAllowlist = Number(alCount) > 0;
-    if (useAllowlist) console.log(`[Stage3] Allowlist active — ${alCount} unique SKUs to index`);
-  } catch { console.log('[Stage3] No allowlist — indexing all active products'); }
-
-  const [{ count }] = useAllowlist
-    ? await sql`SELECT COUNT(*) FROM catalog_products WHERE is_active = true AND is_discontinued = false AND computed_price IS NOT NULL AND EXISTS (SELECT 1 FROM catalog_allowlist a WHERE a.sku = catalog_products.sku)`
-    : await sql`SELECT COUNT(*) FROM catalog_products WHERE is_active = true AND is_discontinued = false AND computed_price IS NOT NULL`;
-  const total = Number(count);
-  console.log(`[Stage3] ${total} products to index...`);
-
-  let offset    = checkpoint?.offset  ?? 0;
-  let indexed   = checkpoint?.indexed ?? 0;
-  let failed    = checkpoint?.failed  ?? 0;
+/**
+ * Main index builder
+ */
+export async function buildTypesenseIndex(options = {}) {
+  const { recreate = false, resume = true } = options;
+  
+  console.log('🚀 Stage 3: Building Typesense Index\n');
+  
   const startTime = Date.now();
+  const collection = await setupCollection(recreate);
 
-  while (offset < total) {
-    const products = await sql`
-      SELECT cp.id, cp.sku, cp.slug, cp.name, cp.brand, cp.manufacturer_part_number,
-             cp.description, cp.category, cp.computed_price, cp.stock_quantity
-      FROM catalog_products cp
-      WHERE cp.is_active = true
-        AND cp.is_discontinued = false
-        AND cp.computed_price IS NOT NULL
-        AND (NOT ${useAllowlist} OR EXISTS (SELECT 1 FROM catalog_allowlist a WHERE a.sku = cp.sku))
-      ORDER BY cp.id
-      LIMIT ${BATCH_SIZE} OFFSET ${offset}
-    `;
+  // Load checkpoint
+  let checkpoint = resume ? loadCheckpoint() : { lastOffset: 0, processed: 0, failed: 0 };
+  
+  if (recreate) {
+    checkpoint = { lastOffset: 0, processed: 0, failed: 0 };
+  }
 
-    if (!products.length) break;
+  console.log(`Starting from offset: ${checkpoint.lastOffset}`);
 
-    const ids = products.map(p => p.id);
+  // Get total count
+  const { count: allowlistCount } = await supabase
+    .from('catalog_allowlist')
+    .select('sku', { count: 'exact', head: true });
 
-    // Batch-fetch related data — note catalog_product_id on vendor_offers
-    const [specs, fitment, media, offers] = await Promise.all([
-      sql`SELECT product_id, attribute, value
-          FROM catalog_specs
-          WHERE product_id = ANY(${ids})`,
+  const useAllowlist = allowlistCount > 0;
+  console.log(`Allowlist entries: ${allowlistCount || 0}`);
 
-      sql`SELECT product_id, make, model, year_start, year_end
-          FROM catalog_fitment
-          WHERE product_id = ANY(${ids})`,
+  let totalProducts = 0;
+  
+  if (useAllowlist) {
+    const { data: skus } = await supabase
+      .from('catalog_allowlist')
+      .select('sku');
+    
+    const uniqueSkus = [...new Set(skus?.map(s => s.sku) || [])];
+    
+    const { count } = await supabase
+      .from('catalog_products')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_active', true)
+      .eq('is_discontinued', false)
+      .not('computed_price', 'is', null)
+      .in('sku', uniqueSkus);
+    
+    totalProducts = count || 0;
+  } else {
+    const { count } = await supabase
+      .from('catalog_products')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_active', true)
+      .eq('is_discontinued', false)
+      .not('computed_price', 'is', null);
+    
+    totalProducts = count || 0;
+  }
 
-      sql`SELECT product_id, url, priority
-          FROM catalog_media
-          WHERE product_id = ANY(${ids})
-          ORDER BY priority ASC NULLS LAST`,
+  console.log(`Products to index: ${totalProducts}\n`);
 
-      sql`SELECT catalog_product_id, vendor_code
-          FROM vendor_offers
-          WHERE catalog_product_id = ANY(${ids})`,
-    ]);
+  let offset = checkpoint.lastOffset;
+  let processed = checkpoint.processed;
+  let failed = checkpoint.failed;
 
-    // Group by the correct key for each table
-    const specsMap   = groupBy(specs,   'product_id');
-    const fitmentMap = groupBy(fitment, 'product_id');
-    const mediaMap   = groupBy(media,   'product_id');
-    const offersMap  = groupBy(offers,  'catalog_product_id'); // different key
+  while (offset < totalProducts) {
+    const { data: products, error } = await getProductsToIndex(offset, BATCH_SIZE);
 
+    if (error) {
+      console.error(`Fetch error at offset ${offset}:`, error.message);
+      break;
+    }
+
+    if (!products || products.length === 0) {
+      break;
+    }
+
+    // Build documents
     const documents = [];
     for (const product of products) {
       try {
-        const doc = buildDocument(product, {
-          specs:   specsMap[product.id]   ?? [],
-          fitment: fitmentMap[product.id] ?? [],
-          media:   mediaMap[product.id]   ?? [],
-          offers:  offersMap[product.id]  ?? [],
-        });
+        const doc = await buildDocument(product);
         documents.push(doc);
-      } catch (err) {
-        console.error(`[Stage3] Build failed id ${product.id}: ${err.message}`);
+      } catch (e) {
+        console.error(`Error building document for ${product.sku}:`, e.message);
         failed++;
       }
     }
 
-    if (documents.length) {
-      const results = await client
-        .collections(COLLECTION)
-        .documents()
-        .import(documents, { action: 'upsert' });
-
-      const batchFailed = results.filter(r => !r.success).length;
-      if (batchFailed) {
-        console.warn(`[Stage3] ${batchFailed} import failures in this batch`);
-        results.filter(r => !r.success).slice(0, 3).forEach(r =>
-          console.warn('  ', r.error, r.document?.sku)
+    // Import to Typesense
+    if (documents.length > 0) {
+      try {
+        await typesense.collections(collection).documents().import(
+          documents.map(d => JSON.stringify(d)).join('\n'),
+          { action: 'upsert' }
         );
-        failed += batchFailed;
+        processed += documents.length;
+      } catch (e) {
+        console.error(`Import error:`, e.message);
+        failed += documents.length;
       }
-      indexed += documents.length - batchFailed;
     }
 
-    offset += BATCH_SIZE;
-    const pct3    = Math.min(offset, total) / total;
-    const filled3 = Math.round(pct3 * 26);
-    const bar3    = '█'.repeat(filled3) + '░'.repeat(26 - filled3);
-    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.log(`[Stage3] │${bar3}│ ${(pct3 * 100).toFixed(1).padStart(5)}% (${Math.min(offset, total)}/${total}) indexed: ${indexed} failed: ${failed} | ${elapsed}s`);
+    offset += products.length;
 
-    // Save checkpoint after every batch
-    saveCheckpoint(offset, indexed, failed);
+    // Save checkpoint
+    checkpoint = { lastOffset: offset, processed, failed };
+    saveCheckpoint(checkpoint);
+
+    // Progress
+    const pct = ((offset / totalProducts) * 100).toFixed(1);
+    process.stdout.write(`\r  Progress: ${offset}/${totalProducts} (${pct}%) | Indexed: ${processed} | Failed: ${failed}`);
   }
 
-  clearCheckpoint();
-  const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
-  console.log(`[Stage3] Done. Indexed: ${indexed} | Failed: ${failed} | Time: ${totalTime}s`);
-  return { indexed, failed, totalTime };
+  console.log('\n');
+  
+  const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+  console.log(`\n⏱️  Total time: ${duration}s`);
+  console.log('\n✅ Stage 3 Complete!');
+  console.log(`  Total indexed: ${processed}`);
+  console.log(`  Failed: ${failed}`);
+
+  // Clean up checkpoint
+  if (fs.existsSync(CHECKPOINT_FILE)) {
+    fs.unlinkSync(CHECKPOINT_FILE);
+  }
 }
 
-// ─── util ─────────────────────────────────────────────────────────────────────
-
-function groupBy(rows, key) {
-  const map = {};
-  for (const row of rows) {
-    const k = row[key];
-    if (!map[k]) map[k] = [];
-    map[k].push(row);
-  }
-  return map;
+// Run if called directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const args = process.argv.slice(2);
+  const recreate = args.includes('--recreate');
+  const resume = !args.includes('--no-resume');
+  
+  buildTypesenseIndex({ recreate, resume }).catch(err => {
+    console.error('❌ Error:', err);
+    process.exit(1);
+  });
 }

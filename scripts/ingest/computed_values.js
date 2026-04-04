@@ -1,247 +1,253 @@
 /**
- * Stage 2 — Computed Values
- * Reads:  catalog_products, vendor_offers
- * Writes: vendor_offers.our_price, vendor_offers.computed_at
- *         catalog_products.computed_price, stock_quantity,
- *                          is_active, is_discontinued
- *
- * Column names match live DB schema:
- *   vendor_offers:     catalog_product_id, vendor_code, wholesale_cost,
- *                      our_price, map_price, msrp, total_qty,
- *                      computed_at, updated_at
- *   catalog_products:  computed_price, stock_quantity,
- *                      is_active, is_discontinued, updated_at
- *
- * Pricing rules (MAP-safe):
- *   1. cost exists  → our_price = cost * markup
- *   2. no cost      → our_price = msrp * msrp_discount
- *   3. MAP exists   → our_price = MAX(our_price, map_price)
- *
- * computed_price on catalog_products:
- *   = lowest our_price from an in-stock vendor offer
- *   fallback to lowest our_price from any offer if none in stock
- *
- * Timestamps:
- *   updated_at  → set by vendor ingest (normalize_pu / normalize_wps)
- *   computed_at → set here when our_price is written
+ * Stage 2: Computed Values
+ * Calculates pricing, stock totals, and flags for catalog products
  */
 
-import { sql } from '../lib/db.js';
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
 
-// ─── config ───────────────────────────────────────────────────────────────────
+dotenv.config({ path: '.env.local' });
 
-const CONFIG = {
-  markup: {
-    pu:      1.30,
-    wps:     1.35,
-    default: 1.35,
-  },
-  msrpDiscount: {
-    pu:      0.75,
-    wps:     0.80,
-    default: 0.80,
-  },
-  freeShippingThreshold: 99,
-  staleDays:  60,
-  batchSize: 1000,
-};
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// ─── pricing logic ────────────────────────────────────────────────────────────
-
-function computeOurPrice(offer) {
-  const markup   = CONFIG.markup[offer.vendor_code]      ?? CONFIG.markup.default;
-  const msrpDisc = CONFIG.msrpDiscount[offer.vendor_code] ?? CONFIG.msrpDiscount.default;
-  const cost     = offer.wholesale_cost ? Number(offer.wholesale_cost) : null;
-  const msrp     = offer.msrp           ? Number(offer.msrp)           : null;
-  const mapPrice = offer.map_price      ? Number(offer.map_price)      : null;
-
-  let price = null;
-
-  if (cost && cost > 0) {
-    price = cost * markup;
-  } else if (msrp && msrp > 0) {
-    price = msrp * msrpDisc;
-  }
-
-  if (price === null) return null;
-
-  // MAP enforcement — never price below MAP
-  if (mapPrice && mapPrice > 0 && price < mapPrice) {
-    price = mapPrice;
-  }
-
-  return Math.round(price * 100) / 100;
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error('Missing Supabase credentials');
 }
 
-// ─── main ─────────────────────────────────────────────────────────────────────
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-export async function runComputedValues({ batchSize = CONFIG.batchSize, resume = true } = {}) {
-  console.log('[Stage2] Starting computed values pass...');
+// Pricing rules
+const PRICING_RULES = {
+  minMargin: 0.15,      // 15% minimum margin
+  maxMargin: 0.50,      // 50% maximum margin
+  mapBuffer: 0.01,      // $0.01 buffer below MAP
+  defaultMultiplier: 1.25 // 1.25x cost if no MSRP
+};
 
-  // ── Step 1: compute our_price per vendor offer ────────────────────────────
-  console.log('[Stage2] Step 1 — computing our_price per vendor offer...');
+/**
+ * Calculate our_price based on cost and MSRP with MAP compliance
+ */
+function calculatePrice(cost, msrp, mapPrice) {
+  if (!cost) return null;
 
-  const [{ count: offerCount }] = await sql`SELECT COUNT(*) FROM vendor_offers`;
-  const totalOffers = Number(offerCount);
+  // Start with cost + default margin
+  let ourPrice = cost * PRICING_RULES.defaultMultiplier;
 
-  // Resume: check how many already have computed_at set
-  const [{ count: alreadyDone }] = await sql`SELECT COUNT(*) FROM vendor_offers WHERE computed_at IS NOT NULL`;
-  const resumeCount = resume ? Number(alreadyDone) : 0;
-
-  if (resume && resumeCount > 0) {
-    console.log(`[Stage2] ⚡ Resuming — ${resumeCount} offers already priced, ${totalOffers - resumeCount} remaining`);
-  } else {
-    console.log(`[Stage2] ${totalOffers} vendor offers to price`);
+  // If MSRP exists, use it as ceiling
+  if (msrp && msrp > 0) {
+    // Price at 85% of MSRP (15% off retail)
+    const retailBased = msrp * 0.85;
+    ourPrice = Math.min(ourPrice, retailBased);
   }
 
-  let offersDone = resumeCount;
-  let offersNull = 0;
+  // Respect MAP (Minimum Advertised Price)
+  if (mapPrice && mapPrice > 0) {
+    // Stay just above MAP
+    const mapFloor = mapPrice + PRICING_RULES.mapBuffer;
+    ourPrice = Math.max(ourPrice, mapFloor);
+  }
 
-  while (true) {
-    // Fetch only unpriced offers — computed_at IS NULL is the checkpoint
-    const offers = await sql`
-      SELECT id, vendor_code, wholesale_cost, msrp, map_price, total_qty
-      FROM vendor_offers
-      WHERE computed_at IS NULL
-      ORDER BY id
-      LIMIT ${batchSize}
-    `;
+  // Ensure minimum margin
+  const minPrice = cost * (1 + PRICING_RULES.minMargin);
+  ourPrice = Math.max(ourPrice, minPrice);
 
-    if (!offers.length) break;
+  // Cap at maximum margin
+  const maxPrice = cost * (1 + PRICING_RULES.maxMargin);
+  ourPrice = Math.min(ourPrice, maxPrice);
 
-    for (const offer of offers) {
-      const ourPrice = computeOurPrice(offer);
-      await sql`
-        UPDATE vendor_offers
-        SET our_price   = ${ourPrice},
-            computed_at = NOW()
-        WHERE id = ${offer.id}
-      `;
-      if (ourPrice === null) offersNull++;
-      offersDone++;
+  // Round to 2 decimal places
+  return Math.round(ourPrice * 100) / 100;
+}
+
+/**
+ * Calculate total stock from warehouse JSON
+ */
+function calculateTotalStock(warehouseJson) {
+  if (!warehouseJson) return 0;
+  
+  let total = 0;
+  const locations = ['wi', 'ny', 'tx', 'ca', 'nv', 'nc', 'national'];
+  
+  for (const loc of locations) {
+    const val = warehouseJson[loc];
+    if (val && val !== 'N/A') {
+      const num = parseInt(val, 10);
+      if (!isNaN(num)) total += num;
+    }
+  }
+  
+  return total;
+}
+
+/**
+ * Update vendor offers with computed pricing
+ */
+async function computeVendorPricing() {
+  console.log('💰 Computing vendor offer pricing...');
+
+  // Get all PU vendor offers
+  const { data: offers, error } = await supabase
+    .from('vendor_offers')
+    .select('*')
+    .eq('vendor', 'pu');
+
+  if (error) {
+    throw new Error(`Failed to fetch offers: ${error.message}`);
+  }
+
+  console.log(`Found ${offers.length} PU vendor offers`);
+
+  let updated = 0;
+  let errors = 0;
+
+  for (const offer of offers) {
+    const ourPrice = calculatePrice(offer.cost, offer.msrp, offer.map_price);
+    
+    const { error: updateError } = await supabase
+      .from('vendor_offers')
+      .update({
+        our_price: ourPrice,
+        computed_at: new Date().toISOString()
+      })
+      .eq('id', offer.id);
+
+    if (updateError) {
+      errors++;
+    } else {
+      updated++;
     }
 
-    const pct2    = Math.min(offersDone, totalOffers) / totalOffers;
-    const filled2 = Math.round(pct2 * 26);
-    const bar2    = '█'.repeat(filled2) + '░'.repeat(26 - filled2);
-    console.log(`[Stage2] Offers │${bar2}│ ${(pct2 * 100).toFixed(1).padStart(5)}% (${offersDone}/${totalOffers}) priced: ${offersDone - offersNull} no-price: ${offersNull}`);
+    if (updated % 1000 === 0) {
+      process.stdout.write(`\r  Updated: ${updated}/${offers.length}`);
+    }
   }
 
-  // ── Step 2: roll up computed_price + stock to catalog_products ────────────
-  console.log('[Stage2] Step 2 — rolling up computed_price + stock_quantity to catalog_products...');
+  console.log('\n✓ Vendor pricing complete');
+  console.log(`  Updated: ${updated}`);
+  console.log(`  Errors: ${errors}`);
+}
 
-  // In-stock price first, fallback to any price
-  await sql`
-    UPDATE catalog_products cp
-    SET
-      computed_price = COALESCE(
-        (SELECT MIN(our_price)
-         FROM vendor_offers
-         WHERE catalog_product_id = cp.id
-           AND total_qty > 0
-           AND our_price IS NOT NULL),
-        (SELECT MIN(our_price)
-         FROM vendor_offers
-         WHERE catalog_product_id = cp.id
-           AND our_price IS NOT NULL)
-      ),
-      stock_quantity = COALESCE(
-        (SELECT SUM(total_qty)
-         FROM vendor_offers
-         WHERE catalog_product_id = cp.id),
-        0
-      ),
-      updated_at = NOW()
-    WHERE EXISTS (
-      SELECT 1 FROM vendor_offers WHERE catalog_product_id = cp.id
-    )
-  `;
+/**
+ * Update catalog_products with computed_price from best vendor offer
+ */
+async function computeProductPrices() {
+  console.log('\n🏷️  Computing product prices...');
 
-  const [{ count: priced }] = await sql`
-    SELECT COUNT(*) FROM catalog_products WHERE computed_price IS NOT NULL
-  `;
-  const [{ count: inStock }] = await sql`
-    SELECT COUNT(*) FROM catalog_products WHERE stock_quantity > 0
-  `;
-  console.log(`[Stage2] computed_price set: ${priced} | in_stock: ${inStock}`);
+  // Get products with their offers
+  const { data: products, error } = await supabase
+    .from('catalog_products')
+    .select('id, sku');
 
-  // ── Step 3: discontinued detection ───────────────────────────────────────
-  console.log('[Stage2] Step 3 — detecting discontinued products...');
-
-  // No offers at all
-  await sql`
-    UPDATE catalog_products
-    SET is_discontinued = true,
-        is_active       = false,
-        updated_at      = NOW()
-    WHERE id NOT IN (SELECT DISTINCT catalog_product_id FROM vendor_offers)
-      AND is_discontinued = false
-  `;
-
-  // Offers exist but all zero qty and not updated recently
-  await sql`
-    UPDATE catalog_products cp
-    SET is_discontinued = true,
-        is_active       = false,
-        updated_at      = NOW()
-    WHERE is_discontinued = false
-      AND NOT EXISTS (
-        SELECT 1 FROM vendor_offers
-        WHERE catalog_product_id = cp.id AND total_qty > 0
-      )
-      AND EXISTS (
-        SELECT 1 FROM vendor_offers
-        WHERE catalog_product_id = cp.id
-          AND updated_at < NOW() - INTERVAL '${String(CONFIG.staleDays)} days'
-      )
-  `;
-
-  // Re-activate anything with a price and stock
-  await sql`
-    UPDATE catalog_products
-    SET is_active       = true,
-        is_discontinued = false,
-        updated_at      = NOW()
-    WHERE computed_price IS NOT NULL
-      AND stock_quantity > 0
-      AND is_discontinued = false
-  `;
-
-  const [{ count: discontinued }] = await sql`
-    SELECT COUNT(*) FROM catalog_products WHERE is_discontinued = true
-  `;
-  console.log(`[Stage2] Discontinued: ${discontinued}`);
-
-  // ── Step 4: MAP compliance check ─────────────────────────────────────────
-  console.log('[Stage2] Step 4 — MAP compliance check...');
-
-  const violations = await sql`
-    SELECT cp.sku, cp.name, cp.computed_price, vo.map_price, vo.vendor_code
-    FROM catalog_products cp
-    JOIN vendor_offers vo ON vo.catalog_product_id = cp.id
-    WHERE vo.map_price IS NOT NULL
-      AND cp.computed_price IS NOT NULL
-      AND cp.computed_price < vo.map_price
-    LIMIT 100
-  `;
-
-  if (violations.length) {
-    console.warn(`[Stage2] ⚠️  ${violations.length} MAP violations detected:`);
-    violations.slice(0, 5).forEach(v =>
-      console.warn(`  SKU ${v.sku}: $${v.computed_price} < MAP $${v.map_price} (${v.vendor_code})`)
-    );
-    if (violations.length > 5) console.warn(`  ... and ${violations.length - 5} more`);
-  } else {
-    console.log('[Stage2] ✓ No MAP violations');
+  if (error) {
+    throw new Error(`Failed to fetch products: ${error.message}`);
   }
 
-  console.log('[Stage2] Done.');
-  return {
-    offersDone,
-    offersWithNoPrice: offersNull,
-    pricedProducts:    Number(priced),
-    inStockProducts:   Number(inStock),
-    discontinued:      Number(discontinued),
-    mapViolations:     violations.length,
-  };
+  console.log(`Found ${products.length} products`);
+
+  let updated = 0;
+  let noPrice = 0;
+
+  for (const product of products) {
+    // Get best offer (lowest our_price with stock)
+    const { data: offers } = await supabase
+      .from('vendor_offers')
+      .select('our_price, total_qty')
+      .eq('product_id', product.id)
+      .order('our_price', { ascending: true });
+
+    let bestPrice = null;
+    
+    if (offers && offers.length > 0) {
+      // Prefer in-stock, then lowest price
+      const inStock = offers.filter(o => o.total_qty > 0 && o.our_price);
+      if (inStock.length > 0) {
+        bestPrice = inStock[0].our_price;
+      } else if (offers[0].our_price) {
+        bestPrice = offers[0].our_price;
+      }
+    }
+
+    if (bestPrice) {
+      const { error: updateError } = await supabase
+        .from('catalog_products')
+        .update({ computed_price: bestPrice })
+        .eq('id', product.id);
+
+      if (!updateError) {
+        updated++;
+      }
+    } else {
+      noPrice++;
+    }
+
+    if ((updated + noPrice) % 1000 === 0) {
+      process.stdout.write(`\r  Updated: ${updated} | No price: ${noPrice}`);
+    }
+  }
+
+  console.log('\n✓ Product pricing complete');
+  console.log(`  Updated: ${updated}`);
+  console.log(`  No price available: ${noPrice}`);
+}
+
+/**
+ * Mark discontinued products (no vendor offers)
+ */
+async function markDiscontinued() {
+  console.log('\n🗑️  Marking discontinued products...');
+
+  // Find products with no active offers
+  const { data: products, error } = await supabase
+    .from('catalog_products')
+    .select('id')
+    .eq('is_discontinued', false);
+
+  if (error) {
+    throw new Error(`Failed to fetch products: ${error.message}`);
+  }
+
+  let discontinued = 0;
+
+  for (const product of products) {
+    const { count } = await supabase
+      .from('vendor_offers')
+      .select('*', { count: 'exact', head: true })
+      .eq('product_id', product.id);
+
+    if (count === 0) {
+      await supabase
+        .from('catalog_products')
+        .update({ is_discontinued: true, is_active: false })
+        .eq('id', product.id);
+      discontinued++;
+    }
+  }
+
+  console.log(`✓ Marked ${discontinued} products as discontinued`);
+}
+
+/**
+ * Main computed values function
+ */
+export async function runComputedValues() {
+  console.log('🚀 Stage 2: Computing Values\n');
+  
+  const startTime = Date.now();
+  
+  await computeVendorPricing();
+  await computeProductPrices();
+  await markDiscontinued();
+  
+  const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+  console.log(`\n⏱️  Total time: ${duration}s`);
+  console.log('\n✅ Stage 2 Complete!');
+}
+
+// Run if called directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  runComputedValues().catch(err => {
+    console.error('❌ Error:', err);
+    process.exit(1);
+  });
 }

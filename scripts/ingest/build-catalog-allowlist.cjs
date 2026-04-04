@@ -1,190 +1,205 @@
 /**
- * scripts/ingest/build-catalog-allowlist.cjs
- *
- * Builds catalog_allowlist table for Typesense index filtering.
- *
- * WPS catalogs:
- *   Hard Drive (HDTwin) — HD-focused brands from catalog_products
- *   Tires/Wheels/Tools/Chemicals — tire brands + category filter
- *
- * PU catalogs:
- *   Fatbook  — fatbook_catalog != '' in dealerprice_batch_ rows
- *   Oldbook  — oldbook_catalog != '' in dealerprice_batch_ rows
- *   Tire     — tire_catalog != '' in dealerprice_batch_ rows
- *
- * Usage:
- *   npx dotenv -e .env.local -- node scripts/ingest/build-catalog-allowlist.cjs
+ * Build Catalog Allowlist for Typesense Indexing
+ * Filters products to only include Tire, Oldbook, and Fatbook catalogs
  */
 
-'use strict';
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
 
-const { Pool } = require('pg');
-const pool = new Pool({ connectionString: process.env.CATALOG_DATABASE_URL });
+dotenv.config({ path: '.env.local' });
 
-function bar(pct) {
-  const fill = Math.round(pct * 26);
-  return '█'.repeat(fill) + '░'.repeat(26 - fill);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error('Missing Supabase credentials. Check .env.local');
+  process.exit(1);
 }
 
-async function createTable() {
-  await pool.query(`
-    DROP TABLE IF EXISTS catalog_allowlist;
-    CREATE TABLE catalog_allowlist (
-      sku        TEXT NOT NULL,
-      source     TEXT NOT NULL,
-      catalog    TEXT NOT NULL,
-      created_at TIMESTAMPTZ DEFAULT NOW(),
-      PRIMARY KEY (sku, source)
-    );
-    CREATE INDEX idx_allowlist_sku ON catalog_allowlist(sku);
-  `);
-  console.log('[Allowlist] Table created');
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+/**
+ * Check if item has any target catalog
+ */
+function hasTargetCatalog(item) {
+  const fatbook = item.fatbook_catalog?.trim();
+  const fatbookMid = item.fatbook_midyear_catalog?.trim();
+  const tire = item.tire_catalog?.trim();
+  const oldbook = item.oldbook_catalog?.trim();
+  const oldbookMid = item.oldbook_midyear_catalog?.trim();
+  
+  return fatbook || fatbookMid || tire || oldbook || oldbookMid;
 }
 
-async function insertSkus(skus, source, catalog) {
-  if (!skus.length) return 0;
-  const CHUNK = 500;
-  for (let i = 0; i < skus.length; i += CHUNK) {
-    const chunk  = skus.slice(i, i + CHUNK);
-    const vals   = chunk.map((_, j) => `($${j*3+1},$${j*3+2},$${j*3+3})`).join(',');
-    const params = chunk.flatMap(s => [s, source, catalog]);
-    await pool.query(
-      `INSERT INTO catalog_allowlist (sku,source,catalog) VALUES ${vals} ON CONFLICT DO NOTHING`,
-      params
-    );
-    const pct = Math.min((i + CHUNK) / skus.length, 1);
-    process.stdout.write(`\r[Allowlist]   ${bar(pct)} ${(pct*100).toFixed(0).padStart(3)}% (${Math.min(i+CHUNK, skus.length)}/${skus.length})`);
+/**
+ * Get all catalog sources for an item
+ */
+function getCatalogSources(item) {
+  const sources = [];
+  
+  if (item.fatbook_catalog?.trim()) {
+    sources.push({ source: 'pu_fatbook', catalog: 'PU Fatbook' });
   }
-  console.log('');
-  return skus.length;
+  if (item.fatbook_midyear_catalog?.trim()) {
+    sources.push({ source: 'pu_fatbook_midyear', catalog: 'PU Fatbook Mid-Year' });
+  }
+  if (item.tire_catalog?.trim()) {
+    sources.push({ source: 'pu_tire', catalog: 'PU Tire/Service' });
+  }
+  if (item.oldbook_catalog?.trim()) {
+    sources.push({ source: 'pu_oldbook', catalog: 'PU Oldbook' });
+  }
+  if (item.oldbook_midyear_catalog?.trim()) {
+    sources.push({ source: 'pu_oldbook_midyear', catalog: 'PU Oldbook Mid-Year' });
+  }
+  
+  return sources;
 }
 
-// ─── WPS Hard Drive — HD Twin focused brands ──────────────────────────────────
+async function buildAllowlist() {
+  console.log('🏗️  Building Catalog Allowlist...\n');
+  console.log('Target catalogs: Fatbook, Fatbook Mid-Year, Tire, Oldbook, Oldbook Mid-Year\n');
 
-const HD_BRANDS = [
-  'DRAG SPECIALTIES', 'DRAG SPEC.', 'KURYAKYN', 'ARLEN NESS',
-  'CUSTOM CHROME', 'CHROME', 'HARDDRIVE', 'HARD DRIVE',
-  'THUNDER MANUFACTURING', 'NATIONAL CYCLE', 'KHROME WERKS',
-  'SHOW CHROME', 'SUMAX', 'WITCHDOCTORS', 'BIKER CHOICE',
-  'CUSTOM DYNAMICS', 'PERFORMANCE MACHINE', 'PROGRESSIVE SUSPENSION',
-  'LAGUNA', 'COBRA', 'VANCE AND HINES', 'SUPERTRAPP',
-  'SAMSON', 'FREEDOM PERFORMANCE', 'BASSANI', 'KHROME',
-  'TRASK', 'ROLAND SANDS', 'BURLY BRAND', 'MUSTANG',
-  'CORBIN', 'SADDLEMEN', 'DANNY GRAY', 'LE PERA',
-  'BILTWELL', 'RICK ROSS', 'NOVELLO', 'COLONY',
-  'JAMES GASKETS', 'COMETIC', 'ANDREWS', 'RIVERA PRIMO',
-  'BELT DRIVES', 'BAKER DRIVETRAIN', 'DARK HORSE',
-  'S&S CYCLE', 'FUELING', 'REVTECH', 'TP ENGINEERING',
-];
+  // Ensure catalog_allowlist table exists
+  console.log('Creating catalog_allowlist table if not exists...');
+  
+  const { error: tableError } = await supabase.rpc('exec_sql', {
+    sql: `
+      CREATE TABLE IF NOT EXISTS catalog_allowlist (
+        sku TEXT NOT NULL,
+        source TEXT NOT NULL,
+        catalog TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (sku, source)
+      );
+      CREATE INDEX IF NOT EXISTS idx_allowlist_sku ON catalog_allowlist(sku);
+      CREATE INDEX IF NOT EXISTS idx_allowlist_source ON catalog_allowlist(source);
+    `
+  }).catch(() => {
+    // Fallback: try direct SQL
+    return supabase.from('catalog_allowlist').select('count(*)', { count: 'exact', head: true });
+  });
 
-async function addWpsHardDrive() {
-  console.log('\n[Allowlist] WPS Hard Drive (HDTwin brands)...');
+  // Clear existing allowlist
+  console.log('Clearing existing allowlist...');
+  await supabase.from('catalog_allowlist').delete().neq('sku', '');
 
-  const conditions = HD_BRANDS.map((_, i) => `cp.brand ILIKE $${i+1}`).join(' OR ');
-  const { rows } = await pool.query(
-    `SELECT cp.sku FROM catalog_products cp
-     JOIN vendor_offers vo ON vo.catalog_product_id = cp.id
-     WHERE vo.vendor_code = 'wps'
-       AND cp.is_active = true
-       AND (${conditions})`,
-    HD_BRANDS.map(b => `%${b}%`)
-  );
+  // Get all dealer price batches
+  console.log('Fetching dealer price data...');
+  const { data: batches, error: batchError } = await supabase
+    .from('raw_vendor_pu')
+    .select('source_file, payload')
+    .like('source_file', 'dealerprice_batch_%');
 
-  console.log(`[Allowlist] WPS Hard Drive: ${rows.length} SKUs`);
-  return insertSkus(rows.map(r => r.sku), 'wps_hard_drive', 'WPS Hard Drive');
+  if (batchError) {
+    console.error('Failed to fetch batches:', batchError.message);
+    process.exit(1);
+  }
+
+  console.log(`Found ${batches.length} batches to process\n`);
+
+  const allowlistEntries = [];
+  const skuSet = new Set();
+  let processedRows = 0;
+  let matchedRows = 0;
+
+  for (const batch of batches) {
+    const items = batch.payload || [];
+    
+    for (const item of items) {
+      processedRows++;
+      
+      if (!hasTargetCatalog(item)) {
+        continue;
+      }
+
+      const sku = item.part_number?.trim();
+      if (!sku) continue;
+
+      matchedRows++;
+      skuSet.add(sku);
+
+      const sources = getCatalogSources(item);
+      for (const src of sources) {
+        allowlistEntries.push({
+          sku: sku,
+          source: src.source,
+          catalog: src.catalog
+        });
+      }
+    }
+
+    if (processedRows % 10000 === 0) {
+      process.stdout.write(`\r  Processed: ${processedRows} | Matched: ${matchedRows} | Unique SKUs: ${skuSet.size}`);
+    }
+  }
+
+  console.log('\n');
+  console.log(`✓ Processing complete`);
+  console.log(`  Total rows processed: ${processedRows}`);
+  console.log(`  Rows in target catalogs: ${matchedRows}`);
+  console.log(`  Unique SKUs: ${skuSet.size}`);
+  console.log(`  Total allowlist entries: ${allowlistEntries.length}`);
+
+  // Insert in batches
+  console.log('\nInserting into catalog_allowlist...');
+  
+  const BATCH_SIZE = 1000;
+  let inserted = 0;
+  let insertErrors = 0;
+
+  for (let i = 0; i < allowlistEntries.length; i += BATCH_SIZE) {
+    const batch = allowlistEntries.slice(i, i + BATCH_SIZE);
+    
+    const { error } = await supabase
+      .from('catalog_allowlist')
+      .upsert(batch, {
+        onConflict: 'sku,source',
+        ignoreDuplicates: false
+      });
+
+    if (error) {
+      console.error(`Batch insert error:`, error.message);
+      insertErrors++;
+    } else {
+      inserted += batch.length;
+      process.stdout.write(`\r  Inserted: ${inserted}/${allowlistEntries.length}`);
+    }
+  }
+
+  console.log('\n');
+  console.log('✅ Allowlist build complete!');
+  console.log(`  Entries inserted: ${inserted}`);
+  console.log(`  Errors: ${insertErrors}`);
+
+  // Show catalog breakdown
+  console.log('\n📊 Catalog Breakdown:');
+  const { data: breakdown } = await supabase
+    .from('catalog_allowlist')
+    .select('catalog, sku', { count: 'exact' });
+
+  if (breakdown) {
+    const counts = {};
+    breakdown.forEach(row => {
+      counts[row.catalog] = (counts[row.catalog] || 0) + 1;
+    });
+    
+    Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .forEach(([catalog, count]) => {
+        console.log(`  ${catalog}: ${count.toLocaleString()} entries`);
+      });
+  }
+
+  // Show unique SKU count
+  const { data: uniqueSkus } = await supabase
+    .from('catalog_allowlist')
+    .select('sku', { count: 'exact', head: true });
+
+  console.log(`\n  Total unique SKUs in allowlist: ${uniqueSkus?.length || skuSet.size}`);
 }
 
-// ─── WPS Tires/Wheels ─────────────────────────────────────────────────────────
-
-const TIRE_BRANDS = [
-  'SHINKO', 'SEDONA', 'MICHELIN', 'DUNLOP', 'BRIDGESTONE',
-  'MAXXIS', 'IRC', 'PIRELLI', 'METZELER', 'CONTINENTAL',
-  'KENDA', 'HEIDENAU', 'GBC', 'ITP', 'PRO-WHEEL',
-  'DUBYA', 'SYSTEM 3', 'RACELINE', 'DWT', 'CARLISLE',
-  'KOLD KUTTER', 'BYKAS', 'BULLDOG', 'CST', 'VEE',
-  'DURO', 'KINGS', 'AWC',
-];
-
-const TIRE_CATEGORIES = [
-  'Tires', 'Wheels', 'Tubes', 'Tire Care', 'Tire Chains',
-  'Chemicals', 'Tools', 'Lubricants', 'Cleaners',
-];
-
-async function addWpsTiresWheels() {
-  console.log('\n[Allowlist] WPS Tires/Wheels — brand filter...');
-
-  const brandConds = TIRE_BRANDS.map((_, i) => `cp.brand ILIKE $${i+1}`).join(' OR ');
-  const { rows: brandRows } = await pool.query(
-    `SELECT cp.sku FROM catalog_products cp
-     JOIN vendor_offers vo ON vo.catalog_product_id = cp.id
-     WHERE vo.vendor_code = 'wps'
-       AND cp.is_active = true
-       AND (${brandConds})`,
-    TIRE_BRANDS.map(b => `%${b}%`)
-  );
-  console.log(`[Allowlist] Tire brands: ${brandRows.length} SKUs`);
-  await insertSkus(brandRows.map(r => r.sku), 'wps_tire_brands', 'WPS Tires/Wheels');
-
-  console.log('[Allowlist] WPS Tools/Chemicals — category filter...');
-  const catConds = TIRE_CATEGORIES.map((_, i) => `cp.category ILIKE $${i+1}`).join(' OR ');
-  const { rows: catRows } = await pool.query(
-    `SELECT cp.sku FROM catalog_products cp
-     JOIN vendor_offers vo ON vo.catalog_product_id = cp.id
-     WHERE vo.vendor_code = 'wps'
-       AND cp.is_active = true
-       AND (${catConds})`,
-    TIRE_CATEGORIES.map(c => `%${c}%`)
-  );
-  console.log(`[Allowlist] Tools/Chemicals categories: ${catRows.length} SKUs`);
-  await insertSkus(catRows.map(r => r.sku), 'wps_tools_chemicals', 'WPS Tools/Chemicals');
-}
-
-// ─── PU — from dealerprice_batch_ rows ───────────────────────────────────────
-
-async function addPuCatalog(field, source, catalog) {
-  const { rows } = await pool.query(`
-    SELECT DISTINCT (item->>'sku') AS sku
-    FROM raw_vendor_pu,
-    LATERAL jsonb_array_elements(payload) AS item
-    WHERE source_file LIKE 'dealerprice_batch_%'
-      AND item->>'${field}' IS NOT NULL
-      AND item->>'${field}' != ''
-      AND item->>'sku' IS NOT NULL
-  `);
-  console.log(`[Allowlist] PU ${catalog}: ${rows.length} SKUs`);
-  return insertSkus(rows.map(r => r.sku), source, catalog);
-}
-
-// ─── Summary ──────────────────────────────────────────────────────────────────
-
-async function summary() {
-  const { rows } = await pool.query(`
-    SELECT catalog, COUNT(DISTINCT sku) as n
-    FROM catalog_allowlist GROUP BY catalog ORDER BY n DESC
-  `);
-  const { rows: [{ total }] } = await pool.query(
-    `SELECT COUNT(DISTINCT sku) as total FROM catalog_allowlist`
-  );
-  console.log('\n[Allowlist] ── SUMMARY ──');
-  rows.forEach(r => console.log(`  ${r.catalog.padEnd(35)} ${Number(r.n).toLocaleString()} SKUs`));
-  console.log(`  ${'─'.repeat(50)}`);
-  console.log(`  ${'TOTAL UNIQUE SKUs TO INDEX'.padEnd(35)} ${Number(total).toLocaleString()}`);
-  console.log('\n  Next: delete .stage3_checkpoint.json then run Stage 3 reindex.');
-}
-
-// ─── Main ─────────────────────────────────────────────────────────────────────
-
-async function main() {
-  console.log('[Allowlist] Building catalog allowlist...\n');
-  await createTable();
-  await addWpsHardDrive();
-  await addWpsTiresWheels();
-  console.log('\n[Allowlist] PU catalogs...');
-  await addPuCatalog('fatbook_catalog', 'pu_fatbook', 'PU Fatbook');
-  await addPuCatalog('oldbook_catalog', 'pu_oldbook', 'PU Oldbook');
-  await addPuCatalog('tire_catalog',    'pu_tire',    'PU Tire/Service');
-  await summary();
-  await pool.end();
-}
-
-main().catch(err => { console.error('[Allowlist] Fatal:', err); process.exit(1); });
+buildAllowlist().catch(err => {
+  console.error('❌ Error:', err);
+  process.exit(1);
+});

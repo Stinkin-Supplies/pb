@@ -1,211 +1,191 @@
 /**
- * scripts/ingest/stage0-pu-dealerprice.cjs
- *
- * Imports D00108_DealerPrice.csv into raw_vendor_pu.
- * This file has full catalog codes including Fatbook, Oldbook, Tire.
- *
- * Key columns used for catalog filtering:
- *   Fatbook Catalog Code  → fatbook_catalog (non-empty = Fatbook product)
- *   Oldbook Catalog Code  → oldbook_catalog (non-empty = Oldbook product)
- *   Tire Catalog Code     → tire_catalog    (non-empty = Tire/Service product)
- *
- * Usage:
- *   npx dotenv -e .env.local -- node scripts/ingest/stage0-pu-dealerprice.cjs
+ * Stage 0: Import Parts Unlimited D00108 Dealer Price CSV
+ * Imports raw CSV data into raw_vendor_pu table as JSONB batches
  */
 
-'use strict';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
 
-const fs       = require('fs');
-const readline = require('readline');
-const path     = require('path');
-const { Pool } = require('pg');
+dotenv.config({ path: '.env.local' });
 
-const FILE_PATH  = path.resolve(__dirname, '../data/pu_pricefile/D00108_DealerPrice.csv');
-const BATCH_SIZE = 1000;
-const TABLE      = 'raw_vendor_pu';
-const SOURCE_PREFIX = 'dealerprice_batch_';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-const pool = new Pool({ connectionString: process.env.CATALOG_DATABASE_URL });
+// Supabase connection
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// ─── CSV parser ───────────────────────────────────────────────────────────────
+if (!supabaseUrl || !supabaseKey) {
+  console.error('Missing Supabase credentials. Check .env.local');
+  process.exit(1);
+}
 
-function parseCsvLine(line) {
-  const fields = [];
-  let current  = '';
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+// CSV column mapping (0-indexed)
+const COLUMNS = {
+  partNumber: 0,
+  punctuatedPartNumber: 1,
+  vendorPartNumber: 2,
+  partStatus: 4,
+  partDescription: 5,
+  originalRetail: 6,
+  currentSuggestedRetail: 7,
+  baseDealerPrice: 8,
+  yourDealerPrice: 9,
+  hazardousCode: 10,
+  upcCode: 24,
+  brandName: 25,
+  countryOfOrigin: 26,
+  productCode: 28,
+  weight: 30,
+  // Catalog codes
+  fatbookCatalog: 40,
+  fatbookMidYearCatalog: 45,
+  tireCatalog: 50,
+  oldbookCatalog: 55,
+  oldbookMidYearCatalog: 60,
+  // Availability
+  wiAvailability: 13,
+  nyAvailability: 14,
+  txAvailability: 15,
+  caAvailability: 16,
+  nvAvailability: 17,
+  ncAvailability: 18,
+  nationalAvailability: 19,
+  // Dimensions
+  height: 73,
+  length: 74,
+  width: 75,
+  dropshipFee: 76
+};
+
+function parseCSVLine(line) {
+  const result = [];
+  let current = '';
   let inQuotes = false;
-
+  
   for (let i = 0; i < line.length; i++) {
-    const ch   = line[i];
-    const next = line[i + 1];
-    if (inQuotes) {
-      if (ch === '"' && next === '"') { current += '"'; i++; }
-      else if (ch === '"')             { inQuotes = false; }
-      else                             { current += ch; }
+    const char = line[i];
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === ',' && !inQuotes) {
+      result.push(current.trim());
+      current = '';
     } else {
-      if (ch === '"')       { inQuotes = true; }
-      else if (ch === ',')  { fields.push(current.trim()); current = ''; }
-      else                  { current += ch; }
+      current += char;
     }
   }
-  fields.push(current.trim());
-  return fields;
+  result.push(current.trim());
+  return result;
 }
 
-function toNum(v) {
-  if (!v || v === '' || v === 'N/A') return null;
-  const n = Number(String(v).replace(/[^0-9.-]/g, ''));
-  return isNaN(n) ? null : n;
-}
-
-function toBool(v) {
-  return ['y', 'yes', '1', 'true', 'x', 'n'].includes(String(v ?? '').toLowerCase().trim())
-    ? String(v).toLowerCase().trim() !== 'n'
-    : false;
-}
-
-function mapRow(headers, values) {
-  const r = {};
-  headers.forEach((h, i) => { r[h] = values[i] ?? ''; });
-
-  return {
-    sku:                   r['Part Number']                    || null,
-    vendor_part_number:    r['Vendor Part Number']             || null,
-    name:                  r['Part Description']               || null,
-    brand:                 r['Brand Name']                     || null,
-    status:                r['Part Status']                    || null,
-    uom:                   r['Unit of Measure']                || null,
-    weight:                toNum(r['Weight']),
-    cost:                  toNum(r['Base Dealer Price']),
-    your_dealer_price:     toNum(r['Your Dealer Price']),
-    msrp:                  toNum(r['Current Suggested Retail']),
-    original_retail:       toNum(r['Original Retail']),
-    map_price:             r['Ad Policy']                      || null,
-    drop_ship_fee:         toNum(r['Dropship Fee']),
-    hazardous_code:        r['Hazardous Code']                 || null,
-    no_ship_ca:            r['No Ship to CA'] === 'X',
-    truck_only:            r['Truck Part Only'] === 'T',
-    price_changed_today:   r['Price Changed Today'] === 'U' || r['Price Changed Today'] === 'D',
-    product_code:          r['Product Code']?.trim()           || null,
-    commodity_code:        r['Commodity Code']?.trim()         || null,
-    last_catalog:          r['Last Catalog']                   || null,
-    drag_part:             r['Drag Part'] === 'Y',
-    closeout:              r['Closeout Catalog Indicator'] === 'Y',
-    upc:                   r['UPC Code']                       || null,
-    country_of_origin:     r['Country of Origin']              || null,
-    part_add_date:         r['Part Add Date']                  || null,
-    pfas:                  r['PFAS']                           || null,
-    // Warehouse availability
-    warehouse_wi:          toNum(r['WI Availability']),
-    warehouse_ny:          toNum(r['NY Availability']),
-    warehouse_tx:          toNum(r['TX Availability']),
-    warehouse_nv:          toNum(r['NV Availability']),
-    warehouse_nc:          toNum(r['NC Availability']),
-    total_qty:             toNum(r['National Availability']),
-    // Catalog codes — KEY FIELDS for allowlist filtering
-    street_catalog:        r['Street Catalog Code']            || null,
-    fatbook_catalog:       r['Fatbook Catalog Code']           || null,
-    fatbook_midyear:       r['Fatbook Mid-Year Catalog Code']  || null,
-    tire_catalog:          r['Tire Catalog Code']              || null,
-    oldbook_catalog:       r['Oldbook Catalog Code']           || null,
-    oldbook_midyear:       r['Oldbook Mid-Year Catalog Code']  || null,
-    // Dimensions
-    height_in:             toNum(r['Height(inches)']),
-    length_in:             toNum(r['Length(inches)']),
-    width_in:              toNum(r['Width(inches)']),
-  };
-}
-
-// ─── DB upsert ────────────────────────────────────────────────────────────────
-
-async function upsertBatch(batchNum, rows) {
-  const sourceFile = `${SOURCE_PREFIX}${String(batchNum).padStart(6, '0')}`;
-  await pool.query(
-    `INSERT INTO ${TABLE} (payload, source_file, imported_at)
-     VALUES ($1::jsonb, $2, NOW())
-     ON CONFLICT (source_file) DO UPDATE
-       SET payload = EXCLUDED.payload, imported_at = NOW()`,
-    [JSON.stringify(rows), sourceFile]
-  );
-}
-
-// ─── Main ─────────────────────────────────────────────────────────────────────
-
-async function main() {
-  console.log('[Stage0-DealerPrice] Starting D00108_DealerPrice.csv import...');
-  console.log(`[Stage0-DealerPrice] File: ${FILE_PATH}`);
-
-  if (!fs.existsSync(FILE_PATH)) {
-    console.error(`[Stage0-DealerPrice] File not found: ${FILE_PATH}`);
+async function importDealerPrice() {
+  const filePath = path.join(__dirname, '../data/pu_pricefile/D00108_DealerPrice.csv');
+  
+  if (!fs.existsSync(filePath)) {
+    console.error(`File not found: ${filePath}`);
     process.exit(1);
   }
 
-  // Clear existing dealerprice batches before re-import
-  const { rowCount } = await pool.query(
-    `DELETE FROM ${TABLE} WHERE source_file LIKE '${SOURCE_PREFIX}%'`
-  );
-  if (rowCount > 0) console.log(`[Stage0-DealerPrice] Cleared ${rowCount} existing batches`);
+  console.log('📥 Stage 0: Importing D00108 Dealer Price CSV...');
+  console.log(`File: ${filePath}`);
 
-  const rl = readline.createInterface({
-    input:     fs.createReadStream(FILE_PATH, { encoding: 'utf8' }),
-    crlfDelay: Infinity,
-  });
+  const content = fs.readFileSync(filePath, 'utf8');
+  const lines = content.split('\n').filter(l => l.trim());
+  
+  // Skip header
+  const header = lines[0];
+  const dataLines = lines.slice(1);
+  
+  console.log(`Total rows: ${dataLines.length}`);
 
-  let headers   = null;
-  let batch     = [];
-  let batchNum  = 1;
-  let totalRows = 0;
-  let skipped   = 0;
+  // Process in batches of 1000
+  const BATCH_SIZE = 1000;
   let batchCount = 0;
+  let successCount = 0;
+  let errorCount = 0;
 
-  for await (const line of rl) {
-    if (!line.trim()) continue;
-    const values = parseCsvLine(line);
+  for (let i = 0; i < dataLines.length; i += BATCH_SIZE) {
+    const batch = dataLines.slice(i, i + BATCH_SIZE);
+    const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+    const totalBatches = Math.ceil(dataLines.length / BATCH_SIZE);
+    
+    const payload = batch.map((line, idx) => {
+      const cols = parseCSVLine(line);
+      return {
+        row_num: i + idx + 1,
+        part_number: cols[COLUMNS.partNumber] || '',
+        punctuated_part_number: cols[COLUMNS.punctuatedPartNumber] || '',
+        vendor_part_number: cols[COLUMNS.vendorPartNumber] || '',
+        part_status: cols[COLUMNS.partStatus] || '',
+        part_description: cols[COLUMNS.partDescription] || '',
+        original_retail: parseFloat(cols[COLUMNS.originalRetail]) || null,
+        current_suggested_retail: parseFloat(cols[COLUMNS.currentSuggestedRetail]) || null,
+        base_dealer_price: parseFloat(cols[COLUMNS.baseDealerPrice]) || null,
+        your_dealer_price: parseFloat(cols[COLUMNS.yourDealerPrice]) || null,
+        hazardous_code: cols[COLUMNS.hazardousCode] || '',
+        upc_code: cols[COLUMNS.upcCode] || '',
+        brand_name: cols[COLUMNS.brandName] || '',
+        country_of_origin: cols[COLUMNS.countryOfOrigin] || '',
+        product_code: cols[COLUMNS.productCode] || '',
+        weight: parseFloat(cols[COLUMNS.weight]) || null,
+        fatbook_catalog: cols[COLUMNS.fatbookCatalog] || '',
+        fatbook_midyear_catalog: cols[COLUMNS.fatbookMidYearCatalog] || '',
+        tire_catalog: cols[COLUMNS.tireCatalog] || '',
+        oldbook_catalog: cols[COLUMNS.oldbookCatalog] || '',
+        oldbook_midyear_catalog: cols[COLUMNS.oldbookMidYearCatalog] || '',
+        availability: {
+          wi: cols[COLUMNS.wiAvailability] || '0',
+          ny: cols[COLUMNS.nyAvailability] || '0',
+          tx: cols[COLUMNS.txAvailability] || '0',
+          ca: cols[COLUMNS.caAvailability] || '0',
+          nv: cols[COLUMNS.nvAvailability] || '0',
+          nc: cols[COLUMNS.ncAvailability] || '0',
+          national: cols[COLUMNS.nationalAvailability] || '0'
+        },
+        dimensions: {
+          height: parseFloat(cols[COLUMNS.height]) || null,
+          length: parseFloat(cols[COLUMNS.length]) || null,
+          width: parseFloat(cols[COLUMNS.width]) || null
+        },
+        dropship_fee: parseFloat(cols[COLUMNS.dropshipFee]) || null
+      };
+    });
 
-    if (!headers) {
-      headers = values.map(h => h.replace(/^"|"$/g, '').trim());
-      console.log(`[Stage0-DealerPrice] ${headers.length} columns detected`);
-      // Log catalog code columns found
-      const catalogCols = headers.filter(h => h.toLowerCase().includes('catalog'));
-      console.log(`[Stage0-DealerPrice] Catalog columns: ${catalogCols.join(', ')}`);
-      continue;
-    }
+    try {
+      const { error } = await supabase
+        .from('raw_vendor_pu')
+        .upsert({
+          source_file: `dealerprice_batch_${batchNum.toString().padStart(4, '0')}`,
+          payload: payload,
+          imported_at: new Date().toISOString()
+        }, {
+          onConflict: 'source_file'
+        });
 
-    const row = mapRow(headers, values);
-    if (!row.sku) { skipped++; continue; }
-
-    batch.push(row);
-    totalRows++;
-
-    if (batch.length >= BATCH_SIZE) {
-      await upsertBatch(batchNum, batch);
-      batchCount++;
-      // Progress bar — estimate based on ~155k rows typical size
-      const est   = 155000;
-      const pct   = Math.min(totalRows / est, 1);
-      const fill  = Math.round(pct * 26);
-      const bar   = '█'.repeat(fill) + '░'.repeat(26 - fill);
-      process.stdout.write(`\r[Stage0-DealerPrice] │${bar}│ ${(pct*100).toFixed(1).padStart(5)}% (${totalRows} rows)`);
-      batch    = [];
-      batchNum++;
+      if (error) {
+        console.error(`Batch ${batchNum} error:`, error.message);
+        errorCount++;
+      } else {
+        successCount += batch.length;
+        batchCount++;
+        process.stdout.write(`\r✓ Batch ${batchNum}/${totalBatches} - ${successCount} rows imported`);
+      }
+    } catch (err) {
+      console.error(`Batch ${batchNum} exception:`, err.message);
+      errorCount++;
     }
   }
 
-  if (batch.length) {
-    await upsertBatch(batchNum, batch);
-    batchCount++;
-  }
-  console.log(''); // newline after progress bar
-
-  await pool.end();
-
-  console.log(`\n[Stage0-DealerPrice] Done.`);
-  console.log(`  Total rows:    ${totalRows}`);
-  console.log(`  Batches:       ${batchCount}`);
-  console.log(`  Skipped:       ${skipped}`);
-  console.log(`\n  Next: run build-catalog-allowlist.cjs to update Typesense allowlist`);
+  console.log('\n');
+  console.log('✅ Stage 0 Complete!');
+  console.log(`  Batches: ${batchCount}`);
+  console.log(`  Rows imported: ${successCount}`);
+  console.log(`  Errors: ${errorCount}`);
 }
 
-main().catch(err => {
-  console.error('[Stage0-DealerPrice] Fatal:', err);
-  process.exit(1);
-});
+importDealerPrice().catch(console.error);
