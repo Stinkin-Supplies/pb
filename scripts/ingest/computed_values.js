@@ -89,51 +89,51 @@ function calculateTotalStock(warehouseJson) {
  */
 async function computeVendorPricing() {
   console.log('💰 Computing vendor offer pricing...');
-  const t0 = Date.now();
 
-  // Get all PU vendor offers
-  const offers = await sql`
-    SELECT id, wholesale_cost, msrp, map_price
-    FROM vendor_offers
-    WHERE vendor_code = ${'pu'}
+  // One set-based update is dramatically faster than per-row updates over a network DB.
+  const rows = await sql`
+    UPDATE vendor_offers vo
+    SET
+      our_price = CASE
+        WHEN vo.wholesale_cost IS NULL THEN NULL
+        ELSE (
+          -- Start with cost * defaultMultiplier, cap at 85% MSRP if present,
+          -- respect MAP + buffer, enforce min/max margin, then round to cents.
+          ROUND(
+            LEAST(
+              GREATEST(
+                CASE
+                  WHEN vo.map_price IS NOT NULL AND vo.map_price > 0
+                    THEN GREATEST(
+                      CASE
+                        WHEN vo.msrp IS NOT NULL AND vo.msrp > 0
+                          THEN LEAST(vo.wholesale_cost * ${PRICING_RULES.defaultMultiplier}, vo.msrp * 0.85)
+                          ELSE vo.wholesale_cost * ${PRICING_RULES.defaultMultiplier}
+                      END,
+                      vo.map_price + ${PRICING_RULES.mapBuffer}
+                    )
+                  ELSE (
+                    CASE
+                      WHEN vo.msrp IS NOT NULL AND vo.msrp > 0
+                        THEN LEAST(vo.wholesale_cost * ${PRICING_RULES.defaultMultiplier}, vo.msrp * 0.85)
+                        ELSE vo.wholesale_cost * ${PRICING_RULES.defaultMultiplier}
+                    END
+                  )
+                END,
+                vo.wholesale_cost * ${(1 + PRICING_RULES.minMargin)}
+              ),
+              vo.wholesale_cost * ${(1 + PRICING_RULES.maxMargin)}
+            ),
+            2
+          )
+        )
+      END,
+      computed_at = NOW()
+    WHERE vo.vendor_code = ${'pu'}
+    RETURNING vo.id
   `;
 
-  console.log(`Found ${offers.length} PU vendor offers`);
-
-  let updated = 0;
-  let errors = 0;
-
-  for (const offer of offers) {
-    const ourPrice = calculatePrice(offer.wholesale_cost, offer.msrp, offer.map_price);
-
-    try {
-      await sql`
-        UPDATE vendor_offers
-        SET our_price = ${ourPrice}, computed_at = NOW()
-        WHERE id = ${offer.id}
-      `;
-      updated++;
-    } catch {
-      errors++;
-    }
-
-    if ((updated + errors) % 2000 === 0) {
-      const done = updated + errors;
-      const elapsed = (Date.now() - t0) / 1000;
-      const rate = done / Math.max(1, elapsed);
-      const pct = offers.length > 0 ? ((done / offers.length) * 100) : 0;
-      const eta = rate > 0 ? (offers.length - done) / rate : Infinity;
-      process.stdout.write(
-        `\r  ${done.toLocaleString()}/${offers.length.toLocaleString()} (${pct.toFixed(1)}%)` +
-        ` | Updated: ${updated.toLocaleString()} | Errors: ${errors.toLocaleString()}` +
-        ` | ${rate.toFixed(0)}/s | ETA ${formatEta(eta)}`
-      );
-    }
-  }
-
-  console.log('\n✓ Vendor pricing complete');
-  console.log(`  Updated: ${updated}`);
-  console.log(`  Errors: ${errors}`);
+  console.log(`✓ Vendor pricing complete (${rows.length.toLocaleString()} offers updated)`);
 }
 
 /**
@@ -141,69 +141,33 @@ async function computeVendorPricing() {
  */
 async function computeProductPrices() {
   console.log('\n🏷️  Computing product prices...');
-  const t0 = Date.now();
 
-  // Get products with their offers
-  const products = await sql`SELECT id, sku FROM catalog_products`;
+  // Choose best offer per product:
+  // 1) Prefer in-stock (total_qty > 0) when an our_price exists
+  // 2) Then lowest our_price
+  const updated = await sql`
+    WITH ranked AS (
+      SELECT
+        vo.catalog_product_id,
+        vo.our_price,
+        ROW_NUMBER() OVER (
+          PARTITION BY vo.catalog_product_id
+          ORDER BY
+            CASE WHEN vo.total_qty > 0 THEN 0 ELSE 1 END,
+            vo.our_price ASC NULLS LAST
+        ) AS rn
+      FROM vendor_offers vo
+      WHERE vo.our_price IS NOT NULL
+    )
+    UPDATE catalog_products cp
+    SET computed_price = r.our_price
+    FROM ranked r
+    WHERE r.catalog_product_id = cp.id
+      AND r.rn = 1
+    RETURNING cp.id
+  `;
 
-  console.log(`Found ${products.length} products`);
-
-  let updated = 0;
-  let noPrice = 0;
-
-  for (const product of products) {
-    // Get best offer (lowest our_price with stock)
-    const offers = await sql`
-      SELECT our_price, total_qty
-      FROM vendor_offers
-      WHERE catalog_product_id = ${product.id}
-      ORDER BY our_price ASC NULLS LAST
-    `;
-
-    let bestPrice = null;
-    
-    if (offers && offers.length > 0) {
-      // Prefer in-stock, then lowest price
-      const inStock = offers.filter(o => o.total_qty > 0 && o.our_price);
-      if (inStock.length > 0) {
-        bestPrice = inStock[0].our_price;
-      } else if (offers[0].our_price) {
-        bestPrice = offers[0].our_price;
-      }
-    }
-
-    if (bestPrice) {
-      try {
-        await sql`
-          UPDATE catalog_products
-          SET computed_price = ${bestPrice}
-          WHERE id = ${product.id}
-        `;
-        updated++;
-      } catch {
-        // ignore
-      }
-    } else {
-      noPrice++;
-    }
-
-    if ((updated + noPrice) % 2000 === 0) {
-      const done = updated + noPrice;
-      const elapsed = (Date.now() - t0) / 1000;
-      const rate = done / Math.max(1, elapsed);
-      const pct = products.length > 0 ? ((done / products.length) * 100) : 0;
-      const eta = rate > 0 ? (products.length - done) / rate : Infinity;
-      process.stdout.write(
-        `\r  ${done.toLocaleString()}/${products.length.toLocaleString()} (${pct.toFixed(1)}%)` +
-        ` | Updated: ${updated.toLocaleString()} | No price: ${noPrice.toLocaleString()}` +
-        ` | ${rate.toFixed(0)}/s | ETA ${formatEta(eta)}`
-      );
-    }
-  }
-
-  console.log('\n✓ Product pricing complete');
-  console.log(`  Updated: ${updated}`);
-  console.log(`  No price available: ${noPrice}`);
+  console.log(`✓ Product pricing complete (${updated.length.toLocaleString()} products updated)`);
 }
 
 /**
