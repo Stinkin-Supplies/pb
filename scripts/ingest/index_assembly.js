@@ -18,24 +18,40 @@ let typesense = null;
 function getTypesense() {
   if (typesense) return typesense;
 
-  const typesenseHost = process.env.TYPESENSE_HOST;
+  const rawHost = process.env.TYPESENSE_HOST;
   // Support multiple common env var names.
   const typesenseKey =
     process.env.TYPESENSE_ADMIN_KEY ||
     process.env.TYPESENSE_ADMIN_API_KEY ||
     process.env.TYPESENSE_API_KEY;
+  const protocol = (process.env.TYPESENSE_PROTOCOL || 'https').replace(':', '');
+  const portEnv = process.env.TYPESENSE_PORT;
+  const port =
+    (portEnv && !Number.isNaN(parseInt(portEnv, 10)) ? parseInt(portEnv, 10) : null) ??
+    (protocol === 'https' ? 443 : 8108);
 
-  if (!typesenseHost || !typesenseKey) {
+  if (!rawHost || !typesenseKey) {
     throw new Error(
       'Missing Typesense credentials (need TYPESENSE_HOST and an admin key: TYPESENSE_ADMIN_KEY or TYPESENSE_ADMIN_API_KEY or TYPESENSE_API_KEY)'
     );
   }
 
+  // Allow TYPESENSE_HOST to be either a hostname or a full URL.
+  let host = String(rawHost).trim();
+  try {
+    if (host.includes('://')) {
+      const u = new URL(host);
+      host = u.hostname;
+    }
+  } catch {
+    // ignore
+  }
+
   typesense = new Typesense.Client({
     nodes: [{
-      host: typesenseHost,
-      port: 443,
-      protocol: 'https'
+      host,
+      port,
+      protocol
     }],
     apiKey: typesenseKey,
     connectionTimeoutSeconds: 120
@@ -330,18 +346,19 @@ async function setupCollection(collectionName, profile, recreate = false) {
 
   const baseFields = [
     { name: 'id', type: 'string' },
-    { name: 'sku', type: 'string', facet: !isSearchOnly },
-    { name: 'slug', type: 'string' },
+    { name: 'sku', type: 'string', facet: false, index: true },
+    { name: 'slug', type: 'string', index: false },
+    // Keep facets strictly limited (memory): brand, category, in_stock
     { name: 'brand', type: 'string', facet: !isSearchOnly },
     { name: 'category', type: 'string', facet: !isSearchOnly },
-    { name: 'name', type: 'string', locale: 'en' },
-    { name: 'description', type: 'string', optional: true },
-    { name: 'price', type: 'float', facet: !isSearchOnly, sort: !isSearchOnly },
+    { name: 'name', type: 'string', locale: 'en', index: true },
+    { name: 'description', type: 'string', optional: true, index: false },
+    { name: 'price', type: 'float', facet: false, sort: !isSearchOnly },
     { name: 'msrp', type: 'float', optional: true },
-    { name: 'stock_quantity', type: 'int32', facet: !isSearchOnly, sort: !isSearchOnly },
+    { name: 'stock_quantity', type: 'int32', facet: false, sort: !isSearchOnly },
     { name: 'in_stock', type: 'bool', facet: !isSearchOnly },
     // Existing Typesense collection schema expects this field.
-    { name: 'free_shipping', type: 'bool', facet: !isSearchOnly, optional: true },
+    { name: 'free_shipping', type: 'bool', facet: false, optional: true },
     // Not searched; keep retrievable but avoid indexing overhead.
     { name: 'image_url', type: 'string', optional: true, index: false },
     // Index for search relevance, but don't store on disk to reduce stored payload.
