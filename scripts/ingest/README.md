@@ -43,6 +43,11 @@ Maps PU fields to canonical schema:
 npx dotenv -e .env.local -- node ingest/normalize_pu.js
 ```
 
+Resume safety:
+- Stage 1 writes a checkpoint to `scripts/ingest/.stage1_pu_checkpoint.json` every few seconds.
+- Re-run the same command to resume after a stop/crash.
+- Use `--reset` to discard the checkpoint, or `--no-resume` to ignore it for a single run.
+
 ### Stage 2: Computed Values
 Calculates:
 - `our_price` with MAP compliance
