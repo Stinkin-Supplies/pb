@@ -3,19 +3,19 @@
  * Calculates pricing, stock totals, and flags for catalog products
  */
 
-import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
+import { sql } from '../lib/db.js';
 
 dotenv.config({ path: '.env.local' });
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Missing Supabase credentials');
+function formatEta(seconds) {
+  if (!Number.isFinite(seconds) || seconds < 0) return '—';
+  const s = Math.round(seconds);
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  if (m <= 0) return `${r}s`;
+  return `${m}m${String(r).padStart(2, '0')}s`;
 }
-
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Pricing rules
 const PRICING_RULES = {
@@ -85,16 +85,14 @@ function calculateTotalStock(warehouseJson) {
  */
 async function computeVendorPricing() {
   console.log('💰 Computing vendor offer pricing...');
+  const t0 = Date.now();
 
   // Get all PU vendor offers
-  const { data: offers, error } = await supabase
-    .from('vendor_offers')
-    .select('*')
-    .eq('vendor', 'pu');
-
-  if (error) {
-    throw new Error(`Failed to fetch offers: ${error.message}`);
-  }
+  const offers = await sql`
+    SELECT id, wholesale_cost, msrp, map_price
+    FROM vendor_offers
+    WHERE vendor_code = ${'pu'}
+  `;
 
   console.log(`Found ${offers.length} PU vendor offers`);
 
@@ -102,24 +100,30 @@ async function computeVendorPricing() {
   let errors = 0;
 
   for (const offer of offers) {
-    const ourPrice = calculatePrice(offer.cost, offer.msrp, offer.map_price);
-    
-    const { error: updateError } = await supabase
-      .from('vendor_offers')
-      .update({
-        our_price: ourPrice,
-        computed_at: new Date().toISOString()
-      })
-      .eq('id', offer.id);
+    const ourPrice = calculatePrice(offer.wholesale_cost, offer.msrp, offer.map_price);
 
-    if (updateError) {
-      errors++;
-    } else {
+    try {
+      await sql`
+        UPDATE vendor_offers
+        SET our_price = ${ourPrice}, computed_at = NOW()
+        WHERE id = ${offer.id}
+      `;
       updated++;
+    } catch {
+      errors++;
     }
 
-    if (updated % 1000 === 0) {
-      process.stdout.write(`\r  Updated: ${updated}/${offers.length}`);
+    if ((updated + errors) % 2000 === 0) {
+      const done = updated + errors;
+      const elapsed = (Date.now() - t0) / 1000;
+      const rate = done / Math.max(1, elapsed);
+      const pct = offers.length > 0 ? ((done / offers.length) * 100) : 0;
+      const eta = rate > 0 ? (offers.length - done) / rate : Infinity;
+      process.stdout.write(
+        `\r  ${done.toLocaleString()}/${offers.length.toLocaleString()} (${pct.toFixed(1)}%)` +
+        ` | Updated: ${updated.toLocaleString()} | Errors: ${errors.toLocaleString()}` +
+        ` | ${rate.toFixed(0)}/s | ETA ${formatEta(eta)}`
+      );
     }
   }
 
@@ -133,15 +137,10 @@ async function computeVendorPricing() {
  */
 async function computeProductPrices() {
   console.log('\n🏷️  Computing product prices...');
+  const t0 = Date.now();
 
   // Get products with their offers
-  const { data: products, error } = await supabase
-    .from('catalog_products')
-    .select('id, sku');
-
-  if (error) {
-    throw new Error(`Failed to fetch products: ${error.message}`);
-  }
+  const products = await sql`SELECT id, sku FROM catalog_products`;
 
   console.log(`Found ${products.length} products`);
 
@@ -150,11 +149,12 @@ async function computeProductPrices() {
 
   for (const product of products) {
     // Get best offer (lowest our_price with stock)
-    const { data: offers } = await supabase
-      .from('vendor_offers')
-      .select('our_price, total_qty')
-      .eq('product_id', product.id)
-      .order('our_price', { ascending: true });
+    const offers = await sql`
+      SELECT our_price, total_qty
+      FROM vendor_offers
+      WHERE catalog_product_id = ${product.id}
+      ORDER BY our_price ASC NULLS LAST
+    `;
 
     let bestPrice = null;
     
@@ -169,20 +169,31 @@ async function computeProductPrices() {
     }
 
     if (bestPrice) {
-      const { error: updateError } = await supabase
-        .from('catalog_products')
-        .update({ computed_price: bestPrice })
-        .eq('id', product.id);
-
-      if (!updateError) {
+      try {
+        await sql`
+          UPDATE catalog_products
+          SET computed_price = ${bestPrice}
+          WHERE id = ${product.id}
+        `;
         updated++;
+      } catch {
+        // ignore
       }
     } else {
       noPrice++;
     }
 
-    if ((updated + noPrice) % 1000 === 0) {
-      process.stdout.write(`\r  Updated: ${updated} | No price: ${noPrice}`);
+    if ((updated + noPrice) % 2000 === 0) {
+      const done = updated + noPrice;
+      const elapsed = (Date.now() - t0) / 1000;
+      const rate = done / Math.max(1, elapsed);
+      const pct = products.length > 0 ? ((done / products.length) * 100) : 0;
+      const eta = rate > 0 ? (products.length - done) / rate : Infinity;
+      process.stdout.write(
+        `\r  ${done.toLocaleString()}/${products.length.toLocaleString()} (${pct.toFixed(1)}%)` +
+        ` | Updated: ${updated.toLocaleString()} | No price: ${noPrice.toLocaleString()}` +
+        ` | ${rate.toFixed(0)}/s | ETA ${formatEta(eta)}`
+      );
     }
   }
 
@@ -197,34 +208,18 @@ async function computeProductPrices() {
 async function markDiscontinued() {
   console.log('\n🗑️  Marking discontinued products...');
 
-  // Find products with no active offers
-  const { data: products, error } = await supabase
-    .from('catalog_products')
-    .select('id')
-    .eq('is_discontinued', false);
+  const rows = await sql`
+    UPDATE catalog_products cp
+    SET is_discontinued = true, is_active = false
+    WHERE cp.is_discontinued = false
+      AND NOT EXISTS (
+        SELECT 1 FROM vendor_offers vo
+        WHERE vo.catalog_product_id = cp.id
+      )
+    RETURNING cp.id
+  `;
 
-  if (error) {
-    throw new Error(`Failed to fetch products: ${error.message}`);
-  }
-
-  let discontinued = 0;
-
-  for (const product of products) {
-    const { count } = await supabase
-      .from('vendor_offers')
-      .select('*', { count: 'exact', head: true })
-      .eq('product_id', product.id);
-
-    if (count === 0) {
-      await supabase
-        .from('catalog_products')
-        .update({ is_discontinued: true, is_active: false })
-        .eq('id', product.id);
-      discontinued++;
-    }
-  }
-
-  console.log(`✓ Marked ${discontinued} products as discontinued`);
+  console.log(`✓ Marked ${rows.length} products as discontinued`);
 }
 
 /**

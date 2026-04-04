@@ -9,8 +9,7 @@
 cd scripts && npm install
 
 # 2. Ensure your .env.local has:
-# NEXT_PUBLIC_SUPABASE_URL=...
-# SUPABASE_SERVICE_ROLE_KEY=...
+# CATALOG_DATABASE_URL=...   # Hetzner catalog Postgres (raw_vendor_* + catalog tables)
 # TYPESENSE_HOST=...
 # TYPESENSE_ADMIN_KEY=...
 
@@ -29,6 +28,10 @@ Imports D00108_DealerPrice.csv into `raw_vendor_pu` table as JSONB batches.
 ```bash
 npx dotenv -e .env.local -- node ingest/stage0-pu-dealerprice.cjs
 ```
+
+Notes:
+- Stage 0 writes to the catalog database via `CATALOG_DATABASE_URL`.
+- Stages 1-3 also use `CATALOG_DATABASE_URL` (Hetzner).
 
 ### Stage 1: Normalization
 Maps PU fields to canonical schema:
@@ -65,7 +68,7 @@ npx dotenv -e .env.local -- node ingest/index_assembly.js
 Filter to only Tire/Oldbook/Fatbook products:
 
 ```bash
-npx dotenv -e .env.local -- node ingest/build-catalog-allowlist.cjs
+npx dotenv -e .env.local -- node ingest/build-catalog-allowlist.js
 ```
 
 This creates the `catalog_allowlist` table used by Stage 3 to filter the Typesense index.

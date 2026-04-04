@@ -6,7 +6,6 @@
 import { normalizePu } from './normalize_pu.js';
 import { runComputedValues } from './computed_values.js';
 import { buildTypesenseIndex } from './index_assembly.js';
-import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 
 dotenv.config({ path: '.env.local' });
@@ -20,15 +19,10 @@ const options = {
   recreate: args.includes('--recreate')
 };
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-  console.error('❌ Missing Supabase credentials. Check .env.local');
+if (!process.env.CATALOG_DATABASE_URL) {
+  console.error('❌ Missing CATALOG_DATABASE_URL. Check .env.local');
   process.exit(1);
 }
-
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function runStage0() {
   console.log('\n═══════════════════════════════════════════════════');
