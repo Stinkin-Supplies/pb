@@ -1,7 +1,7 @@
 /**
  * lib/routing/loadCartLines.ts
  *
- * Loads vendor offers from the DB for a given list of SKUs
+ * Loads vendor offers from the Hetzner catalog DB for a given list of SKUs
  * and shapes them into CartLine[] ready for scoreOffers().
  *
  * Usage:
@@ -20,8 +20,6 @@ const VENDOR_CODE_MAP: Record<string, VendorId> = {
 };
 
 // ─── Default shipping options by vendor ──────────────────────────────────────
-// Used when no shipping rules are in the DB yet.
-// Replace with real DB lookup once vendor_shipping_rules is populated.
 
 const DEFAULT_SHIPPING: Record<VendorId, ShippingOption[]> = {
   WPS: [
@@ -36,19 +34,19 @@ const DEFAULT_SHIPPING: Record<VendorId, ShippingOption[]> = {
   ],
 };
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 // ─── Main loader ──────────────────────────────────────────────────────────────
 
 export async function loadCartLines(
   cartItems: CartItem[],
-  sql: any,  // postgres-js or compatible tagged template literal client
+  sql: any, // postgres-js or compatible tagged template literal client
 ): Promise<CartLine[]> {
   if (!cartItems.length) return [];
 
   const skus = cartItems.map(i => i.sku);
 
-  // Fetch all vendor offers for these SKUs in one query
+  // Fetch all vendor offers for these SKUs in one query.
+  // NOTE: vendor_offers does NOT have an is_active column — filter removed.
+  // We gate on total_qty > 0 and catalog_products.is_active instead.
   const offerRows = await sql`
     SELECT
       vo.vendor_code,
@@ -56,15 +54,14 @@ export async function loadCartLines(
       vo.map_price,
       vo.our_price,
       vo.total_qty,
-      vo.drop_ship_fee,
-      vo.drop_ship_eligible,
       cp.sku,
       cp.computed_price,
       cp.name
     FROM vendor_offers vo
     JOIN catalog_products cp ON cp.id = vo.catalog_product_id
     WHERE cp.sku = ANY(${skus})
-      AND vo.is_active = true
+      AND cp.is_active = true
+      AND cp.is_discontinued = false
     ORDER BY cp.sku, vo.vendor_code
   `;
 
@@ -93,7 +90,7 @@ export async function loadCartLines(
     offersBySku.get(row.sku)!.push(offer);
   }
 
-  // Build CartLine[] — one per cart item, matching types.ts CartLine shape
+  // Build CartLine[] — one per cart item
   return cartItems.map(item => ({
     sku:         item.sku,
     qty:         item.qty,
