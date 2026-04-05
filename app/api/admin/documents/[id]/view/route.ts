@@ -29,17 +29,17 @@ export async function GET(
   const supabase = getSupabaseAdmin();
   const { data: doc, error: docErr } = await supabase
     .from("admin_documents")
-    .select("id,storage_path")
+    .select("id,file_path")
     .eq("id", id)
     .single();
 
-  if (docErr || !doc?.storage_path) {
+  if (docErr || !doc?.file_path) {
     return NextResponse.json({ error: docErr?.message ?? "Not found" }, { status: 404 });
   }
 
   const { data, error } = await supabase.storage
     .from(BUCKET)
-    .createSignedUrl(doc.storage_path, 60 * 10); // 10 minutes
+    .createSignedUrl(doc.file_path, 60 * 10); // 10 minutes
 
   if (error || !data?.signedUrl) {
     return NextResponse.json(
