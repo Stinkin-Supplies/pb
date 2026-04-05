@@ -25,7 +25,7 @@ export async function GET(req: Request) {
   let q = supabase
     .from("admin_documents")
     .select(
-      "id,folder_id,name,storage_path,mime_type,size_bytes,created_at,updated_at"
+      "id,folder_id,name,file_path,mime_type,file_size,created_at"
     )
     .order("created_at", { ascending: false });
 
@@ -39,4 +39,3 @@ export async function GET(req: Request) {
 
   return NextResponse.json(data ?? []);
 }
-
