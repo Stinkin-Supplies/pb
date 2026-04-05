@@ -24,9 +24,10 @@ function getTypesense() {
     process.env.TYPESENSE_ADMIN_KEY ||
     process.env.TYPESENSE_ADMIN_API_KEY ||
     process.env.TYPESENSE_API_KEY;
-  const protocol = (process.env.TYPESENSE_PROTOCOL || 'https').replace(':', '');
-  const portEnv = process.env.TYPESENSE_PORT;
-  const port =
+  // Default to cloud-style https unless overridden.
+  let protocol = (process.env.TYPESENSE_PROTOCOL || 'https').replace(':', '');
+  let portEnv = process.env.TYPESENSE_PORT;
+  let port =
     (portEnv && !Number.isNaN(parseInt(portEnv, 10)) ? parseInt(portEnv, 10) : null) ??
     (protocol === 'https' ? 443 : 8108);
 
@@ -42,6 +43,9 @@ function getTypesense() {
     if (host.includes('://')) {
       const u = new URL(host);
       host = u.hostname;
+      // If a full URL is provided, prefer its scheme/port to avoid https->http mismatch.
+      protocol = u.protocol.replace(':', '') || protocol;
+      port = u.port ? parseInt(u.port, 10) : port;
     }
   } catch {
     // ignore
@@ -60,6 +64,7 @@ function getTypesense() {
 }
 
 const CHECKPOINT_FILE = '.stage3_checkpoint.json';
+const FITMENT_CHECKPOINT_FILE = '.stage3_fitment_checkpoint.json';
 const DEFAULT_BATCH_SIZE = 2000;
 const DEFAULT_CONCURRENCY = 6;
 const DEFAULT_INFLIGHT_PER_WORKER = 1;
@@ -342,6 +347,144 @@ async function setupCollection(collectionName, profile, recreate = false) {
     return resolvedName;
   }
 
+  // Incremental profile: products_search + fitment_make (lightweight, non-faceted).
+  if (resolvedProfile === 'products_search_make') {
+    const schema = {
+      name: resolvedName,
+      fields: [
+        { name: 'id', type: 'string' },
+        { name: 'name', type: 'string', index: true },
+        { name: 'sku', type: 'string', index: true },
+        { name: 'brand', type: 'string', facet: true },
+        { name: 'category', type: 'string', facet: true },
+        { name: 'price', type: 'float', sort: true },
+        { name: 'in_stock', type: 'bool', facet: true },
+        { name: 'fitment_make', type: 'string[]', facet: false, index: false, optional: true },
+        { name: 'image_url', type: 'string', index: false, store: true, optional: true },
+      ],
+    };
+
+    await withTypesenseOomRetry(
+      async () => typesenseClient.collections().create(schema),
+      `create collection ${resolvedName}`
+    );
+    console.log('✓ Collection created');
+    return resolvedName;
+  }
+
+  // Incremental profile: products_search_make + description (stored, not indexed).
+  if (resolvedProfile === 'products_search_make_desc') {
+    const schema = {
+      name: resolvedName,
+      fields: [
+        { name: 'id', type: 'string' },
+        { name: 'name', type: 'string', index: true },
+        { name: 'sku', type: 'string', index: true },
+        { name: 'brand', type: 'string', facet: true },
+        { name: 'category', type: 'string', facet: true },
+        { name: 'price', type: 'float', sort: true },
+        { name: 'in_stock', type: 'bool', facet: true },
+        { name: 'fitment_make', type: 'string[]', facet: false, index: false, optional: true },
+        // Add description for display, but do not index it (keeps RAM lower).
+        { name: 'description', type: 'string', index: false, store: true, optional: true },
+        { name: 'image_url', type: 'string', index: false, store: true, optional: true },
+      ],
+    };
+
+    await withTypesenseOomRetry(
+      async () => typesenseClient.collections().create(schema),
+      `create collection ${resolvedName}`
+    );
+    console.log('✓ Collection created');
+    return resolvedName;
+  }
+
+  // Incremental profile: products_search_make_desc + search_blob (indexed, not stored).
+  if (resolvedProfile === 'products_search_make_desc_blob') {
+    const schema = {
+      name: resolvedName,
+      fields: [
+        { name: 'id', type: 'string' },
+        { name: 'name', type: 'string', index: true },
+        { name: 'sku', type: 'string', index: true },
+        { name: 'brand', type: 'string', facet: true },
+        { name: 'category', type: 'string', facet: true },
+        { name: 'price', type: 'float', sort: true },
+        { name: 'in_stock', type: 'bool', facet: true },
+        { name: 'fitment_make', type: 'string[]', facet: false, index: false, optional: true },
+        // Add description for display, but do not index it (keeps RAM lower).
+        { name: 'description', type: 'string', index: false, store: true, optional: true },
+        // Indexed for search, but removed from document before writing to disk.
+        { name: 'search_blob', type: 'string', index: true, store: false, optional: true },
+        { name: 'image_url', type: 'string', index: false, store: true, optional: true },
+      ],
+    };
+
+    await withTypesenseOomRetry(
+      async () => typesenseClient.collections().create(schema),
+      `create collection ${resolvedName}`
+    );
+    console.log('✓ Collection created');
+    return resolvedName;
+  }
+
+  // Primary product index with summarized fitment and year range (no explosion).
+  if (resolvedProfile === 'products_primary_fitment') {
+    const schema = {
+      name: resolvedName,
+      fields: [
+        // id must be faceted to allow id:=[...] filtering in the 2-step fitment pipeline.
+        { name: 'id', type: 'string', facet: true },
+        { name: 'name', type: 'string', index: true },
+        { name: 'sku', type: 'string', index: true },
+        { name: 'brand', type: 'string', facet: true },
+        { name: 'category', type: 'string', facet: true },
+        { name: 'price', type: 'float', sort: true },
+        { name: 'in_stock', type: 'bool', facet: true },
+        // Summarized fitment: capped, non-faceted (filtering uses product_fitment collection).
+        { name: 'fitment_make', type: 'string[]', facet: false, index: false, optional: true },
+        { name: 'fitment_model', type: 'string[]', facet: false, index: false, optional: true },
+        { name: 'fitment_year_min', type: 'int32', facet: false, index: false, optional: true },
+        { name: 'fitment_year_max', type: 'int32', facet: false, index: false, optional: true },
+        // Relevance helper: indexed, not stored.
+        { name: 'search_blob', type: 'string', index: true, store: false, optional: true },
+        { name: 'image_url', type: 'string', index: false, store: true, optional: true },
+      ],
+    };
+
+    await withTypesenseOomRetry(
+      async () => typesenseClient.collections().create(schema),
+      `create collection ${resolvedName}`
+    );
+    console.log('✓ Collection created');
+    return resolvedName;
+  }
+
+  // Secondary index: one doc per (product, make, model, year) for fast fitment lookups.
+  if (resolvedProfile === 'product_fitment') {
+    const schema = {
+      name: resolvedName,
+      fields: [
+        { name: 'id', type: 'string' },
+        { name: 'product_id', type: 'string', facet: false, index: false },
+        { name: 'make', type: 'string', facet: true },
+        { name: 'model', type: 'string', facet: true },
+        { name: 'year', type: 'int32', facet: true },
+        // Precomputed token for direct lookups: "make:model:year" (indexed, not stored).
+        // Do NOT facet this: cardinality is huge and will blow RAM on small nodes.
+        { name: 'token', type: 'string', index: true, store: false, optional: true },
+        { name: 'trim', type: 'string', facet: false, index: false, optional: true },
+      ],
+    };
+
+    await withTypesenseOomRetry(
+      async () => typesenseClient.collections().create(schema),
+      `create collection ${resolvedName}`
+    );
+    console.log('✓ Collection created');
+    return resolvedName;
+  }
+
   const isSearchOnly = resolvedProfile === 'search';
 
   const baseFields = [
@@ -409,6 +552,29 @@ function saveCheckpoint(checkpoint) {
   fs.writeFileSync(CHECKPOINT_FILE, JSON.stringify(checkpoint, null, 2));
 }
 
+function loadCheckpointFrom(file) {
+  try {
+    if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch {
+    // ignore
+  }
+  return { lastOffset: 0, processed: 0, failed: 0 };
+}
+
+function saveCheckpointTo(file, checkpoint) {
+  fs.writeFileSync(file, JSON.stringify(checkpoint, null, 2));
+}
+
+function normalizeFacetValue(v) {
+  // Aggressive normalization for stable equality filters.
+  // Honda -> honda, "Civic LX" -> "civic lx"
+  return String(v ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
 async function buildDocumentsForProducts(products, opts = {}) {
   if (!products || products.length === 0) return [];
 
@@ -418,7 +584,68 @@ async function buildDocumentsForProducts(products, opts = {}) {
   const queryProfile = profile === 'products_search' ? 'core' : profile;
 
   let rows = [];
+  // Primary product fitment summary: always query catalog_fitment directly (no year explosion).
+  if (profile === 'products_primary_fitment') {
+    rows = await sql`
+      WITH ids AS (
+        SELECT unnest(${productIds}::int[]) AS product_id
+      ),
+      fitment AS (
+        SELECT
+          f.product_id,
+          (ARRAY_AGG(
+            DISTINCT NULLIF(LOWER(BTRIM(f.make)), '')
+            ORDER BY NULLIF(LOWER(BTRIM(f.make)), '')
+          ))[1:10] AS makes,
+          (ARRAY_AGG(
+            DISTINCT NULLIF(LOWER(BTRIM(f.model)), '')
+            ORDER BY NULLIF(LOWER(BTRIM(f.model)), '')
+          ))[1:10] AS models,
+          MIN(LEAST(COALESCE(f.year_start, f.year_end), COALESCE(f.year_end, f.year_start)))::int AS year_min,
+          MAX(GREATEST(COALESCE(f.year_start, f.year_end), COALESCE(f.year_end, f.year_start)))::int AS year_max
+        FROM catalog_fitment f
+        JOIN ids ON ids.product_id = f.product_id
+        GROUP BY f.product_id
+      ),
+      media AS (
+        SELECT DISTINCT ON (m.product_id)
+          m.product_id,
+          m.url
+        FROM catalog_media m
+        JOIN ids ON ids.product_id = m.product_id
+        ORDER BY m.product_id, m.priority ASC
+      )
+      SELECT
+        cp.id,
+        COALESCE(fitment.makes, ARRAY[]::text[]) AS fitment_make,
+        COALESCE(fitment.models, ARRAY[]::text[]) AS fitment_model,
+        fitment.year_min AS fitment_year_min,
+        fitment.year_max AS fitment_year_max,
+        media.url AS image_url,
+        COALESCE(cp.stock_quantity, 0)::int AS stock_qty
+      FROM ids
+      JOIN catalog_products cp ON cp.id = ids.product_id
+      LEFT JOIN fitment ON fitment.product_id = cp.id
+      LEFT JOIN media   ON media.product_id   = cp.id
+    `;
+  } else
   if (useCache) {
+    if (profile === 'products_search_make') {
+      rows = await sql`
+        WITH ids AS (
+          SELECT unnest(${productIds}::int[]) AS product_id
+        )
+        SELECT
+          cp.id,
+          COALESCE(c.fitment_make, ARRAY[]::text[]) AS fitment_make,
+          c.image_url AS image_url,
+          COALESCE(cp.stock_quantity, 0)::int AS stock_qty
+        FROM ids
+        JOIN catalog_products cp ON cp.id = ids.product_id
+        LEFT JOIN catalog_product_search_cache c
+          ON c.product_id = cp.id
+      `;
+    } else
     if (queryProfile === 'core') {
       rows = await sql`
         WITH ids AS (
@@ -461,6 +688,41 @@ async function buildDocumentsForProducts(products, opts = {}) {
       `;
     }
   } else {
+    if (profile === 'products_search_make') {
+      rows = await sql`
+        WITH ids AS (
+          SELECT unnest(${productIds}::int[]) AS product_id
+        ),
+        fitment AS (
+          SELECT
+            f.product_id,
+            (ARRAY_AGG(
+              DISTINCT NULLIF(LOWER(BTRIM(f.make)), '')
+              ORDER BY NULLIF(LOWER(BTRIM(f.make)), '')
+            ))[1:10] AS makes
+          FROM catalog_fitment f
+          JOIN ids ON ids.product_id = f.product_id
+          GROUP BY f.product_id
+        ),
+        media AS (
+          SELECT DISTINCT ON (m.product_id)
+            m.product_id,
+            m.url
+          FROM catalog_media m
+          JOIN ids ON ids.product_id = m.product_id
+          ORDER BY m.product_id, m.priority ASC
+        )
+        SELECT
+          cp.id,
+          COALESCE(fitment.makes, ARRAY[]::text[]) AS fitment_make,
+          media.url AS image_url,
+          COALESCE(cp.stock_quantity, 0)::int AS stock_qty
+        FROM ids
+        JOIN catalog_products cp ON cp.id = ids.product_id
+        LEFT JOIN fitment ON fitment.product_id = cp.id
+        LEFT JOIN media   ON media.product_id   = cp.id
+      `;
+    } else
     if (queryProfile === 'core') {
       rows = await sql`
         WITH ids AS (
@@ -575,6 +837,162 @@ async function buildDocumentsForProducts(products, opts = {}) {
       };
     }
 
+    if (profile === 'products_search_make') {
+      const rawMakes = Array.isArray(r?.fitment_make) ? r.fitment_make : [];
+      const seen = new Set();
+      const normalized = [];
+      for (const m of rawMakes) {
+        const v = String(m ?? '').trim().toLowerCase();
+        if (!v) continue;
+        if (seen.has(v)) continue;
+        seen.add(v);
+        normalized.push(v);
+        if (normalized.length >= 10) break;
+      }
+      normalized.sort();
+
+      return {
+        id: product.id.toString(),
+        name: product.name || '',
+        sku: product.sku,
+        brand: product.brand || '',
+        category: product.category || '',
+        price: safePrice,
+        in_stock: stockQty > 0,
+        fitment_make: normalized,
+        image_url: imageUrl,
+      };
+    }
+
+    if (profile === 'products_search_make_desc') {
+      const rawMakes = Array.isArray(r?.fitment_make) ? r.fitment_make : [];
+      const seen = new Set();
+      const normalized = [];
+      for (const m of rawMakes) {
+        const v = String(m ?? '').trim().toLowerCase();
+        if (!v) continue;
+        if (seen.has(v)) continue;
+        seen.add(v);
+        normalized.push(v);
+        if (normalized.length >= 10) break;
+      }
+      normalized.sort();
+
+      const description = String(product.description ?? '').slice(0, 4000) || undefined;
+
+      return {
+        id: product.id.toString(),
+        name: product.name || '',
+        sku: product.sku,
+        brand: product.brand || '',
+        category: product.category || '',
+        price: safePrice,
+        in_stock: stockQty > 0,
+        fitment_make: normalized,
+        description,
+        image_url: imageUrl,
+      };
+    }
+
+    if (profile === 'products_search_make_desc_blob') {
+      const rawMakes = Array.isArray(r?.fitment_make) ? r.fitment_make : [];
+      const seen = new Set();
+      const normalized = [];
+      for (const m of rawMakes) {
+        const v = String(m ?? '').trim().toLowerCase();
+        if (!v) continue;
+        if (seen.has(v)) continue;
+        seen.add(v);
+        normalized.push(v);
+        if (normalized.length >= 10) break;
+      }
+      normalized.sort();
+
+      const description = String(product.description ?? '').slice(0, 4000) || undefined;
+      const searchBlob = [
+        product.name,
+        product.sku,
+        product.brand,
+        product.category,
+        ...normalized,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .slice(0, 200);
+
+      return {
+        id: product.id.toString(),
+        name: product.name || '',
+        sku: product.sku,
+        brand: product.brand || '',
+        category: product.category || '',
+        price: safePrice,
+        in_stock: stockQty > 0,
+        fitment_make: normalized,
+        description,
+        search_blob: searchBlob,
+        image_url: imageUrl,
+      };
+    }
+
+    if (profile === 'products_primary_fitment') {
+      const rawMakes = Array.isArray(r?.fitment_make) ? r.fitment_make : [];
+      const rawModels = Array.isArray(r?.fitment_model) ? r.fitment_model : [];
+
+      const normCap = (arr) => {
+        const seen = new Set();
+        const out = [];
+        for (const x of arr) {
+          const n = normalizeFacetValue(x);
+          if (!n) continue;
+          if (seen.has(n)) continue;
+          seen.add(n);
+          out.push(n);
+          if (out.length >= 10) break;
+        }
+        out.sort();
+        return out;
+      };
+
+      const makes = normCap(rawMakes);
+      const models = normCap(rawModels);
+
+      const yearMin = Number.isFinite(Number(r?.fitment_year_min)) ? Number(r.fitment_year_min) : undefined;
+      const yearMax = Number.isFinite(Number(r?.fitment_year_max)) ? Number(r.fitment_year_max) : undefined;
+
+      const searchBlob = [
+        product.name,
+        product.sku,
+        product.brand,
+        product.category,
+        ...makes,
+        ...models,
+        yearMin,
+        yearMax,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .slice(0, 200);
+
+      return {
+        id: product.id.toString(),
+        name: product.name || '',
+        sku: product.sku,
+        brand: product.brand || '',
+        category: product.category || '',
+        fitment_make: makes,
+        fitment_model: models,
+        fitment_year_min: yearMin,
+        fitment_year_max: yearMax,
+        price: safePrice,
+        in_stock: stockQty > 0,
+        search_blob: searchBlob,
+        image_url: imageUrl,
+      };
+    }
+
     const specs = r?.specs ?? [];
 
     const searchBlob = (r?.search_blob && String(r.search_blob).trim())
@@ -661,6 +1079,180 @@ async function getProductsToIndex(offset, limit, useAllowlist) {
   };
 }
 
+async function getFitmentRowsToIndex(offset, limit, useAllowlist) {
+  // We page over catalog_fitment rows (not products). Each row can expand to multiple year docs.
+  if (useAllowlist) {
+    return {
+      data: await sql`
+        SELECT
+          f.id AS fitment_id,
+          f.product_id,
+          f.make,
+          f.model,
+          f.year_start,
+          f.year_end
+        FROM catalog_fitment f
+        JOIN catalog_products cp ON cp.id = f.product_id
+        WHERE cp.is_active = true
+          AND cp.is_discontinued = false
+          AND cp.computed_price IS NOT NULL
+          AND EXISTS (SELECT 1 FROM catalog_allowlist al WHERE al.sku = cp.sku)
+        ORDER BY f.id
+        OFFSET ${offset}
+        LIMIT ${limit}
+      `,
+      error: null,
+    };
+  }
+
+  return {
+    data: await sql`
+      SELECT
+        f.id AS fitment_id,
+        f.product_id,
+        f.make,
+        f.model,
+        f.year_start,
+        f.year_end
+      FROM catalog_fitment f
+      JOIN catalog_products cp ON cp.id = f.product_id
+      WHERE cp.is_active = true
+        AND cp.is_discontinued = false
+        AND cp.computed_price IS NOT NULL
+      ORDER BY f.id
+      OFFSET ${offset}
+      LIMIT ${limit}
+    `,
+    error: null,
+  };
+}
+
+function buildFitmentDocs(rows) {
+  const docs = [];
+
+  for (const r of rows) {
+    const productId = String(r.product_id);
+    const make = normalizeFacetValue(r.make);
+    const model = normalizeFacetValue(r.model);
+    if (!productId || !make || !model) continue;
+
+    const start = Number.isFinite(Number(r.year_start)) ? Number(r.year_start) : Number(r.year_end);
+    if (!Number.isFinite(start)) continue;
+    const endRaw = Number.isFinite(Number(r.year_end)) ? Number(r.year_end) : start;
+    const end = Math.min(endRaw, start + 24); // cap expansion to 25 years
+
+    for (let year = start; year <= end; year++) {
+      // Include fitment_id to avoid collisions when multiple fitment rows overlap.
+      const id = `${productId}_${r.fitment_id}_${make.replace(/\s+/g, '-')}_${model.replace(/\s+/g, '-')}_${year}`;
+      const token = `${make}:${model}:${year}`;
+      docs.push({
+        id,
+        product_id: productId,
+        make,
+        model,
+        year,
+        token,
+        trim: null,
+      });
+    }
+  }
+
+  return docs;
+}
+
+async function buildProductFitmentIndex(opts) {
+  const {
+    recreate,
+    resume,
+    useAllowlist,
+    typesenseClient,
+  } = opts;
+
+  const fitmentCollection =
+    (process.env.INDEX_FITMENT_COLLECTION || 'product_fitment').trim();
+
+  const batchSize = parseInt(process.env.INDEX_FITMENT_BATCH_SIZE || '100', 10) || 100;
+
+  console.log('\n═══════════════════════════════════════════════════');
+  console.log('  FITMENT INDEX: product_fitment');
+  console.log('═══════════════════════════════════════════════════\n');
+  console.log(`Collection: ${fitmentCollection}`);
+  console.log(`Batch size: ${batchSize}\n`);
+
+  await setupCollection(fitmentCollection, 'product_fitment', recreate);
+
+  let checkpoint = resume ? loadCheckpointFrom(FITMENT_CHECKPOINT_FILE) : { lastOffset: 0, processed: 0, failed: 0 };
+  if (recreate) checkpoint = { lastOffset: 0, processed: 0, failed: 0 };
+
+  console.log(`Starting from offset: ${checkpoint.lastOffset}`);
+
+  const totalRes = useAllowlist
+    ? await sql`
+        SELECT COUNT(*)::int AS count
+        FROM catalog_fitment f
+        JOIN catalog_products cp ON cp.id = f.product_id
+        WHERE cp.is_active = true
+          AND cp.is_discontinued = false
+          AND cp.computed_price IS NOT NULL
+          AND EXISTS (SELECT 1 FROM catalog_allowlist al WHERE al.sku = cp.sku)
+      `
+    : await sql`
+        SELECT COUNT(*)::int AS count
+        FROM catalog_fitment f
+        JOIN catalog_products cp ON cp.id = f.product_id
+        WHERE cp.is_active = true
+          AND cp.is_discontinued = false
+          AND cp.computed_price IS NOT NULL
+      `;
+
+  const totalRows = totalRes?.[0]?.count ?? 0;
+  console.log(`Fitment rows to index: ${totalRows}\n`);
+
+  let offset = checkpoint.lastOffset;
+  let processed = checkpoint.processed;
+  let failed = checkpoint.failed;
+
+  while (offset < totalRows) {
+    const res = await getFitmentRowsToIndex(offset, batchSize, useAllowlist);
+    const rows = res.data ?? [];
+    if (rows.length === 0) break;
+
+    const docs = buildFitmentDocs(rows);
+    if (docs.length > 0) {
+      try {
+        const { failed: batchFailed } = await importWithRetry(
+          typesenseClient,
+          fitmentCollection,
+          docs,
+          {
+            retries: parseInt(process.env.INDEX_IMPORT_RETRIES || '3', 10),
+            baseDelayMs: parseInt(process.env.INDEX_IMPORT_RETRY_BASE_MS || '750', 10),
+          }
+        );
+        processed += docs.length;
+        failed += batchFailed;
+      } catch (e) {
+        console.error(`Import error at fitment row offset ${offset}:`, e?.message ?? e);
+        failed += docs.length;
+      }
+    }
+
+    offset += rows.length;
+    checkpoint = { lastOffset: offset, processed, failed };
+    saveCheckpointTo(FITMENT_CHECKPOINT_FILE, checkpoint);
+
+    const pct = totalRows > 0 ? ((Math.min(offset, totalRows) / totalRows) * 100).toFixed(1) : '0.0';
+    process.stdout.write(
+      `\r  Fitment progress: ${offset}/${totalRows} (${pct}%) | Docs: ${processed} | Failed: ${failed}`
+    );
+  }
+
+  console.log('\n');
+  console.log(`✓ Fitment index complete. Docs: ${processed}, Failed: ${failed}`);
+
+  if (fs.existsSync(FITMENT_CHECKPOINT_FILE)) fs.unlinkSync(FITMENT_CHECKPOINT_FILE);
+}
+
 /**
  * Main index builder
  */
@@ -683,6 +1275,22 @@ export async function buildTypesenseIndex(options = {}) {
   console.log(`Index profile: ${profile}`);
   console.log(`Collection: ${collectionName}\n`);
 
+  // Allowlist is used for both primary and fitment collections.
+  const allowlistCount = await sql`SELECT COUNT(*)::int AS count FROM catalog_allowlist`;
+  const useAllowlist = (allowlistCount?.[0]?.count ?? 0) > 0;
+  console.log(`Allowlist entries: ${allowlistCount?.[0]?.count ?? 0}`);
+
+  const onlyFitment = String(process.env.INDEX_ONLY_FITMENT_COLLECTION ?? '').toLowerCase();
+  if (onlyFitment === '1' || onlyFitment === 'true' || onlyFitment === 'yes') {
+    await buildProductFitmentIndex({
+      recreate,
+      resume,
+      useAllowlist,
+      typesenseClient,
+    });
+    return;
+  }
+
   const collection = await setupCollection(collectionName, profile, recreate);
 
   // Load checkpoint
@@ -693,11 +1301,6 @@ export async function buildTypesenseIndex(options = {}) {
   }
 
   console.log(`Starting from offset: ${checkpoint.lastOffset}`);
-
-  // Get total count
-  const allowlistCount = await sql`SELECT COUNT(*)::int AS count FROM catalog_allowlist`;
-  const useAllowlist = (allowlistCount?.[0]?.count ?? 0) > 0;
-  console.log(`Allowlist entries: ${allowlistCount?.[0]?.count ?? 0}`);
 
   const totalRes = useAllowlist
     ? await sql`
@@ -899,6 +1502,17 @@ export async function buildTypesenseIndex(options = {}) {
   // Clean up checkpoint
   if (fs.existsSync(CHECKPOINT_FILE)) {
     fs.unlinkSync(CHECKPOINT_FILE);
+  }
+
+  // Optional: build the secondary fitment collection after the primary collection succeeds.
+  const buildFitment = String(process.env.INDEX_BUILD_FITMENT_COLLECTION ?? '').toLowerCase();
+  if (buildFitment === '1' || buildFitment === 'true' || buildFitment === 'yes') {
+    await buildProductFitmentIndex({
+      recreate,
+      resume,
+      useAllowlist,
+      typesenseClient,
+    });
   }
 }
 
