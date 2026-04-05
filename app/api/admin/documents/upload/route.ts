@@ -83,7 +83,7 @@ export async function POST(req: Request) {
    })
    .select(
      
- "id,folder_id,name,file_path,mime_type,file_size,created_at,updated_at"
+ "id,folder_id,name,file_path,mime_type,file_size,created_at"
  
    )
    .single();
@@ -96,4 +96,3 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ ok: true, document: data });
 }
-
