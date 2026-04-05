@@ -1,6 +1,6 @@
 export const runtime = "nodejs";
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { isAuthorizedAdmin } from "@/lib/adminAuth";
 
@@ -15,12 +15,15 @@ function getSupabaseAdmin() {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
-export async function GET(req: Request, ctx: { params: { id: string } }) {
+export async function GET(
+  req: NextRequest,
+  ctx: { params: Promise<{ id: string }> }
+) {
   if (!isAuthorizedAdmin(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id } = ctx.params;
+  const { id } = await ctx.params;
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
   const supabase = getSupabaseAdmin();
