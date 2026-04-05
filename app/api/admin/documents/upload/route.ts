@@ -54,39 +54,19 @@ export async function POST(req: Request) {
       { status: 500 }
     );
   }
-  const
-  { data, 
- error
- : insErr } = 
- await
-  supabase
-   .from(
- "admin_documents"
- )
-   .insert({
-     id,
-     
- folder_id
- : folderId,
-     
- name
- : safeName,
-     
- file_path
- : storagePath,
-     
- mime_type
- : file.type,
-     
- file_size
- : file.size,
-   })
-   .select(
-     
- "id,folder_id,name,file_path,mime_type,file_size,created_at"
- 
-   )
-   .single();
+
+  const { data, error: insErr } = await supabase
+    .from("admin_documents")
+    .insert({
+      id,
+      folder_id: folderId,
+      name: safeName,
+      file_path: storagePath,
+      mime_type: file.type,
+      file_size: file.size,
+    })
+    .select("id,folder_id,name,file_path,mime_type,file_size,created_at")
+    .single();
 
   if (insErr) {
     // Best-effort cleanup of orphaned storage object.
