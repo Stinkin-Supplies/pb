@@ -39,7 +39,7 @@ export async function GET(req: Request) {
   )
 
   // ── Build filter_by ─────────────────────────────────────────
-  const filters: string[] = ['is_active:=true']
+  const filters: string[] = []
   if (category) filters.push(`category:=${JSON.stringify(category)}`)
   if (brand)    filters.push(`brand:=${JSON.stringify(brand)}`)
   if (inStock)  filters.push('in_stock:=true')
