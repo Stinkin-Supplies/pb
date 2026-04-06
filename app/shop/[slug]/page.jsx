@@ -15,20 +15,43 @@ export default async function ProductDetailPage({ params }) {
 
   const supabase = await createServerSupabaseClient();
 
-  const { data: product } = await supabase
+  let product = null;
+  let error = null;
+
+  ({ data: product, error } = await supabase
     .from("catalog_products")
     .select(`
-      *,
-      catalog_media (
-        url,
-        media_type,
-        is_primary
-      )
-    `)
+        *,
+        catalog_media (
+          url,
+          media_type,
+          is_primary
+        )
+      `)
     .eq("slug", slug)
-    .single();
+    .eq("is_active", true)
+    .single());
 
-  if (!product) notFound();
+  // Some requests (prefetch/RSC) can hit without the expected auth context/cookies.
+  // Fall back to service-role server fetch so the PDP doesn't intermittently 404.
+  if (error || !product) {
+    console.warn("[PDP] anon fetch failed; falling back to admin client:", error?.message ?? error);
+    ({ data: product, error } = await adminSupabase
+      .from("catalog_products")
+      .select(`
+          *,
+          catalog_media (
+            url,
+            media_type,
+            is_primary
+          )
+        `)
+      .eq("slug", slug)
+      .eq("is_active", true)
+      .single());
+  }
+
+  if (error || !product) notFound();
 
   // Build gallery + primary
   const media = product.catalog_media || [];
