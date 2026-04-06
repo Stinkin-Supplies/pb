@@ -194,6 +194,9 @@ function slimDocumentForTypesense(doc, level = 0) {
       in_stock: out.in_stock,
       free_shipping: out.free_shipping,
       image_url: out.image_url,
+      primary_image: out.primary_image,
+      primaryImage: out.primaryImage ?? out.primary_image,
+      images: Array.isArray(out.images) ? out.images : [],
       specs: [],
       fitment_make: [],
       fitment_model: [],
@@ -336,6 +339,9 @@ async function setupCollection(collectionName, profile, recreate = false) {
         { name: 'price', type: 'float', sort: true },
         { name: 'in_stock', type: 'bool', facet: true },
         { name: 'image_url', type: 'string', index: false, store: true, optional: true },
+        { name: 'primary_image', type: 'string', index: false, store: true, optional: true },
+        { name: 'primaryImage', type: 'string', index: false, store: true, optional: true },
+        { name: 'images', type: 'string[]', index: false, store: true, optional: true },
       ],
     };
 
@@ -361,6 +367,9 @@ async function setupCollection(collectionName, profile, recreate = false) {
         { name: 'in_stock', type: 'bool', facet: true },
         { name: 'fitment_make', type: 'string[]', facet: false, index: false, optional: true },
         { name: 'image_url', type: 'string', index: false, store: true, optional: true },
+        { name: 'primary_image', type: 'string', index: false, store: true, optional: true },
+        { name: 'primaryImage', type: 'string', index: false, store: true, optional: true },
+        { name: 'images', type: 'string[]', index: false, store: true, optional: true },
       ],
     };
 
@@ -388,6 +397,9 @@ async function setupCollection(collectionName, profile, recreate = false) {
         // Add description for display, but do not index it (keeps RAM lower).
         { name: 'description', type: 'string', index: false, store: true, optional: true },
         { name: 'image_url', type: 'string', index: false, store: true, optional: true },
+        { name: 'primary_image', type: 'string', index: false, store: true, optional: true },
+        { name: 'primaryImage', type: 'string', index: false, store: true, optional: true },
+        { name: 'images', type: 'string[]', index: false, store: true, optional: true },
       ],
     };
 
@@ -417,6 +429,9 @@ async function setupCollection(collectionName, profile, recreate = false) {
         // Indexed for search, but removed from document before writing to disk.
         { name: 'search_blob', type: 'string', index: true, store: false, optional: true },
         { name: 'image_url', type: 'string', index: false, store: true, optional: true },
+        { name: 'primary_image', type: 'string', index: false, store: true, optional: true },
+        { name: 'primaryImage', type: 'string', index: false, store: true, optional: true },
+        { name: 'images', type: 'string[]', index: false, store: true, optional: true },
       ],
     };
 
@@ -449,6 +464,9 @@ async function setupCollection(collectionName, profile, recreate = false) {
         // Relevance helper: indexed, not stored.
         { name: 'search_blob', type: 'string', index: true, store: false, optional: true },
         { name: 'image_url', type: 'string', index: false, store: true, optional: true },
+        { name: 'primary_image', type: 'string', index: false, store: true, optional: true },
+        { name: 'primaryImage', type: 'string', index: false, store: true, optional: true },
+        { name: 'images', type: 'string[]', index: false, store: true, optional: true },
       ],
     };
 
@@ -504,6 +522,9 @@ async function setupCollection(collectionName, profile, recreate = false) {
     { name: 'free_shipping', type: 'bool', facet: false, optional: true },
     // Not searched; keep retrievable but avoid indexing overhead.
     { name: 'image_url', type: 'string', optional: true, index: false },
+    { name: 'primary_image', type: 'string', optional: true, index: false },
+    { name: 'primaryImage', type: 'string', optional: true, index: false },
+    { name: 'images', type: 'string[]', optional: true, index: false },
     // Index for search relevance, but don't store on disk to reduce stored payload.
     { name: 'search_blob', type: 'string', optional: true, store: false },
   ];
@@ -811,10 +832,27 @@ async function buildDocumentsForProducts(products, opts = {}) {
   }
 
   const rowById = new Map(rows.map((r) => [r.id, r]));
+  const coerceStringArray = (v) => {
+    if (Array.isArray(v)) return v.filter((x) => typeof x === 'string' && x.length > 0);
+    if (typeof v === 'string') {
+      try {
+        const parsed = JSON.parse(v);
+        if (Array.isArray(parsed)) return parsed.filter((x) => typeof x === 'string' && x.length > 0);
+      } catch {
+        // ignore
+      }
+    }
+    return [];
+  };
 
   return products.map((product) => {
     const r = rowById.get(product.id);
     const imageUrl = r?.image_url ?? null;
+    const images = coerceStringArray(product.images);
+    const primaryImage =
+      (typeof product.primary_image === 'string' && product.primary_image.length > 0)
+        ? product.primary_image
+        : images[0] ?? imageUrl ?? null;
     const stockQty = Number(r?.stock_qty ?? 0);
     const msrp = r?.msrp ?? null;
     const priceNum = Number(product.computed_price ?? 0);
@@ -833,7 +871,10 @@ async function buildDocumentsForProducts(products, opts = {}) {
         category: product.category || '',
         price: safePrice,
         in_stock: stockQty > 0,
-        image_url: imageUrl,
+        image_url: primaryImage,
+        primary_image: primaryImage,
+        primaryImage,
+        images,
       };
     }
 
@@ -860,7 +901,10 @@ async function buildDocumentsForProducts(products, opts = {}) {
         price: safePrice,
         in_stock: stockQty > 0,
         fitment_make: normalized,
-        image_url: imageUrl,
+        image_url: primaryImage,
+        primary_image: primaryImage,
+        primaryImage,
+        images,
       };
     }
 
@@ -890,7 +934,10 @@ async function buildDocumentsForProducts(products, opts = {}) {
         in_stock: stockQty > 0,
         fitment_make: normalized,
         description,
-        image_url: imageUrl,
+        image_url: primaryImage,
+        primary_image: primaryImage,
+        primaryImage,
+        images,
       };
     }
 
@@ -932,7 +979,10 @@ async function buildDocumentsForProducts(products, opts = {}) {
         fitment_make: normalized,
         description,
         search_blob: searchBlob,
-        image_url: imageUrl,
+        image_url: primaryImage,
+        primary_image: primaryImage,
+        primaryImage,
+        images,
       };
     }
 
@@ -989,7 +1039,10 @@ async function buildDocumentsForProducts(products, opts = {}) {
         price: safePrice,
         in_stock: stockQty > 0,
         search_blob: searchBlob,
-        image_url: imageUrl,
+        image_url: primaryImage,
+        primary_image: primaryImage,
+        primaryImage,
+        images,
       };
     }
 
@@ -1027,7 +1080,10 @@ async function buildDocumentsForProducts(products, opts = {}) {
       in_stock: stockQty > 0,
       // Typesense schema requires the field; default false until you implement logic.
       free_shipping: false,
-      image_url: imageUrl,
+      image_url: primaryImage,
+      primary_image: primaryImage,
+      primaryImage,
+      images,
       search_blob: searchBlob.substring(0, 200),
     };
 
@@ -1050,7 +1106,40 @@ async function getProductsToIndex(offset, limit, useAllowlist) {
   if (useAllowlist) {
     return {
       data: await sql`
-        SELECT cp.id, cp.sku, cp.slug, cp.brand, cp.name, cp.description, cp.category, cp.computed_price
+        SELECT
+          cp.id,
+          cp.sku,
+          cp.slug,
+          cp.brand,
+          cp.name,
+          cp.description,
+          cp.category,
+          cp.computed_price,
+          COALESCE((
+            SELECT cm0.url
+            FROM catalog_media cm0
+            WHERE cm0.product_id = cp.id
+              AND cm0.priority = 0
+              AND cm0.url IS NOT NULL
+              AND cm0.url !~* '\\.zip$'
+            ORDER BY cm0.id
+            LIMIT 1
+          ), (
+            SELECT cm1.url
+            FROM catalog_media cm1
+            WHERE cm1.product_id = cp.id
+              AND cm1.url IS NOT NULL
+              AND cm1.url !~* '\\.zip$'
+            ORDER BY cm1.priority ASC NULLS LAST, cm1.id
+            LIMIT 1
+          )) AS primary_image,
+          COALESCE((
+            SELECT json_agg(cm.url ORDER BY cm.priority ASC NULLS LAST, cm.id)
+            FROM catalog_media cm
+            WHERE cm.product_id = cp.id
+              AND cm.url IS NOT NULL
+              AND cm.url !~* '\\.zip$'
+          ), '[]'::json) AS images
         FROM catalog_products cp
         WHERE cp.is_active = true
           AND cp.is_discontinued = false
@@ -1066,7 +1155,40 @@ async function getProductsToIndex(offset, limit, useAllowlist) {
 
   return {
     data: await sql`
-      SELECT cp.id, cp.sku, cp.slug, cp.brand, cp.name, cp.description, cp.category, cp.computed_price
+      SELECT
+        cp.id,
+        cp.sku,
+        cp.slug,
+        cp.brand,
+        cp.name,
+        cp.description,
+        cp.category,
+        cp.computed_price,
+        COALESCE((
+          SELECT cm0.url
+          FROM catalog_media cm0
+          WHERE cm0.product_id = cp.id
+            AND cm0.priority = 0
+            AND cm0.url IS NOT NULL
+            AND cm0.url !~* '\\.zip$'
+          ORDER BY cm0.id
+          LIMIT 1
+        ), (
+          SELECT cm1.url
+          FROM catalog_media cm1
+          WHERE cm1.product_id = cp.id
+            AND cm1.url IS NOT NULL
+            AND cm1.url !~* '\\.zip$'
+          ORDER BY cm1.priority ASC NULLS LAST, cm1.id
+          LIMIT 1
+        )) AS primary_image,
+        COALESCE((
+          SELECT json_agg(cm.url ORDER BY cm.priority ASC NULLS LAST, cm.id)
+          FROM catalog_media cm
+          WHERE cm.product_id = cp.id
+            AND cm.url IS NOT NULL
+            AND cm.url !~* '\\.zip$'
+        ), '[]'::json) AS images
       FROM catalog_products cp
       WHERE cp.is_active = true
         AND cp.is_discontinued = false
