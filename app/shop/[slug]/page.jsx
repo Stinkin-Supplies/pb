@@ -37,15 +37,14 @@ export default async function ProductDetailPage({ params }) {
           'map_price', map_price,
           'wholesale_cost', wholesale_cost
         ) FROM vendor_offers WHERE catalog_product_id = cp.id LIMIT 1) as vendor_offer,
-        -- Get all media
+        -- Get all media (ordered by priority)
         COALESCE(
           (SELECT json_agg(
             json_build_object(
               'url', url,
               'media_type', media_type,
-              'is_primary', is_primary,
               'priority', priority
-            ) ORDER BY is_primary DESC, priority ASC
+            ) ORDER BY priority ASC
           )
           FROM catalog_media
           WHERE catalog_media.product_id = cp.id
@@ -82,15 +81,14 @@ export default async function ProductDetailPage({ params }) {
     ? JSON.parse(product.catalog_media)
     : (Array.isArray(product.catalog_media) ? product.catalog_media : []);
 
-  // Build gallery
+  // Build gallery - priority 0 is the primary image
   const gallery = media
     .filter(m => m.media_type === "image")
     .map(m => m.url)
     .filter(Boolean);
 
-  const primaryImage = media.find(m => m.is_primary && m.media_type === "image")?.url 
-    ?? gallery[0] 
-    ?? null;
+  // First image (priority 0) is the primary
+  const primaryImage = gallery[0] ?? null;
 
   product.gallery = gallery;
   product.primaryImage = primaryImage;
@@ -133,11 +131,8 @@ function normalizeProductRow(row) {
         .map(m => m?.url)
         .filter(Boolean);
 
-  const primaryImage =
-    row.primaryImage ??
-    media.find(m => m?.is_primary && m?.media_type === "image")?.url ??
-    gallery[0] ??
-    null;
+  // First image is the primary (sorted by priority in SQL)
+  const primaryImage = row.primaryImage ?? gallery[0] ?? null;
 
   return {
     id:          row.id,
