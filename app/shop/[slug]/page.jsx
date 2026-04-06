@@ -6,73 +6,49 @@
 // ============================================================
 
 import { notFound } from "next/navigation";
-import { adminSupabase, db } from "@/lib/supabase/admin";
-import { getProductImages } from "@/lib/getProductImages";
+import { adminSupabase } from "@/lib/supabase/admin";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 import ProductDetailClient from "./ProductDetailClient";
 
 export default async function ProductDetailPage({ params }) {
-  const slug = params?.slug;
+  const { slug } = await params;
 
-  let product = null;
-  let related    = [];
-  let fetchError = null;
+  const supabase = await createServerSupabaseClient();
 
-  try {
-    const { data, error } = await adminSupabase
-      .from("catalog_products")
-      .select(`
-        id,
-        sku,
-        slug,
-        name,
-        brand,
-        category,
-        price,
-        cost,
-        map_price,
-        msrp,
-        weight,
-        description,
-        stock_quantity,
-        is_active,
-        catalog_media (
-          url,
-          media_type,
-          is_primary
-        )
-      `)
-      .eq("slug", params.slug)
-      .single();
-
-    if (error) throw error;
-    product = data;
-  } catch (err) {
-    console.error("[ProductDetailPage] product fetch failed:", err?.message ?? err);
-    fetchError = err?.message ?? "Unknown error";
-  }
+  const { data: product } = await supabase
+    .from("catalog_products")
+    .select(`
+      *,
+      catalog_media (
+        url,
+        media_type,
+        is_primary
+      )
+    `)
+    .eq("slug", slug)
+    .single();
 
   if (!product) notFound();
 
-  const normalized = normalizeProductRow(product);
+  // Build gallery + primary
+  const media = product.catalog_media || [];
+  const gallery = media
+    .filter((m) => m.media_type === "image")
+    .map((m) => m.url)
+    .filter(Boolean);
 
-  // Related products — same category, exclude self
-  // TODO: replace with db.getRelatedProducts(product.id, product.category_name)
-  try {
-    related = await db.getProducts({
-      category: normalized.category,
-      limit:    5,
-    });
-    related = related
-      .filter(p => p.slug !== slug)
-      .slice(0, 4)
-      .map(normalizeProductRow);
-  } catch {}
+  const primaryImage =
+    media.find((m) => m.is_primary && m.media_type === "image")?.url ??
+    gallery[0] ??
+    null;
+
+  product.gallery = gallery;
+  product.primaryImage = primaryImage;
 
   return (
     <ProductDetailClient
-      product={normalized}
-      relatedProducts={related}
-      fetchError={fetchError}
+      product={normalizeProductRow(product)}
+      relatedProducts={[]}
     />
   );
 }
@@ -96,20 +72,20 @@ function normalizeProductRow(row) {
     : (row.was != null ? Number(row.was) : null);
   const was = rawWas != null && rawWas > price ? rawWas : null;
 
-  const media = Array.isArray(row.catalog_media) ? row.catalog_media : [];
+  const media = row.catalog_media || [];
 
-  const { primaryImage: mediaPrimaryImage, gallery: mediaGallery } = getProductImages({ catalog_media: media });
+  const gallery = Array.isArray(row.gallery)
+    ? row.gallery.filter(Boolean)
+    : media
+        .filter((m) => m?.media_type === "image")
+        .map((m) => m?.url)
+        .filter(Boolean);
 
-  const fallbackGallery = Array.isArray(row.images) && row.images.length > 0
-    ? row.images.filter(Boolean)
-    : row.primary_image_url
-      ? [row.primary_image_url]
-      : row.image
-        ? [row.image]
-        : [];
-
-  const gallery = mediaGallery.length > 0 ? mediaGallery : fallbackGallery;
-  const primaryImage = mediaPrimaryImage ?? gallery[0] ?? null;
+  const primaryImage =
+    row.primaryImage ??
+    media.find((m) => m?.is_primary && m?.media_type === "image")?.url ??
+    gallery[0] ??
+    null;
 
   return {
     id:          row.id,
@@ -150,6 +126,7 @@ function normalizeProductRow(row) {
 
 // ── SEO metadata ─────────────────────────────────────────────
 export async function generateMetadata({ params }) {
+  const { slug } = await params;
   let product = null;
   try {
     const { data } = await adminSupabase
@@ -160,11 +137,11 @@ export async function generateMetadata({ params }) {
         brand,
         is_active
       `)
-      .eq("slug", params.slug)
+      .eq("slug", slug)
       .single();
     product = data;
   } catch {}
-  const name  = product?.name     ?? params.slug.replace(/-/g, " ");
+  const name  = product?.name ?? slug.replace(/-/g, " ");
   const brand = product?.brand ?? product?.brand_name ?? "Stinkin' Supplies";
   return {
     title:       `${name} | ${brand} | Stinkin' Supplies`,
