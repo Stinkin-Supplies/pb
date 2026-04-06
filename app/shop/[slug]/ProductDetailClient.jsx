@@ -18,12 +18,11 @@
 
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import NavBar from "@/components/NavBar";
 import { useCartSafe } from "@/components/CartContext";
 import NotifyMeButton from "@/components/NotifyMeButton";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
-import { getProductImage, filterImageUrls } from "@/lib/getProductImage";
-import { proxyAllImages, primaryImage } from "@/lib/imageProxy";
 
 // Saved garage vehicle — hardcoded until Phase 3 auth
 const SAVED_VEHICLE = { id:1, year:2022, make:"Harley-Davidson", model:"Road King" };
@@ -434,7 +433,8 @@ const css = `
   }
 `;
 
-export default function ProductDetailClient({ product, relatedProducts = [], fetchError = null }) {
+export default function ProductDetailClient({ product, relatedProducts = [] }) {
+  const fallback = "/images/no-image.png";
   const [activeImg,  setActiveImg]  = useState(0);
   const [qty,        setQty]        = useState(1);
   const [wishlisted, setWishlisted] = useState(false);
@@ -469,8 +469,8 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
     // Ensure cart item has a resolved image
     addItem({
       ...product,
-      image: images[0] ?? product.image ?? null,
-      images: images,
+      image: resolvedGallery[0] ?? product.primaryImage ?? null,
+      images: resolvedGallery,
     }, qty);
     setToast(true);
     // TODO Phase 2 (cart drawer):
@@ -562,14 +562,17 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
     catch { return false; }
   };
 
-  const images = (() => {
-    const raw = Array.isArray(product.images) ? product.images.filter(Boolean) : [];
+  const resolvedGallery = (() => {
+    const rawGallery = Array.isArray(product.gallery) ? product.gallery.filter(Boolean) : [];
+    const raw = rawGallery.length > 0
+      ? rawGallery
+      : (typeof product.primaryImage === "string" && product.primaryImage.length > 0)
+        ? [product.primaryImage]
+        : [];
     if (raw.length > 0) {
       // Proxy CDN URLs that need referer/auth; leave other direct URLs alone.
       return raw.map(url => isWpsCdn(url) ? `/api/image-proxy?url=${encodeURIComponent(url)}` : url);
     }
-    // Fallback to getProductImage
-    const fallback = getProductImage(product);
     return [fallback];
   })();
 
@@ -614,7 +617,7 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
   }
 
   function RelatedCardImage({ product }) {
-    const src = toProxySrc(primaryImage(product.images));
+    const src = toProxySrc(product.primaryImage ?? product.gallery?.[0] ?? fallback);
     const isPlaceholder = src === "/placeholder-product.png" || src === "/images/placeholder.jpg";
 
     return (
@@ -657,11 +660,11 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
 
       {/* ── BREADCRUMB ── */}
       <div className="pdp-breadcrumb">
-        <a href="/">HOME</a>
+        <Link href="/">HOME</Link>
         <span className="sep">→</span>
-        <a href="/shop">SHOP</a>
+        <Link href="/shop">SHOP</Link>
         <span className="sep">→</span>
-        <a href={`/shop?category=${product.category}`}>{product.category.toUpperCase()}</a>
+        <Link href={`/shop?category=${product.category}`}>{product.category.toUpperCase()}</Link>
         <span className="sep">→</span>
         <span className="current">{product.name.toUpperCase()}</span>
       </div>
@@ -678,16 +681,16 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
               </span>
             )}
             <img
-              src={toProxySrc(images[activeImg])}
+              src={toProxySrc(resolvedGallery[activeImg] ?? resolvedGallery[0])}
               alt={product.name}
               style={{ width:"100%", height:"100%", objectFit:"contain", position:"relative", zIndex:1 }}
             />
           </div>
 
           {/* Thumbnails (if multiple) */}
-          {images.length > 1 && (
+          {resolvedGallery.length > 1 && (
             <div className="flex gap-2 mt-4">
-              {images.map((img, i) => (
+              {resolvedGallery.map((img, i) => (
                 <Image
                   key={i}
                   src={toProxySrc(img)}
