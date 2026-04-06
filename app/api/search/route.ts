@@ -17,7 +17,7 @@ const PAGE_SIZE_DEFAULT = 48
 const PAGE_SIZE_MAX     = 96
 
 const SORT_MAP: Record<string, string> = {
-  newest:     'created_at:desc',
+  newest:     'in_stock:desc,price:asc',
   price_asc:  'price:asc',
   price_desc: 'price:desc',
   name_asc:   'name:asc',
@@ -50,8 +50,7 @@ export async function GET(req: Request) {
   }
 
   const sortBy     = SORT_MAP[sort] ?? SORT_MAP.newest
-  const stockSort  = 'in_stock:desc,price:asc'
-  const resolvedSortBy = sortBy ? `${stockSort},${sortBy}` : stockSort
+  const resolvedSortBy = sortBy
   const filterBy   = filters.join(' && ')
   const perPage    = pageSize
   const typesensePage = page + 1 // Typesense is 1-indexed
@@ -65,7 +64,7 @@ export async function GET(req: Request) {
       query_by_weights:  '10,5,3,2',
       filter_by:         filterBy,
       sort_by:           resolvedSortBy,
-      facet_by:          'category,brand,price',
+      facet_by:          'category,brand',
       max_facet_values:  100,
       per_page:          perPage,
       page:              typesensePage,
@@ -101,11 +100,7 @@ export async function GET(req: Request) {
       }))
     }
 
-    // Price range from facet
-    const priceFacet = result.facet_counts?.find((f: any) => f.field_name === 'price')
-    const priceRange = priceFacet
-      ? { min: priceFacet.stats?.min ?? 0, max: priceFacet.stats?.max ?? 0 }
-      : { min: 0, max: 0 }
+    const priceRange = { min: 0, max: 0 }
 
     return NextResponse.json({
       products,
