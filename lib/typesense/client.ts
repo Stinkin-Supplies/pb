@@ -77,9 +77,14 @@ export const SCHEMA = {
     { name: 'in_stock',     type: 'bool'   as const, facet: true },
     { name: 'image',        type: 'string' as const, optional: true, index: false },
     { name: 'description',  type: 'string' as const, optional: true },
-    { name: 'vendor_codes', type: 'string[]' as const, facet: true, optional: true },
-    { name: 'weight',       type: 'float'  as const, optional: true },
-    { name: 'created_at',   type: 'int64'  as const },
+    { name: 'vendor_codes',   type: 'string[]' as const, facet: true, optional: true },
+    { name: 'weight',         type: 'float'  as const, optional: true },
+    { name: 'created_at',     type: 'int64'  as const },
+    // v2 fitment + specs facets
+    { name: 'fitment_make',   type: 'string[]' as const, facet: true, optional: true },
+    { name: 'fitment_model',  type: 'string[]' as const, facet: true, optional: true },
+    { name: 'fitment_year',   type: 'int32[]'  as const, facet: true, optional: true },
+    { name: 'specs',          type: 'string[]' as const, facet: true, optional: true },
   ],
   default_sorting_field: 'created_at',
 }
@@ -102,6 +107,10 @@ export type ProductDocument = {
   image?:       string
   description?: string
   vendor_codes?: string[]
-  weight?:      number
-  created_at:   number
+  weight?:       number
+  created_at:    number
+  fitment_make?:  string[]
+  fitment_model?: string[]
+  fitment_year?:  number[]
+  specs?:         string[]
 }
