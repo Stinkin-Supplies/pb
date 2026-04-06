@@ -42,7 +42,7 @@ export async function GET(req: Request) {
   const filters: string[] = ['is_active:=true']
   if (category) filters.push(`category:=${JSON.stringify(category)}`)
   if (brand)    filters.push(`brand:=${JSON.stringify(brand)}`)
-  if (inStock)  filters.push('in_stock:=1')
+  if (inStock)  filters.push('in_stock:=true')
   if (minPrice || maxPrice) {
     const min = minPrice ? Number(minPrice) : 0
     const max = maxPrice ? Number(maxPrice) : 999999
@@ -50,7 +50,7 @@ export async function GET(req: Request) {
   }
 
   const sortBy     = SORT_MAP[sort] ?? SORT_MAP.newest
-  const stockSort  = 'in_stock:desc,our_price:asc'
+  const stockSort  = 'in_stock:desc,price:asc'
   const resolvedSortBy = sortBy ? `${stockSort},${sortBy}` : stockSort
   const filterBy   = filters.join(' && ')
   const perPage    = pageSize
@@ -61,8 +61,8 @@ export async function GET(req: Request) {
 
     const result = await client.collections(COLLECTION).documents().search({
       q,
-      query_by:          'name,brand,category,sku,description',
-      query_by_weights:  '4,2,2,1,1',
+      query_by:          'name,brand,sku,category',
+      query_by_weights:  '10,5,3,2',
       filter_by:         filterBy,
       sort_by:           resolvedSortBy,
       facet_by:          'category,brand,price',
@@ -86,9 +86,9 @@ export async function GET(req: Request) {
         was:        d.msrp > d.price ? d.msrp : null,
         mapPrice:   d.map_price ?? null,
         badge:      null,
-        inStock:    Number(d.in_stock ?? 0) > 0,
+        inStock:    Boolean(d.in_stock),
         fitmentIds: null,
-        image:      d.image ?? null,
+        image:      d.image_url ?? null,
       }
     })
 

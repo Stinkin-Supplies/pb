@@ -133,17 +133,16 @@ export async function GET(req: Request) {
                   cp.is_active,
                   cp.created_at,
                   COALESCE((
-                    SELECT ci.url
-                    FROM public.catalog_images ci
-                    WHERE ci.catalog_product_id = cp.id
-                      AND ci.is_primary = true
-                    ORDER BY ci.position
+                    SELECT cm.url
+                    FROM public.catalog_media cm
+                    WHERE cm.product_id = cp.id
+                    ORDER BY cm.priority ASC
                     LIMIT 1
                   ), NULL) AS image,
                   COALESCE((
-                    SELECT ARRAY_AGG(ci.url ORDER BY ci.position)
-                    FROM public.catalog_images ci
-                    WHERE ci.catalog_product_id = cp.id
+                    SELECT ARRAY_AGG(cm.url ORDER BY cm.priority ASC)
+                    FROM public.catalog_media cm
+                    WHERE cm.product_id = cp.id
                   ), '{}'::text[]) AS images,
                   COALESCE((
                     SELECT SUM(vo.total_qty)

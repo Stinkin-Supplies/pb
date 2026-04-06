@@ -9,14 +9,37 @@ import Typesense from 'typesense'
 
 export const COLLECTION = process.env.TYPESENSE_COLLECTION ?? 'products'
 
-const NODE = {
-  host:     process.env.TYPESENSE_HOST!,
-  port:     Number(process.env.TYPESENSE_PORT ?? 443),
-  protocol: process.env.TYPESENSE_PROTOCOL ?? 'https',
+function getTypesenseNode() {
+  const rawHost = process.env.TYPESENSE_HOST
+  if (!rawHost) {
+    throw new Error('Missing TYPESENSE_HOST')
+  }
+
+  // Allow either:
+  // - TYPESENSE_HOST="typesense.example.com" (+ TYPESENSE_PROTOCOL/PORT)
+  // - TYPESENSE_HOST="https://typesense.example.com:8108"
+  if (rawHost.includes('://')) {
+    const url = new URL(rawHost)
+    return {
+      host: url.hostname,
+      port: url.port ? Number(url.port) : url.protocol === 'http:' ? 80 : 443,
+      protocol: url.protocol.replace(':', ''),
+    }
+  }
+
+  const protocol = process.env.TYPESENSE_PROTOCOL ?? 'https'
+  const defaultPort = protocol === 'http' ? 80 : 443
+
+  return {
+    host: rawHost,
+    port: Number(process.env.TYPESENSE_PORT ?? defaultPort),
+    protocol,
+  }
 }
 
 // Admin client — never expose to browser
 export function getAdminClient() {
+  const NODE = getTypesenseNode()
   return new Typesense.Client({
     nodes:          [NODE],
     apiKey:         process.env.TYPESENSE_ADMIN_API_KEY ?? process.env.TYPESENSE_API_KEY!,
@@ -26,6 +49,7 @@ export function getAdminClient() {
 
 // Search-only client — safe for browser / API routes
 export function getSearchClient() {
+  const NODE = getTypesenseNode()
   return new Typesense.Client({
     nodes:          [NODE],
     apiKey:         process.env.TYPESENSE_SEARCH_KEY ?? process.env.TYPESENSE_SEARCH_ONLY_API_KEY ?? process.env.TYPESENSE_API_KEY!,
@@ -50,7 +74,7 @@ export const SCHEMA = {
     { name: 'msrp',         type: 'float'  as const, optional: true },
     { name: 'is_active',    type: 'bool'   as const, facet: true  },
     { name: 'stock_quantity', type: 'int64' as const, facet: true  },
-    { name: 'in_stock',     type: 'int32'  as const, facet: true, sort: true },
+    { name: 'in_stock',     type: 'bool'   as const, facet: true },
     { name: 'image',        type: 'string' as const, optional: true, index: false },
     { name: 'description',  type: 'string' as const, optional: true },
     { name: 'vendor_codes', type: 'string[]' as const, facet: true, optional: true },
@@ -74,7 +98,7 @@ export type ProductDocument = {
   msrp?:        number
   is_active:    boolean
   stock_quantity: number
-  in_stock:     number
+  in_stock:     boolean
   image?:       string
   description?: string
   vendor_codes?: string[]
