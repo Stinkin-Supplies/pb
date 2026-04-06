@@ -19,16 +19,27 @@ export async function GET(req: Request) {
   }
 
   const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
+  let res: any = await supabase
     .from("admin_folders")
-    .select("id,name,created_at")
+    .select("id,name,parent_id,created_at")
     .order("name", { ascending: true });
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  // Back-compat if the DB hasn't been migrated yet (no `parent_id` column).
+  if (res.error && /parent_id/i.test(res.error.message)) {
+    res = await supabase
+      .from("admin_folders")
+      .select("id,name,created_at")
+      .order("name", { ascending: true });
+    if (!res.error) {
+      res.data = (res.data ?? []).map((f: any) => ({ ...f, parent_id: null }));
+    }
   }
 
-  return NextResponse.json(data ?? []);
+  if (res.error) {
+    return NextResponse.json({ error: res.error.message }, { status: 500 });
+  }
+
+  return NextResponse.json(res.data ?? []);
 }
 
 export async function POST(req: Request) {
@@ -38,21 +49,31 @@ export async function POST(req: Request) {
 
   const body = await req.json().catch(() => ({}));
   const name = String(body?.name ?? "").trim();
+  const parentId = body?.parentId ? String(body.parentId) : null;
   if (!name) {
     return NextResponse.json({ error: "Missing name" }, { status: 400 });
   }
 
   const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
+  let res: any = await supabase
     .from("admin_folders")
-    .insert({ name })
-    .select("id,name,created_at")
+    .insert(parentId ? { name, parent_id: parentId } : { name })
+    .select("id,name,parent_id,created_at")
     .single();
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  // Back-compat if the DB hasn't been migrated yet (no `parent_id` column).
+  if (res.error && /parent_id/i.test(res.error.message)) {
+    res = await supabase
+      .from("admin_folders")
+      .insert({ name })
+      .select("id,name,created_at")
+      .single();
+    if (!res.error && res.data) res.data = { ...res.data, parent_id: null };
   }
 
-  return NextResponse.json(data);
-}
+  if (res.error) {
+    return NextResponse.json({ error: res.error.message }, { status: 500 });
+  }
 
+  return NextResponse.json(res.data);
+}
