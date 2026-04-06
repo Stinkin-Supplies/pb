@@ -94,7 +94,7 @@ async function run() {
       ...(r.msrp      != null ? { msrp:      Number(r.msrp)      } : {}),
       is_active:    Boolean(r.is_active),
       stock_quantity: Number(r.stock_quantity ?? 0),
-      in_stock:     (Number(r.stock_quantity ?? 0) > 0 ? 1 : 0),
+      in_stock:     Number(r.stock_quantity ?? 0) > 0,
       ...(r.image       ? { image:       r.image       } : {}),
       ...(r.description ? { description: r.description } : {}),
       ...(r.weight != null ? { weight: Number(r.weight) } : {}),
