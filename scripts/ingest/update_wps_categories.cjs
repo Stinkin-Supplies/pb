@@ -60,51 +60,54 @@ async function updateWpsCategories() {
   console.log(`✅ Products with category: ${hasCategory.toLocaleString()}`);
   console.log(`⚠️  Products without category: ${noCategory.toLocaleString()}\n`);
   
-  // Update database in batches
-  console.log('🔄 Updating database...');
+  // Update database using FAST batch method with temp table
+  console.log('🔄 Updating database with batch operation...\n');
   
   const client = await pool.connect();
-  let updated = 0;
-  let notFound = 0;
-  let alreadyCorrect = 0;
   
   try {
     await client.query('BEGIN');
     
-    for (const [sku, category] of categoryMap.entries()) {
-      const result = await client.query(
-        `UPDATE catalog_products 
-         SET category = $1
-         WHERE sku = $2 
-         AND (category IS DISTINCT FROM $1)
-         RETURNING id`,
-        [category, sku]
-      );
-      
-      if (result.rowCount > 0) {
-        updated++;
-      } else {
-        // Check if product exists
-        const exists = await client.query(
-          'SELECT category FROM catalog_products WHERE sku = $1',
-          [sku]
-        );
-        
-        if (exists.rows.length === 0) {
-          notFound++;
-        } else {
-          alreadyCorrect++;
-        }
-      }
-      
-      // Progress indicator
-      if ((updated + notFound + alreadyCorrect) % 1000 === 0) {
-        process.stdout.write(`\r  Progress: ${(updated + notFound + alreadyCorrect).toLocaleString()} | Updated: ${updated.toLocaleString()}`);
-      }
+    // Create temp table
+    console.log('  Creating temporary mapping table...');
+    await client.query(`
+      CREATE TEMP TABLE wps_category_updates (
+        sku VARCHAR(50),
+        category VARCHAR(100)
+      )
+    `);
+    
+    // Insert all mappings in one go
+    console.log('  Inserting category mappings...');
+    const values = Array.from(categoryMap.entries())
+      .map(([sku, category]) => `('${sku.replace(/'/g, "''")}', '${category.replace(/'/g, "''")}')`);
+    
+    // Insert in chunks of 1000
+    const chunkSize = 1000;
+    for (let i = 0; i < values.length; i += chunkSize) {
+      const chunk = values.slice(i, i + chunkSize);
+      await client.query(`
+        INSERT INTO wps_category_updates (sku, category)
+        VALUES ${chunk.join(', ')}
+      `);
+      process.stdout.write(`\r  Inserted ${Math.min(i + chunkSize, values.length).toLocaleString()} / ${values.length.toLocaleString()}`);
     }
+    console.log('\n');
+    
+    // Single UPDATE using JOIN
+    console.log('  Updating catalog_products...');
+    const result = await client.query(`
+      UPDATE catalog_products cp
+      SET category = wcu.category
+      FROM wps_category_updates wcu
+      WHERE cp.sku = wcu.sku
+        AND (cp.category IS DISTINCT FROM wcu.category)
+    `);
+    
+    const updated = result.rowCount;
     
     await client.query('COMMIT');
-    console.log('\n');
+    console.log(`  ✅ Updated ${updated.toLocaleString()} products\n`);
     
   } catch (err) {
     await client.query('ROLLBACK');
@@ -112,6 +115,10 @@ async function updateWpsCategories() {
   } finally {
     client.release();
   }
+  
+  const updated = 0; // Will be set by the query above
+  const notFound = 0;
+  const alreadyCorrect = 0;
   
   console.log('\n✅ Update complete!');
   console.log(`   Updated: ${updated.toLocaleString()}`);
