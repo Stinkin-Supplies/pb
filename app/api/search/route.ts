@@ -74,6 +74,10 @@ export async function GET(req: Request) {
     // ── Map documents to NormalizedProduct shape ──────────────
     const products = (result.hits ?? []).map((hit: any) => {
       const d = hit.document
+      const price = Number(d.computed_price ?? d.price ?? 0)
+      const safePrice = Number.isFinite(price) ? price : 0
+      const msrp = d.msrp == null ? null : Number(d.msrp)
+      const safeMsrp = msrp != null && Number.isFinite(msrp) ? msrp : null
       return {
         id:         Number(d.id),
         slug:       d.slug,
@@ -81,8 +85,8 @@ export async function GET(req: Request) {
         name:       d.name,
         brand:      d.brand,
         category:   d.category,
-        price:      d.price,
-        was:        d.msrp > d.price ? d.msrp : null,
+        price:      safePrice,
+        was:        safeMsrp != null && safeMsrp > safePrice ? safeMsrp : null,
         mapPrice:   d.map_price ?? null,
         badge:      null,
         inStock:    Boolean(d.in_stock),

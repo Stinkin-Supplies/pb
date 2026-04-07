@@ -431,11 +431,11 @@ function ProductCard({ product:p, index, view, onAdd }) {
             {p.was && (
               <div style={{ fontSize:11, color:"#8a8784", textDecoration:"line-through",
                             fontFamily:"var(--font-stencil),sans-serif" }}>
-                ${p.was.toFixed(2)}
+                ${(Number(p.was) || 0).toFixed(2)}
               </div>
             )}
             <div style={B({fontSize:20,color:"#f0ebe3",letterSpacing:"0.04em",lineHeight:1})}>
-              ${p.price.toFixed(2)}
+              ${(Number(p.price) || 0).toFixed(2)}
             </div>
           </div>
           {p.inStock ? (
