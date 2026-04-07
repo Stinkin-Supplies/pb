@@ -17,9 +17,9 @@ const PAGE_SIZE_DEFAULT = 48
 const PAGE_SIZE_MAX     = 96
 
 const SORT_MAP: Record<string, string> = {
-  newest:     'in_stock:desc,price:asc',
-  price_asc:  'price:asc',
-  price_desc: 'price:desc',
+  newest:     'in_stock:desc,computed_price:asc',
+  price_asc:  'computed_price:asc',
+  price_desc: 'computed_price:desc',
   name_asc:   'name:asc',
 }
 
@@ -46,7 +46,7 @@ export async function GET(req: Request) {
   if (minPrice || maxPrice) {
     const min = minPrice ? Number(minPrice) : 0
     const max = maxPrice ? Number(maxPrice) : 999999
-    filters.push(`price:[${min}..${max}]`)
+    filters.push(`computed_price:[${min}..${max}]`)
   }
 
   const sortBy     = SORT_MAP[sort] ?? SORT_MAP.newest
