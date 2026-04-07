@@ -548,7 +548,10 @@ async function main() {
   if (!SKIP_REINDEX && failed === 0) {
     log('\n🔍  Triggering Typesense reindex...');
     try {
-      execSync('node scripts/ingest/indexTypesense.js', { stdio: 'inherit' });
+      execSync(
+        'npx dotenv -e .env.local -- node -e "import(\'./scripts/ingest/index_assembly.js\').then(m=>m.buildTypesenseIndex({recreate:true}))"',
+        { stdio: 'inherit' }
+      );
     } catch (err) {
       console.error('❌  Reindex failed:', err.message);
     }
