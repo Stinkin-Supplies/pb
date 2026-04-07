@@ -144,6 +144,38 @@ async function reimportWpsProducts() {
       )
     `);
     
+    // Import images
+    console.log('  Importing product images...');
+    let imageCount = 0;
+    for (const record of harddriveProducts) {
+      const sku = record.sku?.trim();
+      const imageUrl = record.primary_item_image?.trim();
+      
+      if (!sku || !imageUrl) continue;
+      
+      // Get product ID
+      const productResult = await client.query(
+        'SELECT id FROM catalog_products WHERE sku = $1',
+        [sku]
+      );
+      
+      if (productResult.rows.length === 0) continue;
+      const productId = productResult.rows[0].id;
+      
+      // Insert image if it doesn't exist (ON CONFLICT uses the unique index on product_id, url)
+      await client.query(`
+        INSERT INTO catalog_media (product_id, media_type, url, priority)
+        VALUES ($1, 'image', $2, 0)
+        ON CONFLICT (product_id, url) DO NOTHING
+      `, [productId, imageUrl]);
+      
+      imageCount++;
+      if (imageCount % 1000 === 0) {
+        process.stdout.write(`\r  Imported ${imageCount} images...`);
+      }
+    }
+    console.log(`\n  Imported ${imageCount} images total\n`);
+    
     await client.query('COMMIT');
     console.log('\n');
     
