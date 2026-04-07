@@ -20,6 +20,13 @@
 
 import Typesense from 'typesense';
 import { sql } from '../lib/db.js';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath, pathToFileURL } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, '../../.env.local'), override: true });
 
 // ─── config ───────────────────────────────────────────────────────────────────
 
@@ -301,4 +308,19 @@ function groupBy(rows, key) {
     map[k].push(row);
   }
   return map;
+}
+
+// ─── CLI ──────────────────────────────────────────────────────────────────────
+// Supports running directly: `node scripts/ingest/index_assembly.js --recreate`
+const _argv1 = process.argv[1] ? path.resolve(process.argv[1]) : null;
+const _isMain = Boolean(_argv1) && import.meta.url === pathToFileURL(_argv1).href;
+
+if (_isMain) {
+  const args = process.argv.slice(2);
+  const recreate = args.includes('--no-recreate') ? false : true;
+
+  buildTypesenseIndex({ recreate }).catch((err) => {
+    console.error('❌ Stage 3 failed:', err?.message ?? err);
+    process.exit(1);
+  });
 }
