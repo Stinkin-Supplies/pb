@@ -33,86 +33,122 @@ async function reimportWpsProducts() {
   
   console.log(`✅ Harddrive catalog products: ${harddriveProducts.length.toLocaleString()}\n`);
   
-  const client = await pool.connect();
   let inserted = 0;
   let updated = 0;
   let skipped = 0;
   
+  const client = await pool.connect();
+  
   try {
     await client.query('BEGIN');
     
-    for (const record of harddriveProducts) {
-      const sku = record.sku?.trim();
-      if (!sku) {
-        skipped++;
-        continue;
-      }
-      
-      // Map CSV columns to database columns
-      const product = {
-        sku: sku,
-        name: record.product_name || record.name || 'Unknown Product',
-        brand: record.brand || 'Unknown',
-        category: record.product_type || 'General',
-        description: record.product_description || null,
-        price: parseFloat(record.list_price) || 0,
-        cost: parseFloat(record.standard_dealer_price) || 0,
-        map_price: parseFloat(record.mapp_price) || null,
-        weight: parseFloat(record.weight) || null,
-        status: record.status || 'active',
-        product_type: record.product_type || null,
-      };
-      
-      // Upsert (insert or update if exists)
-      const result = await client.query(`
-        INSERT INTO catalog_products (
-          sku, name, brand, category, description, price, cost, 
-          map_price, weight, status, product_type, is_active, 
-          created_at, updated_at
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, true, NOW(), NOW()
-        )
-        ON CONFLICT (sku) DO UPDATE SET
-          name = EXCLUDED.name,
-          brand = EXCLUDED.brand,
-          category = EXCLUDED.category,
-          description = EXCLUDED.description,
-          price = EXCLUDED.price,
-          cost = EXCLUDED.cost,
-          map_price = EXCLUDED.map_price,
-          weight = EXCLUDED.weight,
-          status = EXCLUDED.status,
-          product_type = EXCLUDED.product_type,
-          updated_at = NOW()
-        RETURNING (xmax = 0) AS inserted
-      `, [
-        product.sku,
-        product.name,
-        product.brand,
-        product.category,
-        product.description,
-        product.price,
-        product.cost,
-        product.map_price,
-        product.weight,
-        product.status,
-        product.product_type,
-      ]);
-      
-      if (result.rows[0].inserted) {
-        inserted++;
-      } else {
-        updated++;
-      }
-      
-      // Progress
-      if ((inserted + updated) % 1000 === 0) {
-        process.stdout.write(`\r  Progress: ${(inserted + updated).toLocaleString()} | Inserted: ${inserted.toLocaleString()} | Updated: ${updated.toLocaleString()}`);
-      }
+    console.log('  Creating temporary staging table...');
+    await client.query(`
+      CREATE TEMP TABLE wps_import_staging (
+        sku VARCHAR(50),
+        name TEXT,
+        brand VARCHAR(100),
+        category VARCHAR(100),
+        description TEXT,
+        price NUMERIC,
+        cost NUMERIC,
+        map_price NUMERIC,
+        weight NUMERIC,
+        status TEXT,
+        product_type TEXT
+      )
+    `);
+    
+    // Prepare batch insert values
+    console.log('  Preparing batch data...');
+    const values = harddriveProducts
+      .filter(r => r.sku?.trim())
+      .map(record => {
+        const sku = record.sku.trim();
+        const name = (record.product_name || record.name || 'Unknown Product').replace(/'/g, "''");
+        const brand = (record.brand || 'Unknown').replace(/'/g, "''");
+        const category = (record.product_type || 'General').replace(/'/g, "''");
+        const description = record.product_description ? record.product_description.replace(/'/g, "''") : null;
+        const price = parseFloat(record.list_price) || 0;
+        const cost = parseFloat(record.standard_dealer_price) || 0;
+        const map_price = parseFloat(record.mapp_price) || null;
+        const weight = parseFloat(record.weight) || null;
+        const status = (record.status || 'active').replace(/'/g, "''");
+        const product_type = record.product_type ? record.product_type.replace(/'/g, "''") : null;
+        
+        return `('${sku}', '${name}', '${brand}', '${category}', ${description ? `'${description}'` : 'NULL'}, ${price}, ${cost}, ${map_price || 'NULL'}, ${weight || 'NULL'}, '${status}', ${product_type ? `'${product_type}'` : 'NULL'})`;
+      });
+    
+    // Insert in chunks
+    console.log('  Inserting into staging table...');
+    const chunkSize = 1000;
+    for (let i = 0; i < values.length; i += chunkSize) {
+      const chunk = values.slice(i, i + chunkSize);
+      await client.query(`
+        INSERT INTO wps_import_staging (sku, name, brand, category, description, price, cost, map_price, weight, status, product_type)
+        VALUES ${chunk.join(', ')}
+      `);
+      process.stdout.write(`\r  Staged: ${Math.min(i + chunkSize, values.length).toLocaleString()} / ${values.length.toLocaleString()}`);
     }
+    console.log('\n');
+    
+    // Count existing vs new
+    console.log('  Analyzing existing products...');
+    const existing = await client.query(`
+      SELECT COUNT(*) as count
+      FROM catalog_products cp
+      INNER JOIN wps_import_staging s ON s.sku = cp.sku
+    `);
+    
+    const toUpdate = parseInt(existing.rows[0].count);
+    const toInsert = values.length - toUpdate;
+    
+    console.log(`  Will update: ${toUpdate.toLocaleString()}`);
+    console.log(`  Will insert: ${toInsert.toLocaleString()}\n`);
+    
+    // Update existing products
+    console.log('  Updating existing products...');
+    await client.query(`
+      UPDATE catalog_products cp
+      SET 
+        name = s.name,
+        brand = s.brand,
+        category = s.category,
+        description = s.description,
+        price = s.price,
+        cost = s.cost,
+        map_price = s.map_price,
+        weight = s.weight,
+        status = s.status,
+        product_type = s.product_type,
+        updated_at = NOW()
+      FROM wps_import_staging s
+      WHERE cp.sku = s.sku
+    `);
+    
+    // Insert new products
+    console.log('  Inserting new products...');
+    await client.query(`
+      INSERT INTO catalog_products (
+        sku, name, brand, category, description, price, cost,
+        map_price, weight, status, product_type, is_active,
+        created_at, updated_at
+      )
+      SELECT 
+        s.sku, s.name, s.brand, s.category, s.description, s.price, s.cost,
+        s.map_price, s.weight, s.status, s.product_type, true,
+        NOW(), NOW()
+      FROM wps_import_staging s
+      WHERE NOT EXISTS (
+        SELECT 1 FROM catalog_products cp WHERE cp.sku = s.sku
+      )
+    `);
     
     await client.query('COMMIT');
     console.log('\n');
+    
+    inserted = toInsert;
+    updated = toUpdate;
     
   } catch (err) {
     await client.query('ROLLBACK');
