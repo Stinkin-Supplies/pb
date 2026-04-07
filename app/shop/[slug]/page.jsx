@@ -37,20 +37,18 @@ export default async function ProductDetailPage({ params }) {
           'map_price', map_price,
           'wholesale_cost', wholesale_cost
         ) FROM vendor_offers WHERE catalog_product_id = cp.id LIMIT 1) as vendor_offer,
-        -- Get all media (ordered by priority)
-        COALESCE(
-          (SELECT json_agg(
-            json_build_object(
-              'url', url,
-              'media_type', media_type,
-              'priority', priority
-            ) ORDER BY priority ASC
-          )
-          FROM catalog_media
-          WHERE catalog_media.product_id = cp.id
-            AND catalog_media.media_type = 'image'),
-          '[]'
-        ) as catalog_media
+        (SELECT url 
+         FROM catalog_media 
+         WHERE product_id = cp.id 
+           AND media_type = 'image' 
+         ORDER BY priority ASC
+         LIMIT 1
+        ) as primary_image,
+        (SELECT json_agg(url ORDER BY priority ASC) 
+         FROM catalog_media 
+         WHERE product_id = cp.id 
+           AND media_type = 'image'
+        ) as images
       FROM catalog_products cp
       WHERE cp.slug = ${slug}
         AND cp.is_active = true
@@ -76,23 +74,15 @@ export default async function ProductDetailPage({ params }) {
 
   if (!product) notFound();
 
-  // Parse catalog_media JSON array
-  const media = typeof product.catalog_media === 'string'
-    ? JSON.parse(product.catalog_media)
-    : (Array.isArray(product.catalog_media) ? product.catalog_media : []);
+  const images = typeof product.images === "string"
+    ? JSON.parse(product.images)
+    : (Array.isArray(product.images) ? product.images : []);
 
-  // Build gallery - priority 0 is the primary image
-  const gallery = media
-    .filter(m => m.media_type === "image")
-    .map(m => m.url)
-    .filter(Boolean);
-
-  // First image (priority 0) is the primary
-  const primaryImage = gallery[0] ?? null;
+  const gallery = images.filter(Boolean);
+  const primaryImage = product.primary_image || gallery[0] || null;
 
   product.gallery = gallery;
   product.primaryImage = primaryImage;
-  product.catalog_media = media;
 
   // Extract vendor info from vendor_offer
   if (product.vendor_offer) {
@@ -120,19 +110,19 @@ function normalizeProductRow(row) {
     : (row.was != null ? Number(row.was) : null);
   const was = rawWas != null && rawWas > price ? rawWas : null;
 
-  const media = typeof row.catalog_media === 'string'
-    ? JSON.parse(row.catalog_media)
-    : (Array.isArray(row.catalog_media) ? row.catalog_media : []);
-
   const gallery = Array.isArray(row.gallery)
     ? row.gallery.filter(Boolean)
-    : media
-        .filter(m => m?.media_type === "image")
-        .map(m => m?.url)
-        .filter(Boolean);
+    : Array.isArray(row.images)
+      ? row.images.filter(Boolean)
+      : typeof row.images === "string"
+        ? JSON.parse(row.images).filter(Boolean)
+        : [];
 
-  // First image is the primary (sorted by priority in SQL)
-  const primaryImage = row.primaryImage ?? gallery[0] ?? null;
+  const primaryImage =
+    row.primaryImage ??
+    row.primary_image ??
+    gallery[0] ??
+    null;
 
   return {
     id:          row.id,
@@ -156,7 +146,6 @@ function normalizeProductRow(row) {
     fitmentIds:  row.fitment_ids ?? null,
 
     // Gallery fields
-    media,
     primaryImage,
     gallery,
 
