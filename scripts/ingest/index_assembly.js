@@ -848,10 +848,10 @@ async function buildDocumentsForProducts(products, opts = {}) {
   return products.map((product) => {
     const r = rowById.get(product.id);
     const imageUrl = r?.image_url ?? null;
-    const images = coerceStringArray(product.images);
+    const images = coerceStringArray(r?.images);
     const primaryImage =
-      (typeof product.primary_image === 'string' && product.primary_image.length > 0)
-        ? product.primary_image
+      (typeof r?.primary_image === 'string' && r.primary_image.length > 0)
+        ? r.primary_image
         : images[0] ?? imageUrl ?? null;
     const stockQty = Number(r?.stock_qty ?? 0);
     const msrp = r?.msrp ?? null;
