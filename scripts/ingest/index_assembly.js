@@ -644,14 +644,14 @@ async function buildDocumentsForProducts(products, opts = {}) {
         fitment.year_max AS fitment_year_max,
         media.url AS image_url,
         COALESCE(cp.stock_quantity, 0)::int AS stock_qty
-      FROM ids
-      JOIN catalog_products cp ON cp.id = ids.product_id
-      LEFT JOIN fitment ON fitment.product_id = cp.id
-      LEFT JOIN media   ON media.product_id   = cp.id
-    `;
-  } else
-  if (useCache) {
-    if (profile === 'products_search_make') {
+	      FROM ids
+	      JOIN catalog_products cp ON cp.id = ids.product_id
+	      LEFT JOIN fitment ON fitment.product_id = cp.id
+	      INNER JOIN media  ON media.product_id   = cp.id
+	    `;
+	  } else
+	  if (useCache) {
+	    if (profile === 'products_search_make') {
       rows = await sql`
         WITH ids AS (
           SELECT unnest(${productIds}::int[]) AS product_id
@@ -738,14 +738,14 @@ async function buildDocumentsForProducts(products, opts = {}) {
           COALESCE(fitment.makes, ARRAY[]::text[]) AS fitment_make,
           media.url AS image_url,
           COALESCE(cp.stock_quantity, 0)::int AS stock_qty
-        FROM ids
-        JOIN catalog_products cp ON cp.id = ids.product_id
-        LEFT JOIN fitment ON fitment.product_id = cp.id
-        LEFT JOIN media   ON media.product_id   = cp.id
-      `;
-    } else
-    if (queryProfile === 'core') {
-      rows = await sql`
+	        FROM ids
+	        JOIN catalog_products cp ON cp.id = ids.product_id
+	        LEFT JOIN fitment ON fitment.product_id = cp.id
+	        INNER JOIN media  ON media.product_id   = cp.id
+	      `;
+	    } else
+	    if (queryProfile === 'core') {
+	      rows = await sql`
         WITH ids AS (
           SELECT unnest(${productIds}::int[]) AS product_id
         ),
@@ -767,13 +767,13 @@ async function buildDocumentsForProducts(products, opts = {}) {
           NULL::text AS search_blob,
           COALESCE(cp.stock_quantity, 0)::int AS stock_qty,
           cp.msrp AS msrp
-        FROM ids
-        JOIN catalog_products cp ON cp.id = ids.product_id
-        LEFT JOIN media ON media.product_id = cp.id
-      `;
-    } else {
-      rows = await sql`
-        -- Single DB round-trip for the batch (still uses multiple CTEs, but one query).
+	        FROM ids
+	        JOIN catalog_products cp ON cp.id = ids.product_id
+	        INNER JOIN media ON media.product_id = cp.id
+	      `;
+	    } else {
+	      rows = await sql`
+	        -- Single DB round-trip for the batch (still uses multiple CTEs, but one query).
         WITH ids AS (
           SELECT unnest(${productIds}::int[]) AS product_id
         ),
@@ -822,14 +822,14 @@ async function buildDocumentsForProducts(products, opts = {}) {
           NULL::text AS search_blob,
           COALESCE(cp.stock_quantity, 0)::int AS stock_qty,
           cp.msrp AS msrp
-        FROM ids
-        JOIN catalog_products cp ON cp.id = ids.product_id
-        LEFT JOIN specs   ON specs.product_id   = cp.id
-        LEFT JOIN fitment ON fitment.product_id = cp.id
-        LEFT JOIN media   ON media.product_id   = cp.id
-      `;
-    }
-  }
+	        FROM ids
+	        JOIN catalog_products cp ON cp.id = ids.product_id
+	        LEFT JOIN specs   ON specs.product_id   = cp.id
+	        LEFT JOIN fitment ON fitment.product_id = cp.id
+	        INNER JOIN media  ON media.product_id   = cp.id
+	      `;
+	    }
+	  }
 
   const rowById = new Map(rows.map((r) => [r.id, r]));
   const coerceStringArray = (v) => {

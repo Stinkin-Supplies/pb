@@ -1156,11 +1156,10 @@ async function getProductRowsToIndex(offset, limit, useAllowlist) {
       SELECT
         p.*,
         media_primary.url AS primary_image,
-        media_all.images
+        COALESCE(media_all.images, '[]'::json) AS images
       FROM products_page p
       INNER JOIN media_primary ON media_primary.product_id = p.id
       INNER JOIN media_all ON media_all.product_id = p.id
-      WHERE media_primary.url IS NOT NULL
       ORDER BY p.id
     `,
     error: null,
