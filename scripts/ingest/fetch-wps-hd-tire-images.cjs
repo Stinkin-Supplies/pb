@@ -1,5 +1,6 @@
 /**
  * Fetch WPS Images - Hard Drive & Tire Catalogs Only
+ * WITH PROGRESS BAR
  * 
  * Fetches images only for products in your catalog allowlist
  * (wps_hard_drive and wps_tire_brands)
@@ -9,6 +10,7 @@
 
 const { Pool } = require('pg');
 const https = require('https');
+const cliProgress = require('cli-progress');
 
 const pool = new Pool({
   connectionString: process.env.CATALOG_DATABASE_URL,
@@ -74,7 +76,19 @@ async function main() {
     );
 
     console.log(`Found ${allowlistResult.rows.length} SKUs in HD + Tire allowlist\n`);
-    console.log('Starting image fetch...\n');
+
+    // Create progress bar
+    const progressBar = new cliProgress.SingleBar({
+      format: 'Progress |{bar}| {percentage}% | {value}/{total} SKUs | Products: {products} | Images: {images} | ETA: {eta}s',
+      barCompleteChar: '\u2588',
+      barIncompleteChar: '\u2591',
+      hideCursor: true
+    });
+
+    progressBar.start(allowlistResult.rows.length, 0, {
+      products: 0,
+      images: 0
+    });
 
     const startTime = Date.now();
     let totalFetched = 0;
@@ -92,6 +106,7 @@ async function main() {
         
         if (!response.data || response.data.length === 0) {
           notFound++;
+          progressBar.update(i + 1, { products: productsUpdated, images: imagesAdded });
           continue;
         }
 
@@ -108,6 +123,7 @@ async function main() {
         }
 
         if (images.length === 0) {
+          progressBar.update(i + 1, { products: productsUpdated, images: imagesAdded });
           continue;
         }
 
@@ -118,6 +134,7 @@ async function main() {
         );
 
         if (productResult.rows.length === 0) {
+          progressBar.update(i + 1, { products: productsUpdated, images: imagesAdded });
           continue;
         }
 
@@ -148,11 +165,8 @@ async function main() {
           productsUpdated++;
         }
 
-        // Show progress every 10 items instead of 50
-        if ((i + 1) % 10 === 0 || productsUpdated > 0) {
-          const pct = ((i + 1) / allowlistResult.rows.length * 100).toFixed(1);
-          process.stdout.write(`\r  → ${i + 1}/${allowlistResult.rows.length} (${pct}%) | Products: ${productsUpdated} | Images: ${imagesAdded}    `);
-        }
+        // Update progress bar
+        progressBar.update(i + 1, { products: productsUpdated, images: imagesAdded });
 
         // Rate limit: 10 requests per second
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -160,10 +174,14 @@ async function main() {
       } catch (err) {
         errors++;
         if (errors <= 10) {
-          console.error(`\n  ✗ Error on ${sku}:`, err.message);
+          progressBar.stop();
+          console.error(`\n✗ Error on ${sku}:`, err.message);
+          progressBar.start(allowlistResult.rows.length, i + 1, { products: productsUpdated, images: imagesAdded });
         }
       }
     }
+
+    progressBar.stop();
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
 
