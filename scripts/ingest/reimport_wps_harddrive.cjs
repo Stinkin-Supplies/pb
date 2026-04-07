@@ -169,9 +169,9 @@ async function reimportWpsProducts() {
     `);
     
     // Insert in chunks
-    const chunkSize = 1000;
-    for (let i = 0; i < imageValues.length; i += chunkSize) {
-      const chunk = imageValues.slice(i, i + chunkSize);
+    const imageChunkSize = 1000;
+    for (let i = 0; i < imageValues.length; i += imageChunkSize) {
+      const chunk = imageValues.slice(i, i + imageChunkSize);
       const values = chunk.map(({ sku, imageUrl }) => 
         `('${sku.replace(/'/g, "''")}', '${imageUrl.replace(/'/g, "''")}')`
       );
@@ -181,7 +181,7 @@ async function reimportWpsProducts() {
         VALUES ${values.join(', ')}
       `);
       
-      process.stdout.write(`\r  Staged: ${Math.min(i + chunkSize, imageValues.length)} / ${imageValues.length}`);
+      process.stdout.write(`\r  Staged: ${Math.min(i + imageChunkSize, imageValues.length)} / ${imageValues.length}`);
     }
     console.log('\n');
     
