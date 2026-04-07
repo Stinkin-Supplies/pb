@@ -144,37 +144,58 @@ async function reimportWpsProducts() {
       )
     `);
     
-    // Import images
+    // Import images in batch
     console.log('  Importing product images...');
-    let imageCount = 0;
+    
+    // Build batch insert values
+    const imageValues = [];
     for (const record of harddriveProducts) {
       const sku = record.sku?.trim();
       const imageUrl = record.primary_item_image?.trim();
       
-      if (!sku || !imageUrl) continue;
-      
-      // Get product ID
-      const productResult = await client.query(
-        'SELECT id FROM catalog_products WHERE sku = $1',
-        [sku]
-      );
-      
-      if (productResult.rows.length === 0) continue;
-      const productId = productResult.rows[0].id;
-      
-      // Insert image if it doesn't exist (ON CONFLICT uses the unique index on product_id, url)
-      await client.query(`
-        INSERT INTO catalog_media (product_id, media_type, url, priority)
-        VALUES ($1, 'image', $2, 0)
-        ON CONFLICT (product_id, url) DO NOTHING
-      `, [productId, imageUrl]);
-      
-      imageCount++;
-      if (imageCount % 1000 === 0) {
-        process.stdout.write(`\r  Imported ${imageCount} images...`);
+      if (sku && imageUrl) {
+        imageValues.push({ sku, imageUrl });
       }
     }
-    console.log(`\n  Imported ${imageCount} images total\n`);
+    
+    console.log(`  Preparing ${imageValues.length} images for batch insert...`);
+    
+    // Create temp table for images
+    await client.query(`
+      CREATE TEMP TABLE images_staging (
+        sku VARCHAR(50),
+        image_url TEXT
+      )
+    `);
+    
+    // Insert in chunks
+    const chunkSize = 1000;
+    for (let i = 0; i < imageValues.length; i += chunkSize) {
+      const chunk = imageValues.slice(i, i + chunkSize);
+      const values = chunk.map(({ sku, imageUrl }) => 
+        `('${sku.replace(/'/g, "''")}', '${imageUrl.replace(/'/g, "''")}')`
+      );
+      
+      await client.query(`
+        INSERT INTO images_staging (sku, image_url)
+        VALUES ${values.join(', ')}
+      `);
+      
+      process.stdout.write(`\r  Staged: ${Math.min(i + chunkSize, imageValues.length)} / ${imageValues.length}`);
+    }
+    console.log('\n');
+    
+    // Batch insert into catalog_media
+    console.log('  Inserting images into catalog_media...');
+    const result = await client.query(`
+      INSERT INTO catalog_media (product_id, media_type, url, priority)
+      SELECT cp.id, 'image', ist.image_url, 0
+      FROM images_staging ist
+      INNER JOIN catalog_products cp ON cp.sku = ist.sku
+      ON CONFLICT (product_id, url) DO NOTHING
+    `);
+    
+    console.log(`  Imported ${result.rowCount} images\n`);
     
     await client.query('COMMIT');
     console.log('\n');
