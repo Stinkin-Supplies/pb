@@ -67,6 +67,7 @@ const SCHEMA = {
 
     // Images
     { name: 'primary_image',  type: 'string', optional: true, index: false },
+    { name: 'images',         type: 'string[]', optional: true, index: false },
 
     // Fitment facets
     { name: 'fitment_make',   type: 'string[]', facet: true, optional: true },
@@ -106,6 +107,12 @@ function buildDocument(product, { specs, fitment, media, offers }) {
   const primaryImage = media
     .filter(m => m.url && !m.url.endsWith('.zip'))
     .sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99))[0]?.url ?? null;
+
+  // All images array — sorted by priority
+  const images = media
+    .filter(m => m.url && !m.url.endsWith('.zip'))
+    .sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99))
+    .map(m => m.url);
 
   // Fitment arrays (deduped, years expanded from ranges)
   const fitmentMakes  = [...new Set(fitment.map(f => f.make).filter(Boolean))];
@@ -153,6 +160,7 @@ function buildDocument(product, { specs, fitment, media, offers }) {
     in_stock:       inStock,
     free_shipping:  freeShipping,
     primary_image:  primaryImage         ?? undefined,
+    images:         images.length        ? images : undefined,
     fitment_make:   fitmentMakes.length  ? fitmentMakes  : undefined,
     fitment_model:  fitmentModels.length ? fitmentModels : undefined,
     fitment_year:   fitmentYears.length  ? fitmentYears  : undefined,
@@ -199,14 +207,13 @@ export async function buildTypesenseIndex({ recreate = true } = {}) {
   while (offset < total) {
     const products = await sql`
       SELECT DISTINCT cp.id, cp.sku, cp.slug, cp.name, cp.brand, cp.manufacturer_part_number, cp.description,
-             cp.category, cp.computed_price, cp.stock_quantity,
-             cp.is_atv, cp.is_offroad, cp.is_snow, cp.is_street, cp.is_watercraft, cp.is_bicycle
+             cp.category, cp.computed_price, cp.stock_quantity
       FROM catalog_products cp
-      INNER JOIN catalog_media m ON m.product_id = cp.id AND m.media_type = 'image'
-      WHERE cp.is_active = true AND cp.is_discontinued = false
-      ORDER BY cp.id
-      LIMIT ${BATCH_SIZE} OFFSET ${offset}
-    `;
+	      INNER JOIN catalog_media m ON m.product_id = cp.id AND m.media_type = 'image'
+	      WHERE cp.is_active = true AND cp.is_discontinued = false
+	      ORDER BY cp.id
+	      LIMIT ${BATCH_SIZE} OFFSET ${offset}
+	    `;
 
     if (!products.length) break;
 
