@@ -537,7 +537,7 @@ async function main() {
   if (failed === 0) {
     log('\n🔗  Merging PU vendor rows into catalog...');
     try {
-      execSync('node scripts/ingest/phase2-merge.js', { stdio: 'inherit' });
+      execSync('node scripts/ingest/phase2-merge.cjs', { stdio: 'inherit' });
     } catch (err) {
       failed = products.length;
       console.error('❌  Catalog merge failed:', err.message);
