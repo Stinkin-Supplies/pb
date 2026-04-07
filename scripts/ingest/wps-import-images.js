@@ -1,12 +1,17 @@
-require('dotenv').config();
-const { Pool } = require('pg');
-const fs   = require('fs');
-const path = require('path');
+import dotenv from 'dotenv';
+import { Pool } from 'pg';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, '../../.env.local'), override: true });
 
 // ── Config ────────────────────────────────────────────────────
 const pool       = new Pool({ connectionString: process.env.CATALOG_DATABASE_URL });
-const CSV_PATH   = process.argv[2] || './master-image-list.csv';
-const CHECKPOINT = './wps-images-checkpoint.json';
+const CSV_PATH   = process.argv[2] || path.resolve(__dirname, './master-image-list.csv');
+const CHECKPOINT = path.resolve(__dirname, './wps-images-checkpoint.json');
 const BATCH_SIZE = 500;
 
 function saveCheckpoint(data) { fs.writeFileSync(CHECKPOINT, JSON.stringify(data, null, 2)); }
@@ -54,20 +59,27 @@ async function run() {
   const totalLines = fs.readFileSync(CSV_PATH, 'utf8').split('\n').filter(l => l.trim()).length - 1;
   console.log(`   Total image rows: ${totalLines.toLocaleString()}\n`);
 
-  // Build lookup: wps_sku → catalog_product_id
-  // Match via vendor_offers WHERE vendor_code = 'wps' AND vendor_part_number = sku
-  console.log('   Building SKU → catalog_product_id lookup from vendor_offers...');
-  const { rows: offerRows } = await client.query(`
-    SELECT vo.vendor_part_number AS sku, vo.catalog_product_id
-    FROM public.vendor_offers vo
-    WHERE vo.vendor_code = 'wps'
-      AND vo.vendor_part_number IS NOT NULL
+  // Build lookup: sku → catalog_product_id
+  // Prefer matching via vendor_offers (WPS vendor_part_number), fall back to catalog_products.sku.
+  console.log('   Building SKU → catalog_product_id lookup...');
+  const { rows: skuRows } = await client.query(`
+    SELECT
+      COALESCE(vo.vendor_part_number, cp.sku) AS sku,
+      COALESCE(vo.catalog_product_id, cp.id) AS catalog_product_id
+    FROM public.catalog_products cp
+    LEFT JOIN public.vendor_offers vo
+      ON vo.catalog_product_id = cp.id
+     AND vo.vendor_code = 'wps'
+     AND vo.vendor_part_number IS NOT NULL
+    WHERE cp.sku IS NOT NULL
   `);
   const skuToProductId = {};
-  for (const row of offerRows) {
-    skuToProductId[row.sku] = row.catalog_product_id;
+  for (const row of skuRows) {
+    if (row.sku && row.catalog_product_id && !skuToProductId[row.sku]) {
+      skuToProductId[row.sku] = row.catalog_product_id;
+    }
   }
-  console.log(`   Loaded ${Object.keys(skuToProductId).length.toLocaleString()} WPS SKU mappings\n`);
+  console.log(`   Loaded ${Object.keys(skuToProductId).length.toLocaleString()} SKU mappings\n`);
 
   let batch   = [];
   let lineNum = 0;
@@ -77,7 +89,12 @@ async function run() {
       lineNum = ln;
       if (lineNum <= startLine) continue; // skip already processed
 
-      const sku = row.sku?.trim();
+      // WPS master-image-list.csv includes both:
+      // - sku (ex: "015-01001")
+      // - supplier_item_id (ex: "FS-1017")
+      // Our DB typically maps WPS offers via vendor_offers.vendor_part_number (often the supplier item id),
+      // so prefer supplier_item_id when present.
+      const sku = (row.supplier_item_id ?? row.vendor_number ?? row.sku)?.trim();
       const url = row.image_uri?.trim();
 
       if (!sku || !url || !url.startsWith('http')) {
@@ -120,9 +137,10 @@ async function run() {
     // Final summary
     const { rows: [summary] } = await client.query(`
       SELECT
-        COUNT(DISTINCT catalog_product_id) AS products_with_images,
+        COUNT(DISTINCT product_id) AS products_with_images,
         COUNT(*) AS total_images
-      FROM public.catalog_images
+      FROM public.catalog_media
+      WHERE media_type = 'image'
     `);
     console.log(`\n   DB totals after import:`);
     console.log(`     Products with images: ${Number(summary.products_with_images).toLocaleString()}`);
@@ -132,8 +150,10 @@ async function run() {
     const { rows: [coverage] } = await client.query(`
       SELECT
         COUNT(*) FILTER (WHERE EXISTS (
-          SELECT 1 FROM public.catalog_images ci
-          WHERE ci.catalog_product_id = cp.id
+          SELECT 1 FROM public.catalog_media cm
+          WHERE cm.product_id = cp.id
+            AND cm.media_type = 'image'
+            AND cm.url IS NOT NULL
         )) AS with_image,
         COUNT(*) AS total
       FROM public.catalog_products cp
@@ -171,13 +191,10 @@ async function flushBatch(client, batch, onResult) {
   for (const { catalogProductId, url } of deduped) {
     try {
       await client.query(`
-        INSERT INTO public.catalog_images
-          (product_id, catalog_product_id, url, position, is_primary, created_at)
-        VALUES ($1, $1, $2, 0, true, NOW())
-        ON CONFLICT (catalog_product_id, url) DO UPDATE SET
-          product_id = EXCLUDED.product_id,
-          is_primary = true,
-          position   = 0
+        INSERT INTO public.catalog_media
+          (product_id, url, media_type, priority)
+        VALUES ($1, $2, 'image', 0)
+        ON CONFLICT DO NOTHING
       `, [catalogProductId, url]);
       written++;
     } catch (err) {
