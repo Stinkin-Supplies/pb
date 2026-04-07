@@ -197,15 +197,15 @@ export async function buildTypesenseIndex({ recreate = true } = {}) {
   const startTime = Date.now();
 
   while (offset < total) {
-	    const products = await sql`
-	      SELECT DISTINCT cp.id, cp.sku, cp.slug, cp.name, cp.brand, cp.manufacturer_part_number, cp.description,
-	             cp.category, cp.computed_price, cp.stock_quantity,
-	      FROM catalog_products cp
+    const products = await sql`
+      SELECT DISTINCT cp.id, cp.sku, cp.slug, cp.name, cp.brand, cp.manufacturer_part_number, cp.description,
+             cp.category, cp.computed_price, cp.stock_quantity
+      FROM catalog_products cp
 	      INNER JOIN catalog_media m ON m.product_id = cp.id AND m.media_type = 'image'
 	      WHERE cp.is_active = true AND cp.is_discontinued = false
 	      ORDER BY cp.id
-      LIMIT ${BATCH_SIZE} OFFSET ${offset}
-    `;
+	      LIMIT ${BATCH_SIZE} OFFSET ${offset}
+	    `;
 
     if (!products.length) break;
 
