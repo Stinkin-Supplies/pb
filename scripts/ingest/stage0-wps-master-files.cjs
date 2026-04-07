@@ -98,12 +98,11 @@ async function processMasterImages(catalog, rows) {
         continue;
       }
 
-      // Insert image
+      // Insert image (no ON CONFLICT since no unique constraint exists)
       await pool.query(
-        `INSERT INTO catalog_media (product_id, url, media_type, priority, source)
-         VALUES ($1, $2, 'image', 1, $3)
-         ON CONFLICT DO NOTHING`,
-        [productId, imageUrl, `wps_master_${catalog}`]
+        `INSERT INTO catalog_media (product_id, url, media_type, priority)
+         VALUES ($1, $2, 'image', 1)`,
+        [productId, imageUrl]
       );
 
       inserted++;
@@ -223,14 +222,22 @@ async function processMasterItems(catalog, rows) {
       for (const column of specColumns) {
         const value = row[column];
         if (value !== null && value !== '' && value !== 'null') {
-          // Insert spec (ignore if already exists)
-          await pool.query(
-            `INSERT INTO catalog_specs (product_id, attribute, value, source)
-             VALUES ($1, $2, $3, $4)
-             ON CONFLICT (product_id, attribute, value) DO NOTHING`,
-            [productId, column, String(value), `wps_master_${catalog}`]
+          // Check if spec already exists
+          const existingSpec = await pool.query(
+            `SELECT id FROM catalog_specs 
+             WHERE product_id = $1 AND attribute = $2 AND value = $3`,
+            [productId, column, String(value)]
           );
-          specsInserted++;
+
+          if (existingSpec.rows.length === 0) {
+            // Insert spec only if it doesn't exist
+            await pool.query(
+              `INSERT INTO catalog_specs (product_id, attribute, value)
+               VALUES ($1, $2, $3)`,
+              [productId, column, String(value)]
+            );
+            specsInserted++;
+          }
         }
       }
 
