@@ -65,8 +65,8 @@ function getTypesense() {
 
 const CHECKPOINT_FILE = '.stage3_checkpoint.json';
 const FITMENT_CHECKPOINT_FILE = '.stage3_fitment_checkpoint.json';
-const DEFAULT_BATCH_SIZE = 2000;
-const DEFAULT_CONCURRENCY = 6;
+const DEFAULT_BATCH_SIZE = 1000;
+const DEFAULT_CONCURRENCY = 10;
 const DEFAULT_INFLIGHT_PER_WORKER = 1;
 
 let _hasSearchCache = null;
@@ -1102,10 +1102,10 @@ async function buildDocumentsForProducts(products, opts = {}) {
 /**
  * Get products to index (respecting allowlist)
  */
-async function getProductsToIndex(offset, limit, useAllowlist) {
-  if (useAllowlist) {
-    return {
-      data: await sql`
+async function getProductRowsToIndex(offset, limit, useAllowlist) {
+  return {
+    data: await sql`
+      WITH products_page AS (
         SELECT
           cp.id,
           cp.sku,
@@ -1114,91 +1114,61 @@ async function getProductsToIndex(offset, limit, useAllowlist) {
           cp.name,
           cp.description,
           cp.category,
-          cp.computed_price,
-          COALESCE((
-            SELECT cm0.url
-            FROM catalog_media cm0
-            WHERE cm0.product_id = cp.id
-              AND cm0.priority = 0
-              AND cm0.url IS NOT NULL
-              AND cm0.url !~* '\\.zip$'
-            ORDER BY cm0.id
-            LIMIT 1
-          ), (
-            SELECT cm1.url
-            FROM catalog_media cm1
-            WHERE cm1.product_id = cp.id
-              AND cm1.url IS NOT NULL
-              AND cm1.url !~* '\\.zip$'
-            ORDER BY cm1.priority ASC NULLS LAST, cm1.id
-            LIMIT 1
-          )) AS primary_image,
-          COALESCE((
-            SELECT json_agg(cm.url ORDER BY cm.priority ASC NULLS LAST, cm.id)
-            FROM catalog_media cm
-            WHERE cm.product_id = cp.id
-              AND cm.url IS NOT NULL
-              AND cm.url !~* '\\.zip$'
-          ), '[]'::json) AS images
+          cp.computed_price
         FROM catalog_products cp
         WHERE cp.is_active = true
           AND cp.is_discontinued = false
           AND cp.computed_price IS NOT NULL
-          AND EXISTS (SELECT 1 FROM catalog_allowlist al WHERE al.sku = cp.sku)
+          AND (
+            ${useAllowlist} = false OR EXISTS (
+              SELECT 1 FROM catalog_allowlist al WHERE al.sku = cp.sku
+            )
+          )
         ORDER BY cp.id
         OFFSET ${offset}
         LIMIT ${limit}
-      `,
-      error: null,
-    };
-  }
-
-  return {
-    data: await sql`
+      ),
+      media_primary AS (
+        SELECT DISTINCT ON (m.product_id)
+          m.product_id,
+          m.url
+        FROM catalog_media m
+        JOIN products_page p ON p.id = m.product_id
+        WHERE m.url IS NOT NULL
+          AND m.url !~* '\\.zip$'
+          AND m.media_type = 'image'
+        ORDER BY m.product_id, m.priority ASC NULLS LAST, m.id ASC
+      ),
+      media_all AS (
+        SELECT
+          m.product_id,
+          COALESCE(
+            json_agg(m.url ORDER BY m.priority ASC NULLS LAST, m.id ASC),
+            '[]'::json
+          ) AS images
+        FROM catalog_media m
+        JOIN products_page p ON p.id = m.product_id
+        WHERE m.url IS NOT NULL
+          AND m.url !~* '\\.zip$'
+          AND m.media_type = 'image'
+        GROUP BY m.product_id
+      )
       SELECT
-        cp.id,
-        cp.sku,
-        cp.slug,
-        cp.brand,
-        cp.name,
-        cp.description,
-        cp.category,
-        cp.computed_price,
-        COALESCE((
-          SELECT cm0.url
-          FROM catalog_media cm0
-          WHERE cm0.product_id = cp.id
-            AND cm0.priority = 0
-            AND cm0.url IS NOT NULL
-            AND cm0.url !~* '\\.zip$'
-          ORDER BY cm0.id
-          LIMIT 1
-        ), (
-          SELECT cm1.url
-          FROM catalog_media cm1
-          WHERE cm1.product_id = cp.id
-            AND cm1.url IS NOT NULL
-            AND cm1.url !~* '\\.zip$'
-          ORDER BY cm1.priority ASC NULLS LAST, cm1.id
-          LIMIT 1
-        )) AS primary_image,
-        COALESCE((
-          SELECT json_agg(cm.url ORDER BY cm.priority ASC NULLS LAST, cm.id)
-          FROM catalog_media cm
-          WHERE cm.product_id = cp.id
-            AND cm.url IS NOT NULL
-            AND cm.url !~* '\\.zip$'
-        ), '[]'::json) AS images
-      FROM catalog_products cp
-      WHERE cp.is_active = true
-        AND cp.is_discontinued = false
-        AND cp.computed_price IS NOT NULL
-      ORDER BY cp.id
-      OFFSET ${offset}
-      LIMIT ${limit}
+        p.*,
+        media_primary.url AS primary_image,
+        media_all.images
+      FROM products_page p
+      LEFT JOIN media_primary ON media_primary.product_id = p.id
+      LEFT JOIN media_all ON media_all.product_id = p.id
+      ORDER BY p.id
     `,
     error: null,
   };
+}
+
+// Back-compat alias (older instructions referenced this name)
+async function getProductsToIndex(offset, limit, useAllowlist) {
+  return getProductRowsToIndex(offset, limit, useAllowlist);
 }
 
 async function getFitmentRowsToIndex(offset, limit, useAllowlist) {
@@ -1470,7 +1440,7 @@ export async function buildTypesenseIndex(options = {}) {
   let inFlightTotal = 0;
 
   async function prepareBatch(start) {
-    const res = await getProductsToIndex(start, batchSize, useAllowlist);
+    const res = await getProductRowsToIndex(start, batchSize, useAllowlist);
     const products = res.data ?? [];
     if (!products || products.length === 0) {
       return { start, count: 0, documents: [] };
