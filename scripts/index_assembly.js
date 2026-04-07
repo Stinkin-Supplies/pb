@@ -183,11 +183,13 @@ export async function buildTypesenseIndex({ recreate = true } = {}) {
   if (recreate) await recreateCollection(client);
 
   const [{ count }] = await sql`
-    SELECT COUNT(*) FROM catalog_products
-    WHERE is_active = true AND is_discontinued = false
+    SELECT COUNT(DISTINCT cp.id) 
+    FROM catalog_products cp
+    INNER JOIN catalog_media m ON m.product_id = cp.id AND m.media_type = 'image'
+    WHERE cp.is_active = true AND cp.is_discontinued = false
   `;
   const total = Number(count);
-  console.log(`[Stage3] Indexing ${total} active products...`);
+  console.log(`[Stage3] Indexing ${total} products with images...`);
 
   let offset    = 0;
   let indexed   = 0;
@@ -196,12 +198,13 @@ export async function buildTypesenseIndex({ recreate = true } = {}) {
 
   while (offset < total) {
     const products = await sql`
-      SELECT id, sku, slug, name, brand, manufacturer_part_number, description,
-             category, computed_price, stock_quantity, in_stock,
-             is_atv, is_offroad, is_snow, is_street, is_watercraft, is_bicycle
-      FROM catalog_products
-      WHERE is_active = true AND is_discontinued = false
-      ORDER BY id
+      SELECT DISTINCT cp.id, cp.sku, cp.slug, cp.name, cp.brand, cp.manufacturer_part_number, cp.description,
+             cp.category, cp.computed_price, cp.stock_quantity, cp.in_stock,
+             cp.is_atv, cp.is_offroad, cp.is_snow, cp.is_street, cp.is_watercraft, cp.is_bicycle
+      FROM catalog_products cp
+      INNER JOIN catalog_media m ON m.product_id = cp.id AND m.media_type = 'image'
+      WHERE cp.is_active = true AND cp.is_discontinued = false
+      ORDER BY cp.id
       LIMIT ${BATCH_SIZE} OFFSET ${offset}
     `;
 
