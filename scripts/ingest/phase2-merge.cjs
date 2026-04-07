@@ -1,6 +1,7 @@
-require('dotenv').config();
-const { Pool } = require('pg');
+const dotenv = require('dotenv');
 const path = require('path');
+dotenv.config({ path: path.resolve(__dirname, '../../.env.local'), override: true });
+const { Pool } = require('pg');
 
 const pool = new Pool({ connectionString: process.env.CATALOG_DATABASE_URL });
 const CHECKPOINT = './phase2-checkpoint.json';
@@ -410,7 +411,7 @@ async function run() {
 
   } catch (err) {
     console.error('\n❌  Phase 2 failed:', err.message);
-    console.error('    Re-run node phase2-merge.js to resume from checkpoint.');
+    console.error('    Re-run node phase2-merge.cjs to resume from checkpoint.');
   } finally {
     client.release();
     await pool.end();
