@@ -198,10 +198,10 @@ export async function buildTypesenseIndex({ recreate = true } = {}) {
 
   while (offset < total) {
     const products = await sql`
-      SELECT DISTINCT cp.id, cp.sku, cp.slug, cp.name, cp.brand, cp.manufacturer_part_number, cp.description,
-             cp.category, cp.computed_price, cp.stock_quantity, cp.in_stock,
-             cp.is_atv, cp.is_offroad, cp.is_snow, cp.is_street, cp.is_watercraft, cp.is_bicycle
-      FROM catalog_products cp
+	      SELECT DISTINCT cp.id, cp.sku, cp.slug, cp.name, cp.brand, cp.manufacturer_part_number, cp.description,
+	             cp.category, cp.computed_price, cp.stock_quantity,
+	             cp.is_atv, cp.is_offroad, cp.is_snow, cp.is_street, cp.is_watercraft, cp.is_bicycle
+	      FROM catalog_products cp
       INNER JOIN catalog_media m ON m.product_id = cp.id AND m.media_type = 'image'
       WHERE cp.is_active = true AND cp.is_discontinued = false
       ORDER BY cp.id
