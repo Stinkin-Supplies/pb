@@ -14,6 +14,7 @@ export default async function ProductDetailPage({ params }) {
   const { slug } = await params;
 
   let product = null;
+  const fallback = "/images/no-image.png";
   
   try {
     const rows = await sql`
@@ -79,7 +80,7 @@ export default async function ProductDetailPage({ params }) {
     : (Array.isArray(product.images) ? product.images : []);
 
   const gallery = images.filter(Boolean);
-  const primaryImage = product.primary_image || gallery[0] || null;
+  const primaryImage = product.primary_image || gallery[0] || fallback;
 
   product.gallery = gallery;
   product.primaryImage = primaryImage;
