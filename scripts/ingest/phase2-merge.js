@@ -1,10 +1,93 @@
 require('dotenv').config();
 const { Pool } = require('pg');
+const path = require('path');
 
 const pool = new Pool({ connectionString: process.env.CATALOG_DATABASE_URL });
 const CHECKPOINT = './phase2-checkpoint.json';
 const fs = require('fs');
 const BATCH_SIZE = 500;
+
+// ── Category mapping ──────────────────────────────────────────────────────────
+// Optional mapping file to translate supplier category codes/labels → your store categories.
+// Create/edit: scripts/ingest/category_map.json
+const CATEGORY_MAP_FILE = path.resolve(__dirname, 'category_map.json');
+const SPORT_TAGS = new Set(['street', 'atv', 'offroad', 'snow', 'watercraft', 'bicycle']);
+
+let _categoryMap = null;
+function loadCategoryMap() {
+  if (_categoryMap) return _categoryMap;
+  try {
+    if (fs.existsSync(CATEGORY_MAP_FILE)) {
+      const raw = JSON.parse(fs.readFileSync(CATEGORY_MAP_FILE, 'utf8'));
+      _categoryMap = raw && typeof raw === 'object' ? raw : {};
+      return _categoryMap;
+    }
+  } catch (e) {
+    console.warn(`⚠️  Could not read ${CATEGORY_MAP_FILE}: ${e.message}`);
+  }
+  _categoryMap = {};
+  return _categoryMap;
+}
+
+function normalizeCategoryKey(v) {
+  return String(v ?? '')
+    .trim()
+    .replace(/^"|"$/g, '')
+    .replace(/\s+/g, '_')
+    .replace(/[^A-Za-z0-9_]/g, '_')
+    .replace(/_+/g, '_')
+    .toUpperCase();
+}
+
+function mapCategory(raw) {
+  if (!raw) return null;
+
+  // If it's a hierarchical string, prefer the leaf segment.
+  let leaf = raw;
+  if (typeof leaf === 'string') {
+    if (leaf.includes('>')) leaf = leaf.split('>').pop();
+    if (leaf.includes('/')) leaf = leaf.split('/').pop();
+    leaf = leaf.trim();
+  }
+
+  const map = loadCategoryMap();
+  const key = normalizeCategoryKey(leaf);
+  const mapped = map[key] ?? map[leaf] ?? null;
+
+  return (mapped && String(mapped).trim()) ? String(mapped).trim() : (String(leaf).trim() || null);
+}
+
+function bestCategory(rows) {
+  // Prefer vendor-provided categories, but never treat sport tags as the store category.
+  for (const r of rows) {
+    let raw = r?.categories_raw ?? null;
+    if (typeof raw === 'string') {
+      try { raw = JSON.parse(raw); } catch { raw = null; }
+    }
+
+    const list = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+    const cleaned = list
+      .map((x) => (typeof x === 'string' ? x.trim() : ''))
+      .filter(Boolean)
+      .filter((x) => !SPORT_TAGS.has(x.toLowerCase()));
+
+    if (cleaned.length > 0) {
+      // If the vendor gives a path, take the leaf.
+      const candidate = cleaned[cleaned.length - 1];
+      const mapped = mapCategory(candidate);
+      if (mapped && !SPORT_TAGS.has(mapped.toLowerCase())) return mapped;
+    }
+
+    // Fall back to product_type if it's meaningful (and not a sport tag).
+    const pt = (r?.product_type ?? '').toString().trim();
+    if (pt && !SPORT_TAGS.has(pt.toLowerCase())) {
+      const mapped = mapCategory(pt);
+      if (mapped && !SPORT_TAGS.has(mapped.toLowerCase())) return mapped;
+    }
+  }
+
+  return null;
+}
 
 function saveCheckpoint(data) { fs.writeFileSync(CHECKPOINT, JSON.stringify(data, null, 2)); }
 function loadCheckpoint() {
@@ -78,6 +161,7 @@ async function upsertCatalogProduct(client, mpn, rows) {
   const title       = bestTitle(rows);
   const description = bestDescription(rows);
   const brand       = bestBrand(rows);
+  const category    = bestCategory(rows);
   const images      = mergeImages(rows);
   const mapPrice    = bestPrice(rows);
   const cost        = bestCost(rows);
@@ -142,18 +226,18 @@ async function upsertCatalogProduct(client, mpn, rows) {
       source_vendor       = EXCLUDED.source_vendor,
       updated_at          = NOW()
     RETURNING id
-  `, [
-    sku,                                    // $1
-    mpn,                                    // $2
-    title,                                  // $3
-    description,                            // $4
-    brand,                                  // $5
-    ref.categories_raw?.[0] ?? null,        // $6  category (first category)
-    mapPrice,                               // $7  price (MAP as default sell price)
-    cost,                                   // $8
-    mapPrice,                               // $9  map_price
-    ref.msrp ?? wps.msrp ?? pu.msrp ?? null, // $10 msrp
-    weight,                                 // $11
+	  `, [
+	    sku,                                    // $1
+	    mpn,                                    // $2
+	    title,                                  // $3
+	    description,                            // $4
+	    brand,                                  // $5
+	    category,                               // $6  category (mapped / canonical)
+	    mapPrice,                               // $7  price (MAP as default sell price)
+	    cost,                                   // $8
+	    mapPrice,                               // $9  map_price
+	    ref.msrp ?? wps.msrp ?? pu.msrp ?? null, // $10 msrp
+	    weight,                                 // $11
     dimensions ? JSON.stringify(dimensions) : null, // $12
     ref.status ?? null,                     // $13
     ref.product_type ?? null,               // $14
