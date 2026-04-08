@@ -7,7 +7,7 @@
  * WARNING: This will delete all existing indexed documents!
  * Make sure you have a backup before running.
  * 
- * Usage: npx dotenv -e .env.local -- node scripts/typesense/recreate-schema.js
+ * Usage: npx dotenv -e .env.local -- node scripts/typesense/recreate-schema.cjs
  */
 
 const Typesense = require('typesense');
