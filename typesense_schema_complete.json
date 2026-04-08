@@ -1,5 +1,6 @@
 {
   "name": "products",
+  "enable_nested_fields": true,
   "fields": [
     {
       "name": "id",
