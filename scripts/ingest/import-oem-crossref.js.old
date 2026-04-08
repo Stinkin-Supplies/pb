@@ -91,7 +91,8 @@ async function importOEMData() {
             VALUES ($1, $2, $3, $4, $5)
             ON CONFLICT (sku, oem_number, oem_manufacturer) 
             DO UPDATE SET 
-              page_reference = EXCLUDED.page_reference
+              page_reference = EXCLUDED.page_reference,
+              updated_at = NOW()
             RETURNING id
           `, [
             sku,
