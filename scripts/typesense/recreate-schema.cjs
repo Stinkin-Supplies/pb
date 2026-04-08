@@ -7,7 +7,7 @@
  * WARNING: This will delete all existing indexed documents!
  * Make sure you have a backup before running.
  * 
- * Usage: npx dotenv -e .env.local -- node scripts/typesense/recreate-schema.cjs
+ * Usage: npx dotenv -e .env.local -- node scripts/typesense/recreate-schema.js
  */
 
 const Typesense = require('typesense');
@@ -16,9 +16,9 @@ const path = require('path');
 
 const client = new Typesense.Client({
   nodes: [{
-    host: process.env.TYPESENSE_HOST,
-    port: '443',
-    protocol: 'https'
+    host: process.env.TYPESENSE_HOST || '5.161.100.126',
+    port: process.env.TYPESENSE_PORT || '8108',
+    protocol: process.env.TYPESENSE_PROTOCOL || 'http'
   }],
   apiKey: process.env.TYPESENSE_API_KEY,
   connectionTimeoutSeconds: 10
