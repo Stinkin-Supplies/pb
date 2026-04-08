@@ -66,10 +66,12 @@ async function loadOEMCrossrefs() {
  * Build a single Typesense document from database rows
  */
 function buildDocument(product, specs, media, fitment, offers, oem_refs) {
-  // Extract vendor codes
+  // Extract vendor codes - vendor_code is the vendor identifier
   const vendorCodes = {};
   offers.forEach(offer => {
-    vendorCodes[offer.vendor] = offer.vendor_code;
+    if (offer.vendor_code) {
+      vendorCodes[offer.vendor_code] = offer.vendor_code;
+    }
   });
 
   // Calculate total quantity across all warehouses
@@ -79,14 +81,17 @@ function buildDocument(product, specs, media, fitment, offers, oem_refs) {
   const warehouseAvailability = [];
   offers.forEach(offer => {
     if (offer.warehouse_json) {
-      const warehouses = JSON.parse(offer.warehouse_json);
-      warehouses.forEach(wh => {
-        warehouseAvailability.push({
-          code: wh.code,
-          name: wh.name,
-          qty: wh.qty
+      // warehouse_json is already a JSONB object, no need to parse
+      const warehouses = offer.warehouse_json;
+      if (Array.isArray(warehouses)) {
+        warehouses.forEach(wh => {
+          warehouseAvailability.push({
+            code: wh.code,
+            name: wh.name,
+            qty: wh.qty
+          });
         });
-      });
+      }
     }
   });
 
@@ -101,12 +106,14 @@ function buildDocument(product, specs, media, fitment, offers, oem_refs) {
   const fitmentYears = [];
   
   fitment.forEach(f => {
-    const startYear = f.year_start || f.year;
-    const endYear = f.year_end || f.year;
+    const startYear = f.year_start;
+    const endYear = f.year_end;
     
-    for (let year = startYear; year <= endYear; year++) {
-      if (!fitmentYears.includes(year)) {
-        fitmentYears.push(year);
+    if (startYear && endYear) {
+      for (let year = startYear; year <= endYear; year++) {
+        if (!fitmentYears.includes(year)) {
+          fitmentYears.push(year);
+        }
       }
     }
   });
@@ -152,17 +159,12 @@ function buildDocument(product, specs, media, fitment, offers, oem_refs) {
     .join(' ')
     .toLowerCase();
 
-  // Determine catalogs
-  const catalogs = [];
-  if (product.fatbook_catalog === '1') catalogs.push('fatbook');
-  if (product.fatbook_midyear === '1') catalogs.push('fatbook_midyear');
-  if (product.oldbook_catalog === '1') catalogs.push('oldbook');
-  if (product.oldbook_midyear === '1') catalogs.push('oldbook_midyear');
-  if (product.tire_catalog === '1') catalogs.push('tire');
+  // Determine catalogs from allowlist (will be passed in)
+  const catalogs = product.catalogs || [];
 
   // Build Typesense document
   return {
-    id: product.id,
+    id: String(product.id),
     sku: product.sku,
     slug: product.slug,
     name: product.name,
@@ -170,9 +172,9 @@ function buildDocument(product, specs, media, fitment, offers, oem_refs) {
     category: product.category,
     description: product.description,
     
-    computed_price: product.computed_price,
-    map_price: product.map_price,
-    msrp: product.msrp,
+    computed_price: product.computed_price ? parseFloat(product.computed_price) : 0,
+    map_price: product.map_price ? parseFloat(product.map_price) : undefined,
+    msrp: product.msrp ? parseFloat(product.msrp) : undefined,
     in_stock: totalQty > 0,
     total_qty: totalQty,
     
@@ -199,7 +201,7 @@ function buildDocument(product, specs, media, fitment, offers, oem_refs) {
     
     // Catalog metadata
     catalogs: catalogs.length > 0 ? catalogs : undefined,
-    product_code: product.product_code,
+    product_code: product.product_type,
     
     // Vendor data (stored as object, not indexed)
     vendor_codes: Object.keys(vendorCodes).length > 0 
@@ -219,10 +221,10 @@ function buildDocument(product, specs, media, fitment, offers, oem_refs) {
     // Timestamps (convert to Unix timestamp)
     created_at: product.created_at 
       ? Math.floor(new Date(product.created_at).getTime() / 1000) 
-      : undefined,
+      : Math.floor(Date.now() / 1000),
     updated_at: product.updated_at 
       ? Math.floor(new Date(product.updated_at).getTime() / 1000)
-      : undefined
+      : Math.floor(Date.now() / 1000)
   };
 }
 
@@ -253,12 +255,7 @@ async function indexProducts() {
         cp.msrp,
         cp.is_discontinued,
         cp.is_active,
-        cp.product_code,
-        cp.fatbook_catalog,
-        cp.fatbook_midyear,
-        cp.oldbook_catalog,
-        cp.oldbook_midyear,
-        cp.tire_catalog,
+        cp.product_type,
         cp.created_at,
         cp.updated_at
       FROM catalog_products cp
@@ -276,6 +273,15 @@ async function indexProducts() {
 
     // Step 2: Batch fetch related data
     const productIds = products.map(p => p.id);
+    const productSkus = products.map(p => p.sku);
+    
+    console.log('📂 Fetching catalog sources...');
+    const { rows: allowlist } = await pool.query(`
+      SELECT sku, catalog
+      FROM catalog_allowlist
+      WHERE sku = ANY($1)
+    `, [productSkus]);
+    console.log(`✓ Found ${allowlist.length} catalog entries`);
     
     console.log('📊 Fetching specs...');
     const { rows: specs } = await pool.query(`
@@ -296,7 +302,7 @@ async function indexProducts() {
 
     console.log('🚗 Fetching fitment...');
     const { rows: fitment } = await pool.query(`
-      SELECT product_id, make, model, year_start, year_end, year
+      SELECT product_id, make, model, year_start, year_end
       FROM catalog_fitment
       WHERE product_id = ANY($1)
     `, [productIds]);
@@ -306,7 +312,6 @@ async function indexProducts() {
     const { rows: offers } = await pool.query(`
       SELECT 
         catalog_product_id as product_id,
-        vendor,
         vendor_code,
         total_qty,
         warehouse_json
@@ -340,6 +345,13 @@ async function indexProducts() {
       if (!offersMap[o.product_id]) offersMap[o.product_id] = [];
       offersMap[o.product_id].push(o);
     });
+    
+    // Build catalog map by SKU
+    const catalogMap = {};
+    allowlist.forEach(a => {
+      if (!catalogMap[a.sku]) catalogMap[a.sku] = [];
+      catalogMap[a.sku].push(a.catalog);
+    });
 
     // Step 4: Build Typesense documents
     console.log('🔨 Building Typesense documents...');
@@ -353,6 +365,9 @@ async function indexProducts() {
       
       // Get OEM cross-references from database
       const oemRefs = oemCrossrefs[product.sku] || [];
+      
+      // Add catalog info from allowlist
+      product.catalogs = catalogMap[product.sku] || [];
       
       const doc = buildDocument(
         product,
