@@ -19,16 +19,48 @@ const pool = new Pool({
 // Typesense client
 const client = new Typesense.Client({
   nodes: [{
-    host: process.env.TYPESENSE_HOST,
-    port: '443',
-    protocol: 'https'
+    host: process.env.TYPESENSE_HOST || '5.161.100.126',
+    port: process.env.TYPESENSE_PORT || '8108',
+    protocol: process.env.TYPESENSE_PROTOCOL || 'http'
   }],
   apiKey: process.env.TYPESENSE_API_KEY,
   connectionTimeoutSeconds: 10
 });
 
-// Load OEM cross-reference data
-const OEM_CROSSREF = require('./oem_crossref_data.json');
+/**
+ * Load OEM cross-references from database
+ */
+async function loadOEMCrossrefs() {
+  console.log('📚 Loading OEM cross-references from database...');
+  
+  const { rows } = await pool.query(`
+    SELECT 
+      sku,
+      oem_number,
+      oem_manufacturer,
+      page_reference
+    FROM catalog_oem_crossref
+  `);
+
+  // Build lookup map: sku -> array of OEM refs
+  const oemMap = {};
+  
+  rows.forEach(row => {
+    if (!oemMap[row.sku]) {
+      oemMap[row.sku] = [];
+    }
+    
+    oemMap[row.sku].push({
+      oem_number: row.oem_number,
+      manufacturer: row.oem_manufacturer,
+      page_reference: row.page_reference
+    });
+  });
+
+  console.log(`✓ Loaded ${rows.length} OEM cross-references for ${Object.keys(oemMap).length} products\n`);
+  
+  return oemMap;
+}
 
 /**
  * Build a single Typesense document from database rows
@@ -201,7 +233,10 @@ async function indexProducts() {
   console.log('🚀 Starting Typesense indexing...\n');
 
   try {
-    // Step 1: Fetch all products with allowlist filter
+    // Step 1: Load OEM cross-references from database
+    const oemCrossrefs = await loadOEMCrossrefs();
+
+    // Step 2: Fetch all products with allowlist filter
     console.log('📦 Fetching products from catalog_products...');
     
     const productQuery = `
@@ -316,8 +351,8 @@ async function indexProducts() {
       const productFitment = fitmentMap[product.id] || [];
       const productOffers = offersMap[product.id] || [];
       
-      // Get OEM cross-references from loaded data
-      const oemRefs = OEM_CROSSREF.ds_to_oem[product.sku] || [];
+      // Get OEM cross-references from database
+      const oemRefs = oemCrossrefs[product.sku] || [];
       
       const doc = buildDocument(
         product,
