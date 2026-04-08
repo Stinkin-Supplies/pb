@@ -1,0 +1,220 @@
+{
+  "name": "products",
+  "fields": [
+    {
+      "name": "id",
+      "type": "string",
+      "index": true,
+      "facet": false,
+      "optional": false
+    },
+    {
+      "name": "sku",
+      "type": "string",
+      "index": true,
+      "facet": false,
+      "optional": false
+    },
+    {
+      "name": "slug",
+      "type": "string",
+      "index": true,
+      "facet": false,
+      "optional": false
+    },
+    {
+      "name": "name",
+      "type": "string",
+      "index": true,
+      "facet": false,
+      "optional": false
+    },
+    {
+      "name": "brand",
+      "type": "string",
+      "index": true,
+      "facet": true,
+      "optional": false
+    },
+    {
+      "name": "category",
+      "type": "string",
+      "index": true,
+      "facet": true,
+      "optional": true
+    },
+    {
+      "name": "description",
+      "type": "string",
+      "index": true,
+      "facet": false,
+      "optional": true
+    },
+    {
+      "name": "computed_price",
+      "type": "float",
+      "index": true,
+      "facet": false,
+      "optional": true,
+      "sort": true
+    },
+    {
+      "name": "map_price",
+      "type": "float",
+      "index": true,
+      "facet": false,
+      "optional": true,
+      "sort": true
+    },
+    {
+      "name": "msrp",
+      "type": "float",
+      "index": true,
+      "facet": false,
+      "optional": true
+    },
+    {
+      "name": "in_stock",
+      "type": "bool",
+      "index": true,
+      "facet": true,
+      "optional": true
+    },
+    {
+      "name": "total_qty",
+      "type": "int32",
+      "index": true,
+      "facet": false,
+      "optional": true
+    },
+    {
+      "name": "oem_numbers",
+      "type": "string[]",
+      "index": true,
+      "facet": false,
+      "optional": true
+    },
+    {
+      "name": "oem_manufacturers",
+      "type": "string[]",
+      "index": true,
+      "facet": true,
+      "optional": true
+    },
+    {
+      "name": "fitment_make",
+      "type": "string[]",
+      "index": true,
+      "facet": true,
+      "optional": true
+    },
+    {
+      "name": "fitment_model",
+      "type": "string[]",
+      "index": true,
+      "facet": true,
+      "optional": true
+    },
+    {
+      "name": "fitment_year",
+      "type": "int32[]",
+      "index": true,
+      "facet": true,
+      "optional": true
+    },
+    {
+      "name": "fitment_applications",
+      "type": "string[]",
+      "index": true,
+      "facet": false,
+      "optional": true
+    },
+    {
+      "name": "specs_facets",
+      "type": "string[]",
+      "index": true,
+      "facet": true,
+      "optional": true
+    },
+    {
+      "name": "images",
+      "type": "string[]",
+      "index": false,
+      "facet": false,
+      "optional": true
+    },
+    {
+      "name": "primary_image",
+      "type": "string",
+      "index": false,
+      "facet": false,
+      "optional": true
+    },
+    {
+      "name": "catalogs",
+      "type": "string[]",
+      "index": true,
+      "facet": true,
+      "optional": true
+    },
+    {
+      "name": "product_code",
+      "type": "string",
+      "index": true,
+      "facet": true,
+      "optional": true
+    },
+    {
+      "name": "vendor_codes",
+      "type": "object",
+      "index": false,
+      "facet": false,
+      "optional": true
+    },
+    {
+      "name": "warehouse_availability",
+      "type": "object[]",
+      "index": false,
+      "facet": false,
+      "optional": true
+    },
+    {
+      "name": "search_blob",
+      "type": "string",
+      "index": true,
+      "facet": false,
+      "optional": true
+    },
+    {
+      "name": "is_discontinued",
+      "type": "bool",
+      "index": true,
+      "facet": true,
+      "optional": true
+    },
+    {
+      "name": "is_active",
+      "type": "bool",
+      "index": true,
+      "facet": true,
+      "optional": true
+    },
+    {
+      "name": "created_at",
+      "type": "int64",
+      "index": true,
+      "facet": false,
+      "optional": true,
+      "sort": true
+    },
+    {
+      "name": "updated_at",
+      "type": "int64",
+      "index": true,
+      "facet": false,
+      "optional": true,
+      "sort": true
+    }
+  ],
+  "default_sorting_field": "computed_price"
+}
