@@ -120,18 +120,31 @@ async function scrapeCatalog(catalogUrl, catalogName) {
         const partMatches = text.match(/\b(?:DS-|0\d{3}-)\d{4,6}\b/g);
         if (partMatches) data.partNumbers = [...new Set(partMatches)];
         
-        // Extract fitment patterns
+        // Extract fitment patterns - matching actual catalog format
         const fitmentPatterns = [
-          /For (?:\d{2}-\d{2}|all|\d{4}-\d{4})\s+(?:Big Twin|Sportster|Dyna|Softail|Touring|FLHT?[A-Z]*|FXST?[A-Z]*|XL[A-Z]*)/gi,
-          /Fits (?:\d{2}-\d{2}|all|\d{4}-\d{4})\s+(?:Big Twin|Sportster|Dyna|Softail|Touring|FLHT?[A-Z]*|FXST?[A-Z]*|XL[A-Z]*)/gi,
-          /(?:\d{2}-\d{2}|\d{4}-\d{4})\s+(?:Road Glide|Street Glide|Electra Glide|Ultra Limited)/gi,
+          // "FOR 24-25 FLHX, 25 FLHXU, 23-25 FLHXSE"
+          /FOR\s+[\d\-',\s]+(?:FL|FX|XL)[A-Z]{1,8}(?:\/(?:FL|FX|XL)[A-Z]{1,8})*/gi,
+          // "For 09-16 FLHT/FLHR/FLHX/FLTR"
+          /For\s+[\d\-',\s]+(?:FL|FX|XL)[A-Z]{1,8}(?:\/(?:FL|FX|XL)[A-Z]{1,8})*/gi,
+          // "21" x 3.5" for 24 FLHTK/FLTRK, 17-24 FLHRXS"
+          /for\s+[\d\-',\s]+(?:FL|FX|XL)[A-Z]{1,8}(?:\/(?:FL|FX|XL)[A-Z]{1,8})*/gi,
+          // Legacy patterns
+          /For (?:\d{2}-\d{2}|all|\d{4}-\d{4})\s+(?:Big Twin|Sportster|Dyna|Softail|Touring)/gi,
+          /Fits (?:\d{2}-\d{2}|all|\d{4}-\d{4})\s+(?:Big Twin|Sportster|Dyna|Softail|Touring)/gi,
         ];
         
         fitmentPatterns.forEach(pattern => {
           const matches = text.match(pattern);
           if (matches) {
             matches.forEach(fit => {
-              data.fitmentData.push(fit.trim());
+              // Clean up and normalize
+              const cleaned = fit.trim()
+                .replace(/\s+/g, ' ')
+                .replace(/[''"]/g, '')
+                .substring(0, 200); // Limit length
+              if (cleaned.length > 5) {
+                data.fitmentData.push(cleaned);
+              }
             });
           }
         });
