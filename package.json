@@ -9,10 +9,10 @@
     "lint": "eslint",
     "setup:db": "psql $CATALOG_DATABASE_URL -f scripts/ingest/migration_add_oem_table.sql",
     "import:oem": "npx dotenv -e .env.local -- node scripts/ingest/import-oem-crossref.cjs",
-    "typesense:recreate": "npx dotenv -e .env.local -- node scripts/typesense/recreate-schema.js",
-    "typesense:index": "npx dotenv -e .env.local -- node scripts/ingest/index_assembly_optimized.js",
+    "typesense:recreate": "npx dotenv -e .env.local -- node scripts/typesense/recreate-schema.cjs",
+    "typesense:index": "npx dotenv -e .env.local -- node scripts/ingest/index_assembly_optimized.cjs",
     "typesense:index-test": "npx dotenv -e .env.local -- node scripts/ingest/index_assembly_optimized.js --limit 100",
-    "verify": "npx dotenv -e .env.local -- node scripts/verify-setup.js"
+    "verify": "npx dotenv -e .env.local -- node scripts/verify-setup.cjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.9.0",
