@@ -56,7 +56,7 @@
       "type": "float",
       "index": true,
       "facet": false,
-      "optional": true,
+      "optional": false,
       "sort": true
     },
     {
