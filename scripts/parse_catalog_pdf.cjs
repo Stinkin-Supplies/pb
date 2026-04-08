@@ -5,14 +5,15 @@
  */
 
 const fs = require('fs');
-const pdfParse = require('pdf-parse');
+const { PDFParse } = require('pdf-parse');
 const path = require('path');
 
 async function parseCatalogPDF(pdfPath) {
   console.log(`\n📄 Parsing PDF: ${path.basename(pdfPath)}\n`);
   
   const dataBuffer = fs.readFileSync(pdfPath);
-  const data = await pdfParse(dataBuffer);
+  const parser = new PDFParse();
+  const data = await parser.parse(dataBuffer);
   
   console.log(`📊 PDF Info:`);
   console.log(`   Pages: ${data.numpages}`);
