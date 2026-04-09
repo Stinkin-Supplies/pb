@@ -8,10 +8,13 @@
  *   node import_wps_pricing.js <path_to_price_file.csv>
  */
 
-require('dotenv').config({ path: '.env.local' });
-const { Pool } = require('pg');
-const fs = require('fs');
-const csv = require('csv-parser');
+import dotenv from 'dotenv';
+import pg from 'pg';
+import fs from 'fs';
+import csv from 'csv-parser';
+
+dotenv.config({ path: '.env.local' });
+const { Pool } = pg;
 
 const pool = new Pool({
   host: process.env.CATALOG_DB_HOST || '5.161.100.126',
@@ -55,23 +58,52 @@ async function importPriceFile(filePath) {
   return new Promise((resolve, reject) => {
     const prices = [];
     let rowCount = 0;
+    let headers = null;
     
     fs.createReadStream(filePath)
       .pipe(csv())
       .on('data', (row) => {
         rowCount++;
         
-        // Handle both possible column name formats
-        const partNumber = row['Part Number'] || row['part_number'] || row['PartNumber'];
-        const punctuatedPartNumber = row['Punctuated Part Number'] || row['punctuated_part_number'];
-        const dealerPrice = row['Your Dealer Price'] || row['dealer_price'] || row['price'];
+        // Log headers on first row for debugging
+        if (rowCount === 1) {
+          headers = Object.keys(row);
+          console.log(`\n📋 CSV Headers detected:`);
+          console.log(`   ${headers.join(', ')}\n`);
+        }
+        
+        // Handle multiple possible column name formats
+        // WPS format, Parts Unlimited format, generic formats
+        const partNumber = row['Part Number'] || 
+                          row['part_number'] || 
+                          row['PartNumber'] || 
+                          row['SKU'] || 
+                          row['sku'] ||
+                          row['Item'] ||
+                          row['item'];
+                          
+        const punctuatedPartNumber = row['Punctuated Part Number'] || 
+                                     row['punctuated_part_number'] ||
+                                     row['Formatted SKU'];
+                                     
+        const dealerPrice = row['Your Dealer Price'] || 
+                           row['dealer_price'] || 
+                           row['Dealer Cost'] ||
+                           row['dealer_cost'] ||
+                           row['Price'] ||
+                           row['price'] ||
+                           row['Cost'] ||
+                           row['cost'];
         
         if (partNumber && dealerPrice) {
-          prices.push({
-            sku: partNumber.trim(),
-            punctuatedSku: punctuatedPartNumber?.trim() || null,
-            price: parseFloat(dealerPrice)
-          });
+          const priceValue = parseFloat(dealerPrice.toString().replace(/[$,]/g, ''));
+          if (!isNaN(priceValue)) {
+            prices.push({
+              sku: partNumber.trim(),
+              punctuatedSku: punctuatedPartNumber?.trim() || null,
+              price: priceValue
+            });
+          }
         }
         
         // Log progress every 10k rows
@@ -82,6 +114,11 @@ async function importPriceFile(filePath) {
       .on('end', () => {
         console.log(`✅ Finished reading ${rowCount.toLocaleString()} rows`);
         console.log(`   Valid price records: ${prices.length.toLocaleString()}`);
+        if (prices.length === 0) {
+          console.log('\n⚠️  Warning: No prices were parsed!');
+          console.log('   CSV Headers found:', headers);
+          console.log('   Please check the column names in your CSV file.');
+        }
         resolve(prices);
       })
       .on('error', reject);
