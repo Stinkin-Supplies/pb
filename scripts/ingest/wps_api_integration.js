@@ -244,13 +244,13 @@ async function fetchProductsForItems(skus) {
     
     for (const sku of batch) {
       try {
-        // Search for item by SKU
+        // Search for item by SKU using proper filter syntax
         const itemData = await wpsApiRequest('/items', { 
-          filter: `sku:${sku}`,
-          include: 'product,attributevalues,features,tags,blocks,resources,taxonomyterms'
+          'filter[sku]': sku,
+          'include': 'product,attributevalues,features,tags,blocks,resources,taxonomyterms'
         });
         
-        if (!itemData.data || itemData.data.length === 0) {
+        if (!itemData?.data || !Array.isArray(itemData.data) || itemData.data.length === 0) {
           console.log(`⚠️  Item not found: ${sku}`);
           continue;
         }

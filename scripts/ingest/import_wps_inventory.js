@@ -120,39 +120,56 @@ async function insertInventory(inventory) {
   let errors = 0;
   
   const progress = new ProgressBar(inventory.length, 'Importing inventory');
+  const BATCH_SIZE = 1000; // Insert 1000 at a time
   
   try {
     await client.query('BEGIN');
     
-    for (let i = 0; i < inventory.length; i++) {
-      const { sku, quantity, warehouse } = inventory[i];
+    for (let i = 0; i < inventory.length; i += BATCH_SIZE) {
+      const batch = inventory.slice(i, i + BATCH_SIZE);
+      
+      // Build multi-row insert
+      const values = [];
+      const placeholders = [];
+      
+      batch.forEach((item, idx) => {
+        const offset = idx * 4;
+        placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4})`);
+        values.push(item.sku, item.quantity, item.warehouse, 'WPS');
+      });
       
       try {
-        const result = await client.query(`
+        const query = `
           INSERT INTO catalog_inventory (sku, quantity, warehouse, supplier)
-          VALUES ($1, $2, $3, 'WPS')
+          VALUES ${placeholders.join(', ')}
           ON CONFLICT (sku, supplier, warehouse)
           DO UPDATE SET
             quantity = EXCLUDED.quantity,
             updated_at = NOW()
-          RETURNING (xmax = 0) AS inserted
-        `, [sku, quantity, warehouse]);
+        `;
         
-        if (result.rows[0].inserted) {
-          inserted++;
-        } else {
-          updated++;
-        }
+        await client.query(query, values);
+        inserted += batch.length;
         
       } catch (err) {
-        errors++;
-        if (errors < 10) {
-          console.error(`\nError with SKU ${sku}:`, err.message);
+        // If batch fails, fall back to individual inserts for this batch
+        for (const item of batch) {
+          try {
+            await client.query(`
+              INSERT INTO catalog_inventory (sku, quantity, warehouse, supplier)
+              VALUES ($1, $2, $3, 'WPS')
+              ON CONFLICT (sku, supplier, warehouse)
+              DO UPDATE SET quantity = EXCLUDED.quantity, updated_at = NOW()
+            `, [item.sku, item.quantity, item.warehouse]);
+            inserted++;
+          } catch (itemErr) {
+            errors++;
+          }
         }
       }
       
       // Update progress bar
-      progress.update(i + 1);
+      progress.update(Math.min(i + BATCH_SIZE, inventory.length));
     }
     
     await client.query('COMMIT');
@@ -160,8 +177,7 @@ async function insertInventory(inventory) {
     progress.finish('Import complete');
     
     console.log(`\n✅ Database import complete:`);
-    console.log(`   Inserted: ${inserted.toLocaleString()}`);
-    console.log(`   Updated: ${updated.toLocaleString()}`);
+    console.log(`   Inserted/Updated: ${inserted.toLocaleString()}`);
     if (errors > 0) {
       console.log(`   Errors: ${errors.toLocaleString()}`);
     }
@@ -197,10 +213,12 @@ async function analyzeInventory() {
   
   // Check overlap with catalog
   const overlap = await pool.query(`
-    SELECT COUNT(*) as matched
-    FROM catalog_products cp
-    INNER JOIN catalog_inventory inv ON cp.sku = inv.sku
-    WHERE cp.supplier = 'WPS' AND inv.supplier = 'WPS'
+    SELECT COUNT(DISTINCT inv.sku) as matched
+    FROM catalog_inventory inv
+    WHERE inv.supplier = 'WPS'
+      AND EXISTS (
+        SELECT 1 FROM catalog_products cp WHERE cp.sku = inv.sku
+      )
   `);
   
   console.log(`  Matched with catalog: ${parseInt(overlap.rows[0].matched).toLocaleString()}`);
