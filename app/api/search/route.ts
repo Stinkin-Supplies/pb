@@ -60,8 +60,8 @@ export async function GET(req: Request) {
 
 	    const result = await client.collections(COLLECTION).documents().search({
 	      q,
-	      query_by:          'name,brand,sku,description',
-	      query_by_weights:  '10,5,8,2',
+		      query_by:          'name,brand,sku',
+		      query_by_weights:  '10,5,8',
 	      filter_by:         filterBy,
 	      sort_by:           resolvedSortBy,
 	      facet_by:          'category,brand',
