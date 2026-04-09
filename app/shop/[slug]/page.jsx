@@ -17,20 +17,21 @@ export default async function ProductDetailPage({ params }) {
   const fallback = "/images/no-image.png";
   
   try {
-    const rows = await sql`
-      SELECT 
-        cp.id,
-        cp.sku,
-        cp.slug,
-        cp.name,
-        cp.brand,
-        cp.category,
-        cp.description,
-        cp.computed_price as price,
-        cp.stock_quantity,
-        cp.is_active,
-        cp.is_discontinued,
-        cp.weight,
+	    const rows = await sql`
+	      SELECT 
+	        cp.id,
+	        cp.sku,
+	        cp.slug,
+	        cp.name,
+	        cp.brand,
+	        cp.category,
+	        cp.description,
+	        cp.product_features,
+	        cp.computed_price as price,
+	        cp.stock_quantity,
+	        cp.is_active,
+	        cp.is_discontinued,
+	        cp.weight,
         -- Get vendor info from first offer
         (SELECT json_build_object(
           'vendor_code', vendor_code,
@@ -153,13 +154,14 @@ function normalizeProductRow(row) {
     sku:         row.sku ?? null,
     vendor:      row.vendor_code ?? null,
     vendor_slug: row.vendor_code ?? null,
-    description: row.description ?? null,
-    specs:       row.specs ?? row.attributes ?? [],
-    weight:      row.weight ?? row.weight_lbs ?? null,
-    shipping:    row.ships_free ?? (price >= 99),
-    pointsEarned: Math.floor(price * 10),
-  };
-}
+	    description: row.description ?? null,
+	    product_features: row.product_features ?? null,
+	    specs:       row.specs ?? row.attributes ?? [],
+	    weight:      row.weight ?? row.weight_lbs ?? null,
+	    shipping:    row.ships_free ?? (price >= 99),
+	    pointsEarned: Math.floor(price * 10),
+	  };
+	}
 
 // ── SEO metadata ─────────────────────────────────────────────
 export async function generateMetadata({ params }) {
