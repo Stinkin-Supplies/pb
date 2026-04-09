@@ -58,13 +58,13 @@ export async function GET(req: Request) {
   try {
     const client = getSearchClient()
 
-    const result = await client.collections(COLLECTION).documents().search({
-      q,
-      query_by:          'name,brand,sku,oem_numbers,description',
-      query_by_weights:  '10,5,8,7,2',
-      filter_by:         filterBy,
-      sort_by:           resolvedSortBy,
-      facet_by:          'category,brand',
+	    const result = await client.collections(COLLECTION).documents().search({
+	      q,
+	      query_by:          'name,brand,sku,description',
+	      query_by_weights:  '10,5,8,2',
+	      filter_by:         filterBy,
+	      sort_by:           resolvedSortBy,
+	      facet_by:          'category,brand',
       max_facet_values:  100,
       per_page:          perPage,
       page:              typesensePage,
