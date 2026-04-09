@@ -293,17 +293,28 @@ const css = `
   }
   .perk-text strong { color: #f0ebe3; display: block; }
 
-  /* divider */
-  .pdp-divider {
-    border: none; border-top: 1px solid #2a2828;
-    margin: 20px 0;
-  }
+	  /* divider */
+	  .pdp-divider {
+	    border: none; border-top: 1px solid #2a2828;
+	    margin: 20px 0;
+	  }
 
-  /* ── SPECS TABLE ── */
-  .specs-section { margin-top: 48px; }
-  .specs-title {
-    font-family: var(--font-stencil), monospace;
-    font-size: 26px; letter-spacing: 0.05em;
+	  /* product features */
+	  .product-features { margin-top: 18px; }
+	  .product-features h3 {
+	    font-family: var(--font-stencil), monospace;
+	    font-size: 12px;
+	    letter-spacing: 0.18em;
+	    color: #e8621a;
+	    margin-bottom: 10px;
+	    text-transform: uppercase;
+	  }
+
+	  /* ── SPECS TABLE ── */
+	  .specs-section { margin-top: 48px; }
+	  .specs-title {
+	    font-family: var(--font-stencil), monospace;
+	    font-size: 26px; letter-spacing: 0.05em;
     color: #f0ebe3; margin-bottom: 16px;
     padding-bottom: 10px;
     border-bottom: 1px solid #2a2828;
@@ -837,20 +848,30 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
           <hr className="pdp-divider"/>
 
           {/* Description */}
-          {product.description ? (
-            <div
-              className="prose prose-invert max-w-none text-sm text-gray-300"
-              dangerouslySetInnerHTML={{ __html: product.description }}
-            />
-          ) : (
+	          {product.description ? (
+	            <div
+	              className="prose prose-invert max-w-none text-sm text-gray-300"
+	              dangerouslySetInnerHTML={{ __html: product.description }}
+	            />
+	          ) : (
             <div style={{ fontFamily:"var(--font-stencil),monospace", fontSize:12, color:"#8a8784", letterSpacing:"0.05em", lineHeight:1.8 }}>
               <p>{product.name} by {product.brand}.</p>
               {product.weight && <p style={{marginTop:8}}>WEIGHT: {product.weight} LBS</p>}
-              <p style={{marginTop:8}}>CATEGORY: {product.category?.toUpperCase()}</p>
-            </div>
-          )}
-        </div>
-      </div>
+	              <p style={{marginTop:8}}>CATEGORY: {product.category?.toUpperCase()}</p>
+	            </div>
+	          )}
+
+	          {product.product_features && (
+	            <div className="product-features">
+	              <h3>Features</h3>
+	              <div
+	                className="prose prose-invert max-w-none text-sm text-gray-300"
+	                dangerouslySetInnerHTML={{ __html: product.product_features }}
+	              />
+	            </div>
+	          )}
+	        </div>
+	      </div>
 
       {/* ── RELATED PRODUCTS ── */}
       {relatedProducts.length > 0 && (
