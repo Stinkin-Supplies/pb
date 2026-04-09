@@ -52,29 +52,27 @@ async function fetchAllBrands() {
   console.log('\n📦 Fetching all brands...');
   
   let allBrands = [];
-  let page = 1;
-  let hasMore = true;
+  let cursor = null;
+  const pageSize = 100; // Fetch 100 at a time
   
-  while (hasMore) {
-    const data = await wpsApiRequest('/brands', { page });
+  do {
+    const params = { 'page[size]': pageSize };
+    if (cursor) {
+      params['page[cursor]'] = cursor;
+    }
+    
+    const data = await wpsApiRequest('/brands', params);
     const brands = data.data || [];
     
-    if (brands.length === 0) {
-      hasMore = false;
-      break;
-    }
+    if (brands.length === 0) break;
     
     allBrands = allBrands.concat(brands);
-    console.log(`   Fetched page ${page}: ${brands.length} brands (total: ${allBrands.length})`);
+    console.log(`   Fetched: ${brands.length} brands (total: ${allBrands.length})`);
     
-    // Check if there's more data
-    // If we got less than a full page, we're done
-    if (brands.length < 10) {
-      hasMore = false;
-    } else {
-      page++;
-    }
-  }
+    // Get next cursor from meta
+    cursor = data.meta?.cursor?.next || null;
+    
+  } while (cursor !== null);
   
   console.log(`\nFound ${allBrands.length} total brands\n`);
   
@@ -154,27 +152,26 @@ async function fetchAllAttributeKeys() {
   console.log('\n🔑 Fetching all attribute keys...');
   
   let allKeys = [];
-  let page = 1;
-  let hasMore = true;
+  let cursor = null;
+  const pageSize = 100;
   
-  while (hasMore) {
-    const data = await wpsApiRequest('/attributekeys', { page });
+  do {
+    const params = { 'page[size]': pageSize };
+    if (cursor) {
+      params['page[cursor]'] = cursor;
+    }
+    
+    const data = await wpsApiRequest('/attributekeys', params);
     const keys = data.data || [];
     
-    if (keys.length === 0) {
-      hasMore = false;
-      break;
-    }
+    if (keys.length === 0) break;
     
     allKeys = allKeys.concat(keys);
-    console.log(`   Fetched page ${page}: ${keys.length} keys (total: ${allKeys.length})`);
+    console.log(`   Fetched: ${keys.length} keys (total: ${allKeys.length})`);
     
-    if (keys.length < 10) {
-      hasMore = false;
-    } else {
-      page++;
-    }
-  }
+    cursor = data.meta?.cursor?.next || null;
+    
+  } while (cursor !== null);
   
   console.log(`\nFound ${allKeys.length} total attribute keys\n`);
   
@@ -225,27 +222,26 @@ async function fetchAllAttributeValues() {
   console.log('   (This may take a few minutes - paginating through results)\n');
   
   let allValues = [];
-  let page = 1;
-  let hasMore = true;
+  let cursor = null;
+  const pageSize = 100;
   
-  while (hasMore) {
-    const data = await wpsApiRequest('/attributevalues', { page });
+  do {
+    const params = { 'page[size]': pageSize };
+    if (cursor) {
+      params['page[cursor]'] = cursor;
+    }
+    
+    const data = await wpsApiRequest('/attributevalues', params);
     const values = data.data || [];
     
-    if (values.length === 0) {
-      hasMore = false;
-      break;
-    }
+    if (values.length === 0) break;
     
     allValues = allValues.concat(values);
-    console.log(`   Fetched page ${page}: ${values.length} values (total: ${allValues.length})`);
+    console.log(`   Fetched: ${values.length} values (total: ${allValues.length})`);
     
-    if (values.length < 10) {
-      hasMore = false;
-    } else {
-      page++;
-    }
-  }
+    cursor = data.meta?.cursor?.next || null;
+    
+  } while (cursor !== null);
   
   console.log(`\nFound ${allValues.length} total attribute values\n`);
   
