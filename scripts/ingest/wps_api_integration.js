@@ -21,9 +21,12 @@
  *   enrich-catalog       - Full enrichment (all of the above)
  */
 
-require('dotenv').config({ path: '.env.local' });
-const { Pool } = require('pg');
-const axios = require('axios');
+import dotenv from 'dotenv';
+import pg from 'pg';
+import axios from 'axios';
+
+dotenv.config({ path: '.env.local' });
+const { Pool } = pg;
 
 // Configuration
 const WPS_API_BASE = 'https://api.wps-inc.com';
@@ -79,28 +82,16 @@ async function fetchBrands() {
   
   console.log(`Found ${brands.length} brands`);
   
-  // Create brands table if not exists
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS catalog_brands (
-      id SERIAL PRIMARY KEY,
-      wps_brand_id INTEGER UNIQUE NOT NULL,
-      name TEXT NOT NULL,
-      description TEXT,
-      logo_url TEXT,
-      website TEXT,
-      metadata JSONB,
-      created_at TIMESTAMPTZ DEFAULT NOW(),
-      updated_at TIMESTAMPTZ DEFAULT NOW()
-    )
-  `);
+  // Don't create table - setup script already did this
   
   let inserted = 0;
+  let updated = 0;
   for (const brand of brands) {
     try {
-      await pool.query(`
-        INSERT INTO catalog_brands (wps_brand_id, name, description, logo_url, website, metadata)
+      const result = await pool.query(`
+        INSERT INTO catalog_brands (brand_id, name, description, logo_url, website, metadata)
         VALUES ($1, $2, $3, $4, $5, $6)
-        ON CONFLICT (wps_brand_id) 
+        ON CONFLICT (brand_id) 
         DO UPDATE SET 
           name = EXCLUDED.name,
           description = EXCLUDED.description,
@@ -108,6 +99,7 @@ async function fetchBrands() {
           website = EXCLUDED.website,
           metadata = EXCLUDED.metadata,
           updated_at = NOW()
+        RETURNING (xmax = 0) AS inserted
       `, [
         brand.id,
         brand.name,
@@ -116,13 +108,44 @@ async function fetchBrands() {
         brand.website || null,
         JSON.stringify(brand)
       ]);
-      inserted++;
+      
+      if (result.rows[0].inserted) {
+        inserted++;
+      } else {
+        updated++;
+      }
     } catch (err) {
-      console.error(`Error inserting brand ${brand.id}:`, err.message);
+      // If brand_id conflict fails, try updating by name
+      if (err.code === '23505' && err.constraint === 'catalog_brands_name_key') {
+        try {
+          await pool.query(`
+            UPDATE catalog_brands 
+            SET brand_id = $1,
+                description = $2,
+                logo_url = $3,
+                website = $4,
+                metadata = $5,
+                updated_at = NOW()
+            WHERE name = $6
+          `, [
+            brand.id,
+            brand.description || null,
+            brand.logo_url || null,
+            brand.website || null,
+            JSON.stringify(brand),
+            brand.name
+          ]);
+          updated++;
+        } catch (updateErr) {
+          console.error(`Error updating brand ${brand.id} (${brand.name}):`, updateErr.message);
+        }
+      } else {
+        console.error(`Error inserting brand ${brand.id}:`, err.message);
+      }
     }
   }
   
-  console.log(`✅ Inserted/updated ${inserted} brands`);
+  console.log(`✅ Inserted: ${inserted}, Updated: ${updated} brands`);
 }
 
 // 2. Fetch and store attribute keys
@@ -134,25 +157,15 @@ async function fetchAttributeKeys() {
   
   console.log(`Found ${keys.length} attribute keys`);
   
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS catalog_attribute_keys (
-      id SERIAL PRIMARY KEY,
-      wps_key_id INTEGER UNIQUE NOT NULL,
-      name TEXT NOT NULL,
-      description TEXT,
-      metadata JSONB,
-      created_at TIMESTAMPTZ DEFAULT NOW(),
-      updated_at TIMESTAMPTZ DEFAULT NOW()
-    )
-  `);
+  // Don't create table - setup script already did this
   
   let inserted = 0;
   for (const key of keys) {
     try {
       await pool.query(`
-        INSERT INTO catalog_attribute_keys (wps_key_id, name, description, metadata)
+        INSERT INTO catalog_attribute_keys (key_id, name, description, metadata)
         VALUES ($1, $2, $3, $4)
-        ON CONFLICT (wps_key_id)
+        ON CONFLICT (key_id)
         DO UPDATE SET 
           name = EXCLUDED.name,
           description = EXCLUDED.description,
@@ -177,33 +190,29 @@ async function fetchAttributeKeys() {
 async function fetchAttributeValues() {
   console.log('\n🏷️  Fetching attribute values...');
   
-  const data = await wpsApiRequest('/attributevalues', { limit: 10000 });
+  const data = await wpsApiRequest('/attributevalues');
   const values = data.data || [];
   
   console.log(`Found ${values.length} attribute values`);
   
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS catalog_attribute_values (
-      id SERIAL PRIMARY KEY,
-      wps_value_id INTEGER UNIQUE NOT NULL,
-      wps_key_id INTEGER,
-      value TEXT NOT NULL,
-      metadata JSONB,
-      created_at TIMESTAMPTZ DEFAULT NOW(),
-      updated_at TIMESTAMPTZ DEFAULT NOW(),
-      FOREIGN KEY (wps_key_id) REFERENCES catalog_attribute_keys(wps_key_id)
-    )
-  `);
+  // Don't create table - setup script already did this
   
   let inserted = 0;
+  let skipped = 0;
   for (const val of values) {
+    // Skip if value is null or empty
+    if (!val.value) {
+      skipped++;
+      continue;
+    }
+    
     try {
       await pool.query(`
-        INSERT INTO catalog_attribute_values (wps_value_id, wps_key_id, value, metadata)
+        INSERT INTO catalog_attribute_values (value_id, key_id, value, metadata)
         VALUES ($1, $2, $3, $4)
-        ON CONFLICT (wps_value_id)
+        ON CONFLICT (value_id)
         DO UPDATE SET 
-          wps_key_id = EXCLUDED.wps_key_id,
+          key_id = EXCLUDED.key_id,
           value = EXCLUDED.value,
           metadata = EXCLUDED.metadata,
           updated_at = NOW()
@@ -219,32 +228,14 @@ async function fetchAttributeValues() {
     }
   }
   
-  console.log(`✅ Inserted/updated ${inserted} attribute values`);
+  console.log(`✅ Inserted/updated ${inserted} attribute values (skipped ${skipped} null values)`);
 }
 
 // 4. Fetch product data for specific items
 async function fetchProductsForItems(skus) {
   console.log(`\n🔍 Fetching product data for ${skus.length} items...`);
   
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS catalog_product_enrichment (
-      id SERIAL PRIMARY KEY,
-      sku TEXT UNIQUE NOT NULL,
-      wps_product_id INTEGER,
-      wps_item_id INTEGER,
-      product_name TEXT,
-      product_description TEXT,
-      attributes JSONB,
-      features JSONB,
-      tags JSONB,
-      blocks JSONB,
-      resources JSONB,
-      taxonomy JSONB,
-      metadata JSONB,
-      created_at TIMESTAMPTZ DEFAULT NOW(),
-      updated_at TIMESTAMPTZ DEFAULT NOW()
-    )
-  `);
+  // Don't create table - setup script already did this
   
   let processed = 0;
   for (let i = 0; i < skus.length; i += BATCH_SIZE) {
@@ -270,8 +261,8 @@ async function fetchProductsForItems(skus) {
         // Extract enrichment data
         const enrichment = {
           sku: sku,
-          wps_product_id: product?.id || null,
-          wps_item_id: item.id,
+          product_id: product?.id || null,
+          item_id: item.id,
           product_name: product?.name || item.name,
           product_description: product?.description || item.description,
           attributes: JSON.stringify(item.attributevalues || []),
@@ -285,13 +276,13 @@ async function fetchProductsForItems(skus) {
         
         await pool.query(`
           INSERT INTO catalog_product_enrichment 
-            (sku, wps_product_id, wps_item_id, product_name, product_description, 
+            (sku, product_id, item_id, product_name, product_description, 
              attributes, features, tags, blocks, resources, taxonomy, metadata)
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
           ON CONFLICT (sku)
           DO UPDATE SET
-            wps_product_id = EXCLUDED.wps_product_id,
-            wps_item_id = EXCLUDED.wps_item_id,
+            product_id = EXCLUDED.product_id,
+            item_id = EXCLUDED.item_id,
             product_name = EXCLUDED.product_name,
             product_description = EXCLUDED.product_description,
             attributes = EXCLUDED.attributes,
