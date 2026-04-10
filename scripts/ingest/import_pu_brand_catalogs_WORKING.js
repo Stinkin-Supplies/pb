@@ -200,9 +200,8 @@ function parseCatalogContent(xmlObj, filePath) {
 // ── SCHEMA ────────────────────────────────────────────────────────────────────
 
 async function migrateTable(client) {
-  await client.query(`DROP TABLE IF EXISTS pu_brand_enrichment`);
   await client.query(`
-    CREATE TABLE pu_brand_enrichment (
+    CREATE TABLE IF NOT EXISTS pu_brand_enrichment (
       id                     SERIAL PRIMARY KEY,
       sku                    VARCHAR(100) NOT NULL UNIQUE,
       brand                  VARCHAR(200),
@@ -241,12 +240,12 @@ async function migrateTable(client) {
       created_at             TIMESTAMPTZ DEFAULT NOW(),
       updated_at             TIMESTAMPTZ DEFAULT NOW()
     );
-    CREATE INDEX idx_pbe_brand       ON pu_brand_enrichment(brand);
-    CREATE INDEX idx_pbe_brand_code  ON pu_brand_enrichment(brand_code);
-    CREATE INDEX idx_pbe_status      ON pu_brand_enrichment(part_status);
-    CREATE INDEX idx_pbe_product_id  ON pu_brand_enrichment(product_id);
+    CREATE INDEX IF NOT EXISTS idx_pbe_brand       ON pu_brand_enrichment(brand);
+    CREATE INDEX IF NOT EXISTS idx_pbe_brand_code  ON pu_brand_enrichment(brand_code);
+    CREATE INDEX IF NOT EXISTS idx_pbe_status      ON pu_brand_enrichment(part_status);
+    CREATE INDEX IF NOT EXISTS idx_pbe_product_id  ON pu_brand_enrichment(product_id);
   `);
-  console.log("  ✓ Table recreated with full schema");
+  console.log("  ✓ Table ready (preserved existing data)");
 }
 
 // ── INSERT ────────────────────────────────────────────────────────────────────
