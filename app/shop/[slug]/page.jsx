@@ -1,191 +1,148 @@
 // ============================================================
 // app/shop/[slug]/page.jsx  —  SERVER COMPONENT
 // ============================================================
-// Fetches product server-side from HETZNER CATALOG DB.
-// Uses lib/db/index.ts sql template tag helper.
-// Page is SSR for SEO.
+// Fetches product from catalog_unified (WPS + PU merged).
+// SSR for SEO. Falls back to catalog_products for legacy slugs.
 // ============================================================
 
 import { notFound } from "next/navigation";
-import { sql } from "@/lib/db";
+import { getCatalogDb } from "@/lib/db/catalog";
 import ProductDetailClient from "./ProductDetailClient";
 
 export default async function ProductDetailPage({ params }) {
   const { slug } = await params;
+  const db = getCatalogDb();
 
   let product = null;
-  const fallback = "/images/no-image.png";
-  
+
   try {
-	    const rows = await sql`
-	      SELECT 
-	        cp.id,
-	        cp.sku,
-	        cp.slug,
-	        cp.name,
-	        cp.brand,
-	        cp.category,
-	        cp.description,
-	        cp.product_features,
-	        cp.computed_price as price,
-	        cp.stock_quantity,
-	        cp.is_active,
-	        cp.is_discontinued,
-	        cp.weight,
-        -- Get vendor info from first offer
-        (SELECT json_build_object(
-          'vendor_code', vendor_code,
-          'our_price', our_price,
-          'map_price', map_price,
-          'wholesale_cost', wholesale_cost
-        ) FROM vendor_offers WHERE catalog_product_id = cp.id LIMIT 1) as vendor_offer,
-        (SELECT url 
-         FROM catalog_media 
-         WHERE product_id = cp.id 
-           AND media_type = 'image' 
-         ORDER BY priority ASC
-         LIMIT 1
-        ) as primary_image,
-        (SELECT json_agg(url ORDER BY priority ASC) 
-         FROM catalog_media 
-         WHERE product_id = cp.id 
-           AND media_type = 'image'
-        ) as images
-      FROM catalog_products cp
-      WHERE cp.slug = ${slug}
-        AND cp.is_active = true
+    // Try catalog_unified first
+    const { rows } = await db.query(`
+      SELECT
+        cu.*,
+        COALESCE(
+          (SELECT array_agg(cm.url ORDER BY cm.priority)
+           FROM catalog_media cm
+           JOIN catalog_products cp ON cp.id = cm.product_id
+           WHERE cp.sku = cu.sku AND cu.source_vendor = 'WPS'),
+          cu.image_urls
+        ) AS all_images
+      FROM catalog_unified cu
+      WHERE cu.slug = $1 AND cu.is_active = true
       LIMIT 1
-    `;
+    `, [slug]);
 
-    if (rows.length === 0) {
-      console.warn(`[PDP] Product not found: ${slug}`);
-      notFound();
+    if (rows.length) {
+      product = rows[0];
+    } else {
+      // Fallback: legacy catalog_products for slugs not yet in unified
+      const { rows: legacyRows } = await db.query(`
+        SELECT
+          cp.*,
+          COALESCE(cp.computed_price, cp.price, cp.msrp) AS unified_price,
+          (SELECT array_agg(url ORDER BY priority)
+           FROM catalog_media WHERE product_id = cp.id AND media_type = 'image') AS all_images
+        FROM catalog_products cp
+        WHERE cp.slug = $1 AND cp.is_active = true
+        LIMIT 1
+      `, [slug]);
+
+      if (!legacyRows.length) notFound();
+      product = { ...legacyRows[0], source_vendor: "WPS", msrp: legacyRows[0].unified_price };
     }
-
-    product = rows[0];
-
-    // Parse vendor_offer JSON
-    if (product.vendor_offer && typeof product.vendor_offer === 'string') {
-      product.vendor_offer = JSON.parse(product.vendor_offer);
-    }
-
-  } catch (error) {
-    console.error("[PDP] catalog DB fetch failed:", error);
+  } catch (err) {
+    console.error("[PDP]", err.message);
     notFound();
   }
 
   if (!product) notFound();
 
-  const images = typeof product.images === "string"
-    ? JSON.parse(product.images)
-    : (Array.isArray(product.images) ? product.images : []);
-
-  const gallery = images.filter(Boolean);
-  const primaryImage = product.primary_image || gallery[0] || fallback;
-
-  product.gallery = gallery;
-  product.primaryImage = primaryImage;
-
-  // Extract vendor info from vendor_offer
-  if (product.vendor_offer) {
-    product.vendor_code = product.vendor_offer.vendor_code;
-    product.our_price = product.vendor_offer.our_price;
-    product.map_price = product.vendor_offer.map_price;
-  }
-
   return (
     <ProductDetailClient
-      product={normalizeProductRow(product)}
+      product={normalizeProduct(product)}
       relatedProducts={[]}
     />
   );
 }
 
-// ── Row normalizer ────────────────────────────────────────────
-// Maps DB column names → component prop names.
-function normalizeProductRow(row) {
-  // Price hierarchy: computed_price > our_price > price
-  const price = Number(row.computed_price ?? row.our_price ?? row.price ?? 0);
-  
-  const rawWas = row.msrp != null ? Number(row.msrp)
-    : row.compare_at_price != null ? Number(row.compare_at_price)
-    : (row.was != null ? Number(row.was) : null);
-  const was = rawWas != null && rawWas > price ? rawWas : null;
+function normalizeProduct(row) {
+  const images = Array.isArray(row.all_images)
+    ? row.all_images.filter(Boolean)
+    : Array.isArray(row.image_urls)
+      ? row.image_urls.filter(Boolean)
+      : [];
 
-  const gallery = Array.isArray(row.gallery)
-    ? row.gallery.filter(Boolean)
-    : Array.isArray(row.images)
-      ? row.images.filter(Boolean)
-      : typeof row.images === "string"
-        ? JSON.parse(row.images).filter(Boolean)
-        : [];
-
-  const primaryImage =
-    row.primaryImage ??
-    row.primary_image ??
-    gallery[0] ??
-    null;
+  const price = Number(row.msrp ?? row.cost ?? row.price ?? row.computed_price ?? 0);
+  const originalRetail = row.original_retail ? Number(row.original_retail) : null;
+  const was = originalRetail && originalRetail > price ? originalRetail : null;
 
   return {
-    id:          row.id,
-    slug:        row.slug,
-    name:        row.name,
-
-    // snake_case DB columns → camelCase props
-    brand:       row.brand ?? "Unknown",
-    category:    row.category ?? "Uncategorized",
-
+    id:           row.id,
+    slug:         row.slug,
+    sku:          row.sku,
+    name:         row.name,
+    brand:        row.brand    ?? "Unknown",
+    category:     row.category ?? "Uncategorized",
+    description:  row.description ?? null,
+    features:     Array.isArray(row.features) ? row.features : [],
     price,
     was,
-    mapPrice:    row.map_price != null ? Number(row.map_price) : null,
+    mapPrice:     row.map_price != null ? Number(row.map_price) : null,
+    inStock:      row.in_stock ?? (Number(row.stock_quantity ?? 0) > 0),
+    stockQty:     row.stock_quantity ?? 0,
+    badge:        row.closeout ? "sale" : null,
+    // Images
+    primaryImage: images[0] ?? null,
+    gallery:      images,
+    // Vendor
+    vendor:       row.source_vendor ?? null,
+    sourceVendor: row.source_vendor ?? null,
+    // Physical
+    weight:       row.weight     ?? null,
+    heightIn:     row.height_in  ?? null,
+    lengthIn:     row.length_in  ?? null,
+    widthIn:      row.width_in   ?? null,
+    uom:          row.uom        ?? null,
+    upc:          row.upc        ?? null,
+    countryOfOrigin: row.country_of_origin ?? null,
+    oemPartNumber:   row.oem_part_number   ?? null,
+    // Fitment
+    isHarleyFitment:   row.is_harley_fitment   ?? false,
+    fitmentHdFamilies: row.fitment_hd_families ?? [],
+    fitmentHdModels:   row.fitment_hd_models   ?? [],
+    fitmentHdCodes:    row.fitment_hd_codes    ?? [],
+    fitmentOtherMakes: row.fitment_other_makes ?? [],
+    fitmentYearStart:  row.fitment_year_start  ?? null,
+    fitmentYearEnd:    row.fitment_year_end    ?? null,
+    // Catalog
+    inOldbook:  row.in_oldbook  ?? false,
+    inFatbook:  row.in_fatbook  ?? false,
+    dragPart:   row.drag_part   ?? false,
+    // Warehouse
+    warehouseWi: row.warehouse_wi ?? 0,
+    warehouseNy: row.warehouse_ny ?? 0,
+    warehouseTx: row.warehouse_tx ?? 0,
+    warehouseNv: row.warehouse_nv ?? 0,
+    warehouseNc: row.warehouse_nc ?? 0,
+    // Misc
+    shipping:     price >= 99,
+    pointsEarned: Math.floor(price * 10),
+  };
+}
 
-    badge:       row.is_new   ? "new"
-               : row.on_sale  ? "sale"
-               : (row.badge   ?? null),
-
-    inStock:     Number(row.stock_quantity ?? 0) > 0,
-    stockQty:    Number(row.stock_quantity ?? 0),
-    fitmentIds:  row.fitment_ids ?? null,
-
-    // Gallery fields
-    primaryImage,
-    gallery,
-
-    sku:         row.sku ?? null,
-    vendor:      row.vendor_code ?? null,
-    vendor_slug: row.vendor_code ?? null,
-	    description: row.description ?? null,
-	    product_features: row.product_features ?? null,
-	    specs:       row.specs ?? row.attributes ?? [],
-	    weight:      row.weight ?? row.weight_lbs ?? null,
-	    shipping:    row.ships_free ?? (price >= 99),
-	    pointsEarned: Math.floor(price * 10),
-	  };
-	}
-
-// ── SEO metadata ─────────────────────────────────────────────
 export async function generateMetadata({ params }) {
   const { slug } = await params;
-  
-  let product = null;
+  const db = getCatalogDb();
   try {
-    const rows = await sql`
-      SELECT slug, name, brand
-      FROM catalog_products
-      WHERE slug = ${slug} AND is_active = true
-      LIMIT 1
-    `;
-    
-    product = rows[0];
-  } catch (error) {
-    console.error("[PDP metadata] catalog DB fetch failed:", error);
-  }
-
-  const name = product?.name ?? slug.replace(/-/g, " ");
-  const brand = product?.brand ?? "Stinkin' Supplies";
-  
-  return {
-    title: `${name} | ${brand} | Stinkin' Supplies`,
-    description: `Shop ${name} by ${brand}. Free shipping on orders over $99.`,
-  };
+    const { rows } = await db.query(`
+      SELECT name, brand FROM catalog_unified
+      WHERE slug = $1 AND is_active = true LIMIT 1
+    `, [slug]);
+    const p = rows[0];
+    if (p) return {
+      title: `${p.name} | ${p.brand} | Stinkin' Supplies`,
+      description: `Shop ${p.name} by ${p.brand}. Free shipping on orders over $99.`,
+    };
+  } catch {}
+  return { title: "Product | Stinkin' Supplies" };
 }
