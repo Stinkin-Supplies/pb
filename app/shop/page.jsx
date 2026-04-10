@@ -1,22 +1,13 @@
 // ============================================================
 // app/shop/page.jsx  —  SERVER COMPONENT
 // ============================================================
-// Fetches first page + facets server-side so the initial render
-// is instant with no loading state. ShopClient takes over for
-// all subsequent filter/sort/page changes via /api/products.
+// SSR first page + facets from catalog_unified via Typesense.
+// ShopClient handles all subsequent filter/sort/page changes.
 // ============================================================
 
-import getCatalogDb from "@/lib/db/catalog";
 import ShopClient from "./ShopClient";
 
 const PAGE_SIZE = 48;
-
-const ORDER_MAP = {
-  newest:     { col: "created_at", dir: "DESC" },
-  price_asc:  { col: "computed_price", dir: "ASC"  },
-  price_desc: { col: "computed_price", dir: "DESC" },
-  name_asc:   { col: "name",       dir: "ASC"  },
-};
 
 export default async function ShopPage({ searchParams }) {
   const p        = await searchParams;
@@ -24,91 +15,25 @@ export default async function ShopPage({ searchParams }) {
   const brand    = p?.brand    ?? null;
   const sort     = p?.sort     ?? "newest";
 
-  let products   = [];
-  let total      = 0;
-  let facets     = { categories: [], brands: [], priceRange: { min: 0, max: 0 } };
-
-  const order  = ORDER_MAP[sort] ?? ORDER_MAP.newest;
+  let products = [];
+  let total    = 0;
+  let facets   = { categories: [], brands: [], priceRange: { min: 0, max: 0 } };
 
   try {
-    const catalogDb = getCatalogDb();
+    const params = new URLSearchParams({ pageSize: String(PAGE_SIZE), sort });
+    if (category) params.set("category", category);
+    if (brand)    params.set("brand",    brand);
 
-    // ── Build WHERE clause ───────────────────────────────
-    const conditions = ["cp.is_active = true"];
-    const params     = [];
-    let   idx        = 1;
+    const baseUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:3000";
 
-    if (category) { conditions.push(`cp.category = $${idx++}`); params.push(category); }
-    if (brand)    { conditions.push(`cp.brand = $${idx++}`);    params.push(brand);    }
+    const res  = await fetch(`${baseUrl}/api/search?${params}`, { cache: "no-store" });
+    const data = await res.json();
 
-    const WHERE = `WHERE ${conditions.join(" AND ")}`;
-
-    // ── Products + count ─────────────────────────────────
-    const [rowsResult, countResult] = await Promise.all([
-      catalogDb.query(
-        `SELECT
-                cp.id,
-                cp.sku,
-                cp.slug,
-                cp.name,
-                cp.brand,
-                cp.category,
-                COALESCE(cp.computed_price, cp.price, cp.msrp) AS price,
-                cp.msrp,
-                cp.map_price,
-                cp.weight,
-                cp.description,
-                cp.is_active,
-                cp.created_at,
-                COALESCE((
-                  SELECT cm.url
-                  FROM public.catalog_media cm
-                  WHERE cm.product_id = cp.id
-                  ORDER BY cm.priority ASC
-                  LIMIT 1
-                ), NULL) AS image,
-                COALESCE((
-                  SELECT ARRAY_AGG(cm.url ORDER BY cm.priority ASC)
-                  FROM public.catalog_media cm
-                  WHERE cm.product_id = cp.id
-                ), '{}'::text[]) AS images,
-                COALESCE((
-                  SELECT SUM(vo.total_qty)
-                  FROM public.vendor_offers vo
-                  WHERE vo.catalog_product_id = cp.id
-                    AND vo.is_active = true
-                ), 0) AS stock_quantity
-         FROM public.catalog_products cp
-         ${WHERE}
-         ORDER BY cp.${order.col} ${order.dir}
-         LIMIT ${PAGE_SIZE} OFFSET 0`,
-        params
-      ),
-      catalogDb.query(
-        `SELECT COUNT(*) FROM public.catalog_products cp ${WHERE}`,
-        params
-      ),
-    ]);
-
-    products = (rowsResult.rows ?? []).map(normalizeRow);
-    total    = parseInt(countResult.rows[0]?.count ?? "0", 10);
-
-    // ── Facets (non-fatal) ───────────────────────────────
-    try {
-      const facetResult = await catalogDb.query(
-        `SELECT get_product_facets($1, $2, $3, $4, $5) AS data`,
-        [brand ?? null, category ?? null, null, null, null]
-      );
-      const raw = facetResult.rows[0]?.data ?? {};
-      facets = {
-        categories: raw.categories ?? [],
-        brands:     raw.brands     ?? [],
-        priceRange: raw.price_range ?? { min: 0, max: 0 },
-      };
-    } catch (facetErr) {
-      console.warn("[ShopPage] facets error:", facetErr.message);
-    }
-
+    products = data.products ?? [];
+    total    = data.total    ?? 0;
+    facets   = data.facets   ?? facets;
   } catch (err) {
     console.error("[ShopPage]", err.message);
   }
@@ -124,24 +49,7 @@ export default async function ShopPage({ searchParams }) {
   );
 }
 
-function normalizeRow(row) {
-  return {
-    id:         row.id,
-    slug:       row.slug,
-    name:       row.name,
-    brand:      row.brand ?? "Unknown",
-    category:   row.category ?? "Uncategorized",
-    price:      Number(row.price ?? 0),
-    was:        Number(row.msrp ?? 0) > Number(row.price ?? 0) ? Number(row.msrp) : null,
-    mapPrice:   row.map_price != null ? Number(row.map_price) : null,
-    badge:      row.is_new ? "new" : null,
-    inStock:    Number(row.stock_quantity ?? 0) > 0,
-    fitmentIds: null,
-    image:      row.image ?? row.images?.[0] ?? null,
-  };
-}
-
 export const metadata = {
   title:       "Shop All Parts | Stinkin' Supplies",
-  description: "Browse 500K+ powersports parts and accessories.",
+  description: "Browse 130K+ powersports parts and accessories.",
 };

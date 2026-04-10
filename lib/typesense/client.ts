@@ -1,117 +1,97 @@
-// lib/typesense/client.ts
-// ─────────────────────────────────────────────────────────────
-// Typed Typesense client + collection schema for catalog_products
-// Admin client: server-side indexing (uses TYPESENSE_API_KEY)
-// Search client: browser-safe (uses TYPESENSE_SEARCH_KEY)
-// ─────────────────────────────────────────────────────────────
+/**
+ * lib/typesense/client.ts
+ * Typesense client — points at Hetzner self-hosted instance
+ */
 
-import Typesense from 'typesense'
+import Typesense from "typesense";
 
-export const COLLECTION = process.env.TYPESENSE_COLLECTION ?? 'products'
-
-function getTypesenseNode() {
-  const rawHost = process.env.TYPESENSE_HOST
-  if (!rawHost) {
-    throw new Error('Missing TYPESENSE_HOST')
-  }
-
-  // Allow either:
-  // - TYPESENSE_HOST="typesense.example.com" (+ TYPESENSE_PROTOCOL/PORT)
-  // - TYPESENSE_HOST="https://typesense.example.com:8108"
-  if (rawHost.includes('://')) {
-    const url = new URL(rawHost)
-    return {
-      host: url.hostname,
-      port: url.port ? Number(url.port) : url.protocol === 'http:' ? 80 : 443,
-      protocol: url.protocol.replace(':', ''),
-    }
-  }
-
-  const protocol = process.env.TYPESENSE_PROTOCOL ?? 'https'
-  const defaultPort = protocol === 'http' ? 80 : 443
-
-  return {
-    host: rawHost,
-    port: Number(process.env.TYPESENSE_PORT ?? defaultPort),
-    protocol,
-  }
-}
-
-// Admin client — never expose to browser
-export function getAdminClient() {
-  const NODE = getTypesenseNode()
-  return new Typesense.Client({
-    nodes:          [NODE],
-    apiKey:         process.env.TYPESENSE_ADMIN_API_KEY ?? process.env.TYPESENSE_API_KEY!,
-    connectionTimeoutSeconds: 60,
-  })
-}
-
-// Search-only client — safe for browser / API routes
-export function getSearchClient() {
-  const NODE = getTypesenseNode()
-  return new Typesense.Client({
-    nodes:          [NODE],
-    apiKey:         process.env.TYPESENSE_SEARCH_KEY ?? process.env.TYPESENSE_SEARCH_ONLY_API_KEY ?? process.env.TYPESENSE_API_KEY!,
-    connectionTimeoutSeconds: 10,
-  })
-}
-
-// ── Collection schema ─────────────────────────────────────────
-export const SCHEMA = {
-  name:                 COLLECTION,
-  enable_nested_fields: false,
-  fields: [
-    { name: 'id',           type: 'string' as const },
-    { name: 'sku',          type: 'string' as const },
-    { name: 'slug',         type: 'string' as const },
-    { name: 'name',         type: 'string' as const },
-    { name: 'brand',        type: 'string' as const, facet: true  },
-    { name: 'category',     type: 'string' as const, facet: true  },
-    { name: 'price',        type: 'float'  as const, facet: true  },
-    { name: 'our_price',    type: 'float'  as const, facet: true  },
-    { name: 'map_price',    type: 'float'  as const, optional: true },
-    { name: 'msrp',         type: 'float'  as const, optional: true },
-    { name: 'is_active',    type: 'bool'   as const, facet: true  },
-    { name: 'stock_quantity', type: 'int64' as const, facet: true  },
-    { name: 'in_stock',     type: 'bool'   as const, facet: true },
-    // Image fields
-    { name: 'image_url',    type: 'string' as const, optional: true, index: false },
-    { name: 'images',       type: 'string[]' as const, optional: true, index: false },
-    { name: 'primary_image', type: 'string' as const, optional: true, index: false },
-    { name: 'primaryImage', type: 'string' as const, optional: true, index: false },
-    // Back-compat (older indexers used `image`)
-    { name: 'image',        type: 'string' as const, optional: true, index: false },
-    { name: 'description',  type: 'string' as const, optional: true },
-    { name: 'vendor_codes', type: 'string[]' as const, facet: true, optional: true },
-    { name: 'weight',       type: 'float'  as const, optional: true },
-    { name: 'created_at',   type: 'int64'  as const },
+export const typesenseClient = new Typesense.Client({
+  nodes: [
+    {
+      host:     process.env.TYPESENSE_HOST     || "5.161.100.126",
+      port:     parseInt(process.env.TYPESENSE_PORT || "8108"),
+      protocol: process.env.TYPESENSE_PROTOCOL || "http",
+    },
   ],
-  default_sorting_field: 'created_at',
-}
+  apiKey:                   process.env.TYPESENSE_SEARCH_KEY || "",
+  connectionTimeoutSeconds: 10,
+});
 
-// ── Document type ─────────────────────────────────────────────
-export type ProductDocument = {
-  id:           string
-  sku:          string
-  slug:         string
-  name:         string
-  brand:        string
-  category:     string
-  price:        number
-  our_price:    number
-  map_price?:   number
-  msrp?:        number
-  is_active:    boolean
-  stock_quantity: number
-  in_stock:     boolean
-  image_url?:   string
-  images?:      string[]
-  primary_image?: string
-  primaryImage?: string
-  image?:       string
-  description?: string
-  vendor_codes?: string[]
-  weight?:      number
-  created_at:   number
+export const COLLECTION = process.env.TYPESENSE_COLLECTION || "products";
+
+// ── Search params ────────────────────────────────────────────────────────────
+
+export const DEFAULT_SEARCH_PARAMS = {
+  query_by:  "name,brand,description,features,oem_part_number,upc",
+  filter_by: "is_active:true",
+  facet_by:  [
+    "brand",
+    "category",
+    "source_vendor",
+    "in_stock",
+    "has_image",
+    "is_harley_fitment",
+    "fitment_hd_families",
+    "fitment_hd_models",
+    "fitment_hd_codes",
+    "in_oldbook",
+    "in_fatbook",
+    "drag_part",
+    "closeout",
+    "product_code",
+  ].join(","),
+  sort_by:      "sort_priority:desc,_text_match:desc",
+  per_page:     24,
+  max_facet_values: 50,
+};
+
+// ── Helper: build filter string ───────────────────────────────────────────────
+
+export function buildFilters(params: {
+  inStock?:     boolean;
+  hasImage?:    boolean;
+  brand?:       string;
+  category?:    string;
+  sourceVendor?: string;
+  isHarley?:    boolean;
+  hdFamily?:    string;
+  hdCode?:      string;
+  inOldbook?:   boolean;
+  inFatbook?:   boolean;
+  dragPart?:    boolean;
+  yearStart?:   number;
+  yearEnd?:     number;
+  minPrice?:    number;
+  maxPrice?:    number;
+  closeout?:    boolean;
+  productCode?: string;
+}): string {
+  const filters: string[] = ["is_active:true"];
+
+  if (params.inStock)      filters.push("in_stock:true");
+  if (params.hasImage)     filters.push("has_image:true");
+  if (params.brand)        filters.push(`brand:=${params.brand}`);
+  if (params.category)     filters.push(`category:=${params.category}`);
+  if (params.sourceVendor) filters.push(`source_vendor:=${params.sourceVendor}`);
+  if (params.isHarley)     filters.push("is_harley_fitment:true");
+  if (params.hdFamily)     filters.push(`fitment_hd_families:=${params.hdFamily}`);
+  if (params.hdCode)       filters.push(`fitment_hd_codes:=${params.hdCode}`);
+  if (params.inOldbook)    filters.push("in_oldbook:true");
+  if (params.inFatbook)    filters.push("in_fatbook:true");
+  if (params.dragPart)     filters.push("drag_part:true");
+  if (params.closeout)     filters.push("closeout:true");
+  if (params.productCode)  filters.push(`product_code:=${params.productCode}`);
+
+  if (params.yearStart && params.yearEnd) {
+    filters.push(`fitment_year_start:<=${params.yearEnd}`);
+    filters.push(`fitment_year_end:>=${params.yearStart}`);
+  }
+
+  if (params.minPrice !== undefined || params.maxPrice !== undefined) {
+    const min = params.minPrice ?? 0;
+    const max = params.maxPrice ?? 99999;
+    filters.push(`msrp:[${min}..${max}]`);
+  }
+
+  return filters.join(" && ");
 }

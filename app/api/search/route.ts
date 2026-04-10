@@ -1,140 +1,159 @@
-// app/api/search/route.ts
-// ─────────────────────────────────────────────────────────────
-// Typesense-powered search endpoint
-//
-// GET /api/search?q=helmet&brand=FLY+RACING&category=Helmets
-//               &minPrice=50&maxPrice=300&inStock=true
-//               &sort=price_asc&page=0&pageSize=48
-//
-// Returns same shape as /api/products so ShopClient needs
-// zero changes to switch over.
-// ─────────────────────────────────────────────────────────────
+/**
+ * app/api/search/route.ts
+ * Unified search — Typesense → normalized response matching frontend expectations
+ */
 
-import { NextResponse } from 'next/server'
-import { getSearchClient, COLLECTION } from '@/lib/typesense/client'
+import { NextRequest, NextResponse } from "next/server";
+import { typesenseClient, COLLECTION, DEFAULT_SEARCH_PARAMS, buildFilters } from "@/lib/typesense/client";
 
-const PAGE_SIZE_DEFAULT = 48
-const PAGE_SIZE_MAX     = 96
+// Map Typesense facet arrays to {name, count} format the frontend expects
+function normalizeFacets(facetCounts: any[]) {
+  const categories: { name: string; count: number }[] = [];
+  const brands:     { name: string; count: number }[] = [];
+  const hdFamilies: { name: string; count: number }[] = [];
+  let priceRange = { min: 0, max: 0 };
 
-const SORT_MAP: Record<string, string> = {
-  newest:     'in_stock:desc,computed_price:asc',
-  price_asc:  'computed_price:asc',
-  price_desc: 'computed_price:desc',
-  name_asc:   'name:asc',
-}
+  for (const facet of facetCounts ?? []) {
+    const items = (facet.counts ?? []).map((c: any) => ({
+      name:  c.value,
+      count: c.count,
+    }));
 
-export async function GET(req: Request) {
-  const url      = new URL(req.url)
-  const q        = url.searchParams.get('q')?.trim()        || '*'
-  const category = url.searchParams.get('category')         || ''
-  const brand    = url.searchParams.get('brand')            || ''
-  const minPrice = url.searchParams.get('minPrice')         || ''
-  const maxPrice = url.searchParams.get('maxPrice')         || ''
-  const inStock  = url.searchParams.get('inStock') === 'true'
-  const sort     = url.searchParams.get('sort')             || 'newest'
-  const page     = Math.max(0, parseInt(url.searchParams.get('page') || '0', 10))
-  const pageSize = Math.min(
-    PAGE_SIZE_MAX,
-    parseInt(url.searchParams.get('pageSize') || String(PAGE_SIZE_DEFAULT), 10)
-  )
-
-  // ── Build filter_by ─────────────────────────────────────────
-  const filters: string[] = []
-  if (category) filters.push(`category:=${JSON.stringify(category)}`)
-  if (brand)    filters.push(`brand:=${JSON.stringify(brand)}`)
-  if (inStock)  filters.push('in_stock:=true')
-  if (minPrice || maxPrice) {
-    const min = minPrice ? Number(minPrice) : 0
-    const max = maxPrice ? Number(maxPrice) : 999999
-    filters.push(`computed_price:[${min}..${max}]`)
+    switch (facet.field_name) {
+      case "category":           categories.push(...items);  break;
+      case "brand":              brands.push(...items);       break;
+      case "fitment_hd_families": hdFamilies.push(...items); break;
+      case "msrp":
+        if (facet.stats) {
+          priceRange = { min: facet.stats.min ?? 0, max: facet.stats.max ?? 0 };
+        }
+        break;
+    }
   }
 
-  const sortBy     = SORT_MAP[sort] ?? SORT_MAP.newest
-  const resolvedSortBy = sortBy
-  const filterBy   = filters.join(' && ')
-  const perPage    = pageSize
-  const typesensePage = page + 1 // Typesense is 1-indexed
+  return { categories, brands, hdFamilies, priceRange };
+}
+
+// Normalize a Typesense document to the shape ShopClient/SearchClient expect
+function normalizeDoc(doc: any) {
+  return {
+    id:           doc.id,
+    sku:          doc.sku,
+    slug:         doc.slug,
+    name:         doc.name,
+    brand:        doc.brand      ?? "",
+    category:     doc.category   ?? "",
+    price:        doc.msrp       ?? doc.cost ?? 0,
+    was:          doc.original_retail && doc.original_retail > (doc.msrp ?? 0)
+                    ? doc.original_retail : null,
+    mapPrice:     doc.map_price  ?? null,
+    inStock:      doc.in_stock   ?? false,
+    stockQty:     doc.stock_quantity ?? 0,
+    image:        doc.image_url  ?? (doc.image_urls?.[0] ?? null),
+    images:       doc.image_urls ?? [],
+    badge:        doc.closeout   ? "sale" : null,
+    vendor:       doc.source_vendor ?? null,
+    source_vendor: doc.source_vendor ?? null,
+    // New unified fields
+    features:          doc.features          ?? [],
+    description:       doc.description       ?? null,
+    isHarleyFitment:   doc.is_harley_fitment ?? false,
+    fitmentHdFamilies: doc.fitment_hd_families ?? [],
+    fitmentHdCodes:    doc.fitment_hd_codes    ?? [],
+    fitmentYearStart:  doc.fitment_year_start  ?? null,
+    fitmentYearEnd:    doc.fitment_year_end    ?? null,
+    inOldbook:         doc.in_oldbook          ?? false,
+    inFatbook:         doc.in_fatbook          ?? false,
+    dragPart:          doc.drag_part           ?? false,
+    warehouseWi:       doc.warehouse_wi        ?? 0,
+    warehouseNy:       doc.warehouse_ny        ?? 0,
+    warehouseTx:       doc.warehouse_tx        ?? 0,
+    oemPartNumber:     doc.oem_part_number     ?? null,
+  };
+}
+
+export async function GET(req: NextRequest) {
+  const p = req.nextUrl.searchParams;
+
+  // Support both old param names (category, brand, inStock) and new ones
+  const q       = p.get("q") || p.get("search") || "*";
+  const page    = parseInt(p.get("page") || "1");
+  const perPage = Math.min(parseInt(p.get("per_page") || p.get("pageSize") || "24"), 100);
+  const sortRaw = p.get("sort_by") || p.get("sort") || "";
+
+  // Map old sort values to Typesense sort syntax
+  const sortMap: Record<string, string> = {
+    "price_asc":  "msrp:asc",
+    "price-asc":  "msrp:asc",
+    "price_desc": "msrp:desc",
+    "price-desc": "msrp:desc",
+    "name_asc":   "name_sort:asc",
+    "name-asc":   "name_sort:asc",
+    "newest":     "sort_priority:desc",
+  };
+  const sortBy = sortMap[sortRaw] || "sort_priority:desc,_text_match:desc";
+
+  const filterBy = buildFilters({
+    inStock:      p.get("in_stock") === "true" || p.get("inStock") === "true",
+    hasImage:     p.get("has_image") === "true",
+    brand:        p.get("brand")        || undefined,
+    category:     p.get("category")     || undefined,
+    sourceVendor: p.get("vendor")       || undefined,
+    isHarley:     p.get("harley")       === "true",
+    hdFamily:     p.get("hd_family")    || undefined,
+    hdCode:       p.get("hd_code")      || undefined,
+    inOldbook:    p.get("oldbook")      === "true",
+    inFatbook:    p.get("fatbook")      === "true",
+    dragPart:     p.get("drag")         === "true",
+    closeout:     p.get("closeout")     === "true",
+    productCode:  p.get("product_code") || undefined,
+    yearStart:    p.get("year_start")   ? parseInt(p.get("year_start")!) : undefined,
+    yearEnd:      p.get("year_end")     ? parseInt(p.get("year_end")!)   : undefined,
+    minPrice:     p.get("min_price") || p.get("minPrice")
+                    ? parseFloat(p.get("min_price") || p.get("minPrice") || "0") : undefined,
+    maxPrice:     p.get("max_price") || p.get("maxPrice")
+                    ? parseFloat(p.get("max_price") || p.get("maxPrice") || "0") : undefined,
+  });
 
   try {
-    const client = getSearchClient()
+    const results = await typesenseClient
+      .collections(COLLECTION)
+      .documents()
+      .search({
+        ...DEFAULT_SEARCH_PARAMS,
+        q,
+        filter_by: filterBy,
+        sort_by:   sortBy,
+        page,
+        per_page:  perPage,
+      });
 
-	    const result = await client.collections(COLLECTION).documents().search({
-	      q,
-		      query_by:          'name,brand,sku',
-		      query_by_weights:  '10,5,8',
-	      filter_by:         filterBy,
-	      sort_by:           resolvedSortBy,
-	      facet_by:          'category,brand',
-      max_facet_values:  100,
-      per_page:          perPage,
-      page:              typesensePage,
-      highlight_full_fields: 'name',
-    })
-
-    // ── Map documents to NormalizedProduct shape ──────────────
-	    const products = (result.hits ?? []).map((hit: any) => {
-	      const d = hit.document
-	      const price = Number(d.computed_price ?? d.price ?? 0)
-	      const safePrice = Number.isFinite(price) ? price : 0
-	      const msrp = d.msrp == null ? null : Number(d.msrp)
-	      const safeMsrp = msrp != null && Number.isFinite(msrp) ? msrp : null
-	      const images =
-	        Array.isArray(d.images) ? d.images
-	        : (typeof d.images === 'string'
-	            ? (() => { try { return JSON.parse(d.images) } catch { return [] } })()
-	            : []);
-	      const primaryImage =
-	        d.primary_image ??
-	        d.primaryImage ??
-	        images?.[0] ??
-	        d.image_url ??
-	        d.image ??
-	        null
-	      return {
-	        id:         Number(d.id),
-	        slug:       d.slug,
-	        sku:        d.sku,
-        name:       d.name,
-        brand:      d.brand,
-        category:   d.category,
-        price:      safePrice,
-        was:        safeMsrp != null && safeMsrp > safePrice ? safeMsrp : null,
-	        mapPrice:   d.map_price ?? null,
-	        badge:      null,
-	        inStock:    Boolean(d.in_stock),
-	        fitmentIds: null,
-	        image:      primaryImage,
-	      }
-	    })
-
-    // ── Map facets ────────────────────────────────────────────
-    const facetMap: Record<string, any[]> = {}
-    for (const fc of result.facet_counts ?? []) {
-      facetMap[fc.field_name] = fc.counts.map((c: any) => ({
-        name:  c.value,
-        count: c.count,
-      }))
-    }
-
-    const priceRange = { min: 0, max: 0 }
+    const products = (results.hits ?? []).map(h => normalizeDoc(h.document));
+    const facets   = normalizeFacets(results.facet_counts ?? []);
 
     return NextResponse.json({
+      // New format
+      hits:       products,
+      found:      results.found,
+      page:       results.page,
+      facets:     results.facet_counts ?? [],
+      query_time: results.search_time_ms,
+      // Legacy format (keeps ShopClient + SearchClient working)
       products,
-      total:    result.found,
-      page,
-      pageSize,
+      total:      results.found,
       facets: {
-        categories: facetMap['category'] ?? [],
-        brands:     facetMap['brand']    ?? [],
-        priceRange,
+        categories: facets.categories,
+        brands:     facets.brands,
+        hdFamilies: facets.hdFamilies,
+        priceRange: facets.priceRange,
       },
-    })
-
+    });
   } catch (err: any) {
-    console.error('[/api/search]', err.message)
+    console.error("Search error:", err.message);
     return NextResponse.json(
-      { error: err.message ?? 'Search failed' },
+      { error: "Search failed", message: err.message, products: [], total: 0,
+        facets: { categories: [], brands: [], priceRange: { min: 0, max: 0 } } },
       { status: 500 }
-    )
+    );
   }
 }
