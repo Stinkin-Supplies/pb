@@ -136,7 +136,7 @@ export async function GET(req: NextRequest) {
       hits:       products,
       found:      results.found,
       page:       results.page,
-      facets:     results.facet_counts ?? [],
+      raw_facets: results.facet_counts ?? [],
       query_time: results.search_time_ms,
       // Legacy format (keeps ShopClient + SearchClient working)
       products,
