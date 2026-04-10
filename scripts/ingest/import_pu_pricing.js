@@ -3,10 +3,14 @@ import fs from 'fs';
 import path from 'path';
 import pg from 'pg';
 import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
 
 const { Client } = pg;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const envPath = path.join(__dirname, '../../.env.local');
+dotenv.config({ path: envPath });
 
 class ProgressBar {
   constructor(total) {
@@ -31,11 +35,7 @@ class ProgressBar {
 }
 
 const dbClient = new Client({
-  host: process.env.CATALOG_DB_HOST || 'localhost',
-  port: process.env.CATALOG_DB_PORT || 5432,
-  database: process.env.CATALOG_DB_NAME || 'stinkin_catalog',
-  user: process.env.CATALOG_DB_USER || 'catalog_app',
-  password: process.env.CATALOG_DB_PASSWORD || 'smelly',
+  connectionString: process.env.CATALOG_DATABASE_URL
 });
 
 async function parseCSV(filePath) {
@@ -123,13 +123,14 @@ async function createTable() {
 
 async function insertBatch(batch) {
   if (batch.length === 0) return;
+  
   const values = [];
-  const placeholders = batch.map((_, idx) => {
-    const base = idx * 14;
-    return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9}, $${base + 10}, $${base + 11}, $${base + 12}, $${base + 13}, $${base + 14})`;
-  }).join(',');
-
-  batch.forEach(record => {
+  const placeholders = [];
+  
+  batch.forEach((record, idx) => {
+    const paramStart = idx * 14 + 1;
+    placeholders.push(`($${paramStart}, $${paramStart + 1}, $${paramStart + 2}, $${paramStart + 3}, $${paramStart + 4}, $${paramStart + 5}, $${paramStart + 6}, $${paramStart + 7}, $${paramStart + 8}, $${paramStart + 9}, $${paramStart + 10}, $${paramStart + 11}, $${paramStart + 12}, $${paramStart + 13})`);
+    
     values.push(
       record['Part Number'] || null,
       record['Punctuated Part Number'] || null,
@@ -144,7 +145,7 @@ async function insertBatch(batch) {
       parseFloat(record['Height(inches)']) || null,
       parseFloat(record['Length(inches)']) || null,
       parseFloat(record['Width(inches)']) || null,
-      parseFloat(record['Dropship Fee']) || null
+      record['Truck Part Only'] === 'Y' ? true : false
     );
   });
 
@@ -154,12 +155,13 @@ async function insertBatch(batch) {
       original_retail, suggested_retail, base_dealer_price,
       brand_name, part_description, upc_code, country_of_origin,
       height_inches, length_inches, width_inches, truck_part_only
-    ) VALUES ${placeholders}
+    ) VALUES ${placeholders.join(',')}
     ON CONFLICT (part_number) DO UPDATE SET
       dealer_price = EXCLUDED.dealer_price,
       suggested_retail = COALESCE(pu_pricing.suggested_retail, EXCLUDED.suggested_retail),
       brand_name = COALESCE(pu_pricing.brand_name, EXCLUDED.brand_name)
   `;
+  
   await dbClient.query(query, values);
 }
 
@@ -182,8 +184,8 @@ async function importPUPricing() {
     const records = await parseCSV(filePath);
     console.log(`✅ Parsed ${records.length} records\n`);
 
-    const batchSize = 5000;
-    const progressBar = new ProgressBar(records.length);
+	    const batchSize = 500;
+	    const progressBar = new ProgressBar(records.length);
 
     for (let i = 0; i < records.length; i += batchSize) {
       const batch = records.slice(i, i + batchSize);
