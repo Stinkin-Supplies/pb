@@ -1,0 +1,84 @@
+                                                                version                                                                |       db        |    user     |  server_addr  | server_port 
+---------------------------------------------------------------------------------------------------------------------------------------+-----------------+-------------+---------------+-------------
+ PostgreSQL 15.17 (Ubuntu 15.17-1.pgdg22.04+1) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0, 64-bit | stinkin_catalog | catalog_app | 5.161.100.126 |        5432
+(1 row)
+
+ table_schema |         table_name         
+--------------+----------------------------
+ public       | catalog_allowlist
+ public       | catalog_attribute_keys
+ public       | catalog_attribute_values
+ public       | catalog_attributes
+ public       | catalog_brands
+ public       | catalog_categories
+ public       | catalog_fitment
+ public       | catalog_images
+ public       | catalog_inventory
+ public       | catalog_media
+ public       | catalog_oem_crossref
+ public       | catalog_prices
+ public       | catalog_pricing
+ public       | catalog_product_enrichment
+ public       | catalog_products
+ public       | catalog_reviews
+ public       | catalog_specs
+ public       | catalog_unified
+ public       | catalog_variants
+ public       | map_audit_log
+ public       | pricing_rules
+ public       | products_search
+ public       | pu_brand_enrichment
+ public       | pu_fitment
+ public       | pu_price_raw
+ public       | pu_pricing
+ public       | pu_products
+ public       | pu_products_filtered
+ public       | raw_vendor_aces
+ public       | raw_vendor_pies
+ public       | raw_vendor_pu
+ public       | raw_vendor_wps_inventory
+ public       | raw_vendor_wps_products
+ public       | raw_vendor_wps_vehicles
+ public       | routing_decisions
+ public       | routing_shipping_rules
+ public       | routing_warehouses
+ public       | sync_log
+ public       | vendor_offers
+ vendor       | pu_pricefile_staging
+ vendor       | vendor_categories
+ vendor       | vendor_error_log
+ vendor       | vendor_inventory
+ vendor       | vendor_products
+ vendor       | vendor_sync_log
+ vendor       | vendor_warehouses
+(46 rows)
+
+           table            | approx_rows | total_size 
+----------------------------+-------------+------------
+ catalog_products           |       98020 | 605 MB
+ vendor_products            |      296112 | 504 MB
+ pu_pricefile_staging       |      153085 | 313 MB
+ catalog_specs              |      469349 | 287 MB
+ vendor_offers              |       74244 | 243 MB
+ catalog_inventory          |      697796 | 203 MB
+ raw_vendor_wps_products    |      121110 | 170 MB
+ catalog_unified            |      138872 | 151 MB
+ pu_brand_enrichment        |       93585 | 141 MB
+ catalog_images             |       29683 | 103 MB
+ catalog_allowlist          |      479565 | 69 MB
+ catalog_product_enrichment |      172656 | 65 MB
+ pu_products                |      152928 | 48 MB
+ pu_pricing                 |      151497 | 40 MB
+ raw_vendor_pu              |         306 | 40 MB
+ pu_products_filtered       |       81431 | 31 MB
+ catalog_pricing            |      123034 | 24 MB
+ catalog_media              |       38512 | 18 MB
+ products_search            |           0 | 12 MB
+ pu_fitment                 |       32615 | 11 MB
+ raw_vendor_pies            |          15 | 3616 kB
+ catalog_attribute_values   |        9730 | 2904 kB
+ catalog_brands             |        1026 | 520 kB
+ catalog_fitment            |         608 | 368 kB
+ catalog_oem_crossref       |          11 | 112 kB
+(25 rows)
+
