@@ -758,10 +758,12 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
 
         {/* RIGHT — Info */}
         <div className="info-col">
-          <div className="info-brand">{product.brand}</div>
+          {(product.display_brand || product.brand) && (
+            <div className="info-brand">{product.display_brand || product.brand}</div>
+          )}
           <div className="info-name">{product.name}</div>
-          {product.sku && (
-            <div className="info-sku">SKU: {product.sku}</div>
+          {product.oem_part_number && (
+            <div className="info-sku">OEM: {product.oem_part_number}</div>
           )}
 
           {/* Fitment badge */}
@@ -877,7 +879,7 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
 	            />
 	          ) : (
             <div style={{ fontFamily:"var(--font-stencil),monospace", fontSize:12, color:"#8a8784", letterSpacing:"0.05em", lineHeight:1.8 }}>
-              <p>{product.name} by {product.brand}.</p>
+              <p>{product.name}{(product.display_brand || product.brand) ? ` by ${product.display_brand || product.brand}` : ''}.</p>
               {product.weight && <p style={{marginTop:8}}>WEIGHT: {product.weight} LBS</p>}
 	              <p style={{marginTop:8}}>CATEGORY: {product.category?.toUpperCase()}</p>
 	            </div>
@@ -899,7 +901,7 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
       {relatedProducts.length > 0 && (
         <div className="related-section">
           <div className="related-head">
-            <div className="related-title">MORE FROM <span>{product.brand.toUpperCase()}</span></div>
+            <div className="related-title">MORE FROM <span>{(product.display_brand || product.brand || 'THIS CATEGORY').toUpperCase()}</span></div>
             <a href={`/shop?category=${product.category}`} className="related-link">
               VIEW ALL IN CATEGORY →
             </a>
@@ -913,7 +915,7 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
               >
                 <RelatedCardImage product={p} />
                 <div className="related-body">
-                  <div className="related-brand">{p.brand}</div>
+                  <div className="related-brand">{p.display_brand || p.brand}</div>
                   <div className="related-name">{p.name}</div>
                   <div className="related-footer">
                     <div className="related-price"

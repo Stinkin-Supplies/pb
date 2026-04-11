@@ -50,16 +50,13 @@ const W = {
  */
 export function calcDropShipFee(
   vendor: VendorId,
-  offer: VendorOffer,
+  _offer: VendorOffer,
 ): number {
-  if (vendor === 'WPS') {
-    // WPS special categories — apply conservatively based on available fields
-    return 9.75;  // standard flat rate; enhance with freight flags when available
-  }
-  if (vendor === 'PU') {
-    return 9.75;  // standard flat rate
-  }
-  return 9.75;
+  // $10 flat per order from both WPS and PU (confirmed April 2026).
+  // This is a per-ORDER fee — divide by number of items on the same PO
+  // to allocate correctly across line items (done in scoreOneOffer).
+  void vendor; // both vendors same rate for now
+  return 10.00;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -74,7 +71,7 @@ function pickShipping(offer: VendorOffer): ShippingOption {
       label:       'Ground',
       carrier:     'UPS',
       transitDays: 5,
-      cost:        9.75,
+      cost:        10.00,
       retailRate:  0,
     };
   }
