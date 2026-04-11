@@ -9,17 +9,17 @@
  *   manufacturer_brand — the actual maker
  *
  * Run:
- *   npx dotenv -e .env.local -- node scripts/ingest/assign-internal-skus.js
+ *   CATALOG_DATABASE_URL="postgresql://catalog_app:smelly@5.161.100.126:5432/stinkin_catalog" \
+ *     node scripts/ingest/assign-internal-skus.js
  *
  * Safe to re-run: skips products that already have an internal_sku.
- * Idempotent: uses ON CONFLICT DO NOTHING for counter inserts.
+ * Kill-safe: counter is saved to DB after every batch — restart picks up exactly where it left off.
  */
 
 'use strict';
 
 import pg from 'pg';
 import dotenv from 'dotenv';
-import { fileURLToPath } from 'url';
 
 dotenv.config({ path: '.env.local' });
 
@@ -29,7 +29,8 @@ const pool = new pg.Pool({
   max: 5,
 });
 
-const BATCH = 500;
+// Larger batch = fewer round-trips. Bulk unnest() keeps memory reasonable.
+const BATCH = 2000;
 
 // =============================================================================
 // PREFIX ASSIGNMENT
@@ -109,54 +110,37 @@ const PREFIX_RULES = [
   { prefix: 'ENG', test: (n,_,b) => /\b(COMETIC|JAMES\sGASKETS?|KIBBLE\s?WHITE|WISECO|NAMURA|VERTEX|ATHENA)\b/.test(b) },
 
   // ── ACCESSORIES / APPAREL / EVERYTHING ELSE ───────────────────────────────
-  // (ACC is last — true catch-all)
   { prefix: 'ACC', test: () => true },
 ];
 
-/**
- * Determine the 3-letter prefix for a product.
- * @param {string} name     product name (will be uppercased internally)
- * @param {string} category category string or null
- * @param {string} brand    brand string or null
- * @returns {string} 3-letter prefix
- */
 function assignPrefix(name, category, brand) {
-  const n = (name    ?? '').toUpperCase();
+  const n = (name     ?? '').toUpperCase();
   const c = (category ?? '').toUpperCase();
-  const b = (brand   ?? '').toUpperCase();
-
+  const b = (brand    ?? '').toUpperCase();
   for (const rule of PREFIX_RULES) {
     if (rule.test(n, c, b)) return rule.prefix;
   }
-  return 'ACC'; // should never reach here, but safe fallback
+  return 'ACC';
 }
 
 // =============================================================================
 // DISPLAY BRAND RULES
 // =============================================================================
 
-/**
- * Pure distributor names — never shown to customers as a product brand.
- * These appear as source/vendor, not as the product's maker.
- */
 const DISTRIBUTOR_NAMES = new Set([
   'WPS', 'WESTERN POWER SPORTS',
   'PARTS UNLIMITED', 'LEMANS',
   'TUCKER ROCKY', 'TUCKER POWERSPORTS',
-  'DRAG SPECIALTIES MFG',   // the mfg entity — DS the brand is fine
+  'DRAG SPECIALTIES MFG',
 ]);
 
-/**
- * Map vendor-cased brand strings to a clean display name.
- * Keys are uppercased for comparison.
- */
 const BRAND_DISPLAY_MAP = {
   'DRAG SPECIALTIES':     'DS',
   'DS':                   'DS',
   'HARDDRIVE':            'HardDrive',
   'HARD DRIVE':           'HardDrive',
-  'PARTS UNLIMITED':      null,   // distributor — omit
-  'WPS':                  null,   // distributor — omit
+  'PARTS UNLIMITED':      null,
+  'WPS':                  null,
   'ALL BALLS':            'All Balls',
   'ALL BALLS RACING':     'All Balls',
   'COMETIC':              'Cometic',
@@ -201,25 +185,14 @@ const BRAND_DISPLAY_MAP = {
   'DUBYA':                'Dubya',
 };
 
-/**
- * Return the customer-facing display brand for a product.
- * @param {string|null} brand   raw brand from vendor data
- * @param {string|null} name    product name (for house-brand detection)
- * @returns {{ displayBrand: string|null, manufacturerBrand: string|null }}
- */
 function resolveDisplayBrand(brand, name) {
   if (!brand || !brand.trim()) {
     return { displayBrand: null, manufacturerBrand: null };
   }
-
   const key = brand.trim().toUpperCase();
-
-  // Pure distributor — don't show
   if (DISTRIBUTOR_NAMES.has(key)) {
     return { displayBrand: null, manufacturerBrand: null };
   }
-
-  // Known brand with explicit mapping
   if (key in BRAND_DISPLAY_MAP) {
     const mapped = BRAND_DISPLAY_MAP[key];
     return {
@@ -227,13 +200,8 @@ function resolveDisplayBrand(brand, name) {
       manufacturerBrand: mapped ?? brand.trim(),
     };
   }
-
-  // Unknown brand — use as-is with title-case cleanup
   const cleaned = titleCase(brand.trim());
-  return {
-    displayBrand:      cleaned,
-    manufacturerBrand: cleaned,
-  };
+  return { displayBrand: cleaned, manufacturerBrand: cleaned };
 }
 
 function titleCase(str) {
@@ -247,20 +215,11 @@ function titleCase(str) {
 // SLUG GENERATION
 // =============================================================================
 
-/**
- * Generate a vendor-blind slug from a product name and internal SKU.
- * "Drag Specialties Oil Filter Chrome" + "ENG-100142"
- *   → "oil-filter-chrome-eng-100142"
- * Brand prefix stripped, internal SKU appended.
- */
 function generateSlug(name, internalSku, brand) {
   let n = (name ?? '').trim();
-
-  // Strip brand prefix from name if it starts with the brand name
   if (brand) {
     const brandParts = brand.trim().split(/\s+/);
     const nameWords  = n.split(/\s+/);
-    // If name starts with brand words, strip them
     let match = 0;
     for (let i = 0; i < brandParts.length && i < nameWords.length; i++) {
       if (nameWords[i].toLowerCase() === brandParts[i].toLowerCase()) match++;
@@ -268,17 +227,15 @@ function generateSlug(name, internalSku, brand) {
     }
     if (match === brandParts.length) n = nameWords.slice(match).join(' ');
   }
-
   const slug = n
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, '')
     .trim()
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
-    .slice(0, 60)               // cap name portion at 60 chars
-    .replace(/-$/, '');         // no trailing dash
-
-  const skuPart = internalSku.toLowerCase(); // e.g. "eng-100142"
+    .slice(0, 60)
+    .replace(/-$/, '');
+  const skuPart = internalSku.toLowerCase();
   return slug ? `${slug}-${skuPart}` : skuPart;
 }
 
@@ -287,16 +244,15 @@ function generateSlug(name, internalSku, brand) {
 // =============================================================================
 
 async function run() {
-  console.log('\n🏷️   Internal SKU Assignment');
+  console.log('\n🏷️   Internal SKU Assignment  (bulk mode)');
   console.log('─'.repeat(55));
 
   const client = await pool.connect();
   try {
-    // Verify columns exist
+    // Verify migration ran
     const colCheck = await client.query(`
       SELECT column_name FROM information_schema.columns
-      WHERE table_name = 'catalog_products'
-        AND column_name = 'internal_sku'
+      WHERE table_name = 'catalog_products' AND column_name = 'internal_sku'
     `);
     if (colCheck.rowCount === 0) {
       console.error('\n❌  Column internal_sku not found on catalog_products.');
@@ -304,141 +260,177 @@ async function run() {
       return;
     }
 
-    // Count pending
     const { rows: [{ pending }] } = await client.query(
       `SELECT COUNT(*) AS pending FROM catalog_products WHERE internal_sku IS NULL`
     );
-    console.log(`    Products needing SKU: ${Number(pending).toLocaleString()}`);
+    console.log(`    Products needing SKU : ${Number(pending).toLocaleString()}`);
 
     if (Number(pending) === 0) {
       console.log('    ✓ All products already have internal SKUs.\n');
       return;
     }
 
-    // Load counter values
+    // Initialize counters from the ACTUAL max assigned values in catalog_products.
+    // This is always correct even if sku_counter was never saved (e.g. after a killed run).
     const { rows: counters } = await client.query(
       `SELECT prefix, last_val FROM sku_counter ORDER BY prefix`
     );
     const counterMap = {};
-    counters.forEach(r => { counterMap[r.prefix] = r.last_val; });
+    counters.forEach(r => { counterMap[r.prefix] = Number(r.last_val); });
 
-    // Track updates needed per prefix
-    const newCounters = { ...counterMap };
+    // Override with real maximums from already-assigned SKUs (authoritative source)
+    const { rows: realMaxes } = await client.query(`
+      SELECT
+        SUBSTRING(internal_sku, 1, 3)              AS prefix,
+        MAX(CAST(SUBSTRING(internal_sku, 5) AS INTEGER)) AS max_val
+      FROM catalog_products
+      WHERE internal_sku IS NOT NULL
+        AND internal_sku ~ '^[A-Z]{3}-[0-9]+$'
+      GROUP BY 1
+    `);
+    realMaxes.forEach(r => {
+      const real = Number(r.max_val);
+      if (real > (counterMap[r.prefix] ?? 0)) {
+        counterMap[r.prefix] = real;
+        console.log(`    Counter sync  ${r.prefix}: sku_counter was stale → advanced to ${real}`);
+      }
+    });
 
-    // Fetch products in batches
-    let offset = 0;
-    let processed = 0;
-    let skuErrors = 0;
+    let processed  = 0;
+    let skuErrors  = 0;
+    const startedAt = Date.now();
 
+    console.log(`    Batch size           : ${BATCH.toLocaleString()} rows`);
     console.log('\n    Processing…\n');
 
     while (true) {
+      // Always fetch the next unassigned batch — no OFFSET needed because
+      // committed rows become internal_sku IS NOT NULL and drop out of the WHERE.
       const { rows } = await client.query(`
-        SELECT id, sku, name, category, brand, slug
+        SELECT id, sku, name, category, brand
         FROM catalog_products
         WHERE internal_sku IS NULL
         ORDER BY id
-        LIMIT $1 OFFSET $2
-      `, [BATCH, offset]);
+        LIMIT $1
+      `, [BATCH]);
 
       if (rows.length === 0) break;
 
-      // Build batch updates
-      const updates = [];
+      // ── Build update arrays in JS ──────────────────────────────────────────
+      const ids               = [];
+      const internalSkus      = [];
+      const displayBrands     = [];
+      const manufacturerBrands = [];
+      const slugs             = [];
+      const vendorSkus        = [];   // for catalog_unified join
+
+      // Track which prefixes change in this batch (for counter updates)
+      const batchCounterChanges = {};
 
       for (const row of rows) {
-        const prefix      = assignPrefix(row.name, row.category, row.brand);
-        newCounters[prefix] = (newCounters[prefix] ?? 100000) + 1;
-        const internalSku = `${prefix}-${newCounters[prefix]}`;
+        const prefix = assignPrefix(row.name, row.category, row.brand);
+        counterMap[prefix] = (counterMap[prefix] ?? 100000) + 1;
+        batchCounterChanges[prefix] = counterMap[prefix];
 
+        const internalSku = `${prefix}-${counterMap[prefix]}`;
         const { displayBrand, manufacturerBrand } = resolveDisplayBrand(row.brand, row.name);
-        const newSlug = generateSlug(row.name, internalSku, row.brand);
+        const slug = generateSlug(row.name, internalSku, row.brand);
 
-        updates.push({
-          id: row.id,
-          internalSku,
-          displayBrand,
-          manufacturerBrand,
-          slug: newSlug,
-        });
+        ids.push(row.id);
+        internalSkus.push(internalSku);
+        displayBrands.push(displayBrand);
+        manufacturerBrands.push(manufacturerBrand);
+        slugs.push(slug);
+        vendorSkus.push(row.sku);
       }
 
-      // Batch UPDATE catalog_products
+      // ── Single transaction: 2 bulk UPDATEs + counter saves ────────────────
       await client.query('BEGIN');
       try {
-        for (const u of updates) {
-          await client.query(`
-            UPDATE catalog_products
-            SET internal_sku       = $1,
-                display_brand      = $2,
-                manufacturer_brand = $3,
-                slug               = $4,
-                updated_at         = NOW()
-            WHERE id = $5 AND internal_sku IS NULL
-          `, [u.internalSku, u.displayBrand, u.manufacturerBrand, u.slug, u.id]);
-        }
+        // 1. Bulk UPDATE catalog_products via unnest()
+        await client.query(`
+          UPDATE catalog_products AS t
+          SET internal_sku       = v.internal_sku,
+              display_brand      = v.display_brand,
+              manufacturer_brand = v.manufacturer_brand,
+              slug               = v.slug,
+              updated_at         = NOW()
+          FROM (
+            SELECT
+              unnest($1::int[])  AS id,
+              unnest($2::text[]) AS internal_sku,
+              unnest($3::text[]) AS display_brand,
+              unnest($4::text[]) AS manufacturer_brand,
+              unnest($5::text[]) AS slug
+          ) AS v
+          WHERE t.id = v.id AND t.internal_sku IS NULL
+        `, [ids, internalSkus, displayBrands, manufacturerBrands, slugs]);
 
-        // Propagate to catalog_unified (match on sku column)
-        // catalog_unified.sku is the vendor SKU = catalog_products.sku
-        const cpSkus = rows.map(r => r.sku);
-        if (cpSkus.length > 0) {
-          const skuToInternal = {};
-          updates.forEach((u, i) => { skuToInternal[rows[i].sku] = u; });
+        // 2. Bulk UPDATE catalog_unified via unnest()
+        await client.query(`
+          UPDATE catalog_unified AS t
+          SET internal_sku       = v.internal_sku,
+              display_brand      = v.display_brand,
+              manufacturer_brand = v.manufacturer_brand,
+              slug               = v.slug,
+              updated_at         = NOW()
+          FROM (
+            SELECT
+              unnest($1::text[]) AS sku,
+              unnest($2::text[]) AS internal_sku,
+              unnest($3::text[]) AS display_brand,
+              unnest($4::text[]) AS manufacturer_brand,
+              unnest($5::text[]) AS slug
+          ) AS v
+          WHERE t.sku = v.sku AND t.internal_sku IS NULL
+        `, [vendorSkus, internalSkus, displayBrands, manufacturerBrands, slugs]);
 
-          for (const vendorSku of cpSkus) {
-            const u = skuToInternal[vendorSku];
-            if (!u) continue;
-            await client.query(`
-              UPDATE catalog_unified
-              SET internal_sku       = $1,
-                  display_brand      = $2,
-                  manufacturer_brand = $3,
-                  slug               = $4,
-                  updated_at         = NOW()
-              WHERE sku = $5 AND internal_sku IS NULL
-            `, [u.internalSku, u.displayBrand, u.manufacturerBrand, u.slug, vendorSku]);
-          }
+        // 3. Persist counter values — saved with the batch so kill-safe
+        for (const [prefix, val] of Object.entries(batchCounterChanges)) {
+          await client.query(
+            `UPDATE sku_counter SET last_val = $1 WHERE prefix = $2`,
+            [val, prefix]
+          );
         }
 
         await client.query('COMMIT');
       } catch (err) {
         await client.query('ROLLBACK');
-        console.error(`\n  ⚠  Batch error at offset ${offset}:`, err.message);
+        console.error(`\n  ⚠  Batch error (offset ~${processed}):`, err.message);
         skuErrors += rows.length;
+        // Re-sync counterMap from DB so the next batch doesn't reuse failed SKUs
+        const { rows: freshCounters } = await client.query(
+          `SELECT prefix, last_val FROM sku_counter ORDER BY prefix`
+        );
+        freshCounters.forEach(r => { counterMap[r.prefix] = Number(r.last_val); });
+        break; // stop on error — re-run will skip already-assigned rows
       }
 
       processed += rows.length;
-      offset    += rows.length;
-      process.stdout.write(`\r    ${processed.toLocaleString()} / ${Number(pending).toLocaleString()} processed…`);
+
+      const elapsed = ((Date.now() - startedAt) / 1000).toFixed(0);
+      const pct = ((processed / Number(pending)) * 100).toFixed(1);
+      process.stdout.write(
+        `\r    ${processed.toLocaleString()} / ${Number(pending).toLocaleString()}  (${pct}%)  ${elapsed}s elapsed`
+      );
     }
 
-    // Save updated counters back to DB
-    for (const [prefix, val] of Object.entries(newCounters)) {
-      await client.query(`
-        UPDATE sku_counter SET last_val = $1, updated_at = NOW() WHERE prefix = $2
-      `, [val, prefix]);
-    }
-
-    // Summary
+    // ── Summary ───────────────────────────────────────────────────────────────
     const { rows: [{ total_with_sku }] } = await client.query(
       `SELECT COUNT(*) AS total_with_sku FROM catalog_products WHERE internal_sku IS NOT NULL`
     );
-
-    // Show prefix breakdown
     const { rows: breakdown } = await client.query(`
-      SELECT
-        SUBSTRING(internal_sku, 1, 3) AS prefix,
-        COUNT(*) AS count
+      SELECT SUBSTRING(internal_sku, 1, 3) AS prefix, COUNT(*) AS count
       FROM catalog_products
       WHERE internal_sku IS NOT NULL
-      GROUP BY 1
-      ORDER BY count DESC
+      GROUP BY 1 ORDER BY count DESC
     `);
 
+    const totalSec = ((Date.now() - startedAt) / 1000).toFixed(1);
     console.log('\n\n' + '─'.repeat(55));
-    console.log(`✅  Done`);
-    console.log(`    Products with internal SKU: ${Number(total_with_sku).toLocaleString()}`);
-    if (skuErrors) console.log(`    ⚠  Errors (not assigned): ${skuErrors}`);
+    console.log(`✅  Done in ${totalSec}s`);
+    console.log(`    Products with internal SKU : ${Number(total_with_sku).toLocaleString()}`);
+    if (skuErrors) console.log(`    ⚠  Errors (not assigned)  : ${skuErrors}`);
     console.log('\n    Breakdown by prefix:');
     breakdown.forEach(r => {
       console.log(`      ${r.prefix}  ${Number(r.count).toLocaleString().padStart(7)}`);
