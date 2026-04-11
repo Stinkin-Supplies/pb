@@ -29,7 +29,6 @@ const SORT_MAP: Record<string, string> = {
   source_file:      "source_file",
   id:               "id",
   created_at:       "created_at",
-  updated_at:       "updated_at",
 };
 
 // ── GET ───────────────────────────────────────────────────────────────────────
@@ -89,8 +88,7 @@ export async function GET(req: Request) {
          oem_manufacturer,
          page_reference,
          source_file,
-         created_at,
-         updated_at
+         created_at
        FROM catalog_oem_crossref
        ${where}
        ORDER BY ${safeSort} ${dir}
@@ -154,8 +152,7 @@ export async function POST(req: Request) {
        VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (sku, oem_number, oem_manufacturer) DO UPDATE
          SET page_reference = EXCLUDED.page_reference,
-             source_file    = EXCLUDED.source_file,
-             updated_at     = NOW()
+             source_file    = EXCLUDED.source_file
        RETURNING *`,
       [sku, oem_number, oem_manufacturer, page_reference ?? null, source_file ?? "manual"]
     );
