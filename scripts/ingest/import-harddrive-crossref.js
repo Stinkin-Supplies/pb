@@ -156,8 +156,7 @@ async function run() {
         VALUES ${valuePlaceholders.join(', ')}
         ON CONFLICT (sku, oem_number, oem_manufacturer) DO UPDATE
           SET page_reference = EXCLUDED.page_reference,
-              source_file    = EXCLUDED.source_file,
-              updated_at     = NOW()
+              source_file    = EXCLUDED.source_file
         RETURNING (xmax = 0) AS was_inserted
       `, params);
 
