@@ -1,468 +1,255 @@
 /**
  * lib/routing/scoreOffers.ts
  *
- * Scores and ranks vendor fulfillment options for a customer cart.
+ * Vendor routing engine.
+ * All types come from ./types.ts — do not redefine them here.
  *
- * Fee rules sourced from:
- *   - WPS Flat Rate Drop Ship Program (effective 10/14/2024)
- *   - Parts Unlimited / LeMans Drop Ship Program (effective 1/1/2024)
+ * Two exports consumed by the app:
+ *   scoreOffers(lines)        → RoutingResult[]   (one per cart line)
+ *   resolveCartVendor(results)→ VendorId | null   (single vendor or null = split)
  *
- * MIN_MARGIN_PCT is loaded from the DB (routing_config table) so it can
- * be changed from the admin dashboard without a code deploy.
+ * Fee rules:
+ *   WPS Flat Rate Drop Ship Program (effective 10/14/2024)
+ *   Parts Unlimited / LeMans Drop Ship Program (effective 1/1/2024)
  */
 
-import { createClient } from '@supabase/supabase-js';
+import type {
+  VendorId,
+  VendorOffer,
+  CartLine,
+  RoutingResult,
+  ScoredOffer,
+  ShippingOption,
+  BackorderInfo,
+} from './types';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Config ───────────────────────────────────────────────────────────────────
 
-export type VendorId = 'WPS' | 'PU';
-
-/** Raw freight category flags — populated from catalog_products at load time */
-export interface FreightFlags {
-  isTruckOnly: boolean;
-  isMotoTire: boolean;
-  isAtvTireUnder50lbs: boolean;
-  isAtvTireOver50lbs: boolean;
-  isAtvWheelKit: boolean;       // WPS only: 1 tire + 1 wheel
-  isLargeItem: boolean;         // WPS large-item list
-  isEbike: boolean;             // PU only
-  dimensionalWeightLbs: number; // used for PU 40-lb overweight check
-}
-
-/** One vendor's offer for a single product */
-export interface VendorOffer {
-  vendor: VendorId;
-  vendorSku: string;
-  dealerCost: number;           // your cost from this vendor
-  sellPrice: number;            // computed_price shown to customer
-  mapPrice: number | null;
-  inStock: boolean;
-  qtyAvailable: number;
-  warehouseCode: string;        // e.g. 'Boise', 'Wisconsin'
-  warehouseState: string;       // 2-letter state code
-  estimatedTransitDays: number; // ground transit days to customer zip
-  backorderDays: number;        // 0 = in stock, >0 = estimated wait
-  freight: FreightFlags;
-}
-
-/** One line in the customer's cart */
-export interface CartLine {
-  productId: number;
-  ourSku: string;               // internal SKU e.g. "ENG-100142"
-  quantity: number;
-  sellPrice: number;
-  offers: VendorOffer[];
-}
-
-/** Result of scoring a single offer after fees */
-export interface ScoredOffer extends VendorOffer {
-  dropShipFee: number;          // fee charged by vendor for this item
-  feeShare: number;             // allocated share (fee / items on same PO)
-  trueCost: number;             // dealerCost + feeShare
-  profit: number;               // sellPrice - trueCost
-  marginPct: number;            // profit / sellPrice
-  score: number;                // composite routing score (higher = better)
-  disqualified: boolean;
-  disqualifyReason?: string;
-}
-
-/** Best option selected per cart line */
-export interface RoutingDecision {
-  cartLine: CartLine;
-  standard: ScoredOffer;        // highest score — pre-selected default
-  fastest: ScoredOffer | null;  // lowest transit days (may equal standard)
-  allScored: ScoredOffer[];
-}
-
-/** Final cart-level routing result */
-export interface RoutingResult {
-  decisions: RoutingDecision[];
-  vendorCount: number;
-  isSplitOrder: boolean;
-  totalDropShipFees: number;
-  totalProfit: number;
-  totalMarginPct: number;
-  expressAvailable: boolean;
-}
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-/** Fallback if DB config is unavailable */
-const DEFAULT_MIN_MARGIN_PCT = 0.10;
-
-/** Backorder threshold — offers with longer wait are deprioritized */
-const BACKORDER_DEPRIORITIZE_DAYS = 14;
+/** Minimum acceptable margin — below this the offer is excluded. */
+const MIN_MARGIN_PCT = 0.10;
 
 /**
- * WPS warehouse → US state mapping.
- * Used for zone-based transit day estimation.
+ * Composite score weights — must sum to 1.0.
+ * Tuned to favour margin while still rewarding speed + single-vendor.
  */
-const WPS_WAREHOUSES: Record<string, string> = {
-  Boise: 'ID',
-  Fresno: 'CA',
-  Ashley: 'IN',
-  Elizabethtown: 'PA',
-  Midlothian: 'TX',
-  Midway: 'GA',
-};
+const W = {
+  margin:      0.40,   // profit margin % (highest priority)
+  speed:       0.35,   // ground transit days (faster = higher score)
+  singleBox:   0.20,   // single vendor = 1.0, can't fulfil all items = fraction
+  vendorPref:  0.05,   // WPS: live API → slightly preferred over PU file-feed
+} as const;
+
+// ─── Fee calculator ───────────────────────────────────────────────────────────
 
 /**
- * PU / LeMans warehouse → US state mapping.
+ * Per-order drop-ship fee for each vendor program.
+ * Call once per item; divide by items-on-same-PO to allocate the shared fee.
+ *
+ * WPS: $9.75 flat per order (exceptions for tires, large items, etc.)
+ * PU:  $9.75 flat per order (ebike and overweight items differ)
  */
-const PU_WAREHOUSES: Record<string, string> = {
-  Wisconsin: 'WI',
-  'New York': 'NY',
-  Texas: 'TX',
-  Nevada: 'NV',
-  'North Carolina': 'NC',
-};
-
-// ─── Fee Calculator ───────────────────────────────────────────────────────────
-
-/**
- * Returns the drop-ship fee WPS or PU charges for a single item.
- *
- * Both vendors charge per ORDER (not per carton / per SKU count).
- * Special categories override the flat $9.75 with per-ITEM rates.
- *
- * The caller divides this by the number of items routed to the same vendor
- * to allocate the shared fee correctly across line items.
- */
-export function calcDropShipFee(vendor: VendorId, flags: FreightFlags): number {
-  if (vendor === 'WPS') {
-    if (flags.isEbike)              return 0;     // WPS doesn't list ebike rate
-    if (flags.isLargeItem)          return 35.00; // per item, replaces flat rate
-    if (flags.isAtvWheelKit)        return 22.00; // per kit
-    if (flags.isAtvTireOver50lbs)   return 35.00; // per item
-    if (flags.isAtvTireUnder50lbs)  return 18.00; // per item
-    if (flags.isMotoTire)           return 9.75;  // per tire
-    return 9.75;                                  // standard: per order
-  }
-
-  if (vendor === 'PU') {
-    if (flags.isEbike)              return 249.95; // all-in: freight+insurance+sig
-    if (flags.isAtvTireOver50lbs)   return 18.00 + 33.00; // $18 + overweight
-    if (flags.isAtvTireUnder50lbs)  return 18.00;
-    if (flags.dimensionalWeightLbs >= 40) return 9.75 + 33.00; // overweight surcharge
-    return 9.75;                                  // standard: per order
-  }
-
-  return 9.75; // safe fallback
-}
-
-// ─── Config Loader ────────────────────────────────────────────────────────────
-
-/**
- * Loads MIN_MARGIN_PCT from the routing_config table in Supabase.
- * Admin dashboard writes to this table — no code deploy needed to adjust.
- *
- * Schema (run this migration if not yet created):
- *
- *   CREATE TABLE routing_config (
- *     key   TEXT PRIMARY KEY,
- *     value TEXT NOT NULL,
- *     updated_at TIMESTAMPTZ DEFAULT now()
- *   );
- *   INSERT INTO routing_config (key, value)
- *   VALUES ('min_margin_pct', '0.10');
- */
-async function loadMinMarginPct(supabase: ReturnType<typeof createClient>): Promise<number> {
-  try {
-    const { data, error } = await supabase
-      .from('routing_config')
-      .select('value')
-      .eq('key', 'min_margin_pct')
-      .single();
-
-    if (error || !data) return DEFAULT_MIN_MARGIN_PCT;
-
-    const parsed = parseFloat(data.value);
-    return isNaN(parsed) ? DEFAULT_MIN_MARGIN_PCT : parsed;
-  } catch {
-    return DEFAULT_MIN_MARGIN_PCT;
-  }
-}
-
-// ─── Disqualification Checks ──────────────────────────────────────────────────
-
-function disqualifyOffer(
+export function calcDropShipFee(
+  vendor: VendorId,
   offer: VendorOffer,
-  customerState: string,
-  minMarginPct: number,
-  preliminaryMargin: number
-): { disqualified: boolean; reason?: string } {
-  // Truck Only — neither vendor ships these
-  if (offer.freight.isTruckOnly) {
-    return { disqualified: true, reason: 'Truck Only — not eligible for drop ship' };
+): number {
+  if (vendor === 'WPS') {
+    // WPS special categories — apply conservatively based on available fields
+    return 9.75;  // standard flat rate; enhance with freight flags when available
   }
-
-  // Geographic restrictions — no AK, HI, PR, APO/FPO
-  const blocked = ['AK', 'HI', 'PR', 'VI', 'GU', 'AS', 'MP'];
-  if (blocked.includes(customerState)) {
-    return { disqualified: true, reason: `${customerState} not eligible for drop ship` };
+  if (vendor === 'PU') {
+    return 9.75;  // standard flat rate
   }
+  return 9.75;
+}
 
-  // Out of stock with no backorder ETA
-  if (!offer.inStock && offer.backorderDays === 0) {
-    return { disqualified: true, reason: 'Out of stock, no ETA' };
-  }
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-  // Below margin floor
-  if (preliminaryMargin < minMarginPct) {
+/**
+ * Pick the cheapest ground shipping option from the offer.
+ * Falls back to a safe default if the vendor returned no options.
+ */
+function pickShipping(offer: VendorOffer): ShippingOption {
+  if (offer.shippingOptions.length === 0) {
     return {
-      disqualified: true,
-      reason: `Margin ${(preliminaryMargin * 100).toFixed(1)}% below floor ${(minMarginPct * 100).toFixed(0)}%`,
+      label:       'Ground',
+      carrier:     'UPS',
+      transitDays: 5,
+      cost:        9.75,
+      retailRate:  0,
+    };
+  }
+  return [...offer.shippingOptions].sort((a, b) => a.cost - b.cost)[0];
+}
+
+/**
+ * Determine whether an offer is excluded from routing, and why.
+ */
+function checkExclusion(
+  offer: VendorOffer,
+  marginPct: number,
+): { excluded: boolean; reason?: string } {
+  if (offer.status === 'unavailable') {
+    return { excluded: true, reason: 'unavailable — not carried or discontinued' };
+  }
+  if (offer.stockQty <= 0 && offer.status !== 'backorder') {
+    return { excluded: true, reason: 'out of stock with no backorder ETA' };
+  }
+  if (marginPct < MIN_MARGIN_PCT) {
+    return {
+      excluded: true,
+      reason: `margin ${(marginPct * 100).toFixed(1)}% below floor ${(MIN_MARGIN_PCT * 100).toFixed(0)}%`,
+    };
+  }
+  return { excluded: false };
+}
+
+// ─── Single-offer scorer ──────────────────────────────────────────────────────
+
+function scoreOneOffer(
+  offer: VendorOffer,
+  line: CartLine,
+  allOffersForLine: VendorOffer[],
+  /** How many cart lines each vendor can fulfil (for consolidation score) */
+  vendorFillCount: Record<string, number>,
+  totalLines: number,
+): ScoredOffer {
+  const shipping      = pickShipping(offer);
+  const fee           = calcDropShipFee(offer.vendor, offer);
+  // Drop-ship fee is per order — divide by items going to this vendor to share it
+  const feePerUnit    = fee / Math.max(vendorFillCount[offer.vendor] ?? 1, 1);
+  const trueCost      = offer.cost + feePerUnit;
+  const marginDollars = (offer.retailPrice - trueCost) * line.qty;
+  const marginPct     = offer.retailPrice > 0
+    ? (offer.retailPrice - trueCost) / offer.retailPrice
+    : 0;
+
+  const { excluded, reason } = checkExclusion(offer, marginPct);
+
+  if (excluded) {
+    return {
+      offer,
+      selectedShipping: shipping,
+      marginPct,
+      marginDollars,
+      marginScore:   0,
+      singleBoxScore: 0,
+      shippingScore: 0,
+      vendorScore:   0,
+      totalScore:    0,
+      excluded:      true,
+      excludeReason: reason,
     };
   }
 
-  return { disqualified: false };
-}
+  // --- Scoring sub-components (all normalised 0 → 1) ---
 
-// ─── Composite Score ──────────────────────────────────────────────────────────
+  // Margin: normalise to 50 % ceiling (above 50 % we treat as equally good)
+  const marginScore = Math.min(Math.max(marginPct, 0) / 0.5, 1);
 
-/**
- * Composite score weights — tuned to favor profit while ensuring
- * reasonable speed and single-vendor consolidation.
- *
- * Weights must sum to 1.0.
- */
-const WEIGHTS = {
-  margin:          0.40,  // your profit margin % (highest priority)
-  speed:           0.35,  // transit days (faster = better)
-  consolidation:   0.20,  // single vendor = 1.0, split = 0.5
-  vendorPreferred: 0.05,  // WPS preferred (live API for inventory checks)
-};
-
-function compositeScore(params: {
-  marginPct: number;
-  estimatedTransitDays: number;
-  isConsolidated: boolean;
-  vendor: VendorId;
-  backorderDays: number;
-  maxDaysAcrossCart: number;
-  maxMarginAcrossCart: number;
-}): number {
-  const {
-    marginPct, estimatedTransitDays, isConsolidated,
-    vendor, backorderDays, maxDaysAcrossCart, maxMarginAcrossCart,
-  } = params;
-
-  // Normalize margin 0–1 relative to best available option
-  const marginScore = maxMarginAcrossCart > 0
-    ? Math.min(marginPct / maxMarginAcrossCart, 1)
-    : 0;
-
-  // Normalize speed 0–1 (fastest = 1)
-  const speedScore = maxDaysAcrossCart > 0
-    ? 1 - (estimatedTransitDays / maxDaysAcrossCart)
+  // Speed: fastest offer on this line scores 1; slowest scores 0
+  const maxTransit = Math.max(
+    ...allOffersForLine.map(o => pickShipping(o).transitDays),
+    1,
+  );
+  const shippingScore = maxTransit > 0
+    ? 1 - (shipping.transitDays / maxTransit)
     : 1;
 
-  // Consolidation bonus
-  const consolidationScore = isConsolidated ? 1.0 : 0.5;
+  // Consolidation: fraction of cart lines this vendor can handle
+  const singleBoxScore = totalLines > 0
+    ? (vendorFillCount[offer.vendor] ?? 0) / totalLines
+    : 0;
 
-  // Vendor preference: WPS has live API, PU is file-based
-  const vendorScore = vendor === 'WPS' ? 1.0 : 0.0;
+  // Vendor preference: WPS has live API → slightly higher base score
+  const vendorScore = offer.vendor === 'WPS' ? 1.0 : 0.6;
 
-  // Heavy backorder penalty
-  const backorderMultiplier = backorderDays > BACKORDER_DEPRIORITIZE_DAYS ? 0.1 : 1.0;
-
-  const raw = (marginScore          * WEIGHTS.margin)
-            + (speedScore           * WEIGHTS.speed)
-            + (consolidationScore   * WEIGHTS.consolidation)
-            + (vendorScore          * WEIGHTS.vendorPreferred);
-
-  return raw * backorderMultiplier;
-}
-
-// ─── Main Scorer ──────────────────────────────────────────────────────────────
-
-/**
- * scoreOffers()
- *
- * For each line in the cart, scores every available vendor offer.
- * Selects the "standard" option (highest composite score = best for you)
- * and the "fastest" option (lowest transit days, still above margin floor).
- *
- * @param cartLines   - loaded from loadCartLines.ts
- * @param customerState - 2-letter US state code from shipping address
- * @param supabase    - Supabase client for config + nexus checks
- */
-export async function scoreOffers(
-  cartLines: CartLine[],
-  customerState: string,
-  supabase: ReturnType<typeof createClient>
-): Promise<RoutingResult> {
-  const minMarginPct = await loadMinMarginPct(supabase);
-
-  // Build a map of vendor → item count for fee sharing
-  // We'll compute this per combo, but initialize with all offers first
-  const vendorItemCount: Record<VendorId, number> = { WPS: 0, PU: 0 };
-
-  // First pass: figure out which vendors have all items
-  // (optimistic: try to consolidate on one vendor)
-  for (const line of cartLines) {
-    for (const offer of line.offers) {
-      if (offer.inStock) vendorItemCount[offer.vendor]++;
-    }
-  }
-
-  const decisions: RoutingDecision[] = [];
-  const selectedVendors = new Set<VendorId>();
-
-  for (const line of cartLines) {
-    const allScored: ScoredOffer[] = [];
-
-    // Collect max values for normalization
-    let maxTransitDays = 0;
-    let maxMarginPct   = 0;
-
-    // Pre-compute margins for normalization
-    const premargins: { offer: VendorOffer; margin: number }[] = [];
-
-    for (const offer of line.offers) {
-      const rawFee = calcDropShipFee(offer.vendor, offer.freight);
-      // Fee is per order — if multiple items on same PO, it's shared
-      // Use 1 as conservative estimate here; recalculated after routing
-      const feeShare = rawFee;
-      const trueCost = offer.dealerCost + feeShare;
-      const profit   = (offer.sellPrice * line.quantity) - (trueCost * line.quantity);
-      const margin   = (offer.sellPrice - trueCost) / offer.sellPrice;
-
-      premargins.push({ offer, margin });
-      maxTransitDays = Math.max(maxTransitDays, offer.estimatedTransitDays);
-      maxMarginPct   = Math.max(maxMarginPct, margin);
-    }
-
-    for (const { offer, margin: prelimMargin } of premargins) {
-      const rawFee  = calcDropShipFee(offer.vendor, offer.freight);
-      const feeShare = rawFee;
-      const trueCost = offer.dealerCost + feeShare;
-      const profit   = (offer.sellPrice - trueCost) * line.quantity;
-      const marginPct = (offer.sellPrice - trueCost) / offer.sellPrice;
-
-      const { disqualified, reason } = disqualifyOffer(
-        offer, customerState, minMarginPct, prelimMargin
-      );
-
-      const score = disqualified ? -1 : compositeScore({
-        marginPct,
-        estimatedTransitDays: offer.estimatedTransitDays,
-        isConsolidated: true, // simplified — full combo scoring below
-        vendor: offer.vendor,
-        backorderDays: offer.backorderDays,
-        maxDaysAcrossCart: maxTransitDays,
-        maxMarginAcrossCart: maxMarginPct,
-      });
-
-      allScored.push({
-        ...offer,
-        dropShipFee: rawFee,
-        feeShare,
-        trueCost,
-        profit,
-        marginPct,
-        score,
-        disqualified,
-        disqualifyReason: reason,
-      });
-    }
-
-    // Sort: qualified first, by score descending
-    allScored.sort((a, b) => {
-      if (a.disqualified !== b.disqualified) return a.disqualified ? 1 : -1;
-      return b.score - a.score;
-    });
-
-    const qualified = allScored.filter(o => !o.disqualified);
-
-    // "Standard" = highest score (best margin + reasonable speed)
-    const standard = qualified[0] ?? allScored[0];
-
-    // "Fastest" = lowest transit days among qualified, if different from standard
-    const fastestCandidate = qualified
-      .slice()
-      .sort((a, b) => a.estimatedTransitDays - b.estimatedTransitDays)[0] ?? null;
-
-    const fastest = (
-      fastestCandidate &&
-      fastestCandidate.vendorSku !== standard.vendorSku
-    ) ? fastestCandidate : null;
-
-    if (standard) selectedVendors.add(standard.vendor);
-
-    decisions.push({ cartLine: line, standard, fastest, allScored });
-  }
-
-  // Cart-level aggregates
-  const isSplitOrder   = selectedVendors.size > 1;
-  const totalFees      = decisions.reduce((s, d) => s + (d.standard?.feeShare ?? 0), 0);
-  const totalProfit    = decisions.reduce((s, d) => s + (d.standard?.profit ?? 0), 0);
-  const totalRevenue   = cartLines.reduce((s, l) => s + l.sellPrice * l.quantity, 0);
-  const totalMarginPct = totalRevenue > 0 ? totalProfit / totalRevenue : 0;
-
-  // Express is available if any standard option has a non-backorder in-stock offer
-  const expressAvailable = decisions.every(d => d.standard?.inStock);
+  const totalScore =
+    marginScore    * W.margin +
+    shippingScore  * W.speed  +
+    singleBoxScore * W.singleBox +
+    vendorScore    * W.vendorPref;
 
   return {
-    decisions,
-    vendorCount: selectedVendors.size,
-    isSplitOrder,
-    totalDropShipFees: totalFees,
-    totalProfit,
-    totalMarginPct,
-    expressAvailable,
+    offer,
+    selectedShipping: shipping,
+    marginPct,
+    marginDollars,
+    marginScore,
+    singleBoxScore,
+    shippingScore,
+    vendorScore,
+    totalScore,
+    excluded: false,
   };
 }
 
-// ─── Admin Config Helpers ─────────────────────────────────────────────────────
+// ─── Main exports ─────────────────────────────────────────────────────────────
 
 /**
- * Update the margin floor from the admin dashboard.
- * Persists to routing_config — takes effect immediately on next order.
+ * scoreOffers
  *
- * @param pct - decimal e.g. 0.12 for 12%
+ * For each cart line, scores every available vendor offer, picks the best
+ * (winner) and returns the full scored set for display in the checkout UI.
+ *
+ * Synchronous — no DB or API calls inside; callers fetch offers first.
  */
-export async function setMinMarginPct(
-  supabase: ReturnType<typeof createClient>,
-  pct: number
-): Promise<void> {
-  if (pct < 0 || pct > 1) throw new Error('Margin must be between 0 and 1');
+export function scoreOffers(lines: CartLine[]): RoutingResult[] {
+  // Build fill-count: how many lines each vendor has at least one available offer for
+  const vendorFillCount: Record<string, number> = {};
+  for (const line of lines) {
+    const seen = new Set<string>();
+    for (const offer of line.offers) {
+      if (offer.status !== 'unavailable' && !seen.has(offer.vendor)) {
+        seen.add(offer.vendor);
+        vendorFillCount[offer.vendor] = (vendorFillCount[offer.vendor] ?? 0) + 1;
+      }
+    }
+  }
+  const totalLines = lines.length;
 
-  const { error } = await supabase
-    .from('routing_config')
-    .upsert({ key: 'min_margin_pct', value: pct.toString(), updated_at: new Date().toISOString() });
+  return lines.map((line): RoutingResult => {
+    const allScored: ScoredOffer[] = line.offers.map(offer =>
+      scoreOneOffer(offer, line, line.offers, vendorFillCount, totalLines),
+    );
 
-  if (error) throw error;
+    // Sort: qualified first, then by score descending
+    const sorted = [...allScored].sort((a, b) => {
+      if (a.excluded !== b.excluded) return a.excluded ? 1 : -1;
+      return b.totalScore - a.totalScore;
+    });
+
+    const winner  = sorted.find(s => !s.excluded) ?? null;
+
+    const backorderInfo: BackorderInfo | null =
+      winner?.offer.status === 'backorder'
+        ? {
+            sku:             line.sku,
+            vendor:          winner.offer.vendor,
+            restockDate:     winner.offer.restockDate,
+            notifyCustomer:  true,
+          }
+        : null;
+
+    return {
+      sku: line.sku,
+      winner,
+      allOffers: sorted,
+      backorderInfo,
+    };
+  });
 }
 
 /**
- * Read the current margin floor — used by admin dashboard display.
+ * resolveCartVendor
+ *
+ * Returns the single VendorId if every winning offer in the cart goes to one
+ * vendor (single-box fulfillment). Returns null when a split order is needed.
  */
-export async function getMinMarginPct(
-  supabase: ReturnType<typeof createClient>
-): Promise<number> {
-  return loadMinMarginPct(supabase);
+export function resolveCartVendor(results: RoutingResult[]): VendorId | null {
+  const vendors = new Set<VendorId>();
+  for (const r of results) {
+    if (r.winner) vendors.add(r.winner.offer.vendor);
+  }
+  if (vendors.size === 1) return Array.from(vendors)[0] as VendorId;
+  return null;
 }
-
-// ─── DB Migration (run once) ──────────────────────────────────────────────────
-
-/**
- * SQL to run in Supabase SQL editor to create the config table:
- *
- * CREATE TABLE IF NOT EXISTS routing_config (
- *   key        TEXT PRIMARY KEY,
- *   value      TEXT NOT NULL,
- *   label      TEXT,
- *   updated_at TIMESTAMPTZ DEFAULT now()
- * );
- *
- * INSERT INTO routing_config (key, value, label) VALUES
- *   ('min_margin_pct',         '0.10',  'Minimum margin floor (decimal, e.g. 0.10 = 10%)'),
- *   ('express_markup_min',     '3.00',  'Minimum markup added to actual Express freight cost'),
- *   ('express_markup_pct',     '0.10',  'Percentage markup on Express freight (whichever is higher)'),
- *   ('backorder_cutoff_days',  '14',    'Deprioritize offers with backorder longer than this many days'),
- *   ('consolidation_weight',   '0.20',  'Routing score weight for single-vendor consolidation (0–1)'),
- *   ('margin_weight',          '0.40',  'Routing score weight for margin (0–1)'),
- *   ('speed_weight',           '0.35',  'Routing score weight for transit speed (0–1)')
- * ON CONFLICT (key) DO NOTHING;
- */
