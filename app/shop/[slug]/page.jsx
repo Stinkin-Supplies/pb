@@ -7,15 +7,38 @@
 
 import { notFound } from "next/navigation";
 import { getCatalogDb } from "@/lib/db/catalog";
+import {
+  typesenseClient,
+  COLLECTION,
+  DEFAULT_SEARCH_PARAMS,
+  IS_GROUPS_COLLECTION,
+} from "@/lib/typesense/client";
 import ProductDetailClient from "./ProductDetailClient";
 
 export default async function ProductDetailPage({ params }) {
   const { slug } = await params;
-  const db = getCatalogDb();
 
   let product = null;
 
   try {
+    // Prefer Typesense (same source as /api/search) so PDP doesn't 404 when the
+    // catalog database is temporarily unavailable/misconfigured in prod.
+    const tsDoc = await fetchTypesenseBySlug(slug);
+    if (tsDoc) {
+      product = normalizeTypesenseDoc(tsDoc);
+    }
+  } catch (err) {
+    // If Typesense fails, fall back to Postgres below.
+    console.error("[PDP Typesense]", err instanceof Error ? err.message : String(err));
+  }
+
+  const db = getCatalogDb();
+
+  try {
+    if (product) {
+      return <ProductDetailClient product={product} relatedProducts={[]} />;
+    }
+
     // Try catalog_unified first
     const { rows } = await db.query(`
       SELECT
@@ -63,6 +86,115 @@ export default async function ProductDetailPage({ params }) {
       relatedProducts={[]}
     />
   );
+}
+
+async function fetchTypesenseBySlug(slug) {
+  const baseFilter = DEFAULT_SEARCH_PARAMS?.filter_by
+    ? String(DEFAULT_SEARCH_PARAMS.filter_by)
+    : "";
+  const filterBy = baseFilter ? `${baseFilter} && slug:=${slug}` : `slug:=${slug}`;
+
+  const results = await typesenseClient
+    .collections(COLLECTION)
+    .documents()
+    .search({
+      ...DEFAULT_SEARCH_PARAMS,
+      q: "*",
+      filter_by: filterBy,
+      page: 1,
+      per_page: 1,
+    });
+
+  return results?.hits?.[0]?.document ?? null;
+}
+
+function normalizeTypesenseDoc(doc) {
+  const imageArr = Array.isArray(doc.image_urls)
+    ? doc.image_urls.filter(Boolean)
+    : Array.isArray(doc.images)
+      ? doc.images.filter(Boolean)
+      : doc.image_url
+        ? [doc.image_url]
+        : doc.image
+          ? [doc.image]
+          : [];
+
+  // product_groups doesn’t have SKU; synthesize something stable so the page can render.
+  const fallbackSku = String(doc.sku ?? doc.internal_sku ?? doc.group_id ?? doc.id ?? doc.slug ?? "");
+
+  const price =
+    doc.msrp != null ? Number(doc.msrp)
+      : doc.price != null ? Number(doc.price)
+        : doc.price_min != null ? Number(doc.price_min)
+          : 0;
+
+  const was =
+    doc.was != null ? Number(doc.was)
+      : doc.original_retail != null ? Number(doc.original_retail)
+        : null;
+
+  return {
+    // Identity
+    id:           doc.id ?? doc.group_id ?? null,
+    slug:         doc.slug ?? "",
+    sku:          doc.sku ?? fallbackSku,
+    name:         doc.name ?? "",
+    brand:        doc.brand ?? "Unknown",
+    category:     doc.category ?? "Uncategorized",
+
+    // Content
+    description:  doc.description ?? null,
+    features:     Array.isArray(doc.features) ? doc.features : [],
+
+    // Pricing
+    price,
+    was,
+    mapPrice:     doc.mapPrice != null ? Number(doc.mapPrice) : (doc.map_price != null ? Number(doc.map_price) : null),
+
+    // Availability
+    inStock:      doc.inStock ?? doc.in_stock ?? false,
+    stockQty:     doc.stockQty ?? doc.stock_quantity ?? doc.stock_total ?? 0,
+
+    // Badges
+    badge:        doc.badge ?? (doc.closeout ? "sale" : null),
+
+    // Images
+    primaryImage: imageArr[0] ?? null,
+    gallery:      imageArr,
+
+    // Vendor/meta (optional)
+    vendor:       doc.vendor ?? doc.source_vendor ?? null,
+    sourceVendor: doc.source_vendor ?? null,
+
+    // Fitment + flags (pass through when present)
+    isHarleyFitment:   doc.isHarleyFitment ?? doc.is_harley_fitment ?? false,
+    isUniversal:       doc.isUniversal ?? doc.is_universal ?? false,
+    fitmentHdFamilies: doc.fitmentHdFamilies ?? doc.fitment_hd_families ?? [],
+    fitmentHdModels:   doc.fitmentHdModels ?? doc.fitment_hd_models ?? [],
+    fitmentHdCodes:    doc.fitmentHdCodes ?? doc.fitment_hd_codes ?? [],
+    fitmentYearStart:  doc.fitmentYearStart ?? doc.fitment_year_start ?? null,
+    fitmentYearEnd:    doc.fitmentYearEnd ?? doc.fitment_year_end ?? null,
+
+    inOldbook:  doc.inOldbook ?? doc.in_oldbook ?? false,
+    inFatbook:  doc.inFatbook ?? doc.in_fatbook ?? false,
+    dragPart:   doc.dragPart ?? doc.drag_part ?? false,
+
+    // Warehouse totals (optional; groups may not have these)
+    warehouseWi: doc.warehouseWi ?? doc.warehouse_wi ?? 0,
+    warehouseNy: doc.warehouseNy ?? doc.warehouse_ny ?? 0,
+    warehouseTx: doc.warehouseTx ?? doc.warehouse_tx ?? 0,
+    warehouseNv: doc.warehouseNv ?? doc.warehouse_nv ?? 0,
+    warehouseNc: doc.warehouseNc ?? doc.warehouse_nc ?? 0,
+
+    // PDP expects these fields in a few places; safe defaults
+    shipping:     price >= 99,
+    pointsEarned: Math.floor(price * 10),
+
+    // Group metadata (when using product_groups collection)
+    groupId:        IS_GROUPS_COLLECTION ? (doc.group_id ?? doc.id ?? null) : undefined,
+    groupSignal:    IS_GROUPS_COLLECTION ? (doc.group_signal ?? "singleton") : undefined,
+    availableBrands: IS_GROUPS_COLLECTION ? (doc.available_brands ?? []) : undefined,
+  };
 }
 
 function normalizeProduct(row) {
