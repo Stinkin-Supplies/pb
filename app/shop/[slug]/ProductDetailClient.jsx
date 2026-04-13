@@ -411,6 +411,60 @@ const css = `
     background: rgba(34,197,94,0.08); cursor: default;
   }
 
+  /* ── BRAND OPTION CARDS ── */
+  .brand-opts-label {
+    font-family: var(--font-stencil), monospace;
+    font-size: 9px; color: #8a8784; letter-spacing: 0.18em;
+    margin-bottom: 8px; margin-top: 4px;
+  }
+  .brand-opts { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+  .brand-opt {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 14px;
+    background: #111010;
+    border: 1px solid #2a2828;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    user-select: none;
+  }
+  .brand-opt:hover { border-color: #4a4848; }
+  .brand-opt.selected { border-color: #e8621a; background: #1a1210; }
+  .brand-opt.oos { opacity: 0.55; }
+  .brand-opt-radio {
+    width: 15px; height: 15px; flex-shrink: 0;
+    border-radius: 50%; border: 2px solid #3a3838;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color 0.15s;
+  }
+  .brand-opt.selected .brand-opt-radio { border-color: #e8621a; }
+  .brand-opt-radio-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #e8621a; display: none;
+  }
+  .brand-opt.selected .brand-opt-radio-dot { display: block; }
+  .brand-opt-body { flex: 1; min-width: 0; }
+  .brand-opt-name {
+    font-family: var(--font-stencil), monospace;
+    font-size: 11px; letter-spacing: 0.1em; color: #f0ebe3;
+  }
+  .brand-opt-part {
+    font-family: var(--font-stencil), monospace;
+    font-size: 9px; color: #8a8784; letter-spacing: 0.1em; margin-top: 2px;
+  }
+  .brand-opt-right { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
+  .brand-opt-price {
+    font-family: var(--font-stencil), monospace;
+    font-size: 18px; letter-spacing: 0.04em; color: #f0ebe3;
+  }
+  .brand-opt.selected .brand-opt-price { color: #e8621a; }
+  .brand-opt-stock {
+    font-family: var(--font-stencil), monospace;
+    font-size: 8px; letter-spacing: 0.1em;
+  }
+  .brand-opt-stock.in  { color: #22c55e; }
+  .brand-opt-stock.out { color: #8a8784; }
+
   /* ── TOAST ── */
   .toast {
     position: fixed; bottom: 24px; right: 24px; z-index: 200;
@@ -476,6 +530,41 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
   const [added,      setAdded]      = useState(false);
   const [toast,      setToast]      = useState(false);
   const { addItem } = useCartSafe();
+
+  // ── Brand / vendor option cards ───────────────────────────────
+  const [groupOptions, setGroupOptions] = useState(null);   // null = loading, [] = no group
+  const [selectedSku,  setSelectedSku]  = useState(product.sku);
+
+  useEffect(() => {
+    let cancelled = false;
+    const slug = product.slug ?? window.location.pathname.split("/").pop();
+    fetch(`/api/products/group?slug=${encodeURIComponent(slug)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (cancelled || !data) return;
+        // Only show the selector if there's more than one option
+        if (data.options?.length > 1) {
+          setGroupOptions(data.options);
+          // Pre-select canonical option
+          const canon = data.options.find(o => o.is_canonical) ?? data.options[0];
+          setSelectedSku(canon.vendor_sku);
+        } else {
+          setGroupOptions([]);   // singleton — hide selector
+        }
+      })
+      .catch(() => { if (!cancelled) setGroupOptions([]); });
+    return () => { cancelled = true; };
+  }, [product.slug, product.sku]);
+
+  // Derive active product data from the selected option (falls back to prop)
+  const activeOption = groupOptions?.find(o => o.vendor_sku === selectedSku);
+  const activePrice   = activeOption ? Number(activeOption.msrp ?? product.price) : product.price;
+  const activeInStock = activeOption ? activeOption.in_stock : product.inStock;
+  const activeStock   = activeOption ? Number(activeOption.stock_quantity ?? 0) : Number(product.stockQty ?? 0);
+  const activeBrand   = activeOption
+    ? (activeOption.display_brand || activeOption.brand || product.display_brand || product.brand)
+    : (product.display_brand || product.brand);
+
   const supabaseRef = useRef(null);
   if (!supabaseRef.current) {
     supabaseRef.current = createBrowserSupabaseClient();
@@ -497,12 +586,15 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
 
   // ── Add to cart ────────────────────────────────────────────
   const handleAdd = () => {
-    if (!product.inStock) return;
+    if (!activeInStock) return;
     setAdded(true);
-    // Ensure cart item has a resolved image
     addItem({
       ...product,
-      image: resolvedGallery[0] ?? product.primaryImage ?? null,
+      // Override with selected option if a group option is active
+      sku:   activeOption?.vendor_sku ?? product.sku,
+      price: activePrice,
+      brand: activeBrand,
+      image: (activeOption?.image_url ? activeOption.image_url : resolvedGallery[0]) ?? null,
       images: resolvedGallery,
     }, qty);
     setToast(true);
@@ -758,12 +850,55 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
 
         {/* RIGHT — Info */}
         <div className="info-col">
-          {(product.display_brand || product.brand) && (
-            <div className="info-brand">{product.display_brand || product.brand}</div>
+          {activeBrand && (
+            <div className="info-brand">{activeBrand}</div>
           )}
           <div className="info-name">{product.name}</div>
           {product.oem_part_number && (
             <div className="info-sku">OEM: {product.oem_part_number}</div>
+          )}
+
+          {/* Brand / vendor option cards — shown when multiple options exist */}
+          {groupOptions && groupOptions.length > 1 && (
+            <div>
+              <div className="brand-opts-label">SELECT BRAND / OPTION</div>
+              <div className="brand-opts">
+                {groupOptions.map((opt) => {
+                  const optBrand = opt.display_brand || opt.brand || "Unknown Brand";
+                  const optPrice = opt.msrp ? Number(opt.msrp) : null;
+                  const selected = opt.vendor_sku === selectedSku;
+                  return (
+                    <div
+                      key={opt.vendor_sku}
+                      className={`brand-opt${selected ? " selected" : ""}${!opt.in_stock ? " oos" : ""}`}
+                      onClick={() => setSelectedSku(opt.vendor_sku)}
+                      role="radio"
+                      aria-checked={selected}
+                    >
+                      <div className="brand-opt-radio">
+                        <div className="brand-opt-radio-dot" />
+                      </div>
+                      <div className="brand-opt-body">
+                        <div className="brand-opt-name">{optBrand.toUpperCase()}</div>
+                        {opt.internal_sku && (
+                          <div className="brand-opt-part">{opt.internal_sku}</div>
+                        )}
+                      </div>
+                      <div className="brand-opt-right">
+                        {optPrice != null && (
+                          <div className="brand-opt-price">${optPrice.toFixed(2)}</div>
+                        )}
+                        <div className={`brand-opt-stock ${opt.in_stock ? "in" : "out"}`}>
+                          {opt.in_stock
+                            ? (opt.stock_quantity > 5 ? "IN STOCK" : `ONLY ${opt.stock_quantity} LEFT`)
+                            : "OUT OF STOCK"}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           )}
 
           {/* Fitment badge */}
@@ -772,12 +907,12 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
             {fitmentLabel}
           </div>
 
-          {/* Price */}
+          {/* Price — reflects selected brand option */}
           <div className="price-block">
             {product.was && (
               <div className="price-was">${product.was.toFixed(2)}</div>
             )}
-            <div className="price-main">${product.price.toFixed(2)}</div>
+            <div className="price-main">${activePrice.toFixed(2)}</div>
             {product.mapPrice && (
               <div className="price-map-note">MAP PRICE: ${product.mapPrice.toFixed(2)}</div>
             )}
@@ -788,13 +923,13 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
             )}
           </div>
 
-          {/* Stock */}
+          {/* Stock — reflects selected brand option */}
           <div className="stock-row">
-            <div className={`stock-dot ${product.inStock?"in":"out"}`}/>
-            <span className={`stock-label ${product.inStock?"in":"out"}`}>
+            <div className={`stock-dot ${activeInStock?"in":"out"}`}/>
+            <span className={`stock-label ${activeInStock?"in":"out"}`}>
               {(() => {
-                const stock = Number(product.stockQty ?? 0);
-                if (!product.inStock || stock <= 0) return "OUT OF STOCK";
+                const stock = activeStock;
+                if (!activeInStock || stock <= 0) return "OUT OF STOCK";
                 if (stock > 5) return "IN STOCK";
                 return `ONLY ${stock} LEFT`;
               })()}
@@ -809,7 +944,7 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
               <button className="qty-btn" onClick={() => setQty(q => Math.min(Number(product.stockQty ?? 10), q+1))} disabled={!product.inStock}>+</button>
             </div>
 
-            {product.inStock ? (
+            {activeInStock ? (
               <button
                 className={`add-to-cart-btn ${added?"added":""}`}
                 onClick={handleAdd}
@@ -818,7 +953,7 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
               </button>
             ) : (
               <NotifyMeButton
-                sku={product.sku}
+                sku={activeOption?.vendor_sku ?? product.sku}
                 productName={product.name}
                 vendor={product.vendor ?? "wps"}
                 source="pdp"

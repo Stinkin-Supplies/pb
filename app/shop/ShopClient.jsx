@@ -253,9 +253,15 @@ function ProductCard({ product:p, index, view, onAdd }) {
                  gap:view==="list"?16:undefined, flex:view==="list"?1:undefined }}>
         <div style={{ flex:view==="list"?1:undefined }}>
           <div style={S({fontSize:9,color:"#e8621a",letterSpacing:"0.14em",marginBottom:3})}>{p.brand}</div>
-          <div style={{ fontSize:13, fontWeight:700, color:"#f0ebe3", lineHeight:1.3, marginBottom:view==="list"?0:9 }}>
+          <div style={{ fontSize:13, fontWeight:700, color:"#f0ebe3", lineHeight:1.3, marginBottom:view==="list"?0:6 }}>
             {p.name}
           </div>
+          {/* Multi-brand badge — shows when group has more than one brand option */}
+          {(p.brandCount > 1 || (p.availableBrands && p.availableBrands.length > 1)) && (
+            <div style={S({fontSize:7,color:"#8a8784",letterSpacing:"0.1em",marginTop:3,marginBottom:2})}>
+              {p.brandCount ?? p.availableBrands?.length} BRANDS AVAILABLE
+            </div>
+          )}
           {p.fitmentYearStart && (
             <div style={S({fontSize:8,color:"#8a8784",letterSpacing:"0.08em",marginTop:2})}>
               {p.fitmentYearStart}–{p.fitmentYearEnd}
@@ -264,7 +270,7 @@ function ProductCard({ product:p, index, view, onAdd }) {
         </div>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
                       flexDirection:view==="list"?"column":undefined, gap:view==="list"?6:undefined,
-                      alignSelf:view==="list"?"center":undefined }}>
+                      alignSelf:view==="list"?"center":undefined, marginTop: view==="list"?0:8 }}>
           <div>
             {p.was && (
               <div style={{ fontSize:11, color:"#8a8784", textDecoration:"line-through",
@@ -272,8 +278,14 @@ function ProductCard({ product:p, index, view, onAdd }) {
                 ${(Number(p.was)||0).toFixed(2)}
               </div>
             )}
-            <div style={B({fontSize:20,color:"#f0ebe3",letterSpacing:"0.04em",lineHeight:1})}>
-              ${(Number(p.price)||0).toFixed(2)}
+            <div style={{ display:"flex", alignItems:"baseline", gap:4 }}>
+              {/* Show "from $X.XX" when group has multiple price points */}
+              {p.priceMax && p.priceMin && p.priceMax > p.priceMin && (
+                <span style={S({fontSize:9,color:"#8a8784",letterSpacing:"0.06em"})}>from</span>
+              )}
+              <span style={B({fontSize:20,color:"#f0ebe3",letterSpacing:"0.04em",lineHeight:1})}>
+                ${(Number(p.price)||0).toFixed(2)}
+              </span>
             </div>
           </div>
           {p.inStock ? (
@@ -281,10 +293,10 @@ function ProductCard({ product:p, index, view, onAdd }) {
               onClick={e => { e.preventDefault(); e.stopPropagation(); onAdd(); }}
               style={{ background:"#e8621a", border:"none", color:"#0a0909",
                        ...B({fontSize:13,letterSpacing:"0.1em",padding:"5px 12px",borderRadius:2,cursor:"pointer",transition:"background 0.2s"}) }}>
-              ADD
+              {p.brandCount > 1 ? "OPTIONS" : "ADD"}
             </button>
           ) : (
-            <GridNotifyButton sku={p.sku} productName={p.name} vendor={p.vendor??"wps"}/>
+            <GridNotifyButton sku={p.sku ?? p.slug} productName={p.name} vendor={p.vendor??"wps"}/>
           )}
         </div>
       </div>
