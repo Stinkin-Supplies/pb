@@ -118,6 +118,30 @@ async function run() {
     const byId  = new Map(allProducts.map(p => [p.id, p]));
     const bySku = new Map(allProducts.map(p => [p.sku, p]));
 
+    // Secondary lookup: manufacturer_part_number (upper-cased) → [unified product]
+    // Used to widen OEM crossref groups via Brand-Part# matching.
+    const byMpn = new Map();
+    for (const p of allProducts) {
+      // catalog_unified may have manufacturer_part_number via the catalog_products join;
+      // we load it separately below. For now seed with internal_sku as fallback.
+    }
+
+    // Load manufacturer_part_number for all active catalog_products
+    console.log('📦  Loading manufacturer_part_number map…');
+    const { rows: mpnRows } = await client.query(`
+      SELECT cp.sku, UPPER(TRIM(cp.manufacturer_part_number)) AS mpn
+      FROM catalog_products cp
+      WHERE cp.manufacturer_part_number IS NOT NULL
+        AND btrim(cp.manufacturer_part_number) <> ''
+    `);
+    for (const r of mpnRows) {
+      const product = bySku.get(r.sku);
+      if (!product) continue;
+      if (!byMpn.has(r.mpn)) byMpn.set(r.mpn, []);
+      byMpn.get(r.mpn).push(product);
+    }
+    console.log(`    ${byMpn.size.toLocaleString()} distinct MPNs indexed.\n`);
+
     // Track which unified ids have been grouped already
     const grouped = new Set();
 
@@ -125,9 +149,17 @@ async function run() {
     const groups  = [];  // { signal, oem_number, upc, members: [unified rows] }
 
     // ── SIGNAL 1: OEM crossref grouping ──────────────────────────────────────
+    // Matches via:
+    //   a) crossref.sku → catalog_unified.sku  (direct SKU match)
+    //   b) crossref.page_reference → catalog_products.manufacturer_part_number
+    //      (Brand-Part# matches the manufacturer's own part number)
     console.log('🔍  Signal 1 — OEM crossref groups…');
     const { rows: crossrefRows } = await client.query(`
-      SELECT oem_number, array_agg(DISTINCT sku) AS skus
+      SELECT
+        oem_number,
+        array_agg(DISTINCT sku)            AS skus,
+        array_agg(DISTINCT page_reference)
+          FILTER (WHERE page_reference IS NOT NULL AND page_reference <> '') AS page_refs
       FROM catalog_oem_crossref
       WHERE oem_number IS NOT NULL AND oem_number <> ''
         AND sku        IS NOT NULL AND sku        <> ''
@@ -136,20 +168,39 @@ async function run() {
       ORDER BY oem_number
     `);
 
-    let oemGroups = 0;
+    let oemGroups  = 0;
     let oemSingles = 0;
+    let mpnMatched = 0;
 
     for (const cr of crossrefRows) {
-      // Find all catalog_unified products matching these SKUs
-      const members = cr.skus
+      // ── Path A: direct SKU match ─────────────────────────────────────────
+      const skuMembers = cr.skus
         .map(s => bySku.get(s))
         .filter(Boolean)
         .filter(p => !grouped.has(p.id));
 
+      // ── Path B: Brand-Part# (page_reference) → manufacturer_part_number ──
+      // Catches products that share the same manufacturer part number but are
+      // catalogued under a different vendor SKU (e.g. same James Gaskets part
+      // from WPS vs PU, where PU uses MPN as the key).
+      const mpnMembers = [];
+      if (cr.page_refs && cr.page_refs.length > 0) {
+        for (const ref of cr.page_refs) {
+          const key = ref.trim().toUpperCase();
+          const hits = byMpn.get(key) ?? [];
+          for (const p of hits) {
+            if (!grouped.has(p.id) && !skuMembers.includes(p)) {
+              mpnMembers.push(p);
+              mpnMatched++;
+            }
+          }
+        }
+      }
+
+      const members = [...skuMembers, ...mpnMembers];
       if (members.length === 0) continue;
 
       if (members.length === 1) {
-        // Only one product for this OEM# — still group it (singleton via crossref)
         oemSingles++;
       } else {
         oemGroups++;
@@ -157,6 +208,9 @@ async function run() {
 
       groups.push({ signal: 'oem_crossref', oem_number: cr.oem_number, upc: null, members });
       members.forEach(p => grouped.add(p.id));
+    }
+    if (mpnMatched > 0) {
+      console.log(`    +${mpnMatched} extra members found via Brand-Part# → MPN match.`);
     }
     console.log(`    ${oemGroups} multi-member OEM groups, ${oemSingles} crossref singletons.\n`);
 
