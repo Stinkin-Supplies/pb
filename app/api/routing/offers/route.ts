@@ -21,7 +21,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { scoreOffers, resolveCartVendor } from "@/lib/routing/scoreOffers";
-import type { CartLine, VendorOffer, VendorId } from "@/lib/routing/scoreOffers";
+import type { CartLine, VendorOffer, VendorId } from "@/lib/routing/types";
 
 // ---------------------------------------------------------------------------
 // Vendor inventory adapters
