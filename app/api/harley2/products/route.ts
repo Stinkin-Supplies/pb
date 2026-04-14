@@ -1,45 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import getCatalogDb from "@/lib/db/catalog";
-import { adminSupabase } from "@/lib/supabase/admin";
 import { normalizeHarleyProductRow } from "@/lib/harley/catalog";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const generic = searchParams.get("generic")?.trim();
-  const submodel = searchParams.get('submodel');
-  const year = parseInt(searchParams.get('year') || '0');
-  const category = searchParams.get('category');
-  const brand = searchParams.get('brand');
+  const year = Number(searchParams.get("year") || "0");
+  const category = searchParams.get("category")?.trim() || null;
+  const brand = searchParams.get("brand")?.trim() || null;
+  const limit = Math.min(Number(searchParams.get("limit") || "24"), 48);
 
-  if ((!submodel && !generic) || !year) {
-    return NextResponse.json({ error: 'Missing generic model or year' }, { status: 400 });
-  }
-
-  let genericModel = generic;
-
-  if (submodel && !genericModel) {
-    const { data, error } = await adminSupabase
-      .from("vehicles")
-      .select("model, submodel, year")
-      .eq("make", "Harley-Davidson")
-      .eq("submodel", submodel)
-      .eq("year", year)
-      .order("model", { ascending: true })
-      .limit(1);
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    genericModel = data?.[0]?.model ?? null;
-  }
-
-  if (!genericModel) {
-    return NextResponse.json({ error: "Exact model not found" }, { status: 404 });
+  if (!generic || !year) {
+    return NextResponse.json({ error: "Missing generic model or year" }, { status: 400 });
   }
 
   const db = getCatalogDb();
-  const params: Array<string | number> = [genericModel, year];
+  const values: Array<string | number> = [generic, year];
   let idx = 3;
   const conditions = [
     "cp.is_active = true",
@@ -48,18 +24,19 @@ export async function GET(request: NextRequest) {
     "cf.year_start <= $2",
     "cf.year_end >= $2",
   ];
+
   if (category) {
     conditions.push(`cp.category = $${idx}`);
-    params.push(category);
+    values.push(category);
     idx++;
   }
   if (brand) {
     conditions.push(`cp.brand = $${idx}`);
-    params.push(brand);
+    values.push(brand);
     idx++;
   }
 
-  params.push(48);
+  values.push(limit);
 
   try {
     const { rows } = await db.query(
@@ -109,7 +86,7 @@ export async function GET(request: NextRequest) {
       ORDER BY cp.sort_priority DESC, cp.name ASC
       LIMIT $${idx}
       `,
-      params
+      values
     );
 
     return NextResponse.json({

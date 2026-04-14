@@ -1,19 +1,30 @@
 // ============================================================
 // app/shop/page.jsx  —  SERVER COMPONENT
 // ============================================================
-// SSR first page + facets from catalog_unified via Typesense.
-// ShopClient handles all subsequent filter/sort/page changes.
+// Default shop experience is Harley-first.
+// Add ?view=classic to access the legacy catalog grid.
 // ============================================================
 
+import HarleySearchClient from "../harley/HarleySearchClient";
+import { HARLEY_STYLES } from "@/lib/harley/config";
 import ShopClient from "./ShopClient";
 
 const PAGE_SIZE = 48;
 
 export default async function ShopPage({ searchParams }) {
   const p        = await searchParams;
+  const view     = p?.view     ?? "harley";
   const category = p?.category ?? null;
   const brand    = p?.brand    ?? null;
   const sort     = p?.sort     ?? "newest";
+
+  if (view !== "classic") {
+    return (
+      <HarleySearchClient
+        initialStyles={HARLEY_STYLES}
+      />
+    );
+  }
 
   let products = [];
   let total    = 0;
@@ -50,6 +61,6 @@ export default async function ShopPage({ searchParams }) {
 }
 
 export const metadata = {
-  title:       "Shop All Parts | Stinkin' Supplies",
-  description: "Browse 130K+ powersports parts and accessories.",
+  title:       "Shop Harley Parts | Stinkin' Supplies",
+  description: "Shop Harley parts by style, model, and exact submodel fitment.",
 };

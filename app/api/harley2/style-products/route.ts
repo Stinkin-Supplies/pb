@@ -1,70 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import getCatalogDb from "@/lib/db/catalog";
-import { adminSupabase } from "@/lib/supabase/admin";
+import { getHarleyStyle } from "@/lib/harley/config";
 import { normalizeHarleyProductRow } from "@/lib/harley/catalog";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
-  const generic = searchParams.get("generic")?.trim();
-  const submodel = searchParams.get('submodel');
-  const year = parseInt(searchParams.get('year') || '0');
-  const category = searchParams.get('category');
-  const brand = searchParams.get('brand');
+  const styleName = searchParams.get("style");
+  const category = searchParams.get("category");
 
-  if ((!submodel && !generic) || !year) {
-    return NextResponse.json({ error: 'Missing generic model or year' }, { status: 400 });
-  }
-
-  let genericModel = generic;
-
-  if (submodel && !genericModel) {
-    const { data, error } = await adminSupabase
-      .from("vehicles")
-      .select("model, submodel, year")
-      .eq("make", "Harley-Davidson")
-      .eq("submodel", submodel)
-      .eq("year", year)
-      .order("model", { ascending: true })
-      .limit(1);
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    genericModel = data?.[0]?.model ?? null;
-  }
-
-  if (!genericModel) {
-    return NextResponse.json({ error: "Exact model not found" }, { status: 404 });
-  }
+  const style = getHarleyStyle(styleName);
+  if (!style) return NextResponse.json({ error: "Missing style" }, { status: 400 });
 
   const db = getCatalogDb();
-  const params: Array<string | number> = [genericModel, year];
-  let idx = 3;
+  const params: Array<string | number | string[]> = [style.generic_models];
   const conditions = [
     "cp.is_active = true",
     "LOWER(cf.make) = LOWER('Harley-Davidson')",
-    "LOWER(cf.model) = LOWER($1)",
-    "cf.year_start <= $2",
-    "cf.year_end >= $2",
+    "cf.model = ANY($1::text[])",
   ];
-  if (category) {
-    conditions.push(`cp.category = $${idx}`);
-    params.push(category);
-    idx++;
-  }
-  if (brand) {
-    conditions.push(`cp.brand = $${idx}`);
-    params.push(brand);
-    idx++;
-  }
 
-  params.push(48);
+  if (category) {
+    conditions.push(`cp.category = $2`);
+    params.push(category);
+  }
 
   try {
     const { rows } = await db.query(
       `
-      SELECT
+      SELECT DISTINCT
         cp.id,
         cp.sku,
         cp.slug,
@@ -107,7 +70,7 @@ export async function GET(request: NextRequest) {
       JOIN public.catalog_fitment cf ON cf.product_id = cp.id
       WHERE ${conditions.join(" AND ")}
       ORDER BY cp.sort_priority DESC, cp.name ASC
-      LIMIT $${idx}
+      LIMIT 60
       `,
       params
     );
