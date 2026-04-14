@@ -218,13 +218,16 @@ const B = s => ({ fontFamily:"var(--font-caesar),sans-serif",     ...s });
 
 function buildQS(filters, sort, page) {
   const p = new URLSearchParams();
-  if (filters.category)          p.set("category",  filters.category);
-  if (filters.brand)             p.set("brand",      filters.brand);
-  if (filters.minPrice != null)  p.set("minPrice",   String(filters.minPrice));
-  if (filters.maxPrice != null)  p.set("maxPrice",   String(filters.maxPrice));
-  if (filters.inStock)           p.set("inStock",    "true");
-  if (sort !== "newest")         p.set("sort",       sort);
-  if (page > 0)                  p.set("page",       String(page));
+  if (filters.category)          p.set("category",     filters.category);
+  if (filters.brand)             p.set("brand",         filters.brand);
+  if (filters.minPrice != null)  p.set("minPrice",      String(filters.minPrice));
+  if (filters.maxPrice != null)  p.set("maxPrice",      String(filters.maxPrice));
+  if (filters.inStock)           p.set("inStock",       "true");
+  if (filters.fitmentMake)       p.set("fitmentMake",   filters.fitmentMake);
+  if (filters.fitmentModel)      p.set("fitmentModel",  filters.fitmentModel);
+  if (filters.fitmentYear)       p.set("fitmentYear",   String(filters.fitmentYear));
+  if (sort !== "newest")         p.set("sort",          sort);
+  if (page > 0)                  p.set("page",          String(page));
   p.set("pageSize", String(PAGE_SIZE));
   return p.toString();
 }
@@ -481,13 +484,16 @@ export default function ShopClient({
     ? new URLSearchParams(window.location.search)
     : new URLSearchParams();
 
-  const urlCategory = searchParams.get("category");
-  const urlBrand    = searchParams.get("brand");
-  const urlMinPrice = searchParams.get("minPrice");
-  const urlMaxPrice = searchParams.get("maxPrice");
-  const urlInStock  = searchParams.get("inStock") === "true";
-  const urlSort     = searchParams.get("sort") ?? "newest";
-  const urlPage     = parseInt(searchParams.get("page") ?? "0", 10);
+  const urlCategory     = searchParams.get("category");
+  const urlBrand        = searchParams.get("brand");
+  const urlMinPrice     = searchParams.get("minPrice");
+  const urlMaxPrice     = searchParams.get("maxPrice");
+  const urlInStock      = searchParams.get("inStock") === "true";
+  const urlSort         = searchParams.get("sort") ?? "newest";
+  const urlPage         = parseInt(searchParams.get("page") ?? "0", 10);
+  const urlFitmentMake  = searchParams.get("fitmentMake")  || null;
+  const urlFitmentModel = searchParams.get("fitmentModel") || null;
+  const urlFitmentYear  = searchParams.get("fitmentYear")  ? parseInt(searchParams.get("fitmentYear"), 10) : null;
 
   const [products, setProducts] = useState(initialProducts);
   const [facets,   setFacets]   = useState(initialFacets);
@@ -496,12 +502,47 @@ export default function ShopClient({
   const [error,    setError]    = useState(null);
 
   const [filters, setFilters] = useState({
-    category: urlCategory ?? initialCategory ?? null,
-    brand:    urlBrand    ?? initialBrand    ?? null,
-    minPrice: urlMinPrice ? Number(urlMinPrice) : null,
-    maxPrice: urlMaxPrice ? Number(urlMaxPrice) : null,
-    inStock:  urlInStock,
+    category:     urlCategory ?? initialCategory ?? null,
+    brand:        urlBrand    ?? initialBrand    ?? null,
+    minPrice:     urlMinPrice ? Number(urlMinPrice) : null,
+    maxPrice:     urlMaxPrice ? Number(urlMaxPrice) : null,
+    inStock:      urlInStock,
+    fitmentMake:  urlFitmentMake,
+    fitmentModel: urlFitmentModel,
+    fitmentYear:  urlFitmentYear,
   });
+
+  // Fitment dropdown data
+  const [fitmentMakes,  setFitmentMakes]  = useState([]);
+  const [fitmentModels, setFitmentModels] = useState([]);
+  const [fitmentYears,  setFitmentYears]  = useState([]);
+  const [fitmentOpen,   setFitmentOpen]   = useState(!!(urlFitmentMake));
+
+  // Load makes once on mount
+  useEffect(() => {
+    fetch("/api/fitment?type=makes")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.makes) setFitmentMakes(d.makes); })
+      .catch(() => {});
+  }, []);
+
+  // Cascade: load models when make changes
+  useEffect(() => {
+    if (!filters.fitmentMake) { setFitmentModels([]); setFitmentYears([]); return; }
+    fetch(`/api/fitment?type=models&make=${encodeURIComponent(filters.fitmentMake)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.models) setFitmentModels(d.models); })
+      .catch(() => {});
+  }, [filters.fitmentMake]);
+
+  // Cascade: load years when model changes
+  useEffect(() => {
+    if (!filters.fitmentMake || !filters.fitmentModel) { setFitmentYears([]); return; }
+    fetch(`/api/fitment?type=years&make=${encodeURIComponent(filters.fitmentMake)}&model=${encodeURIComponent(filters.fitmentModel)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.years) setFitmentYears(d.years); })
+      .catch(() => {});
+  }, [filters.fitmentMake, filters.fitmentModel]);
   const [minInput, setMinInput] = useState(urlMinPrice ?? "");
   const [maxInput, setMaxInput] = useState(urlMaxPrice ?? "");
   const [sort,     setSort]     = useState(urlSort);
@@ -518,11 +559,14 @@ export default function ShopClient({
   // ── Persist filters + sort + page to URL ──────────────────
   useEffect(() => {
     const params = new URLSearchParams();
-    if (filters.category)         params.set("category", filters.category);
-    if (filters.brand)            params.set("brand",    filters.brand);
-    if (filters.minPrice != null) params.set("minPrice", String(filters.minPrice));
-    if (filters.maxPrice != null) params.set("maxPrice", String(filters.maxPrice));
-    if (filters.inStock)          params.set("inStock",  "true");
+    if (filters.category)         params.set("category",    filters.category);
+    if (filters.brand)            params.set("brand",       filters.brand);
+    if (filters.minPrice != null) params.set("minPrice",    String(filters.minPrice));
+    if (filters.maxPrice != null) params.set("maxPrice",    String(filters.maxPrice));
+    if (filters.inStock)          params.set("inStock",     "true");
+    if (filters.fitmentMake)      params.set("fitmentMake",  filters.fitmentMake);
+    if (filters.fitmentModel)     params.set("fitmentModel", filters.fitmentModel);
+    if (filters.fitmentYear)      params.set("fitmentYear",  String(filters.fitmentYear));
     if (sort !== "newest")        params.set("sort",     sort);
     if (page > 0)                 params.set("page",     String(page));
     const qs = params.toString();
@@ -585,17 +629,21 @@ export default function ShopClient({
   }, [minInput, maxInput]);
 
   const clearAll = useCallback(() => {
-    setFilters({ category:null, brand:null, minPrice:null, maxPrice:null, inStock:false });
+    setFilters({ category:null, brand:null, minPrice:null, maxPrice:null, inStock:false, fitmentMake:null, fitmentModel:null, fitmentYear:null });
     setMinInput(""); setMaxInput("");
     setPage(0);
   }, []);
 
   const chips = [
-    filters.category               && { key:"category", label:filters.category },
-    filters.brand                  && { key:"brand",    label:filters.brand    },
-    filters.minPrice != null       && { key:"minPrice", label:`$${filters.minPrice}+` },
-    filters.maxPrice != null       && { key:"maxPrice", label:`≤$${filters.maxPrice}` },
-    filters.inStock                && { key:"inStock",  label:"In Stock"        },
+    filters.category               && { key:"category",    label:filters.category },
+    filters.brand                  && { key:"brand",       label:filters.brand    },
+    filters.minPrice != null       && { key:"minPrice",    label:`$${filters.minPrice}+` },
+    filters.maxPrice != null       && { key:"maxPrice",    label:`≤$${filters.maxPrice}` },
+    filters.inStock                && { key:"inStock",     label:"In Stock"        },
+    filters.fitmentMake            && {
+      key:"fitment",
+      label: [filters.fitmentYear, filters.fitmentMake, filters.fitmentModel].filter(Boolean).join(" "),
+    },
   ].filter(Boolean);
 
   const removeChip = key => {
@@ -604,6 +652,8 @@ export default function ShopClient({
       setMinInput(""); setMaxInput("");
     } else if (key === "inStock") {
       setFilter("inStock", false);
+    } else if (key === "fitment") {
+      setFilters(p => ({ ...p, fitmentMake:null, fitmentModel:null, fitmentYear:null }));
     } else {
       setFilter(key, null);
     }
@@ -757,6 +807,97 @@ export default function ShopClient({
               <span style={{ fontSize:13, fontWeight:500, color:"#c4c0bc" }}>In Stock Only</span>
               <Toggle on={filters.inStock} onChange={val => setFilter("inStock", val)}/>
             </div>
+          </div>
+
+          {/* Fits My Bike */}
+          <div>
+            <button
+              onClick={() => setFitmentOpen(v => !v)}
+              style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between",
+                       background:"none", border:"none", cursor:"pointer",
+                       padding:"12px 14px 8px", borderBottom: fitmentOpen ? "none" : "1px solid #1a1919" }}
+            >
+              <span style={S({fontSize:9,color:"#e8621a",letterSpacing:"0.2em"})}>FITS MY BIKE</span>
+              <span style={{ color:"#8a8784", fontSize:12 }}>{fitmentOpen ? "▲" : "▼"}</span>
+            </button>
+            {fitmentOpen && (
+              <div style={{ padding:"8px 12px 16px", borderBottom:"1px solid #1a1919" }}>
+                {/* Make */}
+                <select
+                  value={filters.fitmentMake ?? ""}
+                  onChange={e => {
+                    const val = e.target.value || null;
+                    setFilters(p => ({ ...p, fitmentMake:val, fitmentModel:null, fitmentYear:null }));
+                    setPage(0);
+                  }}
+                  style={{ width:"100%", background:"#1a1919", border:"1px solid #2a2828",
+                           color: filters.fitmentMake ? "#f0ebe3" : "#8a8784",
+                           ...S({fontSize:11,letterSpacing:"0.06em",padding:"7px 10px",
+                           borderRadius:2,marginBottom:6,cursor:"pointer"}) }}
+                >
+                  <option value="">SELECT MAKE</option>
+                  {fitmentMakes.map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+
+                {/* Model */}
+                {filters.fitmentMake && (
+                  <select
+                    value={filters.fitmentModel ?? ""}
+                    onChange={e => {
+                      const val = e.target.value || null;
+                      setFilters(p => ({ ...p, fitmentModel:val, fitmentYear:null }));
+                      setPage(0);
+                    }}
+                    style={{ width:"100%", background:"#1a1919", border:"1px solid #2a2828",
+                             color: filters.fitmentModel ? "#f0ebe3" : "#8a8784",
+                             ...S({fontSize:11,letterSpacing:"0.06em",padding:"7px 10px",
+                             borderRadius:2,marginBottom:6,cursor:"pointer"}) }}
+                  >
+                    <option value="">SELECT MODEL</option>
+                    {fitmentModels.map(m => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                )}
+
+                {/* Year */}
+                {filters.fitmentModel && (
+                  <select
+                    value={filters.fitmentYear ?? ""}
+                    onChange={e => {
+                      const val = e.target.value ? parseInt(e.target.value, 10) : null;
+                      setFilters(p => ({ ...p, fitmentYear:val }));
+                      setPage(0);
+                    }}
+                    style={{ width:"100%", background:"#1a1919", border:"1px solid #2a2828",
+                             color: filters.fitmentYear ? "#f0ebe3" : "#8a8784",
+                             ...S({fontSize:11,letterSpacing:"0.06em",padding:"7px 10px",
+                             borderRadius:2,marginBottom:8,cursor:"pointer"}) }}
+                  >
+                    <option value="">ANY YEAR</option>
+                    {fitmentYears.map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                )}
+
+                {filters.fitmentMake && (
+                  <button
+                    onClick={() => {
+                      setFilters(p => ({ ...p, fitmentMake:null, fitmentModel:null, fitmentYear:null }));
+                      setPage(0);
+                    }}
+                    style={{ width:"100%", background:"transparent", border:"1px solid #2a2828",
+                             color:"#8a8784", ...S({fontSize:9,letterSpacing:"0.1em",
+                             padding:"5px",borderRadius:2,cursor:"pointer"}) }}
+                  >
+                    CLEAR VEHICLE
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </aside>
 
