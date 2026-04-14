@@ -247,17 +247,16 @@ async function upsertProduct(client, catalogId, part, skuLookup) {
     stats.descUpdated++;
   }
 
-  // Insert images
+  // Insert images into catalog_media
   for (let i = 0; i < part.images.length; i++) {
     const url = part.images[i];
     if (!url || url.toLowerCase().endsWith('.zip')) continue;
     try {
       await client.query(`
-        INSERT INTO public.catalog_images
-          (product_id, catalog_product_id, url, position, is_primary, created_at)
-        VALUES ($1, $1, $2, $3, $4, NOW())
-        ON CONFLICT (catalog_product_id, url) DO NOTHING
-      `, [catalogId, url, i, i === 0]);
+        INSERT INTO public.catalog_media (product_id, url, media_type, priority)
+        VALUES ($1, $2, 'image', $3)
+        ON CONFLICT DO NOTHING
+      `, [catalogId, url, i]);
       stats.imgInserted++;
     } catch (_) {}
   }

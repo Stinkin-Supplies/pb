@@ -288,213 +288,57 @@ const css = `
     margin: 20px 0;
   }
 
-  /* ── BRAND OPTION CARDS ── */
-  .brand-opts-label {
+  /* ── VARIANT SELECTOR ── */
+  .variants-section { margin-bottom: 20px; }
+  .variant-group { margin-bottom: 14px; }
+  .variant-group-label {
     font-family: var(--font-stencil), monospace;
-    font-size: 9px; color: #8a8784; letter-spacing: 0.18em;
-    margin-bottom: 8px; margin-top: 4px;
+    font-size: 9px; color: #8a8784;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    margin-bottom: 8px;
   }
-  .brand-opts { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
-  .brand-opt {
-    display: flex; align-items: center; gap: 12px;
-    padding: 12px 14px;
-    background: #111010;
-    border: 1px solid #2a2828;
-    border-radius: 2px;
-    cursor: pointer;
-    transition: border-color 0.15s, background 0.15s;
-    user-select: none;
-  }
-  .brand-opt:hover { border-color: #4a4848; }
-  .brand-opt.selected { border-color: #e8621a; background: #1a1210; }
-  .brand-opt.oos { opacity: 0.55; }
-  .brand-opt-radio {
-    width: 15px; height: 15px; flex-shrink: 0;
-    border-radius: 50%; border: 2px solid #3a3838;
-    display: flex; align-items: center; justify-content: center;
-    transition: border-color 0.15s;
-  }
-  .brand-opt.selected .brand-opt-radio { border-color: #e8621a; }
-  .brand-opt-radio-dot {
-    width: 7px; height: 7px; border-radius: 50%;
-    background: #e8621a; display: none;
-  }
-  .brand-opt.selected .brand-opt-radio-dot { display: block; }
-  .brand-opt-body { flex: 1; min-width: 0; }
-  .brand-opt-name {
+  .variant-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+  .variant-btn {
+    padding: 6px 14px;
+    background: #111010; border: 1px solid #2a2828;
+    color: #c4c0bc; border-radius: 2px;
     font-family: var(--font-stencil), monospace;
-    font-size: 11px; letter-spacing: 0.1em; color: #f0ebe3;
+    font-size: 11px; letter-spacing: 0.08em;
+    cursor: pointer; transition: all 0.15s;
   }
-  .brand-opt-part {
-    font-family: var(--font-stencil), monospace;
-    font-size: 9px; color: #8a8784; letter-spacing: 0.1em; margin-top: 2px;
+  .variant-btn:hover  { border-color: rgba(232,98,26,0.5); color: #f0ebe3; }
+  .variant-btn.selected {
+    background: rgba(232,98,26,0.1);
+    border-color: #e8621a; color: #e8621a;
   }
-  .brand-opt-right { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
-  .brand-opt-price {
-    font-family: var(--font-stencil), monospace;
-    font-size: 18px; letter-spacing: 0.04em; color: #f0ebe3;
-  }
-  .brand-opt.selected .brand-opt-price { color: #e8621a; }
-  .brand-opt-stock {
-    font-family: var(--font-stencil), monospace;
-    font-size: 8px; letter-spacing: 0.1em;
-  }
-  .brand-opt-stock.in  { color: #22c55e; }
-  .brand-opt-stock.out { color: #8a8784; }
 
-  /* ── TABBED CONTENT SECTION ── */
+  /* ── TABS ── */
   .pdp-tabs-section {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 24px 48px;
+    max-width: 1200px; margin: 0 auto;
+    padding: 0 24px 60px;
+    border-top: 1px solid #2a2828;
   }
-  .pdp-tabs-nav {
-    display: flex;
+  .pdp-tab-strip {
+    display: flex; gap: 0;
     border-bottom: 1px solid #2a2828;
-    margin-bottom: 0;
-    gap: 0;
-  }
-  .pdp-tab-btn {
-    font-family: var(--font-stencil), monospace;
-    font-size: 11px; letter-spacing: 0.18em;
-    color: #8a8784;
-    background: transparent; border: none;
-    padding: 14px 22px;
-    cursor: pointer;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -1px;
-    transition: color 0.15s, border-color 0.15s;
-  }
-  .pdp-tab-btn:hover { color: #f0ebe3; }
-  .pdp-tab-btn.active {
-    color: #e8621a;
-    border-bottom-color: #e8621a;
-  }
-  .pdp-tab-panel {
-    display: none;
-    padding: 28px 0;
-  }
-  .pdp-tab-panel.active { display: block; }
-
-  /* Description panel */
-  .pdp-description {
-    font-family: var(--font-stencil), monospace;
-    font-size: 13px; line-height: 1.9;
-    color: #c8c3bc; letter-spacing: 0.03em;
-    max-width: 860px;
-  }
-  .pdp-description p { margin-bottom: 14px; }
-  .pdp-description h2, .pdp-description h3 {
-    color: #f0ebe3; font-size: 16px; margin: 20px 0 10px;
-    letter-spacing: 0.1em;
-  }
-  .pdp-description ul, .pdp-description ol {
-    padding-left: 20px; margin-bottom: 14px;
-  }
-  .pdp-description li { margin-bottom: 6px; }
-  .pdp-no-description {
-    font-family: var(--font-stencil), monospace;
-    font-size: 11px; color: #8a8784; letter-spacing: 0.12em;
-    font-style: italic;
-  }
-
-  /* Features panel */
-  .pdp-features-list {
-    list-style: none; padding: 0; margin: 0;
-    max-width: 860px;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-    gap: 0;
-  }
-  .pdp-features-list li {
-    display: flex; align-items: flex-start; gap: 10px;
-    font-family: var(--font-stencil), monospace;
-    font-size: 12px; line-height: 1.7; color: #c8c3bc;
-    letter-spacing: 0.04em;
-    padding: 10px 0;
-    border-bottom: 1px solid #1a1919;
-  }
-  .pdp-features-list li:last-child { border-bottom: none; }
-  .pdp-feat-bullet {
-    color: #e8621a; flex-shrink: 0; margin-top: 2px; font-size: 10px;
-  }
-  .pdp-no-features {
-    font-family: var(--font-stencil), monospace;
-    font-size: 11px; color: #8a8784; letter-spacing: 0.12em;
-    font-style: italic;
-  }
-
-  /* Fitment panel */
-  .pdp-fitment-summary {
-    display: flex; gap: 12px; flex-wrap: wrap;
     margin-bottom: 24px;
   }
-  .pdp-fitment-chip {
+  .pdp-tab {
+    padding: 14px 24px;
     font-family: var(--font-stencil), monospace;
-    font-size: 9px; letter-spacing: 0.14em;
-    padding: 5px 12px;
-    background: rgba(232,98,26,0.08);
-    border: 1px solid rgba(232,98,26,0.2);
-    border-radius: 2px; color: #e8621a;
+    font-size: 10px; letter-spacing: 0.18em;
+    color: #8a8784; cursor: pointer;
+    border: none; background: none;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s; margin-bottom: -1px;
   }
-  .pdp-fitment-chip.year {
-    background: rgba(201,168,76,0.08);
-    border-color: rgba(201,168,76,0.2);
-    color: #c9a84c;
-  }
-  .pdp-fitment-table-wrap {
-    overflow-x: auto;
-  }
-  .pdp-fitment-table {
-    width: 100%; border-collapse: collapse;
-    font-family: var(--font-stencil), monospace;
-    font-size: 11px;
-  }
-  .pdp-fitment-table th {
-    text-align: left;
-    font-size: 8px; letter-spacing: 0.18em; color: #8a8784;
-    padding: 10px 14px 8px;
-    border-bottom: 1px solid #2a2828;
-    white-space: nowrap;
-  }
-  .pdp-fitment-table td {
-    padding: 10px 14px;
-    border-bottom: 1px solid #1a1919;
-    color: #c8c3bc; letter-spacing: 0.04em;
-    vertical-align: top;
-  }
-  .pdp-fitment-table tr:nth-child(odd) td { background: #0f0e0e; }
-  .pdp-fitment-table td:first-child { color: #f0ebe3; }
-  .pdp-fitment-universal {
-    display: flex; align-items: center; gap: 10px;
-    font-family: var(--font-stencil), monospace;
-    font-size: 11px; color: #22c55e; letter-spacing: 0.1em;
-    padding: 16px 0;
-  }
-  .pdp-fitment-universal-dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    background: #22c55e; box-shadow: 0 0 6px #22c55e;
-    flex-shrink: 0;
-  }
-  .pdp-no-fitment {
-    font-family: var(--font-stencil), monospace;
-    font-size: 11px; color: #8a8784; letter-spacing: 0.12em;
-    font-style: italic; padding: 12px 0;
-  }
-  .pdp-fitment-note {
-    font-family: var(--font-stencil), monospace;
-    font-size: 9px; color: #5a5856; letter-spacing: 0.1em;
-    margin-top: 20px; padding-top: 16px;
-    border-top: 1px solid #1a1919;
-  }
+  .pdp-tab:hover  { color: #f0ebe3; }
+  .pdp-tab.active { color: #e8621a; border-bottom-color: #e8621a; }
 
-  /* Specs panel */
-  .pdp-specs-table {
-    width: 100%; border-collapse: collapse;
-    max-width: 700px;
-  }
-  .pdp-specs-table tr:nth-child(odd) td { background: #0f0e0e; }
-  .pdp-specs-table td {
+  /* ── SPECS TABLE ── */
+  .specs-table { width: 100%; border-collapse: collapse; }
+  .specs-table tr:nth-child(odd) td { background: #111010; }
+  .specs-table td {
     padding: 10px 14px;
     font-size: 13px;
     border-bottom: 1px solid #1a1919;
@@ -532,6 +376,26 @@ const css = `
     padding: 4px 10px;
     background: #111010; border: 1px solid #2a2828;
     border-radius: 2px; color: #c8c3bc;
+  }
+
+  /* ── FITMENT TABLE ── */
+  .fitment-table { width: 100%; border-collapse: collapse; }
+  .fitment-table thead td {
+    font-family: var(--font-stencil), monospace;
+    font-size: 9px; color: #e8621a;
+    letter-spacing: 0.15em; padding: 8px 14px;
+    border-bottom: 1px solid #2a2828;
+    text-transform: uppercase;
+  }
+  .fitment-table tbody tr:nth-child(odd) td { background: #111010; }
+  .fitment-table tbody td {
+    padding: 9px 14px; font-size: 13px; font-weight: 500;
+    color: #f0ebe3; border-bottom: 1px solid #1a1919;
+  }
+  .fitment-empty {
+    font-family: var(--font-stencil), monospace;
+    font-size: 10px; color: #8a8784;
+    letter-spacing: 0.12em; padding: 24px 0;
   }
 
   /* ── RELATED ── */
@@ -644,10 +508,22 @@ const css = `
   }
 `;
 
-export default function ProductDetailClient({ product, relatedProducts = [] }) {
-  const fallback = "/images/no-image.png";
+export default function ProductDetailClient({ product, variants = [], fitment = [], relatedProducts = [], fetchError = null }) {
   const [activeImg,  setActiveImg]  = useState(0);
   const [qty,        setQty]        = useState(1);
+  const [activeTab,  setActiveTab]  = useState("description");
+
+  // Group variants by option_name: { Size: ["S","M","L"], Color: ["Red","Black"] }
+  const variantGroups = variants.reduce((acc, v) => {
+    if (!acc[v.option_name]) acc[v.option_name] = [];
+    if (!acc[v.option_name].includes(v.option_value)) acc[v.option_name].push(v.option_value);
+    return acc;
+  }, {});
+  const variantGroupEntries = Object.entries(variantGroups);
+
+  const [selectedVariants, setSelectedVariants] = useState(() =>
+    Object.fromEntries(variantGroupEntries.map(([k, vals]) => [k, vals[0] ?? null]))
+  );
   const [wishlisted, setWishlisted] = useState(false);
   const [wishlistBusy, setWishlistBusy] = useState(false);
   const [wishlistToast, setWishlistToast] = useState(null);
@@ -1000,6 +876,8 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
               ))}
             </div>
           )}
+
+          {/* Specs/Fitment/Description moved to tabbed section below */}
         </div>
 
         {/* RIGHT — Info */}
@@ -1060,6 +938,30 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
             <div className="fitment-dot"/>
             {fitmentLabel}
           </div>
+
+          {/* Variant selector */}
+          {variantGroupEntries.length > 0 && (
+            <div className="variants-section">
+              {variantGroupEntries.map(([groupName, values]) => (
+                <div key={groupName} className="variant-group">
+                  <div className="variant-group-label">
+                    {groupName}: <span style={{ color:"#f0ebe3" }}>{selectedVariants[groupName]}</span>
+                  </div>
+                  <div className="variant-btns">
+                    {values.map(val => (
+                      <button
+                        key={val}
+                        className={`variant-btn ${selectedVariants[groupName] === val ? "selected" : ""}`}
+                        onClick={() => setSelectedVariants(prev => ({ ...prev, [groupName]: val }))}
+                      >
+                        {val}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Price */}
           <div className="price-block">
@@ -1156,189 +1058,124 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
         </div>
       </div>
 
-      {/* ── TABBED CONTENT SECTION ── */}
-      <div className="pdp-tabs-section">
-        <div className="pdp-tabs-nav">
-          {tabs.map(tab => (
+          {/* Tab shortcuts */}
+          {(product.specs?.length > 0 || fitment.length > 0) && (
+            <div style={{ display:"flex", gap:8, marginTop:16 }}>
+              {product.specs?.length > 0 && (
+                <button
+                  onClick={() => { setActiveTab("specs"); document.getElementById("pdp-tabs")?.scrollIntoView({ behavior:"smooth", block:"start" }); }}
+                  style={{ background:"transparent", border:"1px solid #2a2828", color:"#8a8784",
+                           fontFamily:"var(--font-stencil),monospace", fontSize:9, letterSpacing:"0.12em",
+                           padding:"5px 12px", borderRadius:2, cursor:"pointer", transition:"all 0.15s" }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor="#e8621a"; e.currentTarget.style.color="#e8621a"; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor="#2a2828"; e.currentTarget.style.color="#8a8784"; }}
+                >
+                  VIEW SPECS ↓
+                </button>
+              )}
+              {fitment.length > 0 && (
+                <button
+                  onClick={() => { setActiveTab("fitment"); document.getElementById("pdp-tabs")?.scrollIntoView({ behavior:"smooth", block:"start" }); }}
+                  style={{ background:"transparent", border:"1px solid #2a2828", color:"#8a8784",
+                           fontFamily:"var(--font-stencil),monospace", fontSize:9, letterSpacing:"0.12em",
+                           padding:"5px 12px", borderRadius:2, cursor:"pointer", transition:"all 0.15s" }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor="#e8621a"; e.currentTarget.style.color="#e8621a"; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor="#2a2828"; e.currentTarget.style.color="#8a8784"; }}
+                >
+                  VIEW FITMENT ↓
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── TABS: Description | Specs | Fitment ── */}
+      <div id="pdp-tabs" className="pdp-tabs-section">
+        <div className="pdp-tab-strip">
+          <button
+            className={`pdp-tab ${activeTab === "description" ? "active" : ""}`}
+            onClick={() => setActiveTab("description")}
+          >
+            DESCRIPTION
+          </button>
+          {product.specs?.length > 0 && (
             <button
-              key={tab.key}
-              className={`pdp-tab-btn ${activeTab === tab.key ? "active" : ""}`}
-              onClick={() => setActiveTab(tab.key)}
+              className={`pdp-tab ${activeTab === "specs" ? "active" : ""}`}
+              onClick={() => setActiveTab("specs")}
             >
-              {tab.label}
-              {tab.count ? ` (${tab.count})` : ""}
-              {tab.highlight && activeTab !== tab.key ? " ●" : ""}
+              SPECS ({product.specs.length})
             </button>
-          ))}
-        </div>
-
-        {/* DESCRIPTION */}
-        <div className={`pdp-tab-panel ${activeTab === "description" ? "active" : ""}`}>
-          {product.description ? (
-            <div
-              className="pdp-description"
-              dangerouslySetInnerHTML={{ __html: product.description }}
-            />
-          ) : (
-            <div>
-              <p className="pdp-description" style={{ marginBottom: 12 }}>
-                {product.name}{activeBrand ? ` by ${activeBrand}` : ""}.
-                {product.category ? ` Category: ${product.category}.` : ""}
-                {product.weight ? ` Weight: ${product.weight} lbs.` : ""}
-              </p>
-              <p className="pdp-no-description">
-                Full product description not yet available. Check the Features and Fitment tabs for more information.
-              </p>
-            </div>
           )}
+          <button
+            className={`pdp-tab ${activeTab === "fitment" ? "active" : ""}`}
+            onClick={() => setActiveTab("fitment")}
+          >
+            FITMENT {fitment.length > 0 ? `(${fitment.length})` : ""}
+          </button>
         </div>
 
-        {/* FEATURES */}
-        <div className={`pdp-tab-panel ${activeTab === "features" ? "active" : ""}`}>
-          {featuresIsHtml && featuresHtml ? (
-            // HTML blob from vendor catalog — render as markup
-            <div
-              className="pdp-description"
-              dangerouslySetInnerHTML={{ __html: featuresHtml }}
-            />
-          ) : featuresArray.length > 0 ? (
-            // Plain-text array — render as styled bullet list
-            <ul className="pdp-features-list">
-              {featuresArray.map((feat, i) => (
-                <li key={i}>
-                  <span className="pdp-feat-bullet">▸</span>
-                  <span>{feat}</span>
-                </li>
-              ))}
-            </ul>
-          ) : product.product_features ? (
-            // Legacy HTML string field fallback
-            <div
-              className="pdp-description"
-              dangerouslySetInnerHTML={{ __html: product.product_features }}
-            />
-          ) : (
-            <p className="pdp-no-features">No feature details available for this product.</p>
-          )}
-        </div>
-
-        {/* FITMENT */}
-        <div className={`pdp-tab-panel ${activeTab === "fitment" ? "active" : ""}`}>
-          {product.isUniversal ? (
-            <div className="pdp-fitment-universal">
-              <div className="pdp-fitment-universal-dot"/>
-              UNIVERSAL FIT — Compatible with most applications. Verify before installation.
-            </div>
-          ) : hasFitmentData ? (
-            <>
-              {/* Summary chips */}
-              <div className="pdp-fitment-summary">
-                {product.fitmentYearStart && (
-                  <span className="pdp-fitment-chip year">
-                    {product.fitmentYearStart === product.fitmentYearEnd
-                      ? product.fitmentYearStart
-                      : `${product.fitmentYearStart}–${product.fitmentYearEnd ?? "PRESENT"}`}
-                  </span>
-                )}
-                {product.isHarleyFitment && (
-                  <span className="pdp-fitment-chip">HARLEY-DAVIDSON</span>
-                )}
-                {(product.fitmentHdFamilies ?? []).map(f => (
-                  <span key={f} className="pdp-fitment-chip">{f}</span>
-                ))}
+        {activeTab === "description" && (
+          <div>
+            {product.description ? (
+              <div
+                className="prose prose-invert max-w-none text-sm text-gray-300"
+                style={{ lineHeight:1.8, color:"#c4c0bc", fontSize:14 }}
+                dangerouslySetInnerHTML={{ __html: product.description }}
+              />
+            ) : (
+              <div style={{ fontFamily:"var(--font-stencil),monospace", fontSize:12, color:"#8a8784", letterSpacing:"0.05em", lineHeight:1.8 }}>
+                <p>{product.name} by {product.brand}.</p>
+                {product.weight && <p style={{ marginTop:8 }}>WEIGHT: {product.weight} LBS</p>}
+                <p style={{ marginTop:8 }}>CATEGORY: {product.category?.toUpperCase()}</p>
               </div>
+            )}
+          </div>
+        )}
 
-              {/* Fitment table */}
-              {fitmentRows.length > 0 && (
-                <div className="pdp-fitment-table-wrap">
-                  <table className="pdp-fitment-table">
-                    <thead>
-                      <tr>
-                        <th>MAKE</th>
-                        <th>MODEL / FAMILY</th>
-                        <th>CODE</th>
-                        <th>YEARS</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {fitmentRows.map((row, i) => (
-                        <tr key={i}>
-                          <td>{row.make}</td>
-                          <td>{row.model}</td>
-                          <td>{row.code ?? "—"}</td>
-                          <td>{row.years}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+        {activeTab === "specs" && product.specs?.length > 0 && (
+          <table className="specs-table">
+            <tbody>
+              {product.specs.map((s, i) => (
+                <tr key={i}>
+                  <td>{s.label ?? s.attribute}</td>
+                  <td>{s.value}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
 
-              {/* Fitment other makes */}
-              {product.fitmentOtherMakes?.length > 0 && (
-                <div style={{ marginTop: 20 }}>
-                  <div style={{ fontFamily: "var(--font-stencil), monospace", fontSize: 8, letterSpacing: "0.2em", color: "#8a8784", marginBottom: 10 }}>
-                    OTHER MAKES
-                  </div>
-                  <div className="pdp-fitment-summary">
-                    {product.fitmentOtherMakes.map(m => (
-                      <span key={m} className="pdp-fitment-chip">{m}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <p className="pdp-fitment-note">
-                Fitment data is sourced from vendor catalogs. Always verify compatibility with your specific vehicle before installation.
-              </p>
-            </>
-          ) : (
-            <p className="pdp-no-fitment">
-              Fitment data is not yet available for this product. Please verify compatibility before purchasing.
-            </p>
-          )}
-        </div>
-
-        {/* SPECS */}
-        <div className={`pdp-tab-panel ${activeTab === "specs" ? "active" : ""}`}>
-          {specsRows.length > 0 ? (
-            <table className="pdp-specs-table">
+        {activeTab === "fitment" && (
+          fitment.length > 0 ? (
+            <table className="fitment-table">
+              <thead>
+                <tr>
+                  <td>MAKE</td>
+                  <td>MODEL</td>
+                  <td>YEARS</td>
+                </tr>
+              </thead>
               <tbody>
-                {specsRows.map((row, i) => (
+                {fitment.map((f, i) => (
                   <tr key={i}>
-                    <td>{row.label}</td>
-                    <td>{row.value}</td>
+                    <td>{f.make ?? "—"}</td>
+                    <td>{f.model ?? "—"}</td>
+                    <td>
+                      {f.year_start === f.year_end
+                        ? f.year_start
+                        : `${f.year_start}–${f.year_end}`}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           ) : (
-            <p className="pdp-no-features">No spec details available for this product.</p>
-          )}
-
-          {/* OEM numbers from group API */}
-          {groupMeta?.oem_numbers?.length > 0 && (
-            <div className="pdp-oem-strip">
-              <div className="pdp-oem-label">OEM / H-D PART NUMBERS</div>
-              <div className="pdp-oem-chips">
-                {groupMeta.oem_numbers.map(n => (
-                  <span key={n} className="pdp-oem-chip">{n}</span>
-                ))}
-              </div>
+            <div className="fitment-empty">
+              FITMENT DATA PENDING — CHECK BACK AFTER ACES SYNC
             </div>
-          )}
-
-          {groupMeta?.page_references?.length > 0 && (
-            <div className="pdp-oem-strip">
-              <div className="pdp-oem-label">BRAND PART NUMBERS / PAGE REFS</div>
-              <div className="pdp-oem-chips">
-                {groupMeta.page_references.map(n => (
-                  <span key={n} className="pdp-oem-chip">{n}</span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+          )
+        )}
       </div>
 
       {/* ── RELATED PRODUCTS ── */}
