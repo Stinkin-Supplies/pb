@@ -1,0 +1,1469 @@
+# Database Audit Report
+
+Generated: 2026-04-14T20:09:44.330Z
+
+## Schemas
+- pg_temp_3
+- pg_temp_4
+- pg_toast
+- pg_toast_temp_3
+- pg_toast_temp_4
+- public
+- vendor
+
+## Extensions
+- pgcrypto 1.3
+- plpgsql 1.0
+- uuid-ossp 1.1
+
+## Foreign Keys
+- public.catalog_attribute_values.catalog_attribute_values_key_id_fkey: FOREIGN KEY (key_id) REFERENCES catalog_attribute_keys(key_id)
+- public.catalog_attributes.catalog_attributes_product_id_fkey: FOREIGN KEY (product_id) REFERENCES catalog_products(id) ON DELETE CASCADE
+- public.catalog_categories.catalog_categories_parent_id_fkey: FOREIGN KEY (parent_id) REFERENCES catalog_categories(id) ON DELETE SET NULL
+- public.catalog_fitment.catalog_fitment_product_id_fkey: FOREIGN KEY (product_id) REFERENCES catalog_products(id) ON DELETE CASCADE
+- public.catalog_images.catalog_images_catalog_product_id_fkey: FOREIGN KEY (catalog_product_id) REFERENCES catalog_products(id)
+- public.catalog_images.catalog_images_product_id_fkey: FOREIGN KEY (product_id) REFERENCES catalog_products(id) ON DELETE CASCADE
+- public.catalog_media.catalog_media_product_id_fkey: FOREIGN KEY (product_id) REFERENCES catalog_products(id) ON DELETE CASCADE
+- public.catalog_prices.catalog_prices_product_id_fkey: FOREIGN KEY (product_id) REFERENCES catalog_products(id) ON DELETE CASCADE
+- public.catalog_products.catalog_products_pricing_rule_id_fkey: FOREIGN KEY (pricing_rule_id) REFERENCES pricing_rules(id)
+- public.catalog_reviews.catalog_reviews_product_id_fkey: FOREIGN KEY (product_id) REFERENCES catalog_products(id) ON DELETE CASCADE
+- public.catalog_specs.catalog_specs_product_id_fkey: FOREIGN KEY (product_id) REFERENCES catalog_products(id) ON DELETE CASCADE
+- public.catalog_variants.catalog_variants_product_id_fkey: FOREIGN KEY (product_id) REFERENCES catalog_products(id) ON DELETE CASCADE
+- public.map_audit_log.map_audit_log_catalog_product_id_fkey: FOREIGN KEY (catalog_product_id) REFERENCES catalog_products(id)
+- public.product_group_members.product_group_members_group_id_fkey: FOREIGN KEY (group_id) REFERENCES product_groups(id) ON DELETE CASCADE
+- public.routing_decisions.routing_decisions_catalog_product_id_fkey: FOREIGN KEY (catalog_product_id) REFERENCES catalog_products(id)
+- public.vendor_offers.vendor_offers_catalog_product_id_fkey: FOREIGN KEY (catalog_product_id) REFERENCES catalog_products(id)
+- public.vendor_offers.vendor_offers_pricing_rule_id_fkey: FOREIGN KEY (pricing_rule_id) REFERENCES pricing_rules(id)
+- vendor.vendor_error_log.vendor_error_log_sync_log_id_fkey: FOREIGN KEY (sync_log_id) REFERENCES vendor.vendor_sync_log(id) ON DELETE CASCADE
+- vendor.vendor_inventory.vendor_inventory_vendor_product_id_fkey: FOREIGN KEY (vendor_product_id) REFERENCES vendor.vendor_products(id) ON DELETE CASCADE
+- vendor.vendor_inventory.vendor_inventory_warehouse_id_fkey: FOREIGN KEY (warehouse_id) REFERENCES vendor.vendor_warehouses(id) ON DELETE CASCADE
+
+## Top 15 Tables by Row Count
+
+| # | Schema | Table | Approx Rows | Size |
+|---:|---|---|---:|---:|
+| 1 | public | catalog_inventory | 697,796 | 203 MB |
+| 2 | public | catalog_allowlist | 479,565 | 69 MB |
+| 3 | public | catalog_specs | 469,349 | 287 MB |
+| 4 | vendor | vendor_products | 296,112 | 504 MB |
+| 5 | public | catalog_product_enrichment | 172,656 | 65 MB |
+| 6 | vendor | pu_pricefile_staging | 153,085 | 313 MB |
+| 7 | public | pu_products | 152,928 | 48 MB |
+| 8 | public | pu_pricing | 151,497 | 40 MB |
+| 9 | public | catalog_unified | 138,872 | 219 MB |
+| 10 | public | product_group_members | 132,801 | 37 MB |
+| 11 | public | product_groups | 132,783 | 59 MB |
+| 12 | public | catalog_pricing | 123,034 | 24 MB |
+| 13 | public | raw_vendor_wps_products | 121,110 | 170 MB |
+| 14 | public | catalog_products | 97,210 | 620 MB |
+| 15 | public | pu_brand_enrichment | 93,585 | 141 MB |
+
+## Table Catalog
+
+### pg_temp_3
+### pg_temp_4
+### pg_toast
+### pg_toast_temp_3
+### pg_toast_temp_4
+### public
+#### catalog_allowlist
+- Approx rows: 479,565
+- Size: 69 MB
+- Columns (4):
+  - sku: text not null
+  - source: text not null
+  - catalog: text not null
+  - created_at: timestamp with time zone default now()
+- Constraints (1):
+  - catalog_allowlist_pkey [p]: PRIMARY KEY (sku, source)
+- Indexes (2):
+  - catalog_allowlist_pkey: CREATE UNIQUE INDEX catalog_allowlist_pkey ON public.catalog_allowlist USING btree (sku, source)
+  - idx_allowlist_sku: CREATE INDEX idx_allowlist_sku ON public.catalog_allowlist USING btree (sku)
+
+#### catalog_attribute_keys
+- Approx rows: 99
+- Size: 88 kB
+- Columns (7):
+  - id: integer(32,0) not null default nextval('catalog_attribute_keys_id_seq'::regclass)
+  - key_id: integer(32,0) not null
+  - name: text not null
+  - description: text
+  - metadata: jsonb
+  - created_at: timestamp with time zone default now()
+  - updated_at: timestamp with time zone default now()
+- Constraints (2):
+  - catalog_attribute_keys_key_id_key [u]: UNIQUE (key_id)
+  - catalog_attribute_keys_pkey [p]: PRIMARY KEY (id)
+- Indexes (2):
+  - catalog_attribute_keys_key_id_key: CREATE UNIQUE INDEX catalog_attribute_keys_key_id_key ON public.catalog_attribute_keys USING btree (key_id)
+  - catalog_attribute_keys_pkey: CREATE UNIQUE INDEX catalog_attribute_keys_pkey ON public.catalog_attribute_keys USING btree (id)
+
+#### catalog_attribute_values
+- Approx rows: 9,730
+- Size: 2904 kB
+- Columns (7):
+  - id: integer(32,0) not null default nextval('catalog_attribute_values_id_seq'::regclass)
+  - value_id: integer(32,0) not null
+  - key_id: integer(32,0)
+  - value: text not null
+  - metadata: jsonb
+  - created_at: timestamp with time zone default now()
+  - updated_at: timestamp with time zone default now()
+- Constraints (3):
+  - catalog_attribute_values_key_id_fkey [f]: FOREIGN KEY (key_id) REFERENCES catalog_attribute_keys(key_id)
+  - catalog_attribute_values_pkey [p]: PRIMARY KEY (id)
+  - catalog_attribute_values_value_id_key [u]: UNIQUE (value_id)
+- Indexes (2):
+  - catalog_attribute_values_pkey: CREATE UNIQUE INDEX catalog_attribute_values_pkey ON public.catalog_attribute_values USING btree (id)
+  - catalog_attribute_values_value_id_key: CREATE UNIQUE INDEX catalog_attribute_values_value_id_key ON public.catalog_attribute_values USING btree (value_id)
+
+#### catalog_attributes
+- Approx rows: 0
+- Size: 16 kB
+- Columns (5):
+  - id: integer(32,0) not null default nextval('catalog_attributes_id_seq'::regclass)
+  - product_id: integer(32,0) not null
+  - attribute_name: character varying(100) not null
+  - attribute_value: character varying(100) not null
+  - created_at: timestamp without time zone default now()
+- Constraints (2):
+  - catalog_attributes_pkey [p]: PRIMARY KEY (id)
+  - catalog_attributes_product_id_fkey [f]: FOREIGN KEY (product_id) REFERENCES catalog_products(id) ON DELETE CASCADE
+- Indexes (2):
+  - catalog_attributes_pkey: CREATE UNIQUE INDEX catalog_attributes_pkey ON public.catalog_attributes USING btree (id)
+  - idx_attributes_name_value: CREATE INDEX idx_attributes_name_value ON public.catalog_attributes USING btree (attribute_name, attribute_value)
+
+#### catalog_brands
+- Approx rows: 1,026
+- Size: 520 kB
+- Columns (12):
+  - id: integer(32,0) not null default nextval('catalog_brands_id_seq'::regclass)
+  - name: character varying(100) not null
+  - description: text
+  - logo_url: text
+  - created_at: timestamp without time zone default now()
+  - updated_at: timestamp without time zone default now()
+  - slug: text
+  - is_featured: boolean default false
+  - sort_order: integer(32,0) default 0
+  - brand_id: integer(32,0)
+  - website: text
+  - metadata: jsonb
+- Constraints (4):
+  - catalog_brands_brand_id_key [u]: UNIQUE (brand_id)
+  - catalog_brands_name_key [u]: UNIQUE (name)
+  - catalog_brands_pkey [p]: PRIMARY KEY (id)
+  - catalog_brands_slug_unique [u]: UNIQUE (slug)
+- Indexes (4):
+  - catalog_brands_brand_id_key: CREATE UNIQUE INDEX catalog_brands_brand_id_key ON public.catalog_brands USING btree (brand_id)
+  - catalog_brands_name_key: CREATE UNIQUE INDEX catalog_brands_name_key ON public.catalog_brands USING btree (name)
+  - catalog_brands_pkey: CREATE UNIQUE INDEX catalog_brands_pkey ON public.catalog_brands USING btree (id)
+  - catalog_brands_slug_unique: CREATE UNIQUE INDEX catalog_brands_slug_unique ON public.catalog_brands USING btree (slug)
+
+#### catalog_categories
+- Approx rows: 0
+- Size: 24 kB
+- Columns (6):
+  - id: integer(32,0) not null default nextval('catalog_categories_id_seq'::regclass)
+  - name: character varying(100) not null
+  - parent_id: integer(32,0)
+  - slug: character varying(150) not null
+  - created_at: timestamp without time zone default now()
+  - updated_at: timestamp without time zone default now()
+- Constraints (3):
+  - catalog_categories_parent_id_fkey [f]: FOREIGN KEY (parent_id) REFERENCES catalog_categories(id) ON DELETE SET NULL
+  - catalog_categories_pkey [p]: PRIMARY KEY (id)
+  - catalog_categories_slug_key [u]: UNIQUE (slug)
+- Indexes (3):
+  - catalog_categories_pkey: CREATE UNIQUE INDEX catalog_categories_pkey ON public.catalog_categories USING btree (id)
+  - catalog_categories_slug_key: CREATE UNIQUE INDEX catalog_categories_slug_key ON public.catalog_categories USING btree (slug)
+  - idx_categories_slug: CREATE INDEX idx_categories_slug ON public.catalog_categories USING btree (slug)
+
+#### catalog_fitment
+- Approx rows: 11,891
+- Size: 3160 kB
+- Columns (8):
+  - id: integer(32,0) not null default nextval('catalog_fitment_id_seq'::regclass)
+  - product_id: integer(32,0) not null
+  - make: character varying(50) not null
+  - model: character varying(50) not null
+  - year_start: integer(32,0)
+  - year_end: integer(32,0)
+  - notes: text
+  - created_at: timestamp without time zone default now()
+- Constraints (2):
+  - catalog_fitment_pkey [p]: PRIMARY KEY (id)
+  - catalog_fitment_product_id_fkey [f]: FOREIGN KEY (product_id) REFERENCES catalog_products(id) ON DELETE CASCADE
+- Indexes (6):
+  - catalog_fitment_pkey: CREATE UNIQUE INDEX catalog_fitment_pkey ON public.catalog_fitment USING btree (id)
+  - idx_fitment_lookup: CREATE INDEX idx_fitment_lookup ON public.catalog_fitment USING btree (make, model, year_start, year_end)
+  - idx_fitment_make_model: CREATE INDEX idx_fitment_make_model ON public.catalog_fitment USING btree (make, model)
+  - idx_fitment_product: CREATE INDEX idx_fitment_product ON public.catalog_fitment USING btree (product_id)
+  - idx_fitment_year: CREATE INDEX idx_fitment_year ON public.catalog_fitment USING btree (year_start, year_end)
+  - uniq_catalog_fitment_row: CREATE UNIQUE INDEX uniq_catalog_fitment_row ON public.catalog_fitment USING btree (product_id, make, model, year_start, year_end) WHERE ((make IS NOT NULL) AND (model IS NOT NULL) AND (year_start IS NOT NULL) AND (year_end IS NOT NULL))
+
+#### catalog_images
+- Approx rows: 29,683
+- Size: 103 MB
+- Columns (8):
+  - id: integer(32,0) not null default nextval('catalog_images_id_seq'::regclass)
+  - product_id: integer(32,0) not null
+  - url: text not null
+  - alt_text: text
+  - is_primary: boolean default false
+  - created_at: timestamp without time zone default now()
+  - catalog_product_id: integer(32,0)
+  - position: integer(32,0) default 0
+- Constraints (4):
+  - catalog_images_catalog_product_id_fkey [f]: FOREIGN KEY (catalog_product_id) REFERENCES catalog_products(id)
+  - catalog_images_pkey [p]: PRIMARY KEY (id)
+  - catalog_images_product_id_fkey [f]: FOREIGN KEY (product_id) REFERENCES catalog_products(id) ON DELETE CASCADE
+  - catalog_images_product_url_unique [u]: UNIQUE (catalog_product_id, url)
+- Indexes (6):
+  - catalog_images_pkey: CREATE UNIQUE INDEX catalog_images_pkey ON public.catalog_images USING btree (id)
+  - catalog_images_product_url_unique: CREATE UNIQUE INDEX catalog_images_product_url_unique ON public.catalog_images USING btree (catalog_product_id, url)
+  - idx_catalog_images_catalog_product_id: CREATE INDEX idx_catalog_images_catalog_product_id ON public.catalog_images USING btree (catalog_product_id)
+  - idx_catalog_images_product: CREATE INDEX idx_catalog_images_product ON public.catalog_images USING btree (catalog_product_id)
+  - idx_catalog_images_product_primary: CREATE INDEX idx_catalog_images_product_primary ON public.catalog_images USING btree (catalog_product_id, is_primary)
+  - idx_catalog_images_product_url: CREATE UNIQUE INDEX idx_catalog_images_product_url ON public.catalog_images USING btree (catalog_product_id, url)
+
+#### catalog_inventory
+- Approx rows: 697,796
+- Size: 203 MB
+- Columns (7):
+  - id: integer(32,0) not null default nextval('catalog_inventory_id_seq'::regclass)
+  - sku: text not null
+  - quantity: integer(32,0) default 0
+  - warehouse: text
+  - supplier: text default 'WPS'::text
+  - created_at: timestamp with time zone default now()
+  - updated_at: timestamp with time zone default now()
+- Constraints (2):
+  - catalog_inventory_pkey [p]: PRIMARY KEY (id)
+  - catalog_inventory_sku_supplier_warehouse_key [u]: UNIQUE (sku, supplier, warehouse)
+- Indexes (3):
+  - catalog_inventory_pkey: CREATE UNIQUE INDEX catalog_inventory_pkey ON public.catalog_inventory USING btree (id)
+  - catalog_inventory_sku_supplier_warehouse_key: CREATE UNIQUE INDEX catalog_inventory_sku_supplier_warehouse_key ON public.catalog_inventory USING btree (sku, supplier, warehouse)
+  - idx_inventory_sku: CREATE INDEX idx_inventory_sku ON public.catalog_inventory USING btree (sku)
+
+#### catalog_media
+- Approx rows: 38,512
+- Size: 18 MB
+- Columns (5):
+  - id: integer(32,0) not null default nextval('catalog_media_id_seq'::regclass)
+  - product_id: integer(32,0)
+  - url: text not null
+  - media_type: text default 'image'::text
+  - priority: integer(32,0) default 0
+- Constraints (2):
+  - catalog_media_pkey [p]: PRIMARY KEY (id)
+  - catalog_media_product_id_fkey [f]: FOREIGN KEY (product_id) REFERENCES catalog_products(id) ON DELETE CASCADE
+- Indexes (3):
+  - catalog_media_pkey: CREATE UNIQUE INDEX catalog_media_pkey ON public.catalog_media USING btree (id)
+  - idx_catalog_media_priority: CREATE INDEX idx_catalog_media_priority ON public.catalog_media USING btree (product_id, priority) WHERE (media_type = 'image'::text)
+  - idx_catalog_media_unique: CREATE UNIQUE INDEX idx_catalog_media_unique ON public.catalog_media USING btree (product_id, url)
+
+#### catalog_oem_crossref
+- Approx rows: 19
+- Size: 128 kB
+- Columns (7):
+  - id: integer(32,0) not null default nextval('catalog_oem_crossref_id_seq'::regclass)
+  - sku: text not null
+  - oem_number: text not null
+  - oem_manufacturer: text not null
+  - page_reference: text
+  - source_file: text
+  - created_at: timestamp with time zone default now()
+- Constraints (2):
+  - catalog_oem_crossref_pkey [p]: PRIMARY KEY (id)
+  - unique_oem_ref [u]: UNIQUE (sku, oem_number, oem_manufacturer)
+- Indexes (7):
+  - catalog_oem_crossref_pkey: CREATE UNIQUE INDEX catalog_oem_crossref_pkey ON public.catalog_oem_crossref USING btree (id)
+  - idx_crossref_page_reference: CREATE INDEX idx_crossref_page_reference ON public.catalog_oem_crossref USING btree (page_reference) WHERE ((page_reference IS NOT NULL) AND (page_reference <> ''::text))
+  - idx_oem_lookup: CREATE INDEX idx_oem_lookup ON public.catalog_oem_crossref USING btree (oem_number, oem_manufacturer)
+  - idx_oem_manufacturer: CREATE INDEX idx_oem_manufacturer ON public.catalog_oem_crossref USING btree (oem_manufacturer)
+  - idx_oem_number: CREATE INDEX idx_oem_number ON public.catalog_oem_crossref USING btree (oem_number)
+  - idx_oem_sku: CREATE INDEX idx_oem_sku ON public.catalog_oem_crossref USING btree (sku)
+  - unique_oem_ref: CREATE UNIQUE INDEX unique_oem_ref ON public.catalog_oem_crossref USING btree (sku, oem_number, oem_manufacturer)
+
+#### catalog_prices
+- Approx rows: 0
+- Size: 16 kB
+- Columns (6):
+  - id: integer(32,0) not null default nextval('catalog_prices_id_seq'::regclass)
+  - product_id: integer(32,0) not null
+  - price: numeric(10,2) not null
+  - start_date: date not null default CURRENT_DATE
+  - end_date: date
+  - created_at: timestamp without time zone default now()
+- Constraints (2):
+  - catalog_prices_pkey [p]: PRIMARY KEY (id)
+  - catalog_prices_product_id_fkey [f]: FOREIGN KEY (product_id) REFERENCES catalog_products(id) ON DELETE CASCADE
+- Indexes (2):
+  - catalog_prices_pkey: CREATE UNIQUE INDEX catalog_prices_pkey ON public.catalog_prices USING btree (id)
+  - idx_unique_price_period: CREATE UNIQUE INDEX idx_unique_price_period ON public.catalog_prices USING btree (product_id, start_date)
+
+#### catalog_pricing
+- Approx rows: 123,034
+- Size: 24 MB
+- Columns (7):
+  - id: integer(32,0) not null default nextval('catalog_pricing_id_seq'::regclass)
+  - sku: text not null
+  - punctuated_sku: text
+  - dealer_price: numeric(10,2)
+  - supplier: text default 'WPS'::text
+  - created_at: timestamp with time zone default now()
+  - updated_at: timestamp with time zone default now()
+- Constraints (2):
+  - catalog_pricing_pkey [p]: PRIMARY KEY (id)
+  - catalog_pricing_sku_supplier_key [u]: UNIQUE (sku, supplier)
+- Indexes (4):
+  - catalog_pricing_pkey: CREATE UNIQUE INDEX catalog_pricing_pkey ON public.catalog_pricing USING btree (id)
+  - catalog_pricing_sku_supplier_key: CREATE UNIQUE INDEX catalog_pricing_sku_supplier_key ON public.catalog_pricing USING btree (sku, supplier)
+  - idx_pricing_sku: CREATE INDEX idx_pricing_sku ON public.catalog_pricing USING btree (sku)
+  - idx_pricing_supplier: CREATE INDEX idx_pricing_supplier ON public.catalog_pricing USING btree (supplier)
+
+#### catalog_product_enrichment
+- Approx rows: 172,656
+- Size: 65 MB
+- Columns (17):
+  - id: integer(32,0) not null default nextval('catalog_product_enrichment_id_seq'::regclass)
+  - sku: text not null
+  - wps_product_id: integer(32,0)
+  - wps_item_id: integer(32,0)
+  - product_name: text
+  - product_description: text
+  - attributes: jsonb
+  - features: jsonb
+  - tags: jsonb
+  - blocks: jsonb
+  - resources: jsonb
+  - taxonomy: jsonb
+  - metadata: jsonb
+  - created_at: timestamp with time zone default now()
+  - updated_at: timestamp with time zone default now()
+  - product_id: integer(32,0)
+  - item_id: integer(32,0)
+- Constraints (2):
+  - catalog_product_enrichment_pkey [p]: PRIMARY KEY (id)
+  - catalog_product_enrichment_sku_key [u]: UNIQUE (sku)
+- Indexes (3):
+  - catalog_product_enrichment_pkey: CREATE UNIQUE INDEX catalog_product_enrichment_pkey ON public.catalog_product_enrichment USING btree (id)
+  - catalog_product_enrichment_sku_key: CREATE UNIQUE INDEX catalog_product_enrichment_sku_key ON public.catalog_product_enrichment USING btree (sku)
+  - idx_enrichment_sku: CREATE INDEX idx_enrichment_sku ON public.catalog_product_enrichment USING btree (sku)
+
+#### catalog_products
+- Approx rows: 97,210
+- Size: 620 MB
+- Columns (38):
+  - id: integer(32,0) not null default nextval('catalog_products_id_seq'::regclass)
+  - sku: character varying(50) not null
+  - name: text not null
+  - description: text
+  - brand: character varying(100)
+  - category: character varying(100)
+  - price: numeric(10,2)
+  - cost: numeric(10,2)
+  - weight: numeric(8,3)
+  - dimensions: jsonb
+  - stock_quantity: integer(32,0) default 0
+  - created_at: timestamp without time zone default now()
+  - updated_at: timestamp without time zone default now()
+  - manufacturer_part_number: text
+  - vendor_codes: ARRAY
+  - map_price: numeric
+  - msrp: numeric
+  - status: text
+  - product_type: text
+  - unit_of_measurement: text
+  - upc: text
+  - has_map_policy: boolean default false
+  - drop_ship_eligible: boolean default false
+  - is_active: boolean default true
+  - source_vendor: text
+  - pricing_rule_id: integer(32,0)
+  - computed_price: numeric
+  - margin_percent: numeric
+  - last_priced_at: timestamp with time zone
+  - slug: text
+  - is_discontinued: boolean default false
+  - product_features: text
+  - oem_part_number: text
+  - country_of_origin: text
+  - internal_sku: character varying(15)
+  - display_brand: text
+  - manufacturer_brand: text
+  - page_reference: text
+- Constraints (4):
+  - catalog_products_internal_sku_key [u]: UNIQUE (internal_sku)
+  - catalog_products_pkey [p]: PRIMARY KEY (id)
+  - catalog_products_pricing_rule_id_fkey [f]: FOREIGN KEY (pricing_rule_id) REFERENCES pricing_rules(id)
+  - catalog_products_sku_key [u]: UNIQUE (sku)
+- Indexes (14):
+  - catalog_products_internal_sku_key: CREATE UNIQUE INDEX catalog_products_internal_sku_key ON public.catalog_products USING btree (internal_sku)
+  - catalog_products_pkey: CREATE UNIQUE INDEX catalog_products_pkey ON public.catalog_products USING btree (id)
+  - catalog_products_sku_key: CREATE UNIQUE INDEX catalog_products_sku_key ON public.catalog_products USING btree (sku)
+  - idx_catalog_products_brand: CREATE INDEX idx_catalog_products_brand ON public.catalog_products USING btree (brand)
+  - idx_catalog_products_manufacturer_part_number: CREATE INDEX idx_catalog_products_manufacturer_part_number ON public.catalog_products USING btree (manufacturer_part_number) WHERE ((manufacturer_part_number IS NOT NULL) AND (btrim(manufacturer_part_number) <> ''::text))
+  - idx_catalog_products_mpn: CREATE INDEX idx_catalog_products_mpn ON public.catalog_products USING btree (manufacturer_part_number)
+  - idx_catalog_products_oem_part_number: CREATE INDEX idx_catalog_products_oem_part_number ON public.catalog_products USING btree (oem_part_number) WHERE (oem_part_number IS NOT NULL)
+  - idx_catalog_products_sku: CREATE INDEX idx_catalog_products_sku ON public.catalog_products USING btree (sku)
+  - idx_catalog_products_slug: CREATE UNIQUE INDEX idx_catalog_products_slug ON public.catalog_products USING btree (slug)
+  - idx_cp_brand_active: CREATE INDEX idx_cp_brand_active ON public.catalog_products USING btree (brand) WHERE (is_active = true)
+  - idx_cp_category_active: CREATE INDEX idx_cp_category_active ON public.catalog_products USING btree (category) WHERE (is_active = true)
+  - idx_cp_internal_sku: CREATE UNIQUE INDEX idx_cp_internal_sku ON public.catalog_products USING btree (internal_sku) WHERE (internal_sku IS NOT NULL)
+  - idx_cp_manufacturer_part_number: CREATE INDEX idx_cp_manufacturer_part_number ON public.catalog_products USING btree (manufacturer_part_number) WHERE ((manufacturer_part_number IS NOT NULL) AND (btrim(manufacturer_part_number) <> ''::text))
+  - idx_cp_price_active: CREATE INDEX idx_cp_price_active ON public.catalog_products USING btree (price) WHERE (is_active = true)
+
+#### catalog_reviews
+- Approx rows: 0
+- Size: 24 kB
+- Columns (6):
+  - id: integer(32,0) not null default nextval('catalog_reviews_id_seq'::regclass)
+  - product_id: integer(32,0) not null
+  - customer_id: integer(32,0)
+  - rating: integer(32,0)
+  - review_text: text
+  - created_at: timestamp without time zone default now()
+- Constraints (3):
+  - catalog_reviews_pkey [p]: PRIMARY KEY (id)
+  - catalog_reviews_product_id_fkey [f]: FOREIGN KEY (product_id) REFERENCES catalog_products(id) ON DELETE CASCADE
+  - catalog_reviews_rating_check [c]: CHECK (rating >= 1 AND rating <= 5)
+- Indexes (2):
+  - catalog_reviews_pkey: CREATE UNIQUE INDEX catalog_reviews_pkey ON public.catalog_reviews USING btree (id)
+  - idx_reviews_product: CREATE INDEX idx_reviews_product ON public.catalog_reviews USING btree (product_id)
+
+#### catalog_specs
+- Approx rows: 469,349
+- Size: 287 MB
+- Columns (4):
+  - id: integer(32,0) not null default nextval('catalog_specs_id_seq'::regclass)
+  - product_id: integer(32,0)
+  - attribute: text not null
+  - value: text not null
+- Constraints (2):
+  - catalog_specs_pkey [p]: PRIMARY KEY (id)
+  - catalog_specs_product_id_fkey [f]: FOREIGN KEY (product_id) REFERENCES catalog_products(id) ON DELETE CASCADE
+- Indexes (4):
+  - catalog_specs_pkey: CREATE UNIQUE INDEX catalog_specs_pkey ON public.catalog_specs USING btree (id)
+  - idx_catalog_specs_unique: CREATE UNIQUE INDEX idx_catalog_specs_unique ON public.catalog_specs USING btree (product_id, attribute, value)
+  - idx_specs_attribute: CREATE INDEX idx_specs_attribute ON public.catalog_specs USING btree (attribute)
+  - idx_specs_product: CREATE INDEX idx_specs_product ON public.catalog_specs USING btree (product_id)
+
+#### catalog_styles
+- Approx rows: 12
+- Size: 48 kB
+- Columns (4):
+  - id: integer(32,0) not null default nextval('catalog_styles_id_seq'::regclass)
+  - style_name: text not null
+  - description: text
+  - generic_models: ARRAY
+- Constraints (2):
+  - catalog_styles_pkey [p]: PRIMARY KEY (id)
+  - catalog_styles_style_name_key [u]: UNIQUE (style_name)
+- Indexes (2):
+  - catalog_styles_pkey: CREATE UNIQUE INDEX catalog_styles_pkey ON public.catalog_styles USING btree (id)
+  - catalog_styles_style_name_key: CREATE UNIQUE INDEX catalog_styles_style_name_key ON public.catalog_styles USING btree (style_name)
+
+#### catalog_submodels
+- Approx rows: 0
+- Size: 32 kB
+- Columns (7):
+  - id: integer(32,0) not null default nextval('catalog_submodels_id_seq'::regclass)
+  - generic_model: text not null
+  - submodel: text not null
+  - start_year: integer(32,0)
+  - end_year: integer(32,0)
+  - harley_oem: text
+  - created_at: timestamp with time zone default now()
+- Constraints (1):
+  - catalog_submodels_pkey [p]: PRIMARY KEY (id)
+- Indexes (3):
+  - catalog_submodels_pkey: CREATE UNIQUE INDEX catalog_submodels_pkey ON public.catalog_submodels USING btree (id)
+  - idx_submodels_generic: CREATE INDEX idx_submodels_generic ON public.catalog_submodels USING btree (generic_model)
+  - idx_submodels_submodel: CREATE INDEX idx_submodels_submodel ON public.catalog_submodels USING btree (submodel)
+
+#### catalog_unified
+- Approx rows: 138,872
+- Size: 219 MB
+- Columns (68):
+  - id: integer(32,0) not null default nextval('catalog_unified_id_seq'::regclass)
+  - sku: character varying(50) not null
+  - sku_normalized: character varying(50)
+  - vendor_sku: character varying(50)
+  - source_vendor: character varying(10) not null
+  - product_code: character varying(5)
+  - name: text not null
+  - description: text
+  - features: ARRAY
+  - brand: character varying(200)
+  - category: character varying(200)
+  - subcategory: character varying(200)
+  - msrp: numeric(10,2)
+  - original_retail: numeric(10,2)
+  - cost: numeric(10,2)
+  - map_price: numeric(10,2)
+  - has_map_policy: boolean default false
+  - ad_policy: boolean default false
+  - dropship_fee: numeric(8,2)
+  - stock_quantity: integer(32,0) default 0
+  - warehouse_wi: integer(32,0) default 0
+  - warehouse_ny: integer(32,0) default 0
+  - warehouse_tx: integer(32,0) default 0
+  - warehouse_nv: integer(32,0) default 0
+  - warehouse_nc: integer(32,0) default 0
+  - in_stock: boolean default false
+  - weight: numeric(8,3)
+  - height_in: numeric(8,3)
+  - length_in: numeric(8,3)
+  - width_in: numeric(8,3)
+  - uom: character varying(20)
+  - upc: character varying(20)
+  - country_of_origin: character varying(50)
+  - hazardous_code: character varying(5)
+  - truck_only: boolean default false
+  - no_ship_ca: boolean default false
+  - pfas: character varying(5)
+  - harmonized_us: character varying(20)
+  - image_url: text
+  - image_urls: ARRAY
+  - fitment_year_start: smallint(16,0)
+  - fitment_year_end: smallint(16,0)
+  - fitment_year_ranges: jsonb
+  - fitment_hd_families: ARRAY
+  - fitment_hd_models: ARRAY
+  - fitment_hd_codes: ARRAY
+  - fitment_other_makes: ARRAY
+  - is_harley_fitment: boolean default false
+  - is_universal: boolean default false
+  - in_oldbook: boolean default false
+  - in_fatbook: boolean default false
+  - drag_part: boolean default false
+  - closeout: boolean default false
+  - is_active: boolean default true
+  - is_discontinued: boolean default false
+  - brand_part_number: character varying(100)
+  - brand_code: character varying(20)
+  - enrichment_sku: character varying(100)
+  - oldbook_page: character varying(20)
+  - fatbook_page: character varying(20)
+  - part_add_date: date
+  - slug: text
+  - created_at: timestamp with time zone default now()
+  - updated_at: timestamp with time zone default now()
+  - internal_sku: character varying(15)
+  - display_brand: text
+  - manufacturer_brand: text
+  - page_reference: text
+- Constraints (3):
+  - catalog_unified_pkey [p]: PRIMARY KEY (id)
+  - catalog_unified_sku_key [u]: UNIQUE (sku)
+  - catalog_unified_slug_key [u]: UNIQUE (slug)
+- Indexes (18):
+  - catalog_unified_pkey: CREATE UNIQUE INDEX catalog_unified_pkey ON public.catalog_unified USING btree (id)
+  - catalog_unified_sku_key: CREATE UNIQUE INDEX catalog_unified_sku_key ON public.catalog_unified USING btree (sku)
+  - catalog_unified_slug_key: CREATE UNIQUE INDEX catalog_unified_slug_key ON public.catalog_unified USING btree (slug)
+  - idx_cu_brand: CREATE INDEX idx_cu_brand ON public.catalog_unified USING btree (brand)
+  - idx_cu_category: CREATE INDEX idx_cu_category ON public.catalog_unified USING btree (category)
+  - idx_cu_codes: CREATE INDEX idx_cu_codes ON public.catalog_unified USING gin (fitment_hd_codes)
+  - idx_cu_drag: CREATE INDEX idx_cu_drag ON public.catalog_unified USING btree (drag_part)
+  - idx_cu_families: CREATE INDEX idx_cu_families ON public.catalog_unified USING gin (fitment_hd_families)
+  - idx_cu_features: CREATE INDEX idx_cu_features ON public.catalog_unified USING gin (features)
+  - idx_cu_harley: CREATE INDEX idx_cu_harley ON public.catalog_unified USING btree (is_harley_fitment)
+  - idx_cu_in_stock: CREATE INDEX idx_cu_in_stock ON public.catalog_unified USING btree (in_stock)
+  - idx_cu_internal_sku: CREATE UNIQUE INDEX idx_cu_internal_sku ON public.catalog_unified USING btree (internal_sku) WHERE (internal_sku IS NOT NULL)
+  - idx_cu_is_active: CREATE INDEX idx_cu_is_active ON public.catalog_unified USING btree (is_active)
+  - idx_cu_price: CREATE INDEX idx_cu_price ON public.catalog_unified USING btree (msrp)
+  - idx_cu_product_code: CREATE INDEX idx_cu_product_code ON public.catalog_unified USING btree (product_code)
+  - idx_cu_sku_norm: CREATE INDEX idx_cu_sku_norm ON public.catalog_unified USING btree (sku_normalized)
+  - idx_cu_source: CREATE INDEX idx_cu_source ON public.catalog_unified USING btree (source_vendor)
+  - idx_cu_year: CREATE INDEX idx_cu_year ON public.catalog_unified USING btree (fitment_year_start, fitment_year_end)
+
+#### catalog_variants
+- Approx rows: 0
+- Size: 32 kB
+- Columns (4):
+  - id: integer(32,0) not null default nextval('catalog_variants_id_seq'::regclass)
+  - product_id: integer(32,0)
+  - option_name: text not null
+  - option_value: text not null
+- Constraints (2):
+  - catalog_variants_pkey [p]: PRIMARY KEY (id)
+  - catalog_variants_product_id_fkey [f]: FOREIGN KEY (product_id) REFERENCES catalog_products(id) ON DELETE CASCADE
+- Indexes (3):
+  - catalog_variants_pkey: CREATE UNIQUE INDEX catalog_variants_pkey ON public.catalog_variants USING btree (id)
+  - idx_catalog_variants_option: CREATE INDEX idx_catalog_variants_option ON public.catalog_variants USING btree (option_name, option_value)
+  - idx_catalog_variants_product: CREATE INDEX idx_catalog_variants_product ON public.catalog_variants USING btree (product_id)
+
+#### map_audit_log
+- Approx rows: 0
+- Size: 40 kB
+- Columns (11):
+  - id: integer(32,0) not null default nextval('map_audit_log_id_seq'::regclass)
+  - catalog_product_id: integer(32,0)
+  - sku: text
+  - brand: text
+  - map_price: numeric
+  - computed_price: numeric
+  - violation_amount: numeric
+  - vendor_code: text
+  - status: text default 'violation'::text
+  - resolved_at: timestamp with time zone
+  - created_at: timestamp with time zone default now()
+- Constraints (2):
+  - map_audit_log_catalog_product_id_fkey [f]: FOREIGN KEY (catalog_product_id) REFERENCES catalog_products(id)
+  - map_audit_log_pkey [p]: PRIMARY KEY (id)
+- Indexes (4):
+  - idx_map_audit_log_created: CREATE INDEX idx_map_audit_log_created ON public.map_audit_log USING btree (created_at DESC)
+  - idx_map_audit_log_product: CREATE INDEX idx_map_audit_log_product ON public.map_audit_log USING btree (catalog_product_id)
+  - idx_map_audit_log_status: CREATE INDEX idx_map_audit_log_status ON public.map_audit_log USING btree (status)
+  - map_audit_log_pkey: CREATE UNIQUE INDEX map_audit_log_pkey ON public.map_audit_log USING btree (id)
+
+#### pricing_rules
+- Approx rows: 4
+- Size: 64 kB
+- Columns (15):
+  - id: integer(32,0) not null default nextval('pricing_rules_id_seq'::regclass)
+  - name: text not null
+  - vendor_code: text
+  - formula_type: text not null default 'map_protected'::text
+  - markup_percent: numeric default 0
+  - markdown_percent: numeric default 0
+  - min_margin: numeric default 0.15
+  - is_default: boolean default false
+  - is_active: boolean default true
+  - created_at: timestamp with time zone default now()
+  - updated_at: timestamp with time zone default now()
+  - margin_min: numeric default 0.10
+  - margin_target: numeric default 0.25
+  - map_floor: boolean default true
+  - msrp_ceiling: boolean default true
+- Constraints (1):
+  - pricing_rules_pkey [p]: PRIMARY KEY (id)
+- Indexes (1):
+  - pricing_rules_pkey: CREATE UNIQUE INDEX pricing_rules_pkey ON public.pricing_rules USING btree (id)
+
+#### product_group_members
+- Approx rows: 132,801
+- Size: 37 MB
+- Columns (22):
+  - id: integer(32,0) not null default nextval('product_group_members_id_seq'::regclass)
+  - group_id: integer(32,0) not null
+  - product_id: integer(32,0)
+  - unified_id: integer(32,0)
+  - vendor: character varying(10) not null
+  - vendor_sku: character varying(100) not null
+  - brand: text
+  - display_brand: text
+  - internal_sku: character varying(15)
+  - msrp: numeric(10,2)
+  - cost: numeric(10,2)
+  - map_price: numeric(10,2)
+  - in_stock: boolean default false
+  - stock_quantity: integer(32,0) default 0
+  - warehouse_wi: integer(32,0) default 0
+  - warehouse_ny: integer(32,0) default 0
+  - warehouse_tx: integer(32,0) default 0
+  - warehouse_nv: integer(32,0) default 0
+  - warehouse_nc: integer(32,0) default 0
+  - is_canonical: boolean default false
+  - created_at: timestamp with time zone default now()
+  - updated_at: timestamp with time zone default now()
+- Constraints (3):
+  - product_group_members_group_id_fkey [f]: FOREIGN KEY (group_id) REFERENCES product_groups(id) ON DELETE CASCADE
+  - product_group_members_group_id_vendor_sku_key [u]: UNIQUE (group_id, vendor_sku)
+  - product_group_members_pkey [p]: PRIMARY KEY (id)
+- Indexes (7):
+  - idx_pgm_canonical: CREATE INDEX idx_pgm_canonical ON public.product_group_members USING btree (is_canonical) WHERE (is_canonical = true)
+  - idx_pgm_group_id: CREATE INDEX idx_pgm_group_id ON public.product_group_members USING btree (group_id)
+  - idx_pgm_in_stock: CREATE INDEX idx_pgm_in_stock ON public.product_group_members USING btree (in_stock)
+  - idx_pgm_vendor: CREATE INDEX idx_pgm_vendor ON public.product_group_members USING btree (vendor)
+  - idx_pgm_vendor_sku: CREATE INDEX idx_pgm_vendor_sku ON public.product_group_members USING btree (vendor_sku)
+  - product_group_members_group_id_vendor_sku_key: CREATE UNIQUE INDEX product_group_members_group_id_vendor_sku_key ON public.product_group_members USING btree (group_id, vendor_sku)
+  - product_group_members_pkey: CREATE UNIQUE INDEX product_group_members_pkey ON public.product_group_members USING btree (id)
+
+#### product_groups
+- Approx rows: 132,783
+- Size: 59 MB
+- Columns (19):
+  - id: integer(32,0) not null default nextval('product_groups_id_seq'::regclass)
+  - group_signal: character varying(20) not null default 'singleton'::character varying
+  - oem_number: character varying(100)
+  - upc: character varying(30)
+  - canonical_name: text not null
+  - canonical_brand: text
+  - canonical_category: text
+  - canonical_image_url: text
+  - canonical_product_id: integer(32,0)
+  - any_in_stock: boolean default false
+  - member_count: smallint(16,0) default 1
+  - vendor_count: smallint(16,0) default 1
+  - brand_count: smallint(16,0) default 1
+  - price_min: numeric(10,2)
+  - price_max: numeric(10,2)
+  - canonical_internal_sku: character varying(15)
+  - slug: text
+  - created_at: timestamp with time zone default now()
+  - updated_at: timestamp with time zone default now()
+- Constraints (2):
+  - product_groups_pkey [p]: PRIMARY KEY (id)
+  - product_groups_slug_key [u]: UNIQUE (slug)
+- Indexes (8):
+  - idx_pg_category: CREATE INDEX idx_pg_category ON public.product_groups USING btree (canonical_category)
+  - idx_pg_in_stock: CREATE INDEX idx_pg_in_stock ON public.product_groups USING btree (any_in_stock)
+  - idx_pg_oem_number: CREATE INDEX idx_pg_oem_number ON public.product_groups USING btree (oem_number) WHERE (oem_number IS NOT NULL)
+  - idx_pg_signal: CREATE INDEX idx_pg_signal ON public.product_groups USING btree (group_signal)
+  - idx_pg_slug: CREATE INDEX idx_pg_slug ON public.product_groups USING btree (slug)
+  - idx_pg_upc: CREATE INDEX idx_pg_upc ON public.product_groups USING btree (upc) WHERE (upc IS NOT NULL)
+  - product_groups_pkey: CREATE UNIQUE INDEX product_groups_pkey ON public.product_groups USING btree (id)
+  - product_groups_slug_key: CREATE UNIQUE INDEX product_groups_slug_key ON public.product_groups USING btree (slug)
+
+#### products_search
+- Approx rows: 0
+- Size: 12 MB
+- Columns (8):
+  - id: text not null
+  - name: text
+  - brand: text
+  - category: text
+  - price: numeric(10,2)
+  - in_stock: boolean
+  - search_text: text
+  - catalog: text
+- Constraints (1):
+  - products_search_pkey [p]: PRIMARY KEY (id)
+- Indexes (1):
+  - products_search_pkey: CREATE UNIQUE INDEX products_search_pkey ON public.products_search USING btree (id)
+
+#### pu_brand_enrichment
+- Approx rows: 93,585
+- Size: 141 MB
+- Columns (32):
+  - id: integer(32,0) not null default nextval('pu_brand_enrichment_id_seq'::regclass)
+  - sku: character varying(100) not null
+  - brand: character varying(200)
+  - brand_code: character varying(20)
+  - name: text
+  - features: ARRAY
+  - oem_part_number: character varying(100)
+  - country_of_origin: character varying(10)
+  - package_uom: character varying(20)
+  - qty_of_eaches: integer(32,0) default 1
+  - merch_h: numeric(8,3)
+  - merch_w: numeric(8,3)
+  - merch_l: numeric(8,3)
+  - ship_h: numeric(8,3)
+  - ship_w: numeric(8,3)
+  - ship_l: numeric(8,3)
+  - dimension_uom: character varying(10)
+  - weight: numeric(8,3)
+  - weight_uom: character varying(10)
+  - image_uri: text
+  - image_filename: character varying(200)
+  - dealer_price: numeric(10,2)
+  - your_dealer_price: numeric(10,2)
+  - retail_price: numeric(10,2)
+  - original_retail_price: numeric(10,2)
+  - part_status: character varying(50)
+  - special_instructions: text
+  - vendor_price_updated_at: timestamp with time zone
+  - product_id: character varying(20)
+  - source_file: character varying(200)
+  - created_at: timestamp with time zone default now()
+  - updated_at: timestamp with time zone default now()
+- Constraints (2):
+  - pu_brand_enrichment_pkey [p]: PRIMARY KEY (id)
+  - pu_brand_enrichment_sku_key [u]: UNIQUE (sku)
+- Indexes (6):
+  - idx_pbe_brand: CREATE INDEX idx_pbe_brand ON public.pu_brand_enrichment USING btree (brand)
+  - idx_pbe_brand_code: CREATE INDEX idx_pbe_brand_code ON public.pu_brand_enrichment USING btree (brand_code)
+  - idx_pbe_product_id: CREATE INDEX idx_pbe_product_id ON public.pu_brand_enrichment USING btree (product_id)
+  - idx_pbe_status: CREATE INDEX idx_pbe_status ON public.pu_brand_enrichment USING btree (part_status)
+  - pu_brand_enrichment_pkey: CREATE UNIQUE INDEX pu_brand_enrichment_pkey ON public.pu_brand_enrichment USING btree (id)
+  - pu_brand_enrichment_sku_key: CREATE UNIQUE INDEX pu_brand_enrichment_sku_key ON public.pu_brand_enrichment USING btree (sku)
+
+#### pu_fitment
+- Approx rows: 15,289
+- Size: 11 MB
+- Columns (14):
+  - id: integer(32,0) not null default nextval('pu_fitment_id_seq'::regclass)
+  - sku: character varying(100) not null
+  - brand: character varying(200)
+  - year_start: smallint(16,0)
+  - year_end: smallint(16,0)
+  - year_ranges: jsonb
+  - hd_families: ARRAY
+  - hd_models: ARRAY
+  - hd_codes: ARRAY
+  - other_makes: ARRAY
+  - is_harley: boolean default false
+  - is_universal: boolean default false
+  - parsed_from: text
+  - created_at: timestamp with time zone default now()
+- Constraints (2):
+  - pu_fitment_pkey [p]: PRIMARY KEY (id)
+  - pu_fitment_sku_key [u]: UNIQUE (sku)
+- Indexes (10):
+  - idx_fit_brand: CREATE INDEX idx_fit_brand ON public.pu_fitment USING btree (brand)
+  - idx_fit_codes: CREATE INDEX idx_fit_codes ON public.pu_fitment USING gin (hd_codes)
+  - idx_fit_families: CREATE INDEX idx_fit_families ON public.pu_fitment USING gin (hd_families)
+  - idx_fit_is_harley: CREATE INDEX idx_fit_is_harley ON public.pu_fitment USING btree (is_harley)
+  - idx_fit_makes: CREATE INDEX idx_fit_makes ON public.pu_fitment USING gin (other_makes)
+  - idx_fit_sku: CREATE INDEX idx_fit_sku ON public.pu_fitment USING btree (sku)
+  - idx_fit_year_end: CREATE INDEX idx_fit_year_end ON public.pu_fitment USING btree (year_end)
+  - idx_fit_year_start: CREATE INDEX idx_fit_year_start ON public.pu_fitment USING btree (year_start)
+  - pu_fitment_pkey: CREATE UNIQUE INDEX pu_fitment_pkey ON public.pu_fitment USING btree (id)
+  - pu_fitment_sku_key: CREATE UNIQUE INDEX pu_fitment_sku_key ON public.pu_fitment USING btree (sku)
+
+#### pu_price_raw
+- Approx rows: 0
+- Size: 8192 bytes
+- Columns (36):
+  - part_number: text
+  - punctuated_part_number: text
+  - vendor_part_number: text
+  - vendor_punctuated_part_number: text
+  - part_status: text
+  - part_description: text
+  - original_retail: numeric
+  - current_suggested_retail: numeric
+  - base_dealer_price: numeric
+  - your_dealer_price: numeric
+  - hazardous_code: text
+  - truck_part_only: text
+  - part_add_date: text
+  - wi_availability: text
+  - ny_availability: text
+  - tx_availability: text
+  - ca_availability: text
+  - nv_availability: text
+  - nc_availability: text
+  - national_availability: text
+  - trademark: text
+  - ad_policy: text
+  - price_changed_today: text
+  - unit_of_measure: text
+  - upc_code: text
+  - brand_name: text
+  - country_of_origin: text
+  - commodity_code: text
+  - product_code: text
+  - drag_part: text
+  - weight: numeric
+  - notes: text
+  - height_inches: numeric
+  - length_inches: numeric
+  - width_inches: numeric
+  - dropship_fee: numeric
+- Constraints (0):
+  - None
+- Indexes (0):
+  - None
+
+#### pu_pricing
+- Approx rows: 151,497
+- Size: 40 MB
+- Columns (19):
+  - id: integer(32,0) not null default nextval('pu_pricing_id_seq'::regclass)
+  - part_number: character varying(100) not null
+  - punctuated_part_number: character varying(100)
+  - dealer_price: numeric(10,2)
+  - original_retail: numeric(10,2)
+  - suggested_retail: numeric(10,2)
+  - base_dealer_price: numeric(10,2)
+  - brand_name: character varying(200)
+  - part_description: text
+  - upc_code: character varying(20)
+  - country_of_origin: character varying(100)
+  - height_inches: numeric(8,2)
+  - length_inches: numeric(8,2)
+  - width_inches: numeric(8,2)
+  - unit_of_measure: character varying(20)
+  - truck_part_only: boolean default false
+  - hazmat_code: character varying(20)
+  - part_status: character varying(50)
+  - last_updated: timestamp without time zone default now()
+- Constraints (2):
+  - pu_pricing_part_number_key [u]: UNIQUE (part_number)
+  - pu_pricing_pkey [p]: PRIMARY KEY (id)
+- Indexes (5):
+  - idx_pu_pricing_brand: CREATE INDEX idx_pu_pricing_brand ON public.pu_pricing USING btree (brand_name)
+  - idx_pu_pricing_part_number: CREATE INDEX idx_pu_pricing_part_number ON public.pu_pricing USING btree (part_number)
+  - idx_pu_pricing_upc: CREATE INDEX idx_pu_pricing_upc ON public.pu_pricing USING btree (upc_code)
+  - pu_pricing_part_number_key: CREATE UNIQUE INDEX pu_pricing_part_number_key ON public.pu_pricing USING btree (part_number)
+  - pu_pricing_pkey: CREATE UNIQUE INDEX pu_pricing_pkey ON public.pu_pricing USING btree (id)
+
+#### pu_products
+- Approx rows: 152,928
+- Size: 48 MB
+- Columns (37):
+  - id: integer(32,0) not null default nextval('pu_products_id_seq'::regclass)
+  - sku: character varying(50) not null
+  - uom: character varying(10)
+  - cost: numeric(10,2)
+  - msrp: numeric(10,2)
+  - name: text not null
+  - brand: character varying(100)
+  - status: character varying(20)
+  - weight: numeric(8,2)
+  - notes: text
+  - is_atv: boolean default false
+  - is_snow: boolean default false
+  - is_street: boolean default false
+  - is_offroad: boolean default false
+  - is_watercraft: boolean default false
+  - map_price: character varying(1)
+  - truck_only: boolean default false
+  - no_ship_ca: boolean default false
+  - atv_catalog: character varying(10)
+  - snow_catalog: character varying(10)
+  - street_catalog: character varying(10)
+  - offroad_catalog: character varying(10)
+  - watercraft_catalog: character varying(10)
+  - warehouse_nc: integer(32,0) default 0
+  - warehouse_nv: integer(32,0) default 0
+  - warehouse_ny: integer(32,0) default 0
+  - warehouse_tx: integer(32,0) default 0
+  - warehouse_wi: integer(32,0) default 0
+  - total_qty: integer(32,0) default 0
+  - drop_ship_fee: numeric(10,2)
+  - original_retail: numeric(10,2)
+  - part_add_date: character varying(20)
+  - hazardous_code: character varying(20)
+  - vendor_part_number: character varying(100)
+  - price_changed_today: boolean default false
+  - trademark: character varying(100)
+  - imported_at: timestamp without time zone default now()
+- Constraints (2):
+  - pu_products_pkey [p]: PRIMARY KEY (id)
+  - pu_products_sku_key [u]: UNIQUE (sku)
+- Indexes (5):
+  - idx_pu_products_brand: CREATE INDEX idx_pu_products_brand ON public.pu_products USING btree (brand)
+  - idx_pu_products_sku: CREATE INDEX idx_pu_products_sku ON public.pu_products USING btree (sku)
+  - idx_pu_products_status: CREATE INDEX idx_pu_products_status ON public.pu_products USING btree (status)
+  - pu_products_pkey: CREATE UNIQUE INDEX pu_products_pkey ON public.pu_products USING btree (id)
+  - pu_products_sku_key: CREATE UNIQUE INDEX pu_products_sku_key ON public.pu_products USING btree (sku)
+
+#### pu_products_filtered
+- Approx rows: 81,431
+- Size: 31 MB
+- Columns (46):
+  - id: integer(32,0) not null default nextval('pu_products_filtered_id_seq'::regclass)
+  - sku: character varying(20) not null
+  - sku_punctuated: character varying(20)
+  - vendor_part_number: character varying(20)
+  - vendor_part_punctuated: character varying(20)
+  - part_status: character varying(5)
+  - name: text not null
+  - original_retail: numeric(10,2)
+  - msrp: numeric(10,2)
+  - base_dealer_price: numeric(10,2)
+  - your_dealer_price: numeric(10,2)
+  - hazardous_code: character varying(5)
+  - truck_only: boolean default false
+  - part_add_date: date
+  - warehouse_wi: integer(32,0) default 0
+  - warehouse_ny: integer(32,0) default 0
+  - warehouse_tx: integer(32,0) default 0
+  - warehouse_nv: integer(32,0) default 0
+  - warehouse_nc: integer(32,0) default 0
+  - total_qty: integer(32,0) default 0
+  - trademark: boolean default false
+  - ad_policy: boolean default false
+  - price_changed_today: character varying(1)
+  - uom: character varying(10)
+  - upc_code: character varying(20)
+  - brand: character varying(100)
+  - country_of_origin: character varying(5)
+  - product_code: character varying(5)
+  - drag_part: boolean default false
+  - weight: numeric(8,2)
+  - closeout: boolean default false
+  - no_ship_ca: boolean default false
+  - notes: text
+  - pfas: character varying(5)
+  - harmonized_us: character varying(20)
+  - height_in: numeric(8,3)
+  - length_in: numeric(8,3)
+  - width_in: numeric(8,3)
+  - dropship_fee: numeric(8,2)
+  - oldbook_code: character varying(5)
+  - oldbook_year: character varying(5)
+  - oldbook_year_page: character varying(10)
+  - fatbook_code: character varying(5)
+  - fatbook_year: character varying(5)
+  - fatbook_year_page: character varying(10)
+  - imported_at: timestamp with time zone default now()
+- Constraints (2):
+  - pu_products_filtered_pkey [p]: PRIMARY KEY (id)
+  - pu_products_filtered_sku_key [u]: UNIQUE (sku)
+- Indexes (9):
+  - idx_puf_brand: CREATE INDEX idx_puf_brand ON public.pu_products_filtered USING btree (brand)
+  - idx_puf_drag: CREATE INDEX idx_puf_drag ON public.pu_products_filtered USING btree (drag_part)
+  - idx_puf_fatbook: CREATE INDEX idx_puf_fatbook ON public.pu_products_filtered USING btree (fatbook_code)
+  - idx_puf_oldbook: CREATE INDEX idx_puf_oldbook ON public.pu_products_filtered USING btree (oldbook_code)
+  - idx_puf_product_code: CREATE INDEX idx_puf_product_code ON public.pu_products_filtered USING btree (product_code)
+  - idx_puf_qty: CREATE INDEX idx_puf_qty ON public.pu_products_filtered USING btree (total_qty)
+  - idx_puf_status: CREATE INDEX idx_puf_status ON public.pu_products_filtered USING btree (part_status)
+  - pu_products_filtered_pkey: CREATE UNIQUE INDEX pu_products_filtered_pkey ON public.pu_products_filtered USING btree (id)
+  - pu_products_filtered_sku_key: CREATE UNIQUE INDEX pu_products_filtered_sku_key ON public.pu_products_filtered USING btree (sku)
+
+#### raw_vendor_aces
+- Approx rows: 0
+- Size: 24 kB
+- Columns (4):
+  - id: integer(32,0) not null default nextval('raw_vendor_aces_id_seq'::regclass)
+  - payload: jsonb
+  - source_file: text
+  - imported_at: timestamp without time zone default now()
+- Constraints (2):
+  - raw_vendor_aces_pkey [p]: PRIMARY KEY (id)
+  - raw_vendor_aces_source_file_key [u]: UNIQUE (source_file)
+- Indexes (2):
+  - raw_vendor_aces_pkey: CREATE UNIQUE INDEX raw_vendor_aces_pkey ON public.raw_vendor_aces USING btree (id)
+  - raw_vendor_aces_source_file_key: CREATE UNIQUE INDEX raw_vendor_aces_source_file_key ON public.raw_vendor_aces USING btree (source_file)
+
+#### raw_vendor_pies
+- Approx rows: 15
+- Size: 3616 kB
+- Columns (4):
+  - id: integer(32,0) not null default nextval('raw_vendor_pies_id_seq'::regclass)
+  - payload: jsonb
+  - source_file: text
+  - imported_at: timestamp without time zone default now()
+- Constraints (2):
+  - raw_vendor_pies_pkey [p]: PRIMARY KEY (id)
+  - raw_vendor_pies_source_file_key [u]: UNIQUE (source_file)
+- Indexes (2):
+  - raw_vendor_pies_pkey: CREATE UNIQUE INDEX raw_vendor_pies_pkey ON public.raw_vendor_pies USING btree (id)
+  - raw_vendor_pies_source_file_key: CREATE UNIQUE INDEX raw_vendor_pies_source_file_key ON public.raw_vendor_pies USING btree (source_file)
+
+#### raw_vendor_pu
+- Approx rows: 306
+- Size: 40 MB
+- Columns (4):
+  - id: integer(32,0) not null default nextval('raw_vendor_pu_id_seq'::regclass)
+  - payload: jsonb
+  - source_file: text
+  - imported_at: timestamp without time zone default now()
+- Constraints (2):
+  - raw_vendor_pu_pkey [p]: PRIMARY KEY (id)
+  - raw_vendor_pu_source_file_key [u]: UNIQUE (source_file)
+- Indexes (2):
+  - raw_vendor_pu_pkey: CREATE UNIQUE INDEX raw_vendor_pu_pkey ON public.raw_vendor_pu USING btree (id)
+  - raw_vendor_pu_source_file_key: CREATE UNIQUE INDEX raw_vendor_pu_source_file_key ON public.raw_vendor_pu USING btree (source_file)
+
+#### raw_vendor_wps_inventory
+- Approx rows: 0
+- Size: 24 kB
+- Columns (4):
+  - id: integer(32,0) not null default nextval('raw_vendor_wps_inventory_id_seq'::regclass)
+  - payload: jsonb
+  - source_file: text
+  - imported_at: timestamp without time zone default now()
+- Constraints (2):
+  - raw_vendor_wps_inventory_pkey [p]: PRIMARY KEY (id)
+  - raw_vendor_wps_inventory_source_file_key [u]: UNIQUE (source_file)
+- Indexes (2):
+  - raw_vendor_wps_inventory_pkey: CREATE UNIQUE INDEX raw_vendor_wps_inventory_pkey ON public.raw_vendor_wps_inventory USING btree (id)
+  - raw_vendor_wps_inventory_source_file_key: CREATE UNIQUE INDEX raw_vendor_wps_inventory_source_file_key ON public.raw_vendor_wps_inventory USING btree (source_file)
+
+#### raw_vendor_wps_products
+- Approx rows: 121,110
+- Size: 170 MB
+- Columns (4):
+  - id: integer(32,0) not null default nextval('raw_vendor_wps_products_id_seq'::regclass)
+  - payload: jsonb
+  - source_file: text
+  - imported_at: timestamp without time zone default now()
+- Constraints (2):
+  - raw_vendor_wps_products_pkey [p]: PRIMARY KEY (id)
+  - raw_vendor_wps_products_source_file_key [u]: UNIQUE (source_file)
+- Indexes (2):
+  - raw_vendor_wps_products_pkey: CREATE UNIQUE INDEX raw_vendor_wps_products_pkey ON public.raw_vendor_wps_products USING btree (id)
+  - raw_vendor_wps_products_source_file_key: CREATE UNIQUE INDEX raw_vendor_wps_products_source_file_key ON public.raw_vendor_wps_products USING btree (source_file)
+
+#### raw_vendor_wps_vehicles
+- Approx rows: 0
+- Size: 32 kB
+- Columns (4):
+  - id: integer(32,0) not null default nextval('raw_vendor_wps_vehicles_id_seq'::regclass)
+  - payload: jsonb not null
+  - source_file: text not null
+  - imported_at: timestamp with time zone default now()
+- Constraints (2):
+  - raw_vendor_wps_vehicles_pkey [p]: PRIMARY KEY (id)
+  - raw_vendor_wps_vehicles_source_file_key [u]: UNIQUE (source_file)
+- Indexes (3):
+  - idx_raw_vendor_wps_vehicles_imported_at: CREATE INDEX idx_raw_vendor_wps_vehicles_imported_at ON public.raw_vendor_wps_vehicles USING btree (imported_at)
+  - raw_vendor_wps_vehicles_pkey: CREATE UNIQUE INDEX raw_vendor_wps_vehicles_pkey ON public.raw_vendor_wps_vehicles USING btree (id)
+  - raw_vendor_wps_vehicles_source_file_key: CREATE UNIQUE INDEX raw_vendor_wps_vehicles_source_file_key ON public.raw_vendor_wps_vehicles USING btree (source_file)
+
+#### routing_decisions
+- Approx rows: 0
+- Size: 32 kB
+- Columns (11):
+  - id: integer(32,0) not null default nextval('routing_decisions_id_seq'::regclass)
+  - order_id: text
+  - catalog_product_id: integer(32,0)
+  - selected_vendor_code: text
+  - selected_warehouse: text
+  - routing_strategy: text default 'cheapest'::text
+  - estimated_days: integer(32,0)
+  - estimated_cost: numeric
+  - drop_ship_fee: numeric default 0
+  - routing_metadata: jsonb
+  - created_at: timestamp with time zone default now()
+- Constraints (2):
+  - routing_decisions_catalog_product_id_fkey [f]: FOREIGN KEY (catalog_product_id) REFERENCES catalog_products(id)
+  - routing_decisions_pkey [p]: PRIMARY KEY (id)
+- Indexes (3):
+  - idx_routing_decisions_order: CREATE INDEX idx_routing_decisions_order ON public.routing_decisions USING btree (order_id)
+  - idx_routing_decisions_product: CREATE INDEX idx_routing_decisions_product ON public.routing_decisions USING btree (catalog_product_id)
+  - routing_decisions_pkey: CREATE UNIQUE INDEX routing_decisions_pkey ON public.routing_decisions USING btree (id)
+
+#### routing_shipping_rules
+- Approx rows: 24
+- Size: 64 kB
+- Columns (13):
+  - id: integer(32,0) not null default nextval('routing_shipping_rules_id_seq'::regclass)
+  - vendor_code: text not null
+  - warehouse_id: text
+  - carrier: text
+  - service_level: text
+  - min_days: integer(32,0)
+  - max_days: integer(32,0)
+  - base_rate: numeric default 0
+  - per_lb_rate: numeric default 0
+  - free_shipping_over: numeric
+  - max_weight_lbs: numeric
+  - is_active: boolean default true
+  - created_at: timestamp with time zone default now()
+- Constraints (1):
+  - routing_shipping_rules_pkey [p]: PRIMARY KEY (id)
+- Indexes (1):
+  - routing_shipping_rules_pkey: CREATE UNIQUE INDEX routing_shipping_rules_pkey ON public.routing_shipping_rules USING btree (id)
+
+#### routing_warehouses
+- Approx rows: 10
+- Size: 96 kB
+- Columns (12):
+  - id: integer(32,0) not null default nextval('routing_warehouses_id_seq'::regclass)
+  - vendor_code: text not null
+  - warehouse_id: text not null
+  - name: text
+  - city: text
+  - state: text
+  - zip: text
+  - country: text default 'US'::text
+  - latitude: numeric(9,6)
+  - longitude: numeric(9,6)
+  - is_active: boolean default true
+  - created_at: timestamp with time zone default now()
+- Constraints (2):
+  - routing_warehouses_pkey [p]: PRIMARY KEY (id)
+  - routing_warehouses_vendor_code_warehouse_id_key [u]: UNIQUE (vendor_code, warehouse_id)
+- Indexes (3):
+  - idx_routing_warehouses_vendor: CREATE INDEX idx_routing_warehouses_vendor ON public.routing_warehouses USING btree (vendor_code)
+  - routing_warehouses_pkey: CREATE UNIQUE INDEX routing_warehouses_pkey ON public.routing_warehouses USING btree (id)
+  - routing_warehouses_vendor_code_warehouse_id_key: CREATE UNIQUE INDEX routing_warehouses_vendor_code_warehouse_id_key ON public.routing_warehouses USING btree (vendor_code, warehouse_id)
+
+#### sku_counter
+- Approx rows: 15
+- Size: 32 kB
+- Columns (4):
+  - prefix: character(3) not null
+  - description: text not null
+  - last_val: integer(32,0) not null default 100000
+  - updated_at: timestamp with time zone default now()
+- Constraints (1):
+  - sku_counter_pkey [p]: PRIMARY KEY (prefix)
+- Indexes (1):
+  - sku_counter_pkey: CREATE UNIQUE INDEX sku_counter_pkey ON public.sku_counter USING btree (prefix)
+
+#### sync_log
+- Approx rows: 0
+- Size: 40 kB
+- Columns (14):
+  - id: integer(32,0) not null default nextval('sync_log_id_seq'::regclass)
+  - vendor: text
+  - status: text
+  - event: text
+  - upserted: integer(32,0)
+  - skipped: integer(32,0)
+  - errors: integer(32,0) default 0
+  - duration_ms: integer(32,0)
+  - error_message: text
+  - vendor_order_id: text
+  - stripe_session_id: text
+  - raw_response: jsonb
+  - completed_at: timestamp with time zone default now()
+  - created_at: timestamp with time zone default now()
+- Constraints (1):
+  - sync_log_pkey [p]: PRIMARY KEY (id)
+- Indexes (4):
+  - idx_sync_log_completed: CREATE INDEX idx_sync_log_completed ON public.sync_log USING btree (completed_at DESC)
+  - idx_sync_log_status: CREATE INDEX idx_sync_log_status ON public.sync_log USING btree (status)
+  - idx_sync_log_vendor: CREATE INDEX idx_sync_log_vendor ON public.sync_log USING btree (vendor)
+  - sync_log_pkey: CREATE UNIQUE INDEX sync_log_pkey ON public.sync_log USING btree (id)
+
+#### vendor_offers
+- Approx rows: 74,244
+- Size: 243 MB
+- Columns (32):
+  - id: integer(32,0) not null default nextval('vendor_offers_id_seq'::regclass)
+  - catalog_product_id: integer(32,0)
+  - vendor_code: text
+  - vendor_part_number: text
+  - manufacturer_part_number: text
+  - wholesale_cost: numeric
+  - map_price: numeric
+  - msrp: numeric
+  - drop_ship_fee: numeric default 0
+  - drop_ship_eligible: boolean default false
+  - is_active: boolean default true
+  - created_at: timestamp with time zone default now()
+  - updated_at: timestamp with time zone default now()
+  - pricing_rule_id: integer(32,0)
+  - computed_price: numeric
+  - margin_percent: numeric
+  - total_qty: integer(32,0) default 0
+  - in_stock: boolean default false
+  - wi_qty: integer(32,0) default 0
+  - ny_qty: integer(32,0) default 0
+  - tx_qty: integer(32,0) default 0
+  - ca_qty: integer(32,0) default 0
+  - nv_qty: integer(32,0) default 0
+  - nc_qty: integer(32,0) default 0
+  - our_price: numeric(10,2)
+  - last_stock_sync: timestamp with time zone
+  - ga_qty: integer(32,0) default 0
+  - id_qty: integer(32,0) default 0
+  - in_qty: integer(32,0) default 0
+  - pa_qty: integer(32,0) default 0
+  - computed_at: timestamp without time zone
+  - warehouse_json: jsonb
+- Constraints (4):
+  - vendor_offers_catalog_product_id_fkey [f]: FOREIGN KEY (catalog_product_id) REFERENCES catalog_products(id)
+  - vendor_offers_catalog_product_vendor_key [u]: UNIQUE (catalog_product_id, vendor_code)
+  - vendor_offers_pkey [p]: PRIMARY KEY (id)
+  - vendor_offers_pricing_rule_id_fkey [f]: FOREIGN KEY (pricing_rule_id) REFERENCES pricing_rules(id)
+- Indexes (6):
+  - idx_vendor_offers_catalog_active: CREATE INDEX idx_vendor_offers_catalog_active ON public.vendor_offers USING btree (catalog_product_id, is_active)
+  - idx_vendor_offers_catalog_product_id: CREATE INDEX idx_vendor_offers_catalog_product_id ON public.vendor_offers USING btree (catalog_product_id)
+  - idx_vendor_offers_product: CREATE INDEX idx_vendor_offers_product ON public.vendor_offers USING btree (catalog_product_id)
+  - idx_vendor_offers_vendor: CREATE INDEX idx_vendor_offers_vendor ON public.vendor_offers USING btree (vendor_code)
+  - vendor_offers_catalog_product_vendor_key: CREATE UNIQUE INDEX vendor_offers_catalog_product_vendor_key ON public.vendor_offers USING btree (catalog_product_id, vendor_code)
+  - vendor_offers_pkey: CREATE UNIQUE INDEX vendor_offers_pkey ON public.vendor_offers USING btree (id)
+
+### vendor
+#### pu_pricefile_staging
+- Approx rows: 153,085
+- Size: 313 MB
+- Columns (26):
+  - id: uuid not null default gen_random_uuid()
+  - mfr_sku: text not null
+  - sku: text
+  - name: text
+  - slug: text
+  - description_raw: text
+  - brand: text
+  - categories_raw: jsonb
+  - attributes_raw: jsonb
+  - best_price: numeric(10,2)
+  - msrp: numeric(10,2)
+  - total_qty: integer(32,0) default 0
+  - in_stock: smallint(16,0) default 0
+  - hazardous_code: text
+  - no_ship_ca: boolean default false
+  - is_atv: boolean default false
+  - is_street: boolean default false
+  - is_snow: boolean default false
+  - is_offroad: boolean default false
+  - is_watercraft: boolean default false
+  - weight_lbs: numeric(10,2)
+  - dropship_fee_pu: numeric(10,2)
+  - source_file: text
+  - source_row: jsonb not null
+  - imported_at: timestamp with time zone default now()
+  - updated_at: timestamp with time zone default now()
+- Constraints (2):
+  - pu_pricefile_staging_mfr_sku_key [u]: UNIQUE (mfr_sku)
+  - pu_pricefile_staging_pkey [p]: PRIMARY KEY (id)
+- Indexes (4):
+  - pu_pricefile_staging_imported_at_idx: CREATE INDEX pu_pricefile_staging_imported_at_idx ON vendor.pu_pricefile_staging USING btree (imported_at DESC)
+  - pu_pricefile_staging_in_stock_idx: CREATE INDEX pu_pricefile_staging_in_stock_idx ON vendor.pu_pricefile_staging USING btree (in_stock)
+  - pu_pricefile_staging_mfr_sku_key: CREATE UNIQUE INDEX pu_pricefile_staging_mfr_sku_key ON vendor.pu_pricefile_staging USING btree (mfr_sku)
+  - pu_pricefile_staging_pkey: CREATE UNIQUE INDEX pu_pricefile_staging_pkey ON vendor.pu_pricefile_staging USING btree (id)
+
+#### vendor_categories
+- Approx rows: 0
+- Size: 32 kB
+- Columns (9):
+  - id: uuid not null default gen_random_uuid()
+  - vendor_code: text not null
+  - vendor_category_id: text not null
+  - parent_category_id: text
+  - name: text not null
+  - full_path: text
+  - metadata: jsonb
+  - created_at: timestamp without time zone default now()
+  - updated_at: timestamp without time zone default now()
+- Constraints (1):
+  - vendor_categories_pkey [p]: PRIMARY KEY (id)
+- Indexes (3):
+  - vendor_categories_parent_idx: CREATE INDEX vendor_categories_parent_idx ON vendor.vendor_categories USING btree (parent_category_id)
+  - vendor_categories_pkey: CREATE UNIQUE INDEX vendor_categories_pkey ON vendor.vendor_categories USING btree (id)
+  - vendor_categories_vendor_idx: CREATE INDEX vendor_categories_vendor_idx ON vendor.vendor_categories USING btree (vendor_code)
+
+#### vendor_error_log
+- Approx rows: 0
+- Size: 32 kB
+- Columns (11):
+  - id: uuid not null default gen_random_uuid()
+  - vendor_code: text not null
+  - sync_log_id: uuid
+  - error_message: text
+  - raw_payload: text
+  - stack_trace: text
+  - severity: text
+  - occurred_at: timestamp without time zone default now()
+  - vendor_part_number: text
+  - error_type: text
+  - created_at: timestamp with time zone default now()
+- Constraints (2):
+  - vendor_error_log_pkey [p]: PRIMARY KEY (id)
+  - vendor_error_log_sync_log_id_fkey [f]: FOREIGN KEY (sync_log_id) REFERENCES vendor.vendor_sync_log(id) ON DELETE CASCADE
+- Indexes (3):
+  - vendor_error_log_pkey: CREATE UNIQUE INDEX vendor_error_log_pkey ON vendor.vendor_error_log USING btree (id)
+  - vendor_error_log_sync_idx: CREATE INDEX vendor_error_log_sync_idx ON vendor.vendor_error_log USING btree (sync_log_id)
+  - vendor_error_log_vendor_idx: CREATE INDEX vendor_error_log_vendor_idx ON vendor.vendor_error_log USING btree (vendor_code)
+
+#### vendor_inventory
+- Approx rows: 0
+- Size: 40 kB
+- Columns (6):
+  - id: uuid not null default gen_random_uuid()
+  - vendor_product_id: uuid not null
+  - warehouse_id: uuid not null
+  - stock_quantity: integer(32,0)
+  - backorder_eta: text
+  - updated_at: timestamp without time zone default now()
+- Constraints (3):
+  - vendor_inventory_pkey [p]: PRIMARY KEY (id)
+  - vendor_inventory_vendor_product_id_fkey [f]: FOREIGN KEY (vendor_product_id) REFERENCES vendor.vendor_products(id) ON DELETE CASCADE
+  - vendor_inventory_warehouse_id_fkey [f]: FOREIGN KEY (warehouse_id) REFERENCES vendor.vendor_warehouses(id) ON DELETE CASCADE
+- Indexes (4):
+  - vendor_inventory_pkey: CREATE UNIQUE INDEX vendor_inventory_pkey ON vendor.vendor_inventory USING btree (id)
+  - vendor_inventory_product_idx: CREATE INDEX vendor_inventory_product_idx ON vendor.vendor_inventory USING btree (vendor_product_id)
+  - vendor_inventory_stock_idx: CREATE INDEX vendor_inventory_stock_idx ON vendor.vendor_inventory USING btree (stock_quantity)
+  - vendor_inventory_warehouse_idx: CREATE INDEX vendor_inventory_warehouse_idx ON vendor.vendor_inventory USING btree (warehouse_id)
+
+#### vendor_products
+- Approx rows: 296,112
+- Size: 504 MB
+- Columns (40):
+  - id: uuid not null default gen_random_uuid()
+  - vendor_code: text not null
+  - vendor_part_number: text not null
+  - manufacturer_part_number: text not null
+  - your_part_number: text
+  - title: text
+  - description_raw: text
+  - brand: text
+  - categories_raw: jsonb
+  - attributes_raw: jsonb
+  - msrp: numeric(10,2)
+  - map_price: numeric(10,2)
+  - wholesale_cost: numeric(10,2)
+  - vendor_fees: jsonb
+  - drop_ship_fee: numeric(10,2)
+  - images_raw: jsonb
+  - fitment_raw: jsonb
+  - weight: numeric(10,2)
+  - length: numeric(10,2)
+  - width: numeric(10,2)
+  - height: numeric(10,2)
+  - created_at: timestamp without time zone default now()
+  - updated_at: timestamp without time zone default now()
+  - vendor_item_id: text
+  - vendor_product_id: text
+  - upc: text
+  - superseded_sku: text
+  - status: text
+  - status_id: text
+  - product_type: text
+  - unit_of_measurement: text
+  - has_map_policy: boolean default false
+  - drop_ship_eligible: boolean default false
+  - carb: text
+  - prop_65_code: text
+  - prop_65_detail: text
+  - country_id: integer(32,0)
+  - published_at: timestamp with time zone
+  - vendor_created_at: timestamp with time zone
+  - vendor_updated_at: timestamp with time zone
+- Constraints (2):
+  - vendor_products_pkey [p]: PRIMARY KEY (id)
+  - vendor_products_vendor_part_number_key [u]: UNIQUE (vendor_part_number)
+- Indexes (5):
+  - vendor_products_mpn_idx: CREATE INDEX vendor_products_mpn_idx ON vendor.vendor_products USING btree (manufacturer_part_number)
+  - vendor_products_pkey: CREATE UNIQUE INDEX vendor_products_pkey ON vendor.vendor_products USING btree (id)
+  - vendor_products_vendor_code_idx: CREATE INDEX vendor_products_vendor_code_idx ON vendor.vendor_products USING btree (vendor_code)
+  - vendor_products_vendor_part_idx: CREATE INDEX vendor_products_vendor_part_idx ON vendor.vendor_products USING btree (vendor_part_number)
+  - vendor_products_vendor_part_number_key: CREATE UNIQUE INDEX vendor_products_vendor_part_number_key ON vendor.vendor_products USING btree (vendor_part_number)
+
+#### vendor_sync_log
+- Approx rows: 19
+- Size: 80 kB
+- Columns (14):
+  - id: uuid not null default gen_random_uuid()
+  - vendor_code: text not null
+  - sync_type: text not null
+  - started_at: timestamp without time zone default now()
+  - finished_at: timestamp without time zone
+  - records_processed: integer(32,0)
+  - success: boolean default false
+  - created_at: timestamp without time zone default now()
+  - status: text
+  - rows_inserted: integer(32,0) default 0
+  - rows_updated: integer(32,0) default 0
+  - rows_failed: integer(32,0) default 0
+  - completed_at: timestamp with time zone
+  - notes: text
+- Constraints (1):
+  - vendor_sync_log_pkey [p]: PRIMARY KEY (id)
+- Indexes (2):
+  - vendor_sync_log_pkey: CREATE UNIQUE INDEX vendor_sync_log_pkey ON vendor.vendor_sync_log USING btree (id)
+  - vendor_sync_log_vendor_idx: CREATE INDEX vendor_sync_log_vendor_idx ON vendor.vendor_sync_log USING btree (vendor_code)
+
+#### vendor_warehouses
+- Approx rows: 0
+- Size: 24 kB
+- Columns (14):
+  - id: uuid not null default gen_random_uuid()
+  - vendor_code: text not null
+  - warehouse_code: text not null
+  - name: text
+  - address: text
+  - city: text
+  - state: text
+  - postal_code: text
+  - lat: double precision(53)
+  - lng: double precision(53)
+  - shipping_zone: text
+  - shipping_rules: jsonb
+  - created_at: timestamp without time zone default now()
+  - updated_at: timestamp without time zone default now()
+- Constraints (1):
+  - vendor_warehouses_pkey [p]: PRIMARY KEY (id)
+- Indexes (2):
+  - vendor_warehouses_pkey: CREATE UNIQUE INDEX vendor_warehouses_pkey ON vendor.vendor_warehouses USING btree (id)
+  - vendor_warehouses_vendor_idx: CREATE INDEX vendor_warehouses_vendor_idx ON vendor.vendor_warehouses USING btree (vendor_code)
+
+## Cleanup Observations
+- There are two schema namespaces: `public` and `vendor`.
+- No foreign keys were present in the current live schema dump, so relational integrity is largely enforced by application logic and conventions.
+- The largest tables are the raw/vendor staging and derived catalog tables, so cleanup should focus on deduping source-of-truth boundaries, normalization, and pruning stale staging data.
+- The canonical customer-facing catalog is primarily `catalog_unified`, with `catalog_products`, `vendor_products`, `vendor_offers`, `catalog_specs`, and `catalog_inventory` feeding it.
+- Harley-specific fitment is currently sparse in the core schema; most model/submodel precision will depend on `vehicles`, `catalog_fitment`, and your import/mapping pipeline.
