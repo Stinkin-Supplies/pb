@@ -4,16 +4,13 @@
 // ============================================================
 // Full product detail page UI:
 //   - Image gallery with thumbnail rail
-//   - Fitment check badge (ACES — lights up Phase 5)
+//   - Fitment check badge + full fitment table
 //   - Price / MAP display
 //   - Points earned preview
 //   - Add to cart with quantity selector
-//   - Specs table
+//   - Tabbed content: Description | Features | Fitment | Specs
+//   - OEM numbers + page references
 //   - Related products strip
-//
-// TODO Phase 3: pull SAVED_VEHICLE from Supabase user_garage
-//               via useUser() once auth is built
-// TODO Phase 5: fitmentIds populated by ACES vendor sync
 // ============================================================
 
 import { useState, useEffect, useRef } from "react";
@@ -113,10 +110,6 @@ const css = `
   .gallery-thumb.active { border-color: #e8621a; }
   .gallery-thumb:hover  { border-color: rgba(232,98,26,0.4); }
   .gallery-thumb img { width: 100%; height: 100%; object-fit: cover; }
-  .gallery-thumb-placeholder {
-    font-family: var(--font-stencil), monospace;
-    font-size: 7px; color: #3a3838; letter-spacing: 0.05em;
-  }
 
   /* ── INFO COL ── */
   .info-col { display: flex; flex-direction: column; gap: 0; }
@@ -209,10 +202,6 @@ const css = `
   }
   .stock-label.in  { color: #22c55e; }
   .stock-label.out { color: #8a8784; }
-  .stock-qty {
-    font-family: var(--font-stencil), monospace;
-    font-size: 9px; color: #8a8784; letter-spacing: 0.1em;
-  }
 
   /* qty + add */
   .purchase-row {
@@ -293,37 +282,257 @@ const css = `
   }
   .perk-text strong { color: #f0ebe3; display: block; }
 
-	  /* divider */
-	  .pdp-divider {
-	    border: none; border-top: 1px solid #2a2828;
-	    margin: 20px 0;
-	  }
-
-	  /* ── SPECS TABLE ── */
-	  .specs-section { margin-top: 48px; }
-	  .specs-title {
-	    font-family: var(--font-stencil), monospace;
-	    font-size: 26px; letter-spacing: 0.05em;
-    color: #f0ebe3; margin-bottom: 16px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #2a2828;
+  /* divider */
+  .pdp-divider {
+    border: none; border-top: 1px solid #2a2828;
+    margin: 20px 0;
   }
-  .specs-title span { color: #e8621a; }
-  .specs-table { width: 100%; border-collapse: collapse; }
-  .specs-table tr:nth-child(odd) td { background: #111010; }
-  .specs-table td {
+
+  /* ── BRAND OPTION CARDS ── */
+  .brand-opts-label {
+    font-family: var(--font-stencil), monospace;
+    font-size: 9px; color: #8a8784; letter-spacing: 0.18em;
+    margin-bottom: 8px; margin-top: 4px;
+  }
+  .brand-opts { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+  .brand-opt {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 14px;
+    background: #111010;
+    border: 1px solid #2a2828;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    user-select: none;
+  }
+  .brand-opt:hover { border-color: #4a4848; }
+  .brand-opt.selected { border-color: #e8621a; background: #1a1210; }
+  .brand-opt.oos { opacity: 0.55; }
+  .brand-opt-radio {
+    width: 15px; height: 15px; flex-shrink: 0;
+    border-radius: 50%; border: 2px solid #3a3838;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color 0.15s;
+  }
+  .brand-opt.selected .brand-opt-radio { border-color: #e8621a; }
+  .brand-opt-radio-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #e8621a; display: none;
+  }
+  .brand-opt.selected .brand-opt-radio-dot { display: block; }
+  .brand-opt-body { flex: 1; min-width: 0; }
+  .brand-opt-name {
+    font-family: var(--font-stencil), monospace;
+    font-size: 11px; letter-spacing: 0.1em; color: #f0ebe3;
+  }
+  .brand-opt-part {
+    font-family: var(--font-stencil), monospace;
+    font-size: 9px; color: #8a8784; letter-spacing: 0.1em; margin-top: 2px;
+  }
+  .brand-opt-right { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
+  .brand-opt-price {
+    font-family: var(--font-stencil), monospace;
+    font-size: 18px; letter-spacing: 0.04em; color: #f0ebe3;
+  }
+  .brand-opt.selected .brand-opt-price { color: #e8621a; }
+  .brand-opt-stock {
+    font-family: var(--font-stencil), monospace;
+    font-size: 8px; letter-spacing: 0.1em;
+  }
+  .brand-opt-stock.in  { color: #22c55e; }
+  .brand-opt-stock.out { color: #8a8784; }
+
+  /* ── TABBED CONTENT SECTION ── */
+  .pdp-tabs-section {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 24px 48px;
+  }
+  .pdp-tabs-nav {
+    display: flex;
+    border-bottom: 1px solid #2a2828;
+    margin-bottom: 0;
+    gap: 0;
+  }
+  .pdp-tab-btn {
+    font-family: var(--font-stencil), monospace;
+    font-size: 11px; letter-spacing: 0.18em;
+    color: #8a8784;
+    background: transparent; border: none;
+    padding: 14px 22px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .pdp-tab-btn:hover { color: #f0ebe3; }
+  .pdp-tab-btn.active {
+    color: #e8621a;
+    border-bottom-color: #e8621a;
+  }
+  .pdp-tab-panel {
+    display: none;
+    padding: 28px 0;
+  }
+  .pdp-tab-panel.active { display: block; }
+
+  /* Description panel */
+  .pdp-description {
+    font-family: var(--font-stencil), monospace;
+    font-size: 13px; line-height: 1.9;
+    color: #c8c3bc; letter-spacing: 0.03em;
+    max-width: 860px;
+  }
+  .pdp-description p { margin-bottom: 14px; }
+  .pdp-description h2, .pdp-description h3 {
+    color: #f0ebe3; font-size: 16px; margin: 20px 0 10px;
+    letter-spacing: 0.1em;
+  }
+  .pdp-description ul, .pdp-description ol {
+    padding-left: 20px; margin-bottom: 14px;
+  }
+  .pdp-description li { margin-bottom: 6px; }
+  .pdp-no-description {
+    font-family: var(--font-stencil), monospace;
+    font-size: 11px; color: #8a8784; letter-spacing: 0.12em;
+    font-style: italic;
+  }
+
+  /* Features panel */
+  .pdp-features-list {
+    list-style: none; padding: 0; margin: 0;
+    max-width: 860px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 0;
+  }
+  .pdp-features-list li {
+    display: flex; align-items: flex-start; gap: 10px;
+    font-family: var(--font-stencil), monospace;
+    font-size: 12px; line-height: 1.7; color: #c8c3bc;
+    letter-spacing: 0.04em;
+    padding: 10px 0;
+    border-bottom: 1px solid #1a1919;
+  }
+  .pdp-features-list li:last-child { border-bottom: none; }
+  .pdp-feat-bullet {
+    color: #e8621a; flex-shrink: 0; margin-top: 2px; font-size: 10px;
+  }
+  .pdp-no-features {
+    font-family: var(--font-stencil), monospace;
+    font-size: 11px; color: #8a8784; letter-spacing: 0.12em;
+    font-style: italic;
+  }
+
+  /* Fitment panel */
+  .pdp-fitment-summary {
+    display: flex; gap: 12px; flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+  .pdp-fitment-chip {
+    font-family: var(--font-stencil), monospace;
+    font-size: 9px; letter-spacing: 0.14em;
+    padding: 5px 12px;
+    background: rgba(232,98,26,0.08);
+    border: 1px solid rgba(232,98,26,0.2);
+    border-radius: 2px; color: #e8621a;
+  }
+  .pdp-fitment-chip.year {
+    background: rgba(201,168,76,0.08);
+    border-color: rgba(201,168,76,0.2);
+    color: #c9a84c;
+  }
+  .pdp-fitment-table-wrap {
+    overflow-x: auto;
+  }
+  .pdp-fitment-table {
+    width: 100%; border-collapse: collapse;
+    font-family: var(--font-stencil), monospace;
+    font-size: 11px;
+  }
+  .pdp-fitment-table th {
+    text-align: left;
+    font-size: 8px; letter-spacing: 0.18em; color: #8a8784;
+    padding: 10px 14px 8px;
+    border-bottom: 1px solid #2a2828;
+    white-space: nowrap;
+  }
+  .pdp-fitment-table td {
     padding: 10px 14px;
-    font-size: 14px; font-weight: 500;
+    border-bottom: 1px solid #1a1919;
+    color: #c8c3bc; letter-spacing: 0.04em;
+    vertical-align: top;
+  }
+  .pdp-fitment-table tr:nth-child(odd) td { background: #0f0e0e; }
+  .pdp-fitment-table td:first-child { color: #f0ebe3; }
+  .pdp-fitment-universal {
+    display: flex; align-items: center; gap: 10px;
+    font-family: var(--font-stencil), monospace;
+    font-size: 11px; color: #22c55e; letter-spacing: 0.1em;
+    padding: 16px 0;
+  }
+  .pdp-fitment-universal-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #22c55e; box-shadow: 0 0 6px #22c55e;
+    flex-shrink: 0;
+  }
+  .pdp-no-fitment {
+    font-family: var(--font-stencil), monospace;
+    font-size: 11px; color: #8a8784; letter-spacing: 0.12em;
+    font-style: italic; padding: 12px 0;
+  }
+  .pdp-fitment-note {
+    font-family: var(--font-stencil), monospace;
+    font-size: 9px; color: #5a5856; letter-spacing: 0.1em;
+    margin-top: 20px; padding-top: 16px;
+    border-top: 1px solid #1a1919;
+  }
+
+  /* Specs panel */
+  .pdp-specs-table {
+    width: 100%; border-collapse: collapse;
+    max-width: 700px;
+  }
+  .pdp-specs-table tr:nth-child(odd) td { background: #0f0e0e; }
+  .pdp-specs-table td {
+    padding: 10px 14px;
+    font-size: 13px;
     border-bottom: 1px solid #1a1919;
     vertical-align: top;
   }
-  .specs-table td:first-child {
+  .pdp-specs-table td:first-child {
     font-family: var(--font-stencil), monospace;
     font-size: 9px; color: #8a8784;
     letter-spacing: 0.15em; text-transform: uppercase;
-    width: 160px; white-space: nowrap;
+    width: 180px; white-space: nowrap;
   }
-  .specs-table td:last-child { color: #f0ebe3; }
+  .pdp-specs-table td:last-child {
+    color: #f0ebe3;
+    font-family: var(--font-stencil), monospace;
+    font-size: 11px; letter-spacing: 0.06em;
+  }
+
+  /* OEM numbers strip */
+  .pdp-oem-strip {
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid #2a2828;
+  }
+  .pdp-oem-label {
+    font-family: var(--font-stencil), monospace;
+    font-size: 8px; letter-spacing: 0.2em; color: #8a8784;
+    margin-bottom: 10px;
+  }
+  .pdp-oem-chips {
+    display: flex; gap: 8px; flex-wrap: wrap;
+  }
+  .pdp-oem-chip {
+    font-family: var(--font-stencil), monospace;
+    font-size: 10px; letter-spacing: 0.1em;
+    padding: 4px 10px;
+    background: #111010; border: 1px solid #2a2828;
+    border-radius: 2px; color: #c8c3bc;
+  }
 
   /* ── RELATED ── */
   .related-section {
@@ -411,60 +620,6 @@ const css = `
     background: rgba(34,197,94,0.08); cursor: default;
   }
 
-  /* ── BRAND OPTION CARDS ── */
-  .brand-opts-label {
-    font-family: var(--font-stencil), monospace;
-    font-size: 9px; color: #8a8784; letter-spacing: 0.18em;
-    margin-bottom: 8px; margin-top: 4px;
-  }
-  .brand-opts { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
-  .brand-opt {
-    display: flex; align-items: center; gap: 12px;
-    padding: 12px 14px;
-    background: #111010;
-    border: 1px solid #2a2828;
-    border-radius: 2px;
-    cursor: pointer;
-    transition: border-color 0.15s, background 0.15s;
-    user-select: none;
-  }
-  .brand-opt:hover { border-color: #4a4848; }
-  .brand-opt.selected { border-color: #e8621a; background: #1a1210; }
-  .brand-opt.oos { opacity: 0.55; }
-  .brand-opt-radio {
-    width: 15px; height: 15px; flex-shrink: 0;
-    border-radius: 50%; border: 2px solid #3a3838;
-    display: flex; align-items: center; justify-content: center;
-    transition: border-color 0.15s;
-  }
-  .brand-opt.selected .brand-opt-radio { border-color: #e8621a; }
-  .brand-opt-radio-dot {
-    width: 7px; height: 7px; border-radius: 50%;
-    background: #e8621a; display: none;
-  }
-  .brand-opt.selected .brand-opt-radio-dot { display: block; }
-  .brand-opt-body { flex: 1; min-width: 0; }
-  .brand-opt-name {
-    font-family: var(--font-stencil), monospace;
-    font-size: 11px; letter-spacing: 0.1em; color: #f0ebe3;
-  }
-  .brand-opt-part {
-    font-family: var(--font-stencil), monospace;
-    font-size: 9px; color: #8a8784; letter-spacing: 0.1em; margin-top: 2px;
-  }
-  .brand-opt-right { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
-  .brand-opt-price {
-    font-family: var(--font-stencil), monospace;
-    font-size: 18px; letter-spacing: 0.04em; color: #f0ebe3;
-  }
-  .brand-opt.selected .brand-opt-price { color: #e8621a; }
-  .brand-opt-stock {
-    font-family: var(--font-stencil), monospace;
-    font-size: 8px; letter-spacing: 0.1em;
-  }
-  .brand-opt-stock.in  { color: #22c55e; }
-  .brand-opt-stock.out { color: #8a8784; }
-
   /* ── TOAST ── */
   .toast {
     position: fixed; bottom: 24px; right: 24px; z-index: 200;
@@ -480,45 +635,14 @@ const css = `
     to   { opacity:1; transform:translateY(0); }
   }
 
-	  @media (max-width: 860px) {
-	    .pdp-main { grid-template-columns: 1fr; gap: 28px; }
-	    .info-name { font-size: 30px; }
-	    .price-main { font-size: 40px; }
-	  }
-
-	  /* ── PRODUCT FEATURES ── */
-	  .product-features {
-	    margin-top: 24px;
-	    padding-top: 20px;
-	    border-top: 1px solid #2a2828;
-	  }
-	  .product-features h3 {
-	    font-family: var(--font-stencil), monospace;
-	    font-size: 14px;
-	    letter-spacing: 0.18em;
-	    color: #e8621a;
-	    margin-bottom: 12px;
-	  }
-	  .product-features ul {
-	    list-style: none;
-	    padding-left: 0;
-	  }
-	  .product-features li {
-	    font-family: var(--font-stencil), monospace;
-	    font-size: 11px;
-	    line-height: 1.8;
-	    color: #f0ebe3;
-	    padding-left: 20px;
-	    position: relative;
-	    margin-bottom: 8px;
-	  }
-	  .product-features li:before {
-	    content: '▸';
-	    position: absolute;
-	    left: 0;
-	    color: #e8621a;
-	  }
-	`;
+  @media (max-width: 860px) {
+    .pdp-main { grid-template-columns: 1fr; gap: 28px; }
+    .info-name { font-size: 30px; }
+    .price-main { font-size: 40px; }
+    .pdp-features-list { grid-template-columns: 1fr; }
+    .pdp-tab-btn { padding: 12px 14px; font-size: 9px; }
+  }
+`;
 
 export default function ProductDetailClient({ product, relatedProducts = [] }) {
   const fallback = "/images/no-image.png";
@@ -529,11 +653,13 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
   const [wishlistToast, setWishlistToast] = useState(null);
   const [added,      setAdded]      = useState(false);
   const [toast,      setToast]      = useState(false);
+  const [activeTab,  setActiveTab]  = useState("description");
   const { addItem } = useCartSafe();
 
   // ── Brand / vendor option cards ───────────────────────────────
-  const [groupOptions, setGroupOptions] = useState(null);   // null = loading, [] = no group
+  const [groupOptions, setGroupOptions] = useState(null);
   const [selectedSku,  setSelectedSku]  = useState(product.sku);
+  const [groupMeta,    setGroupMeta]    = useState(null); // { oem_numbers, page_references }
 
   useEffect(() => {
     let cancelled = false;
@@ -542,22 +668,25 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (cancelled || !data) return;
-        // Only show the selector if there's more than one option
+        // Store OEM numbers + page references for the specs tab
+        setGroupMeta({
+          oem_numbers:     data.oem_numbers     ?? [],
+          page_references: data.page_references ?? [],
+        });
         if (data.options?.length > 1) {
           setGroupOptions(data.options);
-          // Pre-select canonical option
           const canon = data.options.find(o => o.is_canonical) ?? data.options[0];
           setSelectedSku(canon.vendor_sku);
         } else {
-          setGroupOptions([]);   // singleton — hide selector
+          setGroupOptions([]);
         }
       })
       .catch(() => { if (!cancelled) setGroupOptions([]); });
     return () => { cancelled = true; };
   }, [product.slug, product.sku]);
 
-  // Derive active product data from the selected option (falls back to prop)
-  const activeOption = groupOptions?.find(o => o.vendor_sku === selectedSku);
+  // Derive active product data from the selected option
+  const activeOption  = groupOptions?.find(o => o.vendor_sku === selectedSku);
   const activePrice   = activeOption ? Number(activeOption.msrp ?? product.price) : product.price;
   const activeInStock = activeOption ? activeOption.in_stock : product.inStock;
   const activeStock   = activeOption ? Number(activeOption.stock_quantity ?? 0) : Number(product.stockQty ?? 0);
@@ -566,17 +695,13 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
     : (product.display_brand || product.brand);
 
   const supabaseRef = useRef(null);
-  if (!supabaseRef.current) {
-    supabaseRef.current = createBrowserSupabaseClient();
-  }
+  if (!supabaseRef.current) supabaseRef.current = createBrowserSupabaseClient();
   const supabase = supabaseRef.current;
 
   // ── Fitment check ──────────────────────────────────────────
-  // Phase 5: fitmentIds will be an array of vehicle IDs from ACES data.
-  // Until vendor sync runs, fitmentIds is null → show "no data" state.
   const fitmentStatus =
-    !product.fitmentIds                         ? "no-data" :
-    product.fitmentIds.includes(SAVED_VEHICLE.id) ? "fits"    : "no-fit";
+    !product.fitmentIds                              ? "no-data" :
+    product.fitmentIds.includes(SAVED_VEHICLE.id)   ? "fits"    : "no-fit";
 
   const fitmentLabel = {
     "fits":    `✓ FITS YOUR ${SAVED_VEHICLE.year} ${SAVED_VEHICLE.make} ${SAVED_VEHICLE.model}`,
@@ -584,25 +709,28 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
     "no-data": `FITMENT DATA PENDING — ADD TO VERIFY`,
   }[fitmentStatus];
 
+  // ── Auto-select tab based on available data ────────────────
+  useEffect(() => {
+    if (!product.description && !product.features?.length) {
+      if (product.fitmentHdFamilies?.length || product.fitmentYearStart) {
+        setActiveTab("fitment");
+      }
+    }
+  }, [product]);
+
   // ── Add to cart ────────────────────────────────────────────
   const handleAdd = () => {
     if (!activeInStock) return;
     setAdded(true);
     addItem({
       ...product,
-      // Override with selected option if a group option is active
-      sku:   activeOption?.vendor_sku ?? product.sku,
-      price: activePrice,
-      brand: activeBrand,
-      image: (activeOption?.image_url ? activeOption.image_url : resolvedGallery[0]) ?? null,
+      sku:    activeOption?.vendor_sku ?? product.sku,
+      price:  activePrice,
+      brand:  activeBrand,
+      image:  (activeOption?.image_url ? activeOption.image_url : resolvedGallery[0]) ?? null,
       images: resolvedGallery,
     }, qty);
     setToast(true);
-    // TODO Phase 2 (cart drawer):
-    //   await db.getOrCreateCart()
-    //   await supabase.from('cart_items').upsert({
-    //     cart_id, product_id: product.id, quantity: qty
-    //   })
     setTimeout(() => setAdded(false), 2000);
     setTimeout(() => setToast(false),  2500);
   };
@@ -617,10 +745,7 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
     let mounted = true;
     const load = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        if (mounted) setWishlisted(false);
-        return;
-      }
+      if (!user) { if (mounted) setWishlisted(false); return; }
       const { data, error } = await supabase
         .from("wishlists")
         .select("user_id")
@@ -640,47 +765,28 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
     setWishlistBusy(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        window.location.href = "/auth";
-        return;
-      }
-
+      if (!user) { window.location.href = "/auth"; return; }
       if (wishlisted) {
-        const { error } = await supabase
-          .from("wishlists")
-          .delete()
-          .eq("user_id", user.id)
-          .eq("product_sku", product.sku);
-        if (!error) {
-          setWishlisted(false);
-          showWishlistToast("Removed from wishlist");
-        } else {
-          console.warn("Wishlist remove failed:", error.message);
-          showWishlistToast("Could not remove");
-        }
+        const { error } = await supabase.from("wishlists").delete()
+          .eq("user_id", user.id).eq("product_sku", product.sku);
+        if (!error) { setWishlisted(false); showWishlistToast("Removed from wishlist"); }
+        else showWishlistToast("Could not remove");
       } else {
-        const { error } = await supabase
-          .from("wishlists")
-          .insert({
-            user_id: user.id,
-            product_sku: product.sku,
-            product_name: product.name,
-            notify_in_stock: !product.inStock,
-          });
-        if (!error) {
-          setWishlisted(true);
-          showWishlistToast("Saved to wishlist");
-        } else {
-          console.warn("Wishlist add failed:", error.message);
-          showWishlistToast("Could not save");
-        }
+        const { error } = await supabase.from("wishlists").insert({
+          user_id: user.id,
+          product_sku: product.sku,
+          product_name: product.name,
+          notify_in_stock: !product.inStock,
+        });
+        if (!error) { setWishlisted(true); showWishlistToast("Saved to wishlist"); }
+        else showWishlistToast("Could not save");
       }
     } finally {
       setWishlistBusy(false);
     }
   };
 
-  // ── Render helpers ─────────────────────────────────────────
+  // ── Image helpers ──────────────────────────────────────────
   const WPS_DOMAINS = ["cdn.wpsstatic.com", "asset.lemansnet.com"];
   const isWpsCdn = (url) => {
     try { return WPS_DOMAINS.some(d => new URL(url).hostname.includes(d)); }
@@ -695,7 +801,6 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
         ? [product.primaryImage]
         : [];
     if (raw.length > 0) {
-      // Proxy CDN URLs that need referer/auth; leave other direct URLs alone.
       return raw.map(url => isWpsCdn(url) ? `/api/image-proxy?url=${encodeURIComponent(url)}` : url);
     }
     return [fallback];
@@ -706,10 +811,72 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
       ? `/api/image-proxy?url=${encodeURIComponent(src)}`
       : src;
 
-  // Lightweight inline notify button for related cards
-  function RelatedNotifyButton({ sku, productName, vendor }) {
-    const [state, setState] = useState("idle"); // idle | loading | done | error
+  // ── Fitment table data ─────────────────────────────────────
+  const hasFitmentData =
+    product.isUniversal ||
+    product.fitmentHdFamilies?.length > 0 ||
+    product.fitmentHdModels?.length > 0 ||
+    product.fitmentYearStart != null;
 
+  // Build fitment rows from HD families + year ranges
+  const fitmentRows = (() => {
+    const families  = product.fitmentHdFamilies ?? [];
+    const models    = product.fitmentHdModels   ?? [];
+    const codes     = product.fitmentHdCodes    ?? [];
+    const yearStart = product.fitmentYearStart;
+    const yearEnd   = product.fitmentYearEnd;
+
+    if (!families.length && !models.length) return [];
+
+    // If we have models use those, otherwise use families
+    const entries = models.length > 0 ? models : families;
+    return entries.map((entry, i) => ({
+      make:   "Harley-Davidson",
+      model:  entry,
+      code:   codes[i] ?? null,
+      years:  yearStart && yearEnd
+                ? (yearStart === yearEnd ? String(yearStart) : `${yearStart}–${yearEnd}`)
+                : yearStart
+                  ? `${yearStart}+`
+                  : yearEnd
+                    ? `Up to ${yearEnd}`
+                    : "Verify Application",
+    }));
+  })();
+
+  // ── Features data ──────────────────────────────────────────
+  // product.features is an array from the server (fixed: was product.product_features HTML string)
+  const featuresArray = Array.isArray(product.features) ? product.features.filter(Boolean) : [];
+
+  // ── Tab visibility ─────────────────────────────────────────
+  const tabs = [
+    { key: "description", label: "DESCRIPTION" },
+    { key: "features",    label: "FEATURES",    count: featuresArray.length || null },
+    { key: "fitment",     label: "FITMENT",     highlight: hasFitmentData },
+    { key: "specs",       label: "SPECS" },
+  ];
+
+  // ── Specs rows ─────────────────────────────────────────────
+  const specsRows = [
+    product.sku           && { label: "SKU",              value: product.sku },
+    product.upc           && { label: "UPC",              value: product.upc },
+    product.weight        && { label: "WEIGHT",           value: `${product.weight} lbs` },
+    (product.lengthIn || product.widthIn || product.heightIn) && {
+      label: "DIMENSIONS",
+      value: [product.lengthIn, product.widthIn, product.heightIn].filter(Boolean).join(" × ") + " in"
+    },
+    product.uom           && { label: "UNIT",             value: product.uom },
+    product.countryOfOrigin && { label: "ORIGIN",         value: product.countryOfOrigin },
+    product.oemPartNumber && { label: "OEM PART #",       value: product.oemPartNumber },
+    product.category      && { label: "CATEGORY",         value: product.category },
+    product.vendor        && { label: "VENDOR",           value: product.vendor },
+    product.inFatbook     && { label: "FATBOOK",          value: "YES" },
+    product.inOldbook     && { label: "OLDBOOK",          value: "YES" },
+  ].filter(Boolean);
+
+  // Inline notify button for related cards
+  function RelatedNotifyButton({ sku, productName, vendor }) {
+    const [state, setState] = useState("idle");
     const handleClick = async (e) => {
       e.stopPropagation();
       if (state !== "idle" && state !== "error") return;
@@ -723,13 +890,9 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
           body: JSON.stringify({ product_sku: sku, product_name: productName, vendor, source: "pdp" }),
         });
         setState("done");
-      } catch {
-        setState("error");
-      }
+      } catch { setState("error"); }
     };
-
     const label = { idle: "🔔 NOTIFY ME", loading: "...", done: "✓ ON THE LIST", error: "RETRY" }[state];
-
     return (
       <button
         className={`related-notify-btn ${state === "done" ? "done" : ""}`}
@@ -744,35 +907,21 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
   function RelatedCardImage({ product }) {
     const src = toProxySrc(product.primaryImage ?? product.gallery?.[0] ?? fallback);
     const isPlaceholder = src === "/placeholder-product.png" || src === "/images/placeholder.jpg";
-
     return (
       <div className="related-img">
         {isPlaceholder ? (
-          <span
-            style={{
-              fontFamily: "var(--font-stencil),monospace",
-              fontSize: 8,
-              color: "#3a3838",
-              letterSpacing: "0.1em",
-              position: "relative",
-              zIndex: 1,
-            }}
-          >
+          <span style={{ fontFamily:"var(--font-stencil),monospace", fontSize:8, color:"#3a3838", letterSpacing:"0.1em", position:"relative", zIndex:1 }}>
             NO IMAGE
           </span>
         ) : (
           <Image
-            src={src}
-            alt={product.name}
-            width={200}
-            height={200}
-            style={{ width: "100%", height: "100%", objectFit: "cover", opacity: product.inStock ? 1 : 0.5 }}
+            src={src} alt={product.name}
+            width={200} height={200}
+            style={{ width:"100%", height:"100%", objectFit:"cover", opacity: product.inStock ? 1 : 0.5 }}
             unoptimized
           />
         )}
-        {!product.inStock && (
-          <span className="related-oos-badge">OUT OF STOCK</span>
-        )}
+        {!product.inStock && <span className="related-oos-badge">OUT OF STOCK</span>}
       </div>
     );
   }
@@ -789,12 +938,12 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
         <span className="sep">→</span>
         <Link href="/shop">SHOP</Link>
         <span className="sep">→</span>
-        <Link href={`/shop?category=${product.category}`}>{product.category.toUpperCase()}</Link>
+        <Link href={`/shop?category=${product.category}`}>{product.category?.toUpperCase()}</Link>
         <span className="sep">→</span>
-        <span className="current">{product.name.toUpperCase()}</span>
+        <span className="current">{product.name?.toUpperCase()}</span>
       </div>
 
-      {/* ── MAIN ── */}
+      {/* ── MAIN GRID ── */}
       <div className="pdp-main">
 
         {/* LEFT — Gallery */}
@@ -812,61 +961,42 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
             />
           </div>
 
-          {/* Thumbnails (if multiple) */}
+          {/* Thumbnails */}
           {resolvedGallery.length > 1 && (
-            <div className="flex gap-2 mt-4">
+            <div className="gallery-thumbs">
               {resolvedGallery.map((img, i) => (
-                <Image
+                <div
                   key={i}
-                  src={toProxySrc(img)}
-                  alt={`${product.name} ${i}`}
-                  width={80}
-                  height={80}
-                  className={`border rounded cursor-pointer ${activeImg===i ? "border-[#e8621a]" : "border-[#2a2828]"}`}
+                  className={`gallery-thumb ${activeImg === i ? "active" : ""}`}
                   onClick={() => setActiveImg(i)}
-                  unoptimized
-                />
+                >
+                  <img src={toProxySrc(img)} alt={`${product.name} view ${i + 1}`} />
+                </div>
               ))}
-            </div>
-          )}
-
-          {/* Specs table — below gallery on desktop */}
-          {product.specs && product.specs.length > 0 && (
-            <div className="specs-section">
-              <div className="specs-title">SPEC<span>S</span></div>
-              <table className="specs-table">
-                <tbody>
-                  {product.specs.map((s, i) => (
-                    <tr key={i}>
-                      <td>{s.label}</td>
-                      <td>{s.value}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
           )}
         </div>
 
         {/* RIGHT — Info */}
         <div className="info-col">
-          {activeBrand && (
-            <div className="info-brand">{activeBrand}</div>
-          )}
+          {activeBrand && <div className="info-brand">{activeBrand}</div>}
           <div className="info-name">{product.name}</div>
-          {product.oem_part_number && (
-            <div className="info-sku">OEM: {product.oem_part_number}</div>
+          {product.sku && (
+            <div className="info-sku">
+              SKU: {product.sku}
+              {product.oemPartNumber && ` · OEM: ${product.oemPartNumber}`}
+            </div>
           )}
 
-          {/* Brand / vendor option cards — shown when multiple options exist */}
+          {/* Brand / vendor option cards */}
           {groupOptions && groupOptions.length > 1 && (
             <div>
               <div className="brand-opts-label">SELECT BRAND / OPTION</div>
               <div className="brand-opts">
                 {groupOptions.map((opt) => {
-                  const optBrand = opt.display_brand || opt.brand || "Unknown Brand";
-                  const optPrice = opt.msrp ? Number(opt.msrp) : null;
-                  const selected = opt.vendor_sku === selectedSku;
+                  const optBrand  = opt.display_brand || opt.brand || "Unknown Brand";
+                  const optPrice  = opt.msrp ? Number(opt.msrp) : null;
+                  const selected  = opt.vendor_sku === selectedSku;
                   return (
                     <div
                       key={opt.vendor_sku}
@@ -880,9 +1010,7 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
                       </div>
                       <div className="brand-opt-body">
                         <div className="brand-opt-name">{optBrand.toUpperCase()}</div>
-                        {opt.internal_sku && (
-                          <div className="brand-opt-part">{opt.internal_sku}</div>
-                        )}
+                        {opt.internal_sku && <div className="brand-opt-part">{opt.internal_sku}</div>}
                       </div>
                       <div className="brand-opt-right">
                         {optPrice != null && (
@@ -907,7 +1035,7 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
             {fitmentLabel}
           </div>
 
-          {/* Price — reflects selected brand option */}
+          {/* Price */}
           <div className="price-block">
             {product.was && (
               <div className="price-was">${product.was.toFixed(2)}</div>
@@ -923,15 +1051,14 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
             )}
           </div>
 
-          {/* Stock — reflects selected brand option */}
+          {/* Stock */}
           <div className="stock-row">
-            <div className={`stock-dot ${activeInStock?"in":"out"}`}/>
-            <span className={`stock-label ${activeInStock?"in":"out"}`}>
+            <div className={`stock-dot ${activeInStock ? "in" : "out"}`}/>
+            <span className={`stock-label ${activeInStock ? "in" : "out"}`}>
               {(() => {
-                const stock = activeStock;
-                if (!activeInStock || stock <= 0) return "OUT OF STOCK";
-                if (stock > 5) return "IN STOCK";
-                return `ONLY ${stock} LEFT`;
+                if (!activeInStock || activeStock <= 0) return "OUT OF STOCK";
+                if (activeStock > 5) return "IN STOCK";
+                return `ONLY ${activeStock} LEFT`;
               })()}
             </span>
           </div>
@@ -939,16 +1066,13 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
           {/* Qty + Add to Cart */}
           <div className="purchase-row">
             <div className="qty-wrap">
-              <button className="qty-btn" onClick={() => setQty(q => Math.max(1, q-1))} disabled={qty<=1}>−</button>
+              <button className="qty-btn" onClick={() => setQty(q => Math.max(1, q-1))} disabled={qty <= 1}>−</button>
               <div className="qty-val">QTY: {qty}</div>
-              <button className="qty-btn" onClick={() => setQty(q => Math.min(Number(product.stockQty ?? 10), q+1))} disabled={!product.inStock}>+</button>
+              <button className="qty-btn" onClick={() => setQty(q => Math.min(Number(product.stockQty ?? 10), q+1))} disabled={!activeInStock}>+</button>
             </div>
 
             {activeInStock ? (
-              <button
-                className={`add-to-cart-btn ${added?"added":""}`}
-                onClick={handleAdd}
-              >
+              <button className={`add-to-cart-btn ${added ? "added" : ""}`} onClick={handleAdd}>
                 {added ? "✓ ADDED TO CART" : "ADD TO CART"}
               </button>
             ) : (
@@ -961,7 +1085,7 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
             )}
 
             <button
-              className={`wishlist-btn ${wishlisted?"active":""}`}
+              className={`wishlist-btn ${wishlisted ? "active" : ""}`}
               onClick={handleWishlistToggle}
               title={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
               disabled={wishlistBusy}
@@ -1003,40 +1127,196 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
               </div>
             )}
           </div>
+        </div>
+      </div>
 
-          <hr className="pdp-divider"/>
+      {/* ── TABBED CONTENT SECTION ── */}
+      <div className="pdp-tabs-section">
+        <div className="pdp-tabs-nav">
+          {tabs.map(tab => (
+            <button
+              key={tab.key}
+              className={`pdp-tab-btn ${activeTab === tab.key ? "active" : ""}`}
+              onClick={() => setActiveTab(tab.key)}
+            >
+              {tab.label}
+              {tab.count ? ` (${tab.count})` : ""}
+              {tab.highlight && activeTab !== tab.key ? " ●" : ""}
+            </button>
+          ))}
+        </div>
 
-          {/* Description */}
-	          {product.description ? (
-	            <div
-	              className="prose prose-invert max-w-none text-sm text-gray-300"
-	              dangerouslySetInnerHTML={{ __html: product.description }}
-	            />
-	          ) : (
-            <div style={{ fontFamily:"var(--font-stencil),monospace", fontSize:12, color:"#8a8784", letterSpacing:"0.05em", lineHeight:1.8 }}>
-              <p>{product.name}{(product.display_brand || product.brand) ? ` by ${product.display_brand || product.brand}` : ''}.</p>
-              {product.weight && <p style={{marginTop:8}}>WEIGHT: {product.weight} LBS</p>}
-	              <p style={{marginTop:8}}>CATEGORY: {product.category?.toUpperCase()}</p>
-	            </div>
-	          )}
+        {/* DESCRIPTION */}
+        <div className={`pdp-tab-panel ${activeTab === "description" ? "active" : ""}`}>
+          {product.description ? (
+            <div
+              className="pdp-description"
+              dangerouslySetInnerHTML={{ __html: product.description }}
+            />
+          ) : (
+            <div>
+              <p className="pdp-description" style={{ marginBottom: 12 }}>
+                {product.name}{activeBrand ? ` by ${activeBrand}` : ""}.
+                {product.category ? ` Category: ${product.category}.` : ""}
+                {product.weight ? ` Weight: ${product.weight} lbs.` : ""}
+              </p>
+              <p className="pdp-no-description">
+                Full product description not yet available. Check the Features and Fitment tabs for more information.
+              </p>
+            </div>
+          )}
+        </div>
 
-	          {product.product_features && (
-	            <div className="product-features">
-	              <h3>Features</h3>
-	              <div
-	                className="prose prose-invert max-w-none text-sm text-gray-300"
-	                dangerouslySetInnerHTML={{ __html: product.product_features }}
-	              />
-	            </div>
-	          )}
-	        </div>
-	      </div>
+        {/* FEATURES */}
+        <div className={`pdp-tab-panel ${activeTab === "features" ? "active" : ""}`}>
+          {featuresArray.length > 0 ? (
+            <ul className="pdp-features-list">
+              {featuresArray.map((feat, i) => (
+                <li key={i}>
+                  <span className="pdp-feat-bullet">▸</span>
+                  <span>{feat}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            // Fallback: try product.product_features as HTML string
+            product.product_features ? (
+              <div
+                className="pdp-description"
+                dangerouslySetInnerHTML={{ __html: product.product_features }}
+              />
+            ) : (
+              <p className="pdp-no-features">No feature details available for this product.</p>
+            )
+          )}
+        </div>
+
+        {/* FITMENT */}
+        <div className={`pdp-tab-panel ${activeTab === "fitment" ? "active" : ""}`}>
+          {product.isUniversal ? (
+            <div className="pdp-fitment-universal">
+              <div className="pdp-fitment-universal-dot"/>
+              UNIVERSAL FIT — Compatible with most applications. Verify before installation.
+            </div>
+          ) : hasFitmentData ? (
+            <>
+              {/* Summary chips */}
+              <div className="pdp-fitment-summary">
+                {product.fitmentYearStart && (
+                  <span className="pdp-fitment-chip year">
+                    {product.fitmentYearStart === product.fitmentYearEnd
+                      ? product.fitmentYearStart
+                      : `${product.fitmentYearStart}–${product.fitmentYearEnd ?? "PRESENT"}`}
+                  </span>
+                )}
+                {product.isHarleyFitment && (
+                  <span className="pdp-fitment-chip">HARLEY-DAVIDSON</span>
+                )}
+                {(product.fitmentHdFamilies ?? []).map(f => (
+                  <span key={f} className="pdp-fitment-chip">{f}</span>
+                ))}
+              </div>
+
+              {/* Fitment table */}
+              {fitmentRows.length > 0 && (
+                <div className="pdp-fitment-table-wrap">
+                  <table className="pdp-fitment-table">
+                    <thead>
+                      <tr>
+                        <th>MAKE</th>
+                        <th>MODEL / FAMILY</th>
+                        <th>CODE</th>
+                        <th>YEARS</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {fitmentRows.map((row, i) => (
+                        <tr key={i}>
+                          <td>{row.make}</td>
+                          <td>{row.model}</td>
+                          <td>{row.code ?? "—"}</td>
+                          <td>{row.years}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Fitment other makes */}
+              {product.fitmentOtherMakes?.length > 0 && (
+                <div style={{ marginTop: 20 }}>
+                  <div style={{ fontFamily: "var(--font-stencil), monospace", fontSize: 8, letterSpacing: "0.2em", color: "#8a8784", marginBottom: 10 }}>
+                    OTHER MAKES
+                  </div>
+                  <div className="pdp-fitment-summary">
+                    {product.fitmentOtherMakes.map(m => (
+                      <span key={m} className="pdp-fitment-chip">{m}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <p className="pdp-fitment-note">
+                Fitment data is sourced from vendor catalogs. Always verify compatibility with your specific vehicle before installation.
+              </p>
+            </>
+          ) : (
+            <p className="pdp-no-fitment">
+              Fitment data is not yet available for this product. Please verify compatibility before purchasing.
+            </p>
+          )}
+        </div>
+
+        {/* SPECS */}
+        <div className={`pdp-tab-panel ${activeTab === "specs" ? "active" : ""}`}>
+          {specsRows.length > 0 ? (
+            <table className="pdp-specs-table">
+              <tbody>
+                {specsRows.map((row, i) => (
+                  <tr key={i}>
+                    <td>{row.label}</td>
+                    <td>{row.value}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="pdp-no-features">No spec details available for this product.</p>
+          )}
+
+          {/* OEM numbers from group API */}
+          {groupMeta?.oem_numbers?.length > 0 && (
+            <div className="pdp-oem-strip">
+              <div className="pdp-oem-label">OEM / H-D PART NUMBERS</div>
+              <div className="pdp-oem-chips">
+                {groupMeta.oem_numbers.map(n => (
+                  <span key={n} className="pdp-oem-chip">{n}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {groupMeta?.page_references?.length > 0 && (
+            <div className="pdp-oem-strip">
+              <div className="pdp-oem-label">BRAND PART NUMBERS / PAGE REFS</div>
+              <div className="pdp-oem-chips">
+                {groupMeta.page_references.map(n => (
+                  <span key={n} className="pdp-oem-chip">{n}</span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* ── RELATED PRODUCTS ── */}
       {relatedProducts.length > 0 && (
         <div className="related-section">
           <div className="related-head">
-            <div className="related-title">MORE FROM <span>{(product.display_brand || product.brand || 'THIS CATEGORY').toUpperCase()}</span></div>
+            <div className="related-title">
+              MORE FROM <span>{(activeBrand || "THIS CATEGORY").toUpperCase()}</span>
+            </div>
             <a href={`/shop?category=${product.category}`} className="related-link">
               VIEW ALL IN CATEGORY →
             </a>
@@ -1053,8 +1333,7 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
                   <div className="related-brand">{p.display_brand || p.brand}</div>
                   <div className="related-name">{p.name}</div>
                   <div className="related-footer">
-                    <div className="related-price"
-                      style={{ color: p.inStock ? "#f0ebe3" : "#8a8784" }}>
+                    <div className="related-price" style={{ color: p.inStock ? "#f0ebe3" : "#8a8784" }}>
                       ${p.price.toFixed(2)}
                     </div>
                     {p.inStock
@@ -1072,7 +1351,7 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
         </div>
       )}
 
-      {/* ── TOAST ── */}
+      {/* ── TOASTS ── */}
       {toast && (
         <div className="toast">
           ✓ {qty > 1 ? `${qty}× ` : ""}{product.name.split(" ").slice(0,3).join(" ")} ADDED TO CART
