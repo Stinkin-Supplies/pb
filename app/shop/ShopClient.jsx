@@ -440,6 +440,14 @@ export default function ShopClient({
   const [page,     setPage]     = useState(isNaN(urlPage) ? 0 : urlPage);
   const [view,     setView]     = useState("grid");
   const [filterOpen, setFilterOpen] = useState(false);
+  const [openSections, setOpenSections] = useState(() => new Set([
+    "availability",
+    "fitment",
+    "catalog",
+    "category",
+    "brand",
+    "price",
+  ]));
 
   const { addItem } = useCartSafe();
   const router   = useRouter();
