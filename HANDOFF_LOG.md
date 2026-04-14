@@ -33,6 +33,87 @@ Use this file as the root-level record of changes, verification, and follow-up i
 - `/shop/classic` preserves the legacy catalog grid.
 - `/harley` is available as a dedicated Harley-focused landing route.
 - `npm run build` currently passes.
+- Live cloud database audit artifacts were generated in the repo root:
+  - `DB_AUDIT_REPORT.md`
+  - `DB_SAMPLE_ROWS.json`
+- The current implementation direction is to make Harley-first shopping the main flow while preserving the classic catalog fallback until verification is complete.
+
+## Database Audit Summary
+
+- Live DB schemas currently in use: `public` and `vendor`.
+- User tables discovered: 51 total.
+- Top row-count tables are concentrated in catalog, staging, and normalization layers:
+  - `public.catalog_inventory`
+  - `public.catalog_allowlist`
+  - `public.catalog_specs`
+  - `vendor.vendor_products`
+  - `public.catalog_product_enrichment`
+  - `vendor.pu_pricefile_staging`
+  - `public.pu_products`
+  - `public.pu_pricing`
+  - `public.catalog_unified`
+  - `public.product_group_members`
+  - `public.product_groups`
+  - `public.catalog_pricing`
+  - `public.raw_vendor_wps_products`
+  - `public.catalog_products`
+  - `public.pu_brand_enrichment`
+- Core relational integrity exists, but a lot of cleanup still depends on app conventions and import pipelines rather than foreign keys alone.
+- The canonical customer-facing layer is still `catalog_unified`, with `catalog_products`, `vendor_products`, `vendor_offers`, `catalog_specs`, and `catalog_inventory` feeding it.
+
+## Cleanup Priorities
+
+- Normalize and backfill `catalog_unified` where fields are null-heavy:
+  - `category`
+  - `image_url`
+  - `fitment_year_start`
+  - `fitment_year_end`
+  - `display_brand`
+  - `manufacturer_brand`
+- Improve product identity coverage in `catalog_products`:
+  - `manufacturer_part_number`
+  - `oem_part_number`
+  - brand naming consistency
+- Fix linkage gaps in `product_group_members` so group rows resolve to canonical products more often.
+- Materialize pricing consistently so `vendor_offers.computed_price` is not effectively empty.
+- Treat raw/staging tables as source history, not customer-facing truth, and avoid cleaning them destructively.
+- For Harley-specific accuracy, add exact submodel enrichment on top of the existing generic fitment layer instead of replacing it.
+
+## Harley Shop Direction
+
+- The shop should become Harley-first without losing the existing catalog flow.
+- Two browsing modes are required:
+  - exact fitment search by year + submodel
+  - style browsing for broader product discovery
+- The desired style set includes:
+  - chopper
+  - touring
+  - Evo
+  - Shovelhead
+  - Panhead
+  - Softail
+  - Sportster
+  - Dyna
+  - FXR
+  - M8
+  - Big Twin
+- Product scope should stay limited to the two approved catalogs:
+  - Parts Unlimited: `oldbook` and `fatbook`
+  - WPS: `HardDrive`
+- Duplicate display should be handled in the unified catalog layer, not only in the UI.
+- The four requested animations remain part of the target implementation:
+  - layered stack for style selection
+  - expandable cards for categories
+  - shared layout product detail
+  - corner nav for related categories
+
+## Recommended Next Build Steps
+
+- Enrich fitment with a companion `catalog_submodels` table for JP Cycles-style submodel precision.
+- Keep `catalog_fitment` as the generic base layer.
+- Add or confirm API routes for styles, submodels, categories, products, exact-products, and related categories.
+- Keep `/shop/classic` available until browser verification confirms the Harley-first flow is stable.
+- Once verified, decide whether to retire the fallback path or keep it as a hidden support route.
 
 ## 2026-04-14
 
