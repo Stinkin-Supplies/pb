@@ -845,20 +845,45 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
   })();
 
   // ── Features data ──────────────────────────────────────────
-  // product.features is an array from the server (fixed: was product.product_features HTML string)
-  const featuresArray = Array.isArray(product.features) ? product.features.filter(Boolean) : [];
+  // product.features can be:
+  //   a) an array of plain-text strings  ["trivalent plating...", "pure alumina..."]
+  //   b) an array with ONE HTML string   ["<UL><LI>trivalent...</LI></UL>"]
+  //   c) null / empty
+  const featuresRaw = Array.isArray(product.features) ? product.features.filter(Boolean) : [];
+  // Detect if the first item is an HTML blob (vendor catalogs often store it this way)
+  const featuresIsHtml =
+    featuresRaw.length === 1 &&
+    typeof featuresRaw[0] === "string" &&
+    /<[a-z][^>]*>/i.test(featuresRaw[0]);
+  // Plain-text items only (used for bullet-list rendering)
+  const featuresArray = featuresIsHtml ? [] : featuresRaw;
+  // HTML blob (used for dangerouslySetInnerHTML)
+  const featuresHtml  = featuresIsHtml ? featuresRaw[0] : null;
+  // Total feature count for the tab label
+  const featuresCount = featuresIsHtml ? 1 : featuresArray.length;
 
   // ── Tab visibility ─────────────────────────────────────────
   const tabs = [
     { key: "description", label: "DESCRIPTION" },
-    { key: "features",    label: "FEATURES",    count: featuresArray.length || null },
+    { key: "features",    label: "FEATURES",    count: featuresCount || null },
     { key: "fitment",     label: "FITMENT",     highlight: hasFitmentData },
     { key: "specs",       label: "SPECS" },
   ];
 
   // ── Specs rows ─────────────────────────────────────────────
+  // Only display the SKU if it looks like an internal vendor-formatted number
+  // (WPS-style SKUs have a letter prefix: e.g. "DS275118", "NGK-DR9EA").
+  // Raw PU manufacturer codes like "DR9EA" (no dash, short, no vendor prefix)
+  // are suppressed — they belong in the OEM cross-ref, not the product header.
+  const isVendorSku = (s) => {
+    if (!s) return false;
+    if (product.sourceVendor === "PU" || product.vendor === "PU") return false;
+    return true;
+  };
+  const displaySku = isVendorSku(product.sku) ? product.sku : null;
+
   const specsRows = [
-    product.sku           && { label: "SKU",              value: product.sku },
+    displaySku            && { label: "SKU",              value: displaySku },
     product.upc           && { label: "UPC",              value: product.upc },
     product.weight        && { label: "WEIGHT",           value: `${product.weight} lbs` },
     (product.lengthIn || product.widthIn || product.heightIn) && {
@@ -981,10 +1006,11 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
         <div className="info-col">
           {activeBrand && <div className="info-brand">{activeBrand}</div>}
           <div className="info-name">{product.name}</div>
-          {product.sku && (
+          {(displaySku || product.oemPartNumber) && (
             <div className="info-sku">
-              SKU: {product.sku}
-              {product.oemPartNumber && ` · OEM: ${product.oemPartNumber}`}
+              {displaySku && `SKU: ${displaySku}`}
+              {displaySku && product.oemPartNumber && ` · `}
+              {product.oemPartNumber && `OEM: ${product.oemPartNumber}`}
             </div>
           )}
 
@@ -1169,7 +1195,14 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
 
         {/* FEATURES */}
         <div className={`pdp-tab-panel ${activeTab === "features" ? "active" : ""}`}>
-          {featuresArray.length > 0 ? (
+          {featuresIsHtml && featuresHtml ? (
+            // HTML blob from vendor catalog — render as markup
+            <div
+              className="pdp-description"
+              dangerouslySetInnerHTML={{ __html: featuresHtml }}
+            />
+          ) : featuresArray.length > 0 ? (
+            // Plain-text array — render as styled bullet list
             <ul className="pdp-features-list">
               {featuresArray.map((feat, i) => (
                 <li key={i}>
@@ -1178,16 +1211,14 @@ export default function ProductDetailClient({ product, relatedProducts = [] }) {
                 </li>
               ))}
             </ul>
+          ) : product.product_features ? (
+            // Legacy HTML string field fallback
+            <div
+              className="pdp-description"
+              dangerouslySetInnerHTML={{ __html: product.product_features }}
+            />
           ) : (
-            // Fallback: try product.product_features as HTML string
-            product.product_features ? (
-              <div
-                className="pdp-description"
-                dangerouslySetInnerHTML={{ __html: product.product_features }}
-              />
-            ) : (
-              <p className="pdp-no-features">No feature details available for this product.</p>
-            )
+            <p className="pdp-no-features">No feature details available for this product.</p>
           )}
         </div>
 
