@@ -83,67 +83,60 @@ export const DEFAULT_SEARCH_PARAMS = IS_GROUPS_COLLECTION
   ? GROUPS_SEARCH_PARAMS
   : PRODUCTS_SEARCH_PARAMS;
 
-// ── Helper: build filter string ───────────────────────────────────────────────
+// ── Collection schema ─────────────────────────────────────────
+export const SCHEMA = {
+  name:                 COLLECTION,
+  enable_nested_fields: false,
+  fields: [
+    { name: 'id',           type: 'string' as const },
+    { name: 'sku',          type: 'string' as const },
+    { name: 'slug',         type: 'string' as const },
+    { name: 'name',         type: 'string' as const },
+    { name: 'brand',        type: 'string' as const, facet: true  },
+    { name: 'category',     type: 'string' as const, facet: true  },
+    { name: 'price',        type: 'float'  as const, facet: true  },
+    { name: 'our_price',    type: 'float'  as const, facet: true  },
+    { name: 'map_price',    type: 'float'  as const, optional: true },
+    { name: 'msrp',         type: 'float'  as const, optional: true },
+    { name: 'is_active',    type: 'bool'   as const, facet: true  },
+    { name: 'stock_quantity', type: 'int64' as const, facet: true  },
+    { name: 'in_stock',     type: 'bool'   as const, facet: true },
+    { name: 'image',        type: 'string' as const, optional: true, index: false },
+    { name: 'description',  type: 'string' as const, optional: true },
+    { name: 'vendor_codes',   type: 'string[]' as const, facet: true, optional: true },
+    { name: 'weight',         type: 'float'  as const, optional: true },
+    { name: 'created_at',     type: 'int64'  as const },
+    // v2 fitment + specs facets
+    { name: 'fitment_make',   type: 'string[]' as const, facet: true, optional: true },
+    { name: 'fitment_model',  type: 'string[]' as const, facet: true, optional: true },
+    { name: 'fitment_year',   type: 'int32[]'  as const, facet: true, optional: true },
+    { name: 'specs',          type: 'string[]' as const, facet: true, optional: true },
+  ],
+  default_sorting_field: 'created_at',
+}
 
-export function buildFilters(params: {
-  inStock?:     boolean;
-  hasImage?:    boolean;
-  brand?:       string;
-  category?:    string;
-  sourceVendor?: string;
-  isHarley?:    boolean;
-  isUniversal?: boolean;
-  hdFamily?:    string;
-  hdCode?:      string;
-  inOldbook?:   boolean;
-  inFatbook?:   boolean;
-  dragPart?:    boolean;
-  yearStart?:   number;
-  yearEnd?:     number;
-  minPrice?:    number;
-  maxPrice?:    number;
-  closeout?:    boolean;
-  productCode?: string;
-  groupSignal?: string;
-}): string {
-  // product_groups has no is_active — all records are live by definition
-  const filters: string[] = IS_GROUPS_COLLECTION ? [] : ["is_active:true"];
-
-  if (params.inStock)      filters.push("in_stock:true");
-  if (params.hasImage)     filters.push("has_image:true");
-  if (params.brand)        filters.push(`brand:=${params.brand}`);
-  if (params.category)     filters.push(`category:=${params.category}`);
-  if (params.isHarley)     filters.push("is_harley_fitment:true");
-  if (params.isUniversal)  filters.push("is_universal:true");
-  if (params.hdFamily)     filters.push(`fitment_hd_families:=${params.hdFamily}`);
-  if (params.hdCode)       filters.push(`fitment_hd_codes:=${params.hdCode}`);
-  if (params.inOldbook)    filters.push("in_oldbook:true");
-  if (params.inFatbook)    filters.push("in_fatbook:true");
-  if (params.dragPart)     filters.push("drag_part:true");
-  if (params.closeout)     filters.push("closeout:true");
-  if (params.groupSignal)  filters.push(`group_signal:=${params.groupSignal}`);
-
-  // source_vendor / product_code only exist on legacy products collection
-  if (!IS_GROUPS_COLLECTION) {
-    if (params.sourceVendor) filters.push(`source_vendor:=${params.sourceVendor}`);
-    if (params.productCode)  filters.push(`product_code:=${params.productCode}`);
-  } else {
-    // On product_groups: vendor filter hits the vendors[] multi-value field
-    if (params.sourceVendor) filters.push(`vendors:=${params.sourceVendor}`);
-  }
-
-  if (params.yearStart && params.yearEnd) {
-    filters.push(`fitment_year_start:<=${params.yearEnd}`);
-    filters.push(`fitment_year_end:>=${params.yearStart}`);
-  }
-
-  if (params.minPrice !== undefined || params.maxPrice !== undefined) {
-    const min = params.minPrice ?? 0;
-    const max = params.maxPrice ?? 99999;
-    // product_groups uses price_min for range filtering
-    const priceField = IS_GROUPS_COLLECTION ? "price_min" : "msrp";
-    filters.push(`${priceField}:[${min}..${max}]`);
-  }
-
-  return filters.filter(Boolean).join(" && ");
+// ── Document type ─────────────────────────────────────────────
+export type ProductDocument = {
+  id:           string
+  sku:          string
+  slug:         string
+  name:         string
+  brand:        string
+  category:     string
+  price:        number
+  our_price:    number
+  map_price?:   number
+  msrp?:        number
+  is_active:    boolean
+  stock_quantity: number
+  in_stock:     boolean
+  image?:       string
+  description?: string
+  vendor_codes?: string[]
+  weight?:       number
+  created_at:    number
+  fitment_make?:  string[]
+  fitment_model?: string[]
+  fitment_year?:  number[]
+  specs?:         string[]
 }

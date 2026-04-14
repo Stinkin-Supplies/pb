@@ -4,6 +4,9 @@
  */
 
 import { normalizePu } from './normalize_pu.js';
+import { normalizeWps } from './normalize_wps.js';
+import { normalizeAces } from './normalize_aces.js';
+import { normalizePies } from './normalize_pies.js';
 import { runComputedValues } from './computed_values.js';
 import { buildTypesenseIndex } from './index_assembly.js';
 import dotenv from 'dotenv';
@@ -42,8 +45,18 @@ async function runStage1() {
   console.log('\n═══════════════════════════════════════════════════');
   console.log('  STAGE 1: Normalization');
   console.log('═══════════════════════════════════════════════════\n');
-  
+
+  console.log('--- Stage 1a: Parts Unlimited ---');
   await normalizePu();
+
+  console.log('\n--- Stage 1b: WPS ---');
+  await normalizeWps();
+
+  console.log('\n--- Stage 1c: ACES Fitment ---');
+  await normalizeAces();
+
+  console.log('\n--- Stage 1d: PIES Specs + Media ---');
+  await normalizePies();
 }
 
 async function runStage2() {
