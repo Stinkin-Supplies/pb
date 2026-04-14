@@ -53,8 +53,12 @@ export async function GET(req: Request) {
   const brand    = url.searchParams.get("brand")      || undefined;
   const minPrice = url.searchParams.get("minPrice")   ? Number(url.searchParams.get("minPrice"))  : undefined;
   const maxPrice = url.searchParams.get("maxPrice")   ? Number(url.searchParams.get("maxPrice"))  : undefined;
-  const inStock  = url.searchParams.get("inStock") === "true" ? true : undefined;
-  const search   = url.searchParams.get("search")?.trim() || undefined;
+  const inStock      = url.searchParams.get("inStock") === "true" ? true : undefined;
+  const search       = url.searchParams.get("search")?.trim() || undefined;
+  const fitmentMake  = url.searchParams.get("fitmentMake")?.trim()  || undefined;
+  const fitmentModel = url.searchParams.get("fitmentModel")?.trim() || undefined;
+  const fitmentYear  = url.searchParams.get("fitmentYear")
+    ? parseInt(url.searchParams.get("fitmentYear")!, 10) : undefined;
   const sort     = url.searchParams.get("sort")       || "newest";
   const page     = Math.max(0, parseInt(url.searchParams.get("page")     || "0",  10));
   const pageSize = Math.min(
@@ -104,6 +108,23 @@ export async function GET(req: Request) {
           )`);
           values.push(`%${search}%`);
           paramIdx++;
+        }
+        if (fitmentMake) {
+          const makeIdx = paramIdx++;
+          values.push(fitmentMake);
+          let fitmentClauses = `AND LOWER(cf.make) = LOWER($${makeIdx})`;
+          if (fitmentModel) {
+            fitmentClauses += ` AND LOWER(cf.model) = LOWER($${paramIdx++})`;
+            values.push(fitmentModel);
+          }
+          if (fitmentYear) {
+            fitmentClauses += ` AND cf.year_start <= $${paramIdx} AND cf.year_end >= $${paramIdx}`;
+            paramIdx++;
+            values.push(fitmentYear);
+          }
+          conditions.push(
+            `EXISTS (SELECT 1 FROM public.catalog_fitment cf WHERE cf.product_id = cp.id ${fitmentClauses})`
+          );
         }
 
         const where = conditions.join(" AND ");

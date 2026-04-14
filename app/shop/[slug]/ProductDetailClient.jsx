@@ -300,16 +300,54 @@ const css = `
     margin: 20px 0;
   }
 
-  /* ── SPECS TABLE ── */
-  .specs-section { margin-top: 48px; }
-  .specs-title {
+  /* ── VARIANT SELECTOR ── */
+  .variants-section { margin-bottom: 20px; }
+  .variant-group { margin-bottom: 14px; }
+  .variant-group-label {
     font-family: var(--font-stencil), monospace;
-    font-size: 26px; letter-spacing: 0.05em;
-    color: #f0ebe3; margin-bottom: 16px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #2a2828;
+    font-size: 9px; color: #8a8784;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    margin-bottom: 8px;
   }
-  .specs-title span { color: #e8621a; }
+  .variant-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+  .variant-btn {
+    padding: 6px 14px;
+    background: #111010; border: 1px solid #2a2828;
+    color: #c4c0bc; border-radius: 2px;
+    font-family: var(--font-stencil), monospace;
+    font-size: 11px; letter-spacing: 0.08em;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .variant-btn:hover  { border-color: rgba(232,98,26,0.5); color: #f0ebe3; }
+  .variant-btn.selected {
+    background: rgba(232,98,26,0.1);
+    border-color: #e8621a; color: #e8621a;
+  }
+
+  /* ── TABS ── */
+  .pdp-tabs-section {
+    max-width: 1200px; margin: 0 auto;
+    padding: 0 24px 60px;
+    border-top: 1px solid #2a2828;
+  }
+  .pdp-tab-strip {
+    display: flex; gap: 0;
+    border-bottom: 1px solid #2a2828;
+    margin-bottom: 24px;
+  }
+  .pdp-tab {
+    padding: 14px 24px;
+    font-family: var(--font-stencil), monospace;
+    font-size: 10px; letter-spacing: 0.18em;
+    color: #8a8784; cursor: pointer;
+    border: none; background: none;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s; margin-bottom: -1px;
+  }
+  .pdp-tab:hover  { color: #f0ebe3; }
+  .pdp-tab.active { color: #e8621a; border-bottom-color: #e8621a; }
+
+  /* ── SPECS TABLE ── */
   .specs-table { width: 100%; border-collapse: collapse; }
   .specs-table tr:nth-child(odd) td { background: #111010; }
   .specs-table td {
@@ -325,6 +363,26 @@ const css = `
     width: 160px; white-space: nowrap;
   }
   .specs-table td:last-child { color: #f0ebe3; }
+
+  /* ── FITMENT TABLE ── */
+  .fitment-table { width: 100%; border-collapse: collapse; }
+  .fitment-table thead td {
+    font-family: var(--font-stencil), monospace;
+    font-size: 9px; color: #e8621a;
+    letter-spacing: 0.15em; padding: 8px 14px;
+    border-bottom: 1px solid #2a2828;
+    text-transform: uppercase;
+  }
+  .fitment-table tbody tr:nth-child(odd) td { background: #111010; }
+  .fitment-table tbody td {
+    padding: 9px 14px; font-size: 13px; font-weight: 500;
+    color: #f0ebe3; border-bottom: 1px solid #1a1919;
+  }
+  .fitment-empty {
+    font-family: var(--font-stencil), monospace;
+    font-size: 10px; color: #8a8784;
+    letter-spacing: 0.12em; padding: 24px 0;
+  }
 
   /* ── RELATED ── */
   .related-section {
@@ -434,9 +492,22 @@ const css = `
   }
 `;
 
-export default function ProductDetailClient({ product, relatedProducts = [], fetchError = null }) {
+export default function ProductDetailClient({ product, variants = [], fitment = [], relatedProducts = [], fetchError = null }) {
   const [activeImg,  setActiveImg]  = useState(0);
   const [qty,        setQty]        = useState(1);
+  const [activeTab,  setActiveTab]  = useState("description");
+
+  // Group variants by option_name: { Size: ["S","M","L"], Color: ["Red","Black"] }
+  const variantGroups = variants.reduce((acc, v) => {
+    if (!acc[v.option_name]) acc[v.option_name] = [];
+    if (!acc[v.option_name].includes(v.option_value)) acc[v.option_name].push(v.option_value);
+    return acc;
+  }, {});
+  const variantGroupEntries = Object.entries(variantGroups);
+
+  const [selectedVariants, setSelectedVariants] = useState(() =>
+    Object.fromEntries(variantGroupEntries.map(([k, vals]) => [k, vals[0] ?? null]))
+  );
   const [wishlisted, setWishlisted] = useState(false);
   const [wishlistBusy, setWishlistBusy] = useState(false);
   const [wishlistToast, setWishlistToast] = useState(null);
@@ -702,22 +773,7 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
             </div>
           )}
 
-          {/* Specs table — below gallery on desktop */}
-          {product.specs && product.specs.length > 0 && (
-            <div className="specs-section">
-              <div className="specs-title">SPEC<span>S</span></div>
-              <table className="specs-table">
-                <tbody>
-                  {product.specs.map((s, i) => (
-                    <tr key={i}>
-                      <td>{s.label}</td>
-                      <td>{s.value}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          {/* Specs/Fitment/Description moved to tabbed section below */}
         </div>
 
         {/* RIGHT — Info */}
@@ -733,6 +789,30 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
             <div className="fitment-dot"/>
             {fitmentLabel}
           </div>
+
+          {/* Variant selector */}
+          {variantGroupEntries.length > 0 && (
+            <div className="variants-section">
+              {variantGroupEntries.map(([groupName, values]) => (
+                <div key={groupName} className="variant-group">
+                  <div className="variant-group-label">
+                    {groupName}: <span style={{ color:"#f0ebe3" }}>{selectedVariants[groupName]}</span>
+                  </div>
+                  <div className="variant-btns">
+                    {values.map(val => (
+                      <button
+                        key={val}
+                        className={`variant-btn ${selectedVariants[groupName] === val ? "selected" : ""}`}
+                        onClick={() => setSelectedVariants(prev => ({ ...prev, [groupName]: val }))}
+                      >
+                        {val}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Price */}
           <div className="price-block">
@@ -831,22 +911,124 @@ export default function ProductDetailClient({ product, relatedProducts = [], fet
             )}
           </div>
 
-          <hr className="pdp-divider"/>
-
-          {/* Description */}
-          {product.description ? (
-            <div
-              className="prose prose-invert max-w-none text-sm text-gray-300"
-              dangerouslySetInnerHTML={{ __html: product.description }}
-            />
-          ) : (
-            <div style={{ fontFamily:"var(--font-stencil),monospace", fontSize:12, color:"#8a8784", letterSpacing:"0.05em", lineHeight:1.8 }}>
-              <p>{product.name} by {product.brand}.</p>
-              {product.weight && <p style={{marginTop:8}}>WEIGHT: {product.weight} LBS</p>}
-              <p style={{marginTop:8}}>CATEGORY: {product.category?.toUpperCase()}</p>
+          {/* Tab shortcuts */}
+          {(product.specs?.length > 0 || fitment.length > 0) && (
+            <div style={{ display:"flex", gap:8, marginTop:16 }}>
+              {product.specs?.length > 0 && (
+                <button
+                  onClick={() => { setActiveTab("specs"); document.getElementById("pdp-tabs")?.scrollIntoView({ behavior:"smooth", block:"start" }); }}
+                  style={{ background:"transparent", border:"1px solid #2a2828", color:"#8a8784",
+                           fontFamily:"var(--font-stencil),monospace", fontSize:9, letterSpacing:"0.12em",
+                           padding:"5px 12px", borderRadius:2, cursor:"pointer", transition:"all 0.15s" }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor="#e8621a"; e.currentTarget.style.color="#e8621a"; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor="#2a2828"; e.currentTarget.style.color="#8a8784"; }}
+                >
+                  VIEW SPECS ↓
+                </button>
+              )}
+              {fitment.length > 0 && (
+                <button
+                  onClick={() => { setActiveTab("fitment"); document.getElementById("pdp-tabs")?.scrollIntoView({ behavior:"smooth", block:"start" }); }}
+                  style={{ background:"transparent", border:"1px solid #2a2828", color:"#8a8784",
+                           fontFamily:"var(--font-stencil),monospace", fontSize:9, letterSpacing:"0.12em",
+                           padding:"5px 12px", borderRadius:2, cursor:"pointer", transition:"all 0.15s" }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor="#e8621a"; e.currentTarget.style.color="#e8621a"; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor="#2a2828"; e.currentTarget.style.color="#8a8784"; }}
+                >
+                  VIEW FITMENT ↓
+                </button>
+              )}
             </div>
           )}
         </div>
+      </div>
+
+      {/* ── TABS: Description | Specs | Fitment ── */}
+      <div id="pdp-tabs" className="pdp-tabs-section">
+        <div className="pdp-tab-strip">
+          <button
+            className={`pdp-tab ${activeTab === "description" ? "active" : ""}`}
+            onClick={() => setActiveTab("description")}
+          >
+            DESCRIPTION
+          </button>
+          {product.specs?.length > 0 && (
+            <button
+              className={`pdp-tab ${activeTab === "specs" ? "active" : ""}`}
+              onClick={() => setActiveTab("specs")}
+            >
+              SPECS ({product.specs.length})
+            </button>
+          )}
+          <button
+            className={`pdp-tab ${activeTab === "fitment" ? "active" : ""}`}
+            onClick={() => setActiveTab("fitment")}
+          >
+            FITMENT {fitment.length > 0 ? `(${fitment.length})` : ""}
+          </button>
+        </div>
+
+        {activeTab === "description" && (
+          <div>
+            {product.description ? (
+              <div
+                className="prose prose-invert max-w-none text-sm text-gray-300"
+                style={{ lineHeight:1.8, color:"#c4c0bc", fontSize:14 }}
+                dangerouslySetInnerHTML={{ __html: product.description }}
+              />
+            ) : (
+              <div style={{ fontFamily:"var(--font-stencil),monospace", fontSize:12, color:"#8a8784", letterSpacing:"0.05em", lineHeight:1.8 }}>
+                <p>{product.name} by {product.brand}.</p>
+                {product.weight && <p style={{ marginTop:8 }}>WEIGHT: {product.weight} LBS</p>}
+                <p style={{ marginTop:8 }}>CATEGORY: {product.category?.toUpperCase()}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "specs" && product.specs?.length > 0 && (
+          <table className="specs-table">
+            <tbody>
+              {product.specs.map((s, i) => (
+                <tr key={i}>
+                  <td>{s.label ?? s.attribute}</td>
+                  <td>{s.value}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+
+        {activeTab === "fitment" && (
+          fitment.length > 0 ? (
+            <table className="fitment-table">
+              <thead>
+                <tr>
+                  <td>MAKE</td>
+                  <td>MODEL</td>
+                  <td>YEARS</td>
+                </tr>
+              </thead>
+              <tbody>
+                {fitment.map((f, i) => (
+                  <tr key={i}>
+                    <td>{f.make ?? "—"}</td>
+                    <td>{f.model ?? "—"}</td>
+                    <td>
+                      {f.year_start === f.year_end
+                        ? f.year_start
+                        : `${f.year_start}–${f.year_end}`}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="fitment-empty">
+              FITMENT DATA PENDING — CHECK BACK AFTER ACES SYNC
+            </div>
+          )
+        )}
       </div>
 
       {/* ── RELATED PRODUCTS ── */}

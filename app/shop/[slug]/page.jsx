@@ -7,6 +7,7 @@
 
 import { notFound } from "next/navigation";
 import { db } from "@/lib/supabase/admin";
+import getCatalogDb from "@/lib/db/catalog";
 import ProductDetailClient from "./ProductDetailClient";
 
 export default async function ProductDetailPage({ params }) {
@@ -31,6 +32,50 @@ export default async function ProductDetailPage({ params }) {
 
   const normalized = normalizeProductRow(product);
 
+  // Fetch variants, fitment, and specs from catalog DB
+  let variants = [];
+  let fitment  = [];
+  let catalogSpecs = [];
+  try {
+    const catalogDb = getCatalogDb();
+    const [variantRows, fitmentRows, specRows] = await Promise.all([
+      catalogDb.query(
+        `SELECT cv.option_name, cv.option_value
+         FROM catalog_variants cv
+         JOIN catalog_products cp ON cv.product_id = cp.id
+         WHERE cp.slug = $1
+         ORDER BY cv.option_name, cv.option_value`,
+        [slug]
+      ),
+      catalogDb.query(
+        `SELECT cf.make, cf.model, cf.year_start, cf.year_end
+         FROM catalog_fitment cf
+         JOIN catalog_products cp ON cf.product_id = cp.id
+         WHERE cp.slug = $1
+         ORDER BY cf.make, cf.model, cf.year_start`,
+        [slug]
+      ),
+      catalogDb.query(
+        `SELECT cs.attribute, cs.value
+         FROM catalog_specs cs
+         JOIN catalog_products cp ON cs.product_id = cp.id
+         WHERE cp.slug = $1
+         ORDER BY cs.attribute`,
+        [slug]
+      ),
+    ]);
+    variants     = variantRows.rows ?? [];
+    fitment      = fitmentRows.rows ?? [];
+    catalogSpecs = specRows.rows ?? [];
+  } catch (e) {
+    console.error("[PDP] catalog DB fetch failed:", e.message);
+  }
+
+  // Merge catalog specs with any specs already on the product row
+  const mergedSpecs = catalogSpecs.length > 0
+    ? catalogSpecs.map(s => ({ label: s.attribute, value: s.value }))
+    : (normalized.specs ?? []);
+
   // Related products — same category, exclude self
   // TODO: replace with db.getRelatedProducts(product.id, product.category_name)
   try {
@@ -46,7 +91,9 @@ export default async function ProductDetailPage({ params }) {
 
   return (
     <ProductDetailClient
-      product={normalized}
+      product={{ ...normalized, specs: mergedSpecs }}
+      variants={variants}
+      fitment={fitment}
       relatedProducts={related}
       fetchError={fetchError}
     />
