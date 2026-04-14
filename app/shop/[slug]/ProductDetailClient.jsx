@@ -529,7 +529,6 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
   const [wishlistToast, setWishlistToast] = useState(null);
   const [added,      setAdded]      = useState(false);
   const [toast,      setToast]      = useState(false);
-  const [activeTab,  setActiveTab]  = useState("description");
   const { addItem } = useCartSafe();
 
   // ── Brand / vendor option cards ───────────────────────────────
@@ -1087,9 +1086,6 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
               )}
             </div>
           )}
-        </div>
-      </div>
-
       {/* ── TABS: Description | Specs | Fitment ── */}
       <div id="pdp-tabs" className="pdp-tabs-section">
         <div className="pdp-tab-strip">

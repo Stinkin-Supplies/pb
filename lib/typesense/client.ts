@@ -140,3 +140,64 @@ export type ProductDocument = {
   fitment_year?:  number[]
   specs?:         string[]
 }
+
+// ── Helper: build filter string ───────────────────────────────────────────────
+
+export function buildFilters(params: {
+  inStock?:      boolean;
+  hasImage?:     boolean;
+  brand?:        string;
+  category?:     string;
+  sourceVendor?: string;
+  isHarley?:     boolean;
+  isUniversal?:  boolean;
+  hdFamily?:     string;
+  hdCode?:       string;
+  inOldbook?:    boolean;
+  inFatbook?:    boolean;
+  dragPart?:     boolean;
+  yearStart?:    number;
+  yearEnd?:      number;
+  minPrice?:     number;
+  maxPrice?:     number;
+  closeout?:     boolean;
+  productCode?:  string;
+  groupSignal?:  string;
+}): string {
+  const filters: string[] = IS_GROUPS_COLLECTION ? [] : ["is_active:true"];
+
+  if (params.inStock)      filters.push("in_stock:true");
+  if (params.hasImage)     filters.push("has_image:true");
+  if (params.brand)        filters.push(`brand:=${params.brand}`);
+  if (params.category)     filters.push(`category:=${params.category}`);
+  if (params.isHarley)     filters.push("is_harley_fitment:true");
+  if (params.isUniversal)  filters.push("is_universal:true");
+  if (params.hdFamily)     filters.push(`fitment_hd_families:=${params.hdFamily}`);
+  if (params.hdCode)       filters.push(`fitment_hd_codes:=${params.hdCode}`);
+  if (params.inOldbook)    filters.push("in_oldbook:true");
+  if (params.inFatbook)    filters.push("in_fatbook:true");
+  if (params.dragPart)     filters.push("drag_part:true");
+  if (params.closeout)     filters.push("closeout:true");
+  if (params.groupSignal)  filters.push(`group_signal:=${params.groupSignal}`);
+
+  if (!IS_GROUPS_COLLECTION) {
+    if (params.sourceVendor) filters.push(`source_vendor:=${params.sourceVendor}`);
+    if (params.productCode)  filters.push(`product_code:=${params.productCode}`);
+  } else {
+    if (params.sourceVendor) filters.push(`vendors:=${params.sourceVendor}`);
+  }
+
+  if (params.yearStart && params.yearEnd) {
+    filters.push(`fitment_year_start:<=${params.yearEnd}`);
+    filters.push(`fitment_year_end:>=${params.yearStart}`);
+  }
+
+  if (params.minPrice !== undefined || params.maxPrice !== undefined) {
+    const min = params.minPrice ?? 0;
+    const max = params.maxPrice ?? 99999;
+    const priceField = IS_GROUPS_COLLECTION ? "price_min" : "msrp";
+    filters.push(`${priceField}:[${min}..${max}]`);
+  }
+
+  return filters.filter(Boolean).join(" && ");
+}
