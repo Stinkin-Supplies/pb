@@ -169,7 +169,6 @@ function normalizeProductRow(row) {
   };
 }
 
-// ── SEO metadata ─────────────────────────────────────────────
 export async function generateMetadata({ params }) {
   const { slug } = await params;
   try {

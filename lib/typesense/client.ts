@@ -1,61 +1,87 @@
-// lib/typesense/client.ts
-// ─────────────────────────────────────────────────────────────
-// Typed Typesense client + collection schema for catalog_products
-// Admin client: server-side indexing (uses TYPESENSE_API_KEY)
-// Search client: browser-safe (uses TYPESENSE_SEARCH_KEY)
-// ─────────────────────────────────────────────────────────────
+/**
+ * lib/typesense/client.ts
+ * Typesense client — points at Hetzner self-hosted instance
+ *
+ * Collection switch:
+ *   TYPESENSE_COLLECTION=product_groups  → new deduped group search (default)
+ *   TYPESENSE_COLLECTION=products        → legacy per-SKU search
+ */
 
-import Typesense from 'typesense'
+import Typesense from "typesense";
 
-export const COLLECTION = process.env.TYPESENSE_COLLECTION ?? 'products'
+export const typesenseClient = new Typesense.Client({
+  nodes: [
+    {
+      host:     process.env.TYPESENSE_HOST     || "5.161.100.126",
+      port:     parseInt(process.env.TYPESENSE_PORT || "8108"),
+      protocol: process.env.TYPESENSE_PROTOCOL || "http",
+    },
+  ],
+  apiKey:                   process.env.TYPESENSE_SEARCH_KEY || "",
+  connectionTimeoutSeconds: 10,
+});
 
-function getTypesenseNode() {
-  const rawHost = process.env.TYPESENSE_HOST
-  if (!rawHost) {
-    throw new Error('Missing TYPESENSE_HOST')
-  }
+export const COLLECTION = process.env.TYPESENSE_COLLECTION || "product_groups";
 
-  // Allow either:
-  // - TYPESENSE_HOST="typesense.example.com" (+ TYPESENSE_PROTOCOL/PORT)
-  // - TYPESENSE_HOST="https://typesense.example.com:8108"
-  if (rawHost.includes('://')) {
-    const url = new URL(rawHost)
-    return {
-      host: url.hostname,
-      port: url.port ? Number(url.port) : url.protocol === 'http:' ? 80 : 443,
-      protocol: url.protocol.replace(':', ''),
-    }
-  }
+// True when we're using the new deduped group collection
+export const IS_GROUPS_COLLECTION = COLLECTION === "product_groups";
 
-  const protocol = process.env.TYPESENSE_PROTOCOL ?? 'https'
-  const defaultPort = protocol === 'http' ? 80 : 443
+// ── Search params ─────────────────────────────────────────────────────────────
 
-  return {
-    host: rawHost,
-    port: Number(process.env.TYPESENSE_PORT ?? defaultPort),
-    protocol,
-  }
-}
+// product_groups collection — vendor-blind, deduped results
+const GROUPS_SEARCH_PARAMS = {
+  query_by: "name,brand,available_brands,oem_numbers,page_references,description,features",
+  facet_by: [
+    "brand",
+    "category",
+    "available_brands",
+    "vendors",
+    "in_stock",
+    "has_image",
+    "is_harley_fitment",
+    "is_universal",
+    "fitment_hd_families",
+    "fitment_hd_models",
+    "fitment_hd_codes",
+    "in_oldbook",
+    "in_fatbook",
+    "drag_part",
+    "closeout",
+    "group_signal",
+  ].join(","),
+  sort_by:          "sort_priority:desc,_text_match:desc",
+  per_page:         24,
+  max_facet_values: 50,
+};
 
-// Admin client — never expose to browser
-export function getAdminClient() {
-  const NODE = getTypesenseNode()
-  return new Typesense.Client({
-    nodes:          [NODE],
-    apiKey:         process.env.TYPESENSE_ADMIN_API_KEY ?? process.env.TYPESENSE_API_KEY!,
-    connectionTimeoutSeconds: 60,
-  })
-}
+// products collection — legacy per-SKU (fallback)
+const PRODUCTS_SEARCH_PARAMS = {
+  query_by:  "name,brand,description,features,oem_part_number,upc",
+  filter_by: "is_active:true",
+  facet_by:  [
+    "brand",
+    "category",
+    "source_vendor",
+    "in_stock",
+    "has_image",
+    "is_harley_fitment",
+    "fitment_hd_families",
+    "fitment_hd_models",
+    "fitment_hd_codes",
+    "in_oldbook",
+    "in_fatbook",
+    "drag_part",
+    "closeout",
+    "product_code",
+  ].join(","),
+  sort_by:          "sort_priority:desc,_text_match:desc",
+  per_page:         24,
+  max_facet_values: 50,
+};
 
-// Search-only client — safe for browser / API routes
-export function getSearchClient() {
-  const NODE = getTypesenseNode()
-  return new Typesense.Client({
-    nodes:          [NODE],
-    apiKey:         process.env.TYPESENSE_SEARCH_KEY ?? process.env.TYPESENSE_SEARCH_ONLY_API_KEY ?? process.env.TYPESENSE_API_KEY!,
-    connectionTimeoutSeconds: 10,
-  })
-}
+export const DEFAULT_SEARCH_PARAMS = IS_GROUPS_COLLECTION
+  ? GROUPS_SEARCH_PARAMS
+  : PRODUCTS_SEARCH_PARAMS;
 
 // ── Collection schema ─────────────────────────────────────────
 export const SCHEMA = {
