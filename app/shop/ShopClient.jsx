@@ -2,19 +2,6 @@
 // ============================================================
 // app/shop/ShopClient.jsx
 // ============================================================
-// Filter/sort/paginate UI for the shop.
-//
-// Data flow:
-//   1. SSR: initialProducts + initialFacets from page.jsx
-//      (fast first paint, no loading flash)
-//   2. Any filter/sort/page change → debounced fetch to
-//      /api/products → update products + sidebar counts
-//   3. Sidebar counts are accurate across ALL 146k products
-//      not just the current page — powered by get_product_facets()
-//
-// Phase B: swap /api/products fetch for Typesense client.
-//          Component interface stays identical.
-// ============================================================
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
@@ -34,6 +21,11 @@ const SORT_OPTIONS = [
   { value:"name_asc",   label:"A → Z"           },
 ];
 
+// HD fitment year range
+const YEAR_MIN = 1979;
+const YEAR_MAX = 2025;
+const YEARS    = Array.from({ length: YEAR_MAX - YEAR_MIN + 1 }, (_, i) => YEAR_MIN + i);
+
 const css = `
   *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
   :root {
@@ -48,174 +40,93 @@ const css = `
   @keyframes fadeUp  { from{opacity:0;transform:translateY(7px)} to{opacity:1;transform:translateY(0)} }
   @keyframes shimmer { from{background-position:-600px 0} to{background-position:600px 0} }
   @keyframes spin    { to{transform:rotate(360deg)} }
-
   .ph:hover { background:rgba(255,255,255,0.03) !important; }
   .pcard { transition:all 0.22s !important; }
-  .pcard:hover {
-    border-color:rgba(232,98,26,0.45) !important;
-    transform:translateY(-3px) !important;
-    box-shadow:0 10px 36px rgba(0,0,0,0.5) !important;
-  }
+  .pcard:hover { border-color:rgba(232,98,26,0.45) !important; transform:translateY(-3px) !important; box-shadow:0 10px 36px rgba(0,0,0,0.5) !important; }
   .add-btn:hover:not(:disabled) { background:var(--orange2) !important; }
-
-  .skel {
-    background:linear-gradient(90deg,#1a1919 25%,#222121 50%,#1a1919 75%);
-    background-size:600px 100%;
-    animation:shimmer 1.4s infinite;
-    border-radius:2px;
-  }
+  .skel { background:linear-gradient(90deg,#1a1919 25%,#222121 50%,#1a1919 75%); background-size:600px 100%; animation:shimmer 1.4s infinite; border-radius:2px; }
   .grid-wrap { position:relative; }
-  .grid-overlay {
-    position:absolute; inset:0; z-index:10;
-    background:rgba(10,9,9,0.5);
-    display:flex; align-items:flex-start; justify-content:center;
-    padding-top:80px; pointer-events:none;
-  }
-  .spinner {
-    width:24px; height:24px; border-radius:50%;
-    border:3px solid #2a2828; border-top-color:#e8621a;
-    animation:spin 0.7s linear infinite;
-  }
-  .facet-count {
-    font-family:var(--font-stencil),monospace; font-size:8px; color:#8a8784;
-    background:#1a1919; border:1px solid #2a2828;
-    padding:1px 5px; border-radius:1px;
-    min-width:32px; text-align:center; transition:color 0.2s;
-  }
+  .grid-overlay { position:absolute; inset:0; z-index:10; background:rgba(10,9,9,0.5); display:flex; align-items:flex-start; justify-content:center; padding-top:80px; pointer-events:none; }
+  .spinner { width:24px; height:24px; border-radius:50%; border:3px solid #2a2828; border-top-color:#e8621a; animation:spin 0.7s linear infinite; }
+  .facet-count { font-family:var(--font-stencil),monospace; font-size:8px; color:#8a8784; background:#1a1919; border:1px solid #2a2828; padding:1px 5px; border-radius:1px; min-width:32px; text-align:center; transition:color 0.2s; flex-shrink:0; }
   .facet-count.dim { color:#3a3838; }
-  .chip {
-    font-family:var(--font-stencil),monospace; font-size:8px;
-    background:rgba(232,98,26,0.1); border:1px solid rgba(232,98,26,0.25);
-    border-radius:2px; padding:2px 8px; color:#e8621a;
-    letter-spacing:0.1em; cursor:pointer; user-select:none; transition:all 0.15s;
-  }
+  .chip { font-family:var(--font-stencil),monospace; font-size:8px; background:rgba(232,98,26,0.1); border:1px solid rgba(232,98,26,0.25); border-radius:2px; padding:2px 8px; color:#e8621a; letter-spacing:0.1em; cursor:pointer; user-select:none; transition:all 0.15s; }
   .chip:hover { background:rgba(232,98,26,0.18); }
-  .price-input {
-    background:#1a1919; border:1px solid #2a2828; color:#f0ebe3;
-    font-family:var(--font-stencil),sans-serif; font-size:13px;
-    padding:6px 9px; border-radius:2px; outline:none; width:100%;
-    transition:border-color 0.15s;
-  }
+  .price-input { background:#1a1919; border:1px solid #2a2828; color:#f0ebe3; font-family:var(--font-stencil),sans-serif; font-size:12px; padding:6px 9px; border-radius:2px; outline:none; width:100%; transition:border-color 0.15s; }
   .price-input:focus { border-color:rgba(232,98,26,0.4); }
   .price-input::placeholder { color:#3a3838; }
-  .page-btn {
-    font-family:var(--font-stencil),monospace; font-size:10px; letter-spacing:0.08em;
-    background:#111010; border:1px solid #2a2828; color:#8a8784;
-    padding:7px 13px; border-radius:2px; cursor:pointer;
-    transition:all 0.15s; min-width:36px; text-align:center;
-  }
+  .page-btn { font-family:var(--font-stencil),monospace; font-size:10px; letter-spacing:0.08em; background:#111010; border:1px solid #2a2828; color:#8a8784; padding:7px 13px; border-radius:2px; cursor:pointer; transition:all 0.15s; min-width:36px; text-align:center; }
   .page-btn:hover:not(:disabled) { border-color:#e8621a; color:#e8621a; }
   .page-btn.active { background:#e8621a; border-color:#e8621a; color:#0a0909; }
   .page-btn:disabled { opacity:0.3; cursor:default; }
+  .shop-layout { display:grid; grid-template-columns:240px 1fr; }
+  .mobile-filter-btn-wrap { display:none; }
+  .mobile-filter-btn { font-family:var(--font-stencil),monospace; font-size:11px; letter-spacing:0.15em; text-transform:uppercase; background:#1a1919; color:#f0ebe3; border:1px solid #2a2828; padding:10px 20px; cursor:pointer; display:flex; align-items:center; gap:8px; width:100%; }
+  .filter-badge { background:#e8621a; color:#fff; font-size:9px; padding:2px 6px; border-radius:10px; }
+  .filter-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:200; }
+  .filter-close-wrap { display:none; padding:12px 14px; border-bottom:1px solid #2a2828; }
+  .filter-close-btn { font-family:var(--font-stencil),monospace; font-size:10px; letter-spacing:0.15em; background:transparent; color:#8a8784; border:none; cursor:pointer; text-transform:uppercase; }
+  .product-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+  .pcard-body { padding:8px; }
 
-  .shop-layout {
-    display: grid;
-    grid-template-columns: 215px 1fr;
-  }
-  .mobile-filter-btn-wrap { display: none; }
+  /* ── Sidebar accordion ── */
+  .sb-section { border-left:2px solid transparent; transition:border-color 0.15s; }
+  .sb-section.sb-active { border-left-color:#e8621a; }
+  .sb-header { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; cursor:pointer; user-select:none; transition:background 0.12s; }
+  .sb-header:hover { background:rgba(255,255,255,0.025); }
+  .sb-title { font-family:var(--font-stencil),monospace; font-size:9px; letter-spacing:0.2em; color:#8a8784; transition:color 0.15s; }
+  .sb-section.sb-active .sb-title { color:#e8621a; }
+  .sb-chevron { font-size:9px; color:#3a3838; transition:transform 0.2s; line-height:1; }
+  .sb-chevron.open { transform:rotate(180deg); }
+  .sb-body { border-bottom:1px solid #1a1919; }
 
-  .mobile-filter-btn {
-    font-family: var(--font-stencil), monospace;
-    font-size: 11px;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    background: #1a1919;
-    color: #f0ebe3;
-    border: 1px solid #2a2828;
-    padding: 10px 20px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-  }
+  /* toggle row */
+  .toggle-row { display:flex; align-items:center; justify-content:space-between; padding:6px 14px; }
+  .toggle-label { font-size:12px; font-weight:500; color:#c4c0bc; }
 
-  .filter-badge {
-    background: #e8621a;
-    color: #fff;
-    font-size: 9px;
-    padding: 2px 6px;
-    border-radius: 10px;
-  }
+  /* facet search */
+  .facet-search { background:#1a1919; border:none; border-bottom:1px solid #2a2828; color:#f0ebe3; font-family:var(--font-stencil),sans-serif; font-size:11px; padding:6px 12px; outline:none; width:100%; }
+  .facet-search::placeholder { color:#3a3838; }
+  .facet-search:focus { background:#1f1e1e; }
 
-  .filter-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.6);
-    z-index: 200;
-  }
+  /* facet item */
+  .facet-item { display:flex; align-items:center; justify-content:space-between; padding:5px 12px; border-radius:0; cursor:pointer; transition:background 0.12s; gap:8px; }
+  .facet-item:hover { background:rgba(255,255,255,0.03); }
+  .facet-item.on { background:rgba(232,98,26,0.07); }
+  .facet-checkbox { width:12px; height:12px; border-radius:2px; flex-shrink:0; border:1px solid #3a3838; background:transparent; display:flex; align-items:center; justify-content:center; font-size:8px; color:#0a0909; transition:all 0.15s; }
+  .facet-item.on .facet-checkbox { background:#e8621a; border-color:#e8621a; }
+  .facet-name { font-size:12px; font-weight:500; color:#c4c0bc; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+  .facet-item.on .facet-name { color:#f0ebe3; }
+  .show-more-btn { font-family:var(--font-stencil),monospace; font-size:8px; letter-spacing:0.1em; color:#8a8784; background:none; border:none; cursor:pointer; padding:6px 12px 10px; display:block; }
+  .show-more-btn:hover { color:#c4c0bc; }
 
-  .filter-close-wrap {
-    display: none;
-    padding: 12px 14px;
-    border-bottom: 1px solid #2a2828;
-  }
+  /* year selects */
+  .year-select { background:#1a1919; border:1px solid #2a2828; color:#f0ebe3; font-family:var(--font-stencil),sans-serif; font-size:11px; padding:5px 8px; border-radius:2px; outline:none; width:100%; cursor:pointer; transition:border-color 0.15s; }
+  .year-select:focus { border-color:rgba(232,98,26,0.4); }
+  .year-select option { background:#1a1919; }
 
-  .filter-close-btn {
-    font-family: var(--font-stencil), monospace;
-    font-size: 10px;
-    letter-spacing: 0.15em;
-    background: transparent;
-    color: #8a8784;
-    border: none;
-    cursor: pointer;
-    text-transform: uppercase;
-  }
-  .product-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-  }
-  .pcard-body {
-    padding: 8px;
-  }
-
-  @media (min-width:640px) {
-    .pcard-body { padding: 16px; }
-  }
-  @media (min-width:768px) {
-    .product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  }
-  @media (min-width:1024px) {
-    .product-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  }
+  @media (min-width:640px)  { .pcard-body { padding:16px; } }
+  @media (min-width:768px)  { .product-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+  @media (min-width:1024px) { .product-grid { grid-template-columns:repeat(4,minmax(0,1fr)); } }
   @media (max-width:700px) {
-    .mobile-filter-btn-wrap { display: block; }
-
-    .shop-sidebar {
-      position: fixed !important;
-      top: 0 !important;
-      left: -280px;
-      width: 280px;
-      max-height: 100vh !important;
-      height: 100vh;
-      z-index: 201;
-      transition: left 0.25s ease;
-      overflow-y: auto;
-    }
-
-    .shop-sidebar.filter-open {
-      left: 0;
-    }
-
-    .filter-close-wrap { display: block; }
-
-    .shop-layout { grid-template-columns: 1fr !important; }
-
-    .shop-sidebar:not(.filter-open) {
-      display: block;
-      position:fixed;
-      left: -280px;
-    }
-    .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-    .pcard-body { padding: 8px !important; }
-    .pcard img { aspect-ratio: 1/1; }
+    .mobile-filter-btn-wrap { display:block; }
+    .shop-sidebar { position:fixed !important; top:0 !important; left:-280px; width:280px;
+                    max-height:100vh !important; height:100vh; z-index:201;
+                    transition:left 0.25s ease; overflow-y:auto; }
+    .shop-sidebar.filter-open { left:0; }
+    .filter-close-wrap { display:block; }
+    .shop-layout { grid-template-columns:1fr !important; }
+    .shop-sidebar:not(.filter-open) { display:block; position:fixed; left:-280px; }
+    .product-grid { grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
+    .pcard-body { padding:8px !important; }
+    .pcard img { aspect-ratio:1/1; }
   }
 `;
 
 const S = s => ({ fontFamily:"var(--font-stencil),monospace", ...s });
-const B = s => ({ fontFamily:"var(--font-caesar),sans-serif",     ...s });
+const B = s => ({ fontFamily:"var(--font-caesar),sans-serif",  ...s });
 
+// ── URL helpers ───────────────────────────────────────────────
 function buildQS(filters, sort, page) {
   const p = new URLSearchParams();
   if (filters.category)          p.set("category",     filters.category);
@@ -232,37 +143,53 @@ function buildQS(filters, sort, page) {
   return p.toString();
 }
 
+// ── Toggle ────────────────────────────────────────────────────
 function Toggle({ on, onChange }) {
   return (
     <div onClick={() => onChange(!on)}
-      style={{ width:32, height:18, borderRadius:9,
-               background:on?"#e8621a":"#2a2828",
-               position:"relative", cursor:"pointer",
-               transition:"background 0.2s", flexShrink:0 }}>
-      <div style={{ position:"absolute", top:2, left:on?14:2,
-                    width:14, height:14, borderRadius:"50%",
-                    background:"#f0ebe3", transition:"left 0.2s" }}/>
+      style={{ width:34, height:19, borderRadius:10, background:on?"#e8621a":"#2a2828",
+               position:"relative", cursor:"pointer", transition:"background 0.2s", flexShrink:0 }}>
+      <div style={{ position:"absolute", top:2.5, left:on?15:2.5, width:14, height:14,
+                    borderRadius:"50%", background:on?"#fff":"#8a8784", transition:"left 0.2s, background 0.2s" }}/>
     </div>
   );
 }
 
-// ── FacetSection ──────────────────────────────────────────────
-function FacetSection({ label, items, selected, loading, onSelect }) {
+// ── Sidebar section accordion ─────────────────────────────────
+function SbSection({ id, label, isActive, open, onToggle, children }) {
+  return (
+    <div className={`sb-section${isActive ? " sb-active" : ""}`}>
+      <div className="sb-header" onClick={() => onToggle(id)}>
+        <span className="sb-title">{label}</span>
+        <span className={`sb-chevron${open ? " open" : ""}`}>▼</span>
+      </div>
+      {open && <div className="sb-body">{children}</div>}
+    </div>
+  );
+}
+
+// ── Facet list with optional search ──────────────────────────
+function FacetList({ items, selected, loading, onSelect, searchable = false }) {
+  const [query,   setQuery]   = useState("");
   const [showAll, setShowAll] = useState(false);
-  const visible   = showAll ? items : items.slice(0, 10);
-  const hasMore   = items.length > 10;
+  const LIMIT = 8;
+
+  const filtered = query
+    ? items.filter(it => it.name.toLowerCase().includes(query.toLowerCase()))
+    : items;
+  const visible  = showAll ? filtered : filtered.slice(0, LIMIT);
+  const hasMore  = filtered.length > LIMIT;
 
   return (
-    <div>
-      <div style={S({fontSize:9, color:"#e8621a", letterSpacing:"0.2em",
-                     padding:"12px 14px 8px", display:"block"})}>
-        {label}
-      </div>
-      <div style={{ padding:"0 10px 14px", borderBottom:"1px solid #1a1919" }}>
+    <>
+      {searchable && (
+        <input className="facet-search" placeholder="Search…" value={query}
+          onChange={e => { setQuery(e.target.value); setShowAll(false); }}/>
+      )}
+      <div style={{ paddingTop:4, paddingBottom:4 }}>
         {items.length === 0 && loading
-          ? Array.from({length:5}).map((_,i) => (
-              <div key={i} style={{ display:"flex", justifyContent:"space-between",
-                                    padding:"5px 6px", marginBottom:2, gap:8 }}>
+          ? Array.from({ length:5 }).map((_, i) => (
+              <div key={i} style={{ display:"flex", justifyContent:"space-between", padding:"5px 12px", gap:8 }}>
                 <div className="skel" style={{ height:10, flex:1 }}/>
                 <div className="skel" style={{ height:10, width:28 }}/>
               </div>
@@ -271,92 +198,61 @@ function FacetSection({ label, items, selected, loading, onSelect }) {
               {visible.map(item => {
                 const on = selected === item.name;
                 return (
-                  <div key={item.name} className="ph" onClick={() => onSelect(item.name)}
-                    style={{ display:"flex", alignItems:"center",
-                             justifyContent:"space-between",
-                             padding:"5px 6px", borderRadius:2, cursor:"pointer",
-                             background:on?"rgba(232,98,26,0.07)":"transparent",
-                             transition:"background 0.15s" }}>
-                    <div style={{ display:"flex", alignItems:"center", gap:7, minWidth:0 }}>
-                      <div style={{ width:12, height:12, borderRadius:2, flexShrink:0,
-                                    border:`1px solid ${on?"#e8621a":"#3a3838"}`,
-                                    background:on?"#e8621a":"transparent",
-                                    display:"flex", alignItems:"center", justifyContent:"center",
-                                    fontSize:8, color:"#0a0909", transition:"all 0.15s" }}>
-                        {on?"✓":""}
-                      </div>
-                      <span style={{ fontSize:12, fontWeight:500,
-                                     color:on?"#f0ebe3":"#c4c0bc",
-                                     whiteSpace:"nowrap", overflow:"hidden",
-                                     textOverflow:"ellipsis" }}>
-                        {item.name}
-                      </span>
-                    </div>
-                    <span className={`facet-count ${loading?"dim":""}`}>
+                  <div key={item.name} className={`facet-item${on ? " on" : ""}`}
+                    onClick={() => onSelect(item.name)}>
+                    <div className="facet-checkbox">{on ? "✓" : ""}</div>
+                    <span className="facet-name">{item.name}</span>
+                    <span className={`facet-count${loading ? " dim" : ""}`}>
                       {item.count.toLocaleString()}
                     </span>
                   </div>
                 );
               })}
-              {hasMore && (
-                <button onClick={() => setShowAll(s => !s)}
-                  style={{ ...S({fontSize:8, color:"#8a8784", letterSpacing:"0.1em"}),
-                           background:"none", border:"none", cursor:"pointer",
-                           marginTop:6, padding:"0 6px" }}>
-                  {showAll ? "SHOW LESS ▴" : `+${items.length - 10} MORE ▾`}
+              {hasMore && !query && (
+                <button className="show-more-btn" onClick={() => setShowAll(s => !s)}>
+                  {showAll ? "SHOW LESS ▴" : `+${filtered.length - LIMIT} MORE ▾`}
                 </button>
+              )}
+              {items.length === 0 && !loading && (
+                <div style={S({ fontSize:10, color:"#3a3838", letterSpacing:"0.1em", padding:"8px 12px" })}>
+                  NO RESULTS
+                </div>
               )}
             </>
         }
       </div>
-    </div>
+    </>
   );
 }
 
-// ── GridNotifyButton ─────────────────────────────────────────
-// Lightweight inline notify for shop grid cards.
-// Shares the same API route as NotifyMeButton.
+// ── GridNotifyButton ──────────────────────────────────────────
 function GridNotifyButton({ sku, productName, vendor }) {
-  const [state, setState] = React.useState("idle"); // idle | loading | done | error
-
+  const [state, setState] = React.useState("idle");
   const handleClick = async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
+    e.preventDefault(); e.stopPropagation();
     if (state !== "idle" && state !== "error") return;
     setState("loading");
     try {
       const res = await fetch("/api/notifications/restock", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ product_sku: sku, product_name: productName, vendor, source: "pdp" }),
+        method: "POST", headers: { "Content-Type":"application/json" },
+        body: JSON.stringify({ product_sku:sku, product_name:productName, vendor, source:"pdp" }),
       });
       if (res.status === 401) { window.location.href = "/auth"; return; }
       setState("done");
-    } catch {
-      setState("error");
-    }
+    } catch { setState("error"); }
   };
-
   const cfg = {
-    idle:    { label: "🔔 NOTIFY ME",   color: "#e8621a", bg: "transparent",            border: "#e8621a" },
-    loading: { label: "...",             color: "#8a8784", bg: "transparent",            border: "#3a3838" },
-    done:    { label: "✓ ON THE LIST",  color: "#22c55e", bg: "rgba(34,197,94,0.08)",   border: "#22c55e" },
-    error:   { label: "RETRY",          color: "#ef4444", bg: "transparent",            border: "#ef4444" },
+    idle:    { label:"NOTIFY ME",    color:"#e8621a", bg:"transparent",          border:"#e8621a" },
+    loading: { label:"…",            color:"#8a8784", bg:"transparent",          border:"#3a3838" },
+    done:    { label:"ON THE LIST",  color:"#22c55e", bg:"rgba(34,197,94,0.08)", border:"#22c55e" },
+    error:   { label:"RETRY",        color:"#ef4444", bg:"transparent",          border:"#ef4444" },
   }[state];
-
   return (
-    <button
-      onClick={handleClick}
-      disabled={state === "loading" || state === "done"}
-      style={{
-        width: "100%", padding: "5px 8px",
-        background: cfg.bg, border: `1px solid ${cfg.border}`,
-        color: cfg.color, borderRadius: 2, cursor: state === "done" ? "default" : "pointer",
-        fontFamily: "var(--font-stencil), monospace",
-        fontSize: 8, letterSpacing: "0.1em",
-        transition: "all 0.15s",
-      }}
-    >
+    <button onClick={handleClick} disabled={state === "loading" || state === "done"}
+      style={{ width:"100%", padding:"5px 8px", background:cfg.bg, border:`1px solid ${cfg.border}`,
+               color:cfg.color, borderRadius:2, cursor:state==="done"?"default":"pointer",
+               fontFamily:"var(--font-stencil),monospace", fontSize:8, letterSpacing:"0.1em",
+               transition:"all 0.15s" }}>
       {cfg.label}
     </button>
   );
@@ -365,96 +261,93 @@ function GridNotifyButton({ sku, productName, vendor }) {
 // ── ProductCard ───────────────────────────────────────────────
 function ProductCard({ product:p, index, view, onAdd }) {
   const imageSrc = getProductImage(p);
-  const proxiedImageSrc = typeof imageSrc === "string" && imageSrc.startsWith("http")
-    ? `/api/image-proxy?url=${encodeURIComponent(imageSrc)}`
-    : imageSrc;
-
+  const proxied  = typeof imageSrc === "string" && imageSrc.startsWith("http")
+    ? `/api/image-proxy?url=${encodeURIComponent(imageSrc)}` : imageSrc;
   return (
     <Link href={`/shop/${p.slug}`} className="pcard"
-      style={{ background:"#111010", border:"1px solid #2a2828", borderRadius:2,
-               overflow:"hidden", opacity:p.inStock?1:0.55,
-               display:view==="list"?"grid":"block",
-               gridTemplateColumns:view==="list"?"140px 1fr":"unset",
-               animation:`fadeUp 0.3s ease ${Math.min(index,12)*0.03}s both`,
+      style={{ background:"#111010", border:"1px solid #2a2828", borderRadius:2, overflow:"hidden",
+               opacity:p.inStock ? 1 : 0.55, display:view==="list" ? "grid" : "block",
+               gridTemplateColumns:view==="list" ? "140px 1fr" : "unset",
+               animation:`fadeUp 0.3s ease ${Math.min(index, 12) * 0.03}s both`,
                textDecoration:"none", color:"inherit" }}>
-
-      {/* Image */}
-      <div style={{ width:"100%", aspectRatio:view==="list"?"unset":"1/1",
-                    minHeight:view==="list"?110:0, background:"#ffffff",
-                    display:"flex", alignItems:"center", justifyContent:"center",
+      <div style={{ width:"100%", aspectRatio:view==="list" ? "unset" : "1/1", minHeight:view==="list" ? 110 : 0,
+                    background:"#ffffff", display:"flex", alignItems:"center", justifyContent:"center",
                     position:"relative", overflow:"hidden" }}>
         <div style={{ position:"absolute", inset:0,
-          backgroundImage:"linear-gradient(rgba(232,98,26,0.04) 1px,transparent 1px)," +
-                          "linear-gradient(90deg,rgba(232,98,26,0.04) 1px,transparent 1px)",
+          backgroundImage:"linear-gradient(rgba(232,98,26,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(232,98,26,0.04) 1px,transparent 1px)",
           backgroundSize:"16px 16px" }}/>
-        <Image
-          src={proxiedImageSrc}
-          alt={p.name}
-          fill
-          sizes="(max-width: 768px) 50vw, 25vw"
+        <Image src={proxied} alt={p.name} fill
+          sizes="(max-width:768px) 50vw, 25vw"
           style={{ objectFit:"contain", padding:"10px", zIndex:1 }}
-          priority={index < 6}
-          unoptimized
-        />
+          priority={index < 6} unoptimized/>
         {p.badge && (
           <span style={{ position:"absolute", top:7, left:7, zIndex:2,
-            ...S({fontSize:7,fontWeight:700,letterSpacing:"0.1em",padding:"2px 6px",borderRadius:1}),
-            background:p.badge==="sale"?"#b91c1c":"#c9a84c",
-            color:p.badge==="sale"?"#fff":"#0a0909" }}>
+            ...S({ fontSize:7, fontWeight:700, letterSpacing:"0.1em", padding:"2px 6px", borderRadius:1 }),
+            background:p.badge==="sale" ? "#b91c1c" : "#c9a84c",
+            color:p.badge==="sale" ? "#fff" : "#0a0909" }}>
             {p.badge.toUpperCase()}
           </span>
         )}
         {!p.inStock && (
           <span style={{ position:"absolute", bottom:7, left:7, zIndex:2,
-            ...S({fontSize:7,color:"#8a8784",letterSpacing:"0.1em",
-              background:"rgba(0,0,0,0.7)",padding:"2px 6px",borderRadius:1}) }}>
+            ...S({ fontSize:7, color:"#8a8784", letterSpacing:"0.1em", background:"rgba(0,0,0,0.7)", padding:"2px 6px", borderRadius:1 }) }}>
             OUT OF STOCK
           </span>
         )}
+        {p.isHarleyFitment && (
+          <span style={{ position:"absolute", top:7, right:7, zIndex:2,
+            ...S({ fontSize:7, letterSpacing:"0.08em", padding:"2px 5px", borderRadius:1 }),
+            background:"rgba(201,168,76,0.15)", border:"1px solid rgba(201,168,76,0.3)", color:"#c9a84c" }}>
+            H-D
+          </span>
+        )}
       </div>
-
-      {/* Body */}
-      <div className="pcard-body p-2 sm:p-4" style={{
-        display:view==="list"?"flex":"block", alignItems:view==="list"?"center":undefined,
-        gap:view==="list"?16:undefined, flex:view==="list"?1:undefined }}>
-        <div style={{ flex:view==="list"?1:undefined }}>
-          <div style={S({fontSize:9,color:"#e8621a",letterSpacing:"0.14em",marginBottom:3})}>
-            {p.brand}
-          </div>
-          <div style={{ fontSize:13, fontWeight:700, color:"#f0ebe3",
-                        lineHeight:1.3, marginBottom:view==="list"?0:9 }}>
+      <div className="pcard-body"
+        style={{ display:view==="list" ? "flex" : "block", alignItems:view==="list" ? "center" : undefined,
+                 gap:view==="list" ? 16 : undefined, flex:view==="list" ? 1 : undefined }}>
+        <div style={{ flex:view==="list" ? 1 : undefined }}>
+          <div style={S({ fontSize:9, color:"#e8621a", letterSpacing:"0.14em", marginBottom:3 })}>{p.brand}</div>
+          <div style={{ fontSize:13, fontWeight:700, color:"#f0ebe3", lineHeight:1.3, marginBottom:view==="list" ? 0 : 6 }}>
             {p.name}
           </div>
+          {(p.brandCount > 1 || (p.availableBrands && p.availableBrands.length > 1)) && (
+            <div style={S({ fontSize:7, color:"#8a8784", letterSpacing:"0.1em", marginTop:3, marginBottom:2 })}>
+              {p.brandCount ?? p.availableBrands?.length} BRANDS AVAILABLE
+            </div>
+          )}
+          {p.fitmentYearStart && (
+            <div style={S({ fontSize:8, color:"#8a8784", letterSpacing:"0.08em", marginTop:2 })}>
+              {p.fitmentYearStart}–{p.fitmentYearEnd}
+            </div>
+          )}
         </div>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
-                      flexDirection:view==="list"?"column":undefined,
-                      gap:view==="list"?6:undefined,
-                      alignSelf:view==="list"?"center":undefined }}>
+                      flexDirection:view==="list" ? "column" : undefined, gap:view==="list" ? 6 : undefined,
+                      alignSelf:view==="list" ? "center" : undefined, marginTop:view==="list" ? 0 : 8 }}>
           <div>
             {p.was && (
-              <div style={{ fontSize:11, color:"#8a8784", textDecoration:"line-through",
-                            fontFamily:"var(--font-stencil),sans-serif" }}>
-                ${p.was.toFixed(2)}
+              <div style={{ fontSize:11, color:"#8a8784", textDecoration:"line-through", fontFamily:"var(--font-stencil),sans-serif" }}>
+                ${(Number(p.was) || 0).toFixed(2)}
               </div>
             )}
-            <div style={B({fontSize:20,color:"#f0ebe3",letterSpacing:"0.04em",lineHeight:1})}>
-              ${p.price.toFixed(2)}
+            <div style={{ display:"flex", alignItems:"baseline", gap:4 }}>
+              {p.priceMax && p.priceMin && p.priceMax > p.priceMin && (
+                <span style={S({ fontSize:9, color:"#8a8784", letterSpacing:"0.06em" })}>from</span>
+              )}
+              <span style={B({ fontSize:20, color:"#f0ebe3", letterSpacing:"0.04em", lineHeight:1 })}>
+                ${(Number(p.price) || 0).toFixed(2)}
+              </span>
             </div>
           </div>
           {p.inStock ? (
             <button className="add-btn"
               onClick={e => { e.preventDefault(); e.stopPropagation(); onAdd(); }}
               style={{ background:"#e8621a", border:"none", color:"#0a0909",
-                       ...B({fontSize:13,letterSpacing:"0.1em",padding:"5px 12px",
-                       borderRadius:2,cursor:"pointer",transition:"background 0.2s"}) }}>
-              ADD
+                       ...B({ fontSize:13, letterSpacing:"0.1em", padding:"5px 12px", borderRadius:2, cursor:"pointer", transition:"background 0.2s" }) }}>
+              {p.brandCount > 1 ? "OPTIONS" : "ADD"}
             </button>
           ) : (
-            <GridNotifyButton
-              sku={p.sku}
-              productName={p.name}
-              vendor={p.vendor ?? "wps"}
-            />
+            <GridNotifyButton sku={p.sku ?? p.slug} productName={p.name} vendor={p.vendor ?? "wps"}/>
           )}
         </div>
       </div>
@@ -471,7 +364,7 @@ function getPageRange(current, total) {
   return out;
 }
 
-// ── Main component ────────────────────────────────────────────
+// ── Main ──────────────────────────────────────────────────────
 export default function ShopClient({
   initialProducts = [],
   initialFacets   = { categories:[], brands:[], priceRange:{ min:0, max:0 } },
@@ -479,10 +372,8 @@ export default function ShopClient({
   initialCategory = null,
   initialBrand    = null,
 }) {
-  // ── Read initial state from URL (supports share/back/refresh) ──
   const searchParams = typeof window !== "undefined"
-    ? new URLSearchParams(window.location.search)
-    : new URLSearchParams();
+    ? new URLSearchParams(window.location.search) : new URLSearchParams();
 
   const urlCategory     = searchParams.get("category");
   const urlBrand        = searchParams.get("brand");
@@ -556,7 +447,15 @@ export default function ShopClient({
   const isFirst  = useRef(true);
   const abortRef = useRef(null);
 
-  // ── Persist filters + sort + page to URL ──────────────────
+  const toggleSection = useCallback(id => {
+    setOpenSections(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }, []);
+
+  // Persist to URL
   useEffect(() => {
     const params = new URLSearchParams();
     if (filters.category)         params.set("category",    filters.category);
@@ -578,11 +477,9 @@ export default function ShopClient({
   const fetchProducts = useCallback(async (f, s, p) => {
     if (abortRef.current) abortRef.current.abort();
     abortRef.current = new AbortController();
-    setLoading(true);
-    setError(null);
+    setLoading(true); setError(null);
     try {
-      const res  = await fetch(`/api/search?${buildQS(f, s, p)}`,
-        { signal: abortRef.current.signal });
+      const res  = await fetch(`/api/search?${buildQS(f, s, p)}`, { signal:abortRef.current.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setProducts(data.products ?? []);
@@ -595,18 +492,14 @@ export default function ShopClient({
     } catch (err) {
       if (err.name !== "AbortError") {
         console.error("[ShopClient]", err.message);
-        setError("Failed to load products. Please try again.");
+        setError("Failed to load products.");
       }
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }, []);
 
   useEffect(() => {
     if (isFirst.current) {
       isFirst.current = false;
-      // Only skip the initial fetch if SSR gave us BOTH products AND facets.
-      // If facets are empty (timeout on Supabase), still fetch so sidebar populates.
       if (initialProducts.length > 0 && initialFacets.categories.length > 0) return;
     }
     const t = setTimeout(() => fetchProducts(filters, sort, page), DEBOUNCE_MS);
@@ -614,13 +507,13 @@ export default function ShopClient({
   }, [filters, sort, page, fetchProducts]);
 
   const setFilter = useCallback((key, val) => {
-    setFilters(prev => ({ ...prev, [key]: val }));
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setFiltersState(prev => ({ ...prev, [key]:val }));
+    window.scrollTo({ top:0, behavior:"smooth" });
     setPage(0);
   }, []);
 
   const applyPrice = useCallback(() => {
-    setFilters(prev => ({
+    setFiltersState(prev => ({
       ...prev,
       minPrice: minInput ? Number(minInput) : null,
       maxPrice: maxInput ? Number(maxInput) : null,
@@ -648,7 +541,7 @@ export default function ShopClient({
 
   const removeChip = key => {
     if (key === "minPrice" || key === "maxPrice") {
-      setFilters(p => ({ ...p, minPrice:null, maxPrice:null }));
+      setFiltersState(p => ({ ...p, minPrice:null, maxPrice:null }));
       setMinInput(""); setMaxInput("");
     } else if (key === "inStock") {
       setFilter("inStock", false);
@@ -659,144 +552,213 @@ export default function ShopClient({
     }
   };
 
-  const totalPages = Math.ceil(total / PAGE_SIZE);
-  const activeFilterCount = Object.values(filters).filter(Boolean).length;
+  const totalPages        = Math.ceil(total / PAGE_SIZE);
+  const activeFilterCount = chips.length;
+
+  // ── Section active states ──────────────────────────────────
+  const availActive  = filters.inStock;
+  const fitmentActive= filters.harley || filters.yearFrom != null || filters.yearTo != null;
+  const catalogActive= filters.drag || filters.oldbook;
+  const catActive    = !!filters.category;
+  const brandActive  = !!filters.brand;
+  const priceActive  = filters.minPrice != null || filters.maxPrice != null;
 
   return (
-    <div style={{ background:"#0a0909", minHeight:"100vh", color:"#f0ebe3",
-                  fontFamily:"var(--font-stencil),sans-serif" }}>
+    <div style={{ background:"#0a0909", minHeight:"100vh", color:"#f0ebe3", fontFamily:"var(--font-stencil),sans-serif" }}>
       <style>{css}</style>
       <NavBar activePage="shop"/>
 
-      {/* ── TOOLBAR ── */}
-      <div style={{ background:"#111010", borderBottom:"1px solid #2a2828",
-                    padding:"8px 20px", display:"flex", alignItems:"center",
-                    justifyContent:"space-between", flexWrap:"wrap", gap:8 }}>
+      {/* ── TOOLBAR ─────────────────────────────────────────── */}
+      <div style={{ background:"#111010", borderBottom:"1px solid #2a2828", padding:"8px 20px",
+                    display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:8 }}>
+        {/* Left: count + active chips */}
         <div style={{ display:"flex", alignItems:"center", gap:7, flexWrap:"wrap" }}>
-          <span style={S({fontSize:10, color:"#8a8784", letterSpacing:"0.1em"})}>
+          <span style={S({ fontSize:10, color:"#8a8784", letterSpacing:"0.1em" })}>
             {loading
-              ? <span style={{color:"#3a3838"}}>LOADING…</span>
-              : <><span style={{color:"#e8621a"}}>{total.toLocaleString()}</span>{" RESULTS"}</>
+              ? <span style={{ color:"#3a3838" }}>LOADING…</span>
+              : <><span style={{ color:"#e8621a" }}>{total.toLocaleString()}</span>{" RESULTS"}</>
             }
           </span>
           {chips.map(f => (
-            <span key={f.key} className="chip" onClick={() => removeChip(f.key)}>
-              {f.label} ×
-            </span>
+            <span key={f.key} className="chip" onClick={() => removeChip(f.key)}>{f.label} ×</span>
           ))}
           {chips.length > 0 && (
             <button onClick={clearAll}
-              style={{ ...S({fontSize:8,letterSpacing:"0.1em",color:"#8a8784"}),
-                       background:"none",border:"none",cursor:"pointer" }}>
+              style={{ ...S({ fontSize:8, letterSpacing:"0.1em", color:"#8a8784" }), background:"none", border:"none", cursor:"pointer" }}>
               CLEAR ALL
             </button>
           )}
         </div>
+        {/* Right: sort + view */}
         <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-          <select value={sort}
-            onChange={e => { setSort(e.target.value); setPage(0); }}
+          <select value={sort} onChange={e => { setSort(e.target.value); setPage(0); }}
             style={{ background:"#1a1919", border:"1px solid #2a2828", color:"#f0ebe3",
-                     fontFamily:"var(--font-stencil),sans-serif", fontSize:13,
-                     padding:"5px 9px", borderRadius:2, outline:"none" }}>
+                     fontFamily:"var(--font-stencil),sans-serif", fontSize:12, padding:"5px 9px",
+                     borderRadius:2, outline:"none" }}>
             {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
           {["grid","list"].map(v => (
             <button key={v} onClick={() => setView(v)}
-              style={{ background:view===v?"rgba(232,98,26,0.12)":"#1a1919",
-                       border:`1px solid ${view===v?"rgba(232,98,26,0.4)":"#2a2828"}`,
-                       color:view===v?"#e8621a":"#8a8784",
-                       padding:"5px 9px", borderRadius:2, cursor:"pointer",
-                       fontSize:13, transition:"all 0.15s" }}>
-              {v==="grid"?"⊞":"☰"}
+              style={{ background:view===v ? "rgba(232,98,26,0.12)" : "#1a1919",
+                       border:`1px solid ${view===v ? "rgba(232,98,26,0.4)" : "#2a2828"}`,
+                       color:view===v ? "#e8621a" : "#8a8784",
+                       padding:"5px 9px", borderRadius:2, cursor:"pointer", fontSize:13, transition:"all 0.15s" }}>
+              {v === "grid" ? "⊞" : "☰"}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Mobile filter button — add above the shop-layout div */}
+      {/* Mobile filter button */}
       <div className="mobile-filter-btn-wrap">
-        <button
-          className="mobile-filter-btn"
-          onClick={() => setFilterOpen(v => !v)}
-        >
-          ☰ FILTERS {activeFilterCount > 0 && (
-            <span className="filter-badge">{activeFilterCount}</span>
-          )}
+        <button className="mobile-filter-btn" onClick={() => setFilterOpen(v => !v)}>
+          ☰ FILTERS {activeFilterCount > 0 && <span className="filter-badge">{activeFilterCount}</span>}
         </button>
       </div>
 
-      {/* ── BODY ── */}
+      {/* ── BODY ────────────────────────────────────────────── */}
       <div className="shop-layout">
-        {filterOpen && (
-          <div
-            className="filter-overlay"
-            onClick={() => setFilterOpen(false)}
-          />
-        )}
+        {filterOpen && <div className="filter-overlay" onClick={() => setFilterOpen(false)}/>}
 
-        {/* ── SIDEBAR ── */}
+        {/* ── SIDEBAR ───────────────────────────────────────── */}
         <aside className={`shop-sidebar ${filterOpen ? "filter-open" : ""}`}
-          style={{ background:"#111010", borderRight:"1px solid #2a2828",
-                   overflowY:"auto", maxHeight:"calc(100vh - 100px)",
-                   position:"sticky", top:54, alignSelf:"start" }}>
+          style={{ background:"#111010", borderRight:"1px solid #2a2828", overflowY:"auto",
+                   maxHeight:"calc(100vh - 100px)", position:"sticky", top:54, alignSelf:"start" }}>
+
           <div className="filter-close-wrap">
-            <button className="filter-close-btn" onClick={() => setFilterOpen(false)}>
-              ✕ CLOSE
-            </button>
+            <button className="filter-close-btn" onClick={() => setFilterOpen(false)}>✕ CLOSE</button>
           </div>
 
-          <FacetSection label="CATEGORY" items={facets.categories}
-            selected={filters.category} loading={loading}
-            onSelect={val => {
-              setFilter("category", filters.category===val ? null : val);
-              setFilterOpen(false);
-            }}/>
+          {/* ── 1. AVAILABILITY ── */}
+          <SbSection id="availability" label="AVAILABILITY"
+            isActive={availActive} open={openSections.has("availability")} onToggle={toggleSection}>
+            <div style={{ padding:"8px 0 12px" }}>
+              <div className="toggle-row"
+                style={{ background:filters.inStock ? "rgba(232,98,26,0.06)" : "transparent", transition:"background 0.15s" }}>
+                <div>
+                  <div className="toggle-label" style={{ color:filters.inStock ? "#f0ebe3" : "#c4c0bc" }}>
+                    In Stock Only
+                  </div>
+                  <div style={S({ fontSize:8, color:"#8a8784", letterSpacing:"0.08em", marginTop:2 })}>
+                    HIDE OUT-OF-STOCK
+                  </div>
+                </div>
+                <Toggle on={filters.inStock} onChange={val => { setFilter("inStock", val); setFilterOpen(false); }}/>
+              </div>
+            </div>
+          </SbSection>
 
-          <FacetSection label="BRAND" items={facets.brands}
-            selected={filters.brand} loading={loading}
-            onSelect={val => {
-              setFilter("brand", filters.brand===val ? null : val);
-              setFilterOpen(false);
-            }}/>
+          {/* ── 2. FITMENT ── */}
+          <SbSection id="fitment" label="FITMENT"
+            isActive={fitmentActive} open={openSections.has("fitment")} onToggle={toggleSection}>
+            <div style={{ padding:"8px 14px 14px", display:"flex", flexDirection:"column", gap:10 }}>
 
-          {/* Price */}
-          <div>
-            <div style={S({fontSize:9,color:"#e8621a",letterSpacing:"0.2em",
-                           padding:"12px 14px 8px",display:"block"})}>PRICE RANGE</div>
-            <div style={{ padding:"0 12px 16px", borderBottom:"1px solid #1a1919" }}>
+              {/* Year range */}
+              <div>
+                <div style={S({ fontSize:8, color:"#8a8784", letterSpacing:"0.14em", marginBottom:6 })}>
+                  MODEL YEAR RANGE
+                </div>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6 }}>
+                  <div>
+                    <div style={S({ fontSize:7, color:"#3a3838", letterSpacing:"0.1em", marginBottom:3 })}>FROM</div>
+                    <select className="year-select"
+                      value={filters.yearFrom ?? ""}
+                      onChange={e => { setFilter("yearFrom", e.target.value ? Number(e.target.value) : null); setFilterOpen(false); }}>
+                      <option value="">Any</option>
+                      {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <div style={S({ fontSize:7, color:"#3a3838", letterSpacing:"0.1em", marginBottom:3 })}>TO</div>
+                    <select className="year-select"
+                      value={filters.yearTo ?? ""}
+                      onChange={e => { setFilter("yearTo", e.target.value ? Number(e.target.value) : null); setFilterOpen(false); }}>
+                      <option value="">Any</option>
+                      {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* H-D Only toggle */}
+              <div className="toggle-row" style={{ padding:"6px 0" }}>
+                <div>
+                  <div className="toggle-label">Harley-Davidson Only</div>
+                  <div style={S({ fontSize:8, color:"#8a8784", letterSpacing:"0.08em", marginTop:2 })}>
+                    VERIFIED H-D FITMENT
+                  </div>
+                </div>
+                <Toggle on={!!filters.harley} onChange={val => { setFilter("harley", val); setFilterOpen(false); }}/>
+              </div>
+
+            </div>
+          </SbSection>
+
+          {/* ── 3. CATALOG TYPE ── */}
+          <SbSection id="catalog" label="CATALOG TYPE"
+            isActive={catalogActive} open={openSections.has("catalog")} onToggle={toggleSection}>
+            <div style={{ padding:"8px 0 12px" }}>
+              {[
+                { key:"drag",    label:"Drag Specialties", sub:"DS CATALOG" },
+                { key:"oldbook", label:"H-D Catalog",       sub:"OEM REFERENCE" },
+              ].map(({ key, label, sub }) => (
+                <div key={key} className="toggle-row">
+                  <div>
+                    <div className="toggle-label" style={{ color:filters[key] ? "#f0ebe3" : "#c4c0bc" }}>
+                      {label}
+                    </div>
+                    <div style={S({ fontSize:8, color:"#8a8784", letterSpacing:"0.08em", marginTop:2 })}>
+                      {sub}
+                    </div>
+                  </div>
+                  <Toggle on={!!filters[key]} onChange={val => { setFilter(key, val); setFilterOpen(false); }}/>
+                </div>
+              ))}
+            </div>
+          </SbSection>
+
+          {/* ── 4. CATEGORY ── */}
+          <SbSection id="category" label="CATEGORY"
+            isActive={catActive} open={openSections.has("category")} onToggle={toggleSection}>
+            <FacetList
+              items={facets.categories} selected={filters.category} loading={loading}
+              onSelect={val => { setFilter("category", filters.category === val ? null : val); setFilterOpen(false); }}
+            />
+          </SbSection>
+
+          {/* ── 5. BRAND ── */}
+          <SbSection id="brand" label="BRAND"
+            isActive={brandActive} open={openSections.has("brand")} onToggle={toggleSection}>
+            <FacetList
+              items={facets.brands} selected={filters.brand} loading={loading} searchable
+              onSelect={val => { setFilter("brand", filters.brand === val ? null : val); setFilterOpen(false); }}
+            />
+          </SbSection>
+
+          {/* ── 6. PRICE ── */}
+          <SbSection id="price" label="PRICE RANGE"
+            isActive={priceActive} open={openSections.has("price")} onToggle={toggleSection}>
+            <div style={{ padding:"10px 14px 14px" }}>
               {facets.priceRange?.max > 0 && (
-                <div style={S({fontSize:8,color:"#8a8784",letterSpacing:"0.08em",marginBottom:8})}>
-                  ${Math.floor(facets.priceRange.min).toLocaleString()} –{" "}
-                  ${Math.ceil(facets.priceRange.max).toLocaleString()}
+                <div style={S({ fontSize:8, color:"#8a8784", letterSpacing:"0.08em", marginBottom:8 })}>
+                  ${Math.floor(facets.priceRange.min).toLocaleString()} – ${Math.ceil(facets.priceRange.max).toLocaleString()}
                 </div>
               )}
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6, marginBottom:8 }}>
-                <input className="price-input" placeholder="Min $" type="number"
-                  value={minInput} onChange={e => setMinInput(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === "Enter") {
-                      applyPrice();
-                      setFilterOpen(false);
-                    }
-                  }}/>
-                <input className="price-input" placeholder="Max $" type="number"
-                  value={maxInput} onChange={e => setMaxInput(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === "Enter") {
-                      applyPrice();
-                      setFilterOpen(false);
-                    }
-                  }}/>
+                <input className="price-input" placeholder="Min $" type="number" value={minInput}
+                  onChange={e => setMinInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") { applyPrice(); setFilterOpen(false); } }}/>
+                <input className="price-input" placeholder="Max $" type="number" value={maxInput}
+                  onChange={e => setMaxInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") { applyPrice(); setFilterOpen(false); } }}/>
               </div>
-              <button onClick={() => {
-                applyPrice();
-                setFilterOpen(false);
-              }}
+              <button onClick={() => { applyPrice(); setFilterOpen(false); }}
                 style={{ width:"100%", background:"#e8621a", border:"none", color:"#0a0909",
-                         ...B({fontSize:14,letterSpacing:"0.08em",padding:"7px",
-                         borderRadius:2,cursor:"pointer"}) }}>APPLY</button>
+                         ...B({ fontSize:13, letterSpacing:"0.08em", padding:"7px", borderRadius:2, cursor:"pointer" }) }}>
+                APPLY
+              </button>
             </div>
-          </div>
+          </SbSection>
 
           {/* Availability */}
           <div>
@@ -901,47 +863,32 @@ export default function ShopClient({
           </div>
         </aside>
 
-        {/* ── GRID ── */}
+        {/* ── PRODUCT GRID ──────────────────────────────────── */}
         <div style={{ padding:"18px 20px" }}>
           <div className="grid-wrap">
-            {loading && (
-              <div className="grid-overlay">
-                <div className="spinner"/>
-              </div>
-            )}
-
+            {loading && <div className="grid-overlay"><div className="spinner"/></div>}
             {error && (
-              <div style={{ padding:20, background:"rgba(185,28,28,0.08)",
-                            border:"1px solid rgba(185,28,28,0.2)", borderRadius:2,
-                            marginBottom:16, ...S({fontSize:10,color:"#ef4444",
-                            letterSpacing:"0.1em"}) }}>
+              <div style={{ padding:20, background:"rgba(185,28,28,0.08)", border:"1px solid rgba(185,28,28,0.2)",
+                            borderRadius:2, marginBottom:16, ...S({ fontSize:10, color:"#ef4444", letterSpacing:"0.1em" }) }}>
                 {error}
               </div>
             )}
-
             {products.length === 0 && !loading ? (
               <div style={{ padding:"80px 20px", textAlign:"center" }}>
-                <div style={B({fontSize:30,letterSpacing:"0.05em",color:"#3a3838",marginBottom:8})}>
-                  NO PARTS FOUND
-                </div>
-                <div style={S({fontSize:9,color:"#8a8784",letterSpacing:"0.15em"})}>
-                  TRY ADJUSTING YOUR FILTERS
-                </div>
+                <div style={B({ fontSize:30, letterSpacing:"0.05em", color:"#3a3838", marginBottom:8 })}>NO PARTS FOUND</div>
+                <div style={S({ fontSize:9, color:"#8a8784", letterSpacing:"0.15em" })}>TRY ADJUSTING YOUR FILTERS</div>
                 {chips.length > 0 && (
                   <button onClick={clearAll}
                     style={{ marginTop:20, background:"#e8621a", border:"none", color:"#0a0909",
-                             ...B({fontSize:15,letterSpacing:"0.1em",padding:"9px 22px",
-                             borderRadius:2,cursor:"pointer"}) }}>
+                             ...B({ fontSize:15, letterSpacing:"0.1em", padding:"9px 22px", borderRadius:2, cursor:"pointer" }) }}>
                     CLEAR FILTERS
                   </button>
                 )}
               </div>
             ) : (
-              <div className={`${view==="grid" ? "product-grid" : ""} ${view==="list" ? "" : "grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3"}`}
-                style={view==="list" ? { display:"grid", gridTemplateColumns:"1fr", gap:12, opacity:loading?0.5:1, transition:"opacity 0.2s" } : { opacity:loading?0.5:1, transition:"opacity 0.2s" }}>
-                {products.map((p,i) => (
-                  <ProductCard key={p.id} product={p} index={i} view={view}
-                    onAdd={() => addItem(p)}/>
+              <div className="product-grid" style={{ opacity:loading ? 0.5 : 1, transition:"opacity 0.2s" }}>
+                {products.map((p, i) => (
+                  <ProductCard key={p.id ?? p.sku} product={p} index={i} view={view} onAdd={() => addItem(p)}/>
                 ))}
               </div>
             )}
@@ -949,35 +896,24 @@ export default function ShopClient({
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div style={{ display:"flex", alignItems:"center",
-                          justifyContent:"space-between", padding:"28px 0",
-                          marginTop:8, borderTop:"1px solid #2a2828",
-                          flexWrap:"wrap", gap:12 }}>
-              <span style={S({fontSize:9,color:"#8a8784",letterSpacing:"0.12em"})}>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
+                          padding:"28px 0", marginTop:8, borderTop:"1px solid #2a2828", flexWrap:"wrap", gap:12 }}>
+              <span style={S({ fontSize:9, color:"#8a8784", letterSpacing:"0.12em" })}>
                 SHOWING{" "}
-                <span style={{color:"#f0ebe3"}}>
-                  {(page*PAGE_SIZE+1).toLocaleString()}–
-                  {Math.min((page+1)*PAGE_SIZE,total).toLocaleString()}
+                <span style={{ color:"#f0ebe3" }}>
+                  {(page * PAGE_SIZE + 1).toLocaleString()}–{Math.min((page + 1) * PAGE_SIZE, total).toLocaleString()}
                 </span>
                 {" "}OF{" "}
-                <span style={{color:"#e8621a"}}>{total.toLocaleString()}</span>
+                <span style={{ color:"#e8621a" }}>{total.toLocaleString()}</span>
                 {" "}PRODUCTS
               </span>
               <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
-                <button className="page-btn nav" disabled={page===0}
-                  onClick={() => setPage(p => p-1)}>
-                  ← PREV
-                </button>
+                <button className="page-btn" disabled={page === 0} onClick={() => setPage(p => p - 1)}>← PREV</button>
                 {getPageRange(page, totalPages).map(pg => (
-                  <button key={pg} className={`page-btn ${pg===page?"active":""}`}
-                    onClick={() => setPage(pg)}>
-                    {pg+1}
-                  </button>
+                  <button key={pg} className={`page-btn ${pg === page ? "active" : ""}`}
+                    onClick={() => setPage(pg)}>{pg + 1}</button>
                 ))}
-                <button className="page-btn nav" disabled={page>=totalPages-1}
-                  onClick={() => setPage(p => p+1)}>
-                  NEXT →
-                </button>
+                <button className="page-btn" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}>NEXT →</button>
               </div>
             </div>
           )}

@@ -30,6 +30,11 @@ export default function CheckoutPage() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
 
+  // Routing engine — resolves vendor + shipping without exposing vendor to customer
+  const [shippingOption, setShippingOption] = useState("standard"); // "standard" | "express"
+  const [routingResult, setRoutingResult] = useState(null);
+  const [routingLoading, setRoutingLoading] = useState(false);
+
   useEffect(() => {
     let mounted = true;
     const load = async () => {
@@ -61,6 +66,38 @@ export default function CheckoutPage() {
     load();
     return () => { mounted = false; };
   }, []);
+
+  // Fetch routing results whenever the cart changes
+  useEffect(() => {
+    if (!cartItems.length) return;
+    let cancelled = false;
+    const fetchRouting = async () => {
+      setRoutingLoading(true);
+      try {
+        const res = await fetch("/api/routing/offers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            items: cartItems.map((item) => ({
+              sku: item.id ?? item.sku,
+              qty: item.qty,
+              retailPrice: item.price,
+              name: item.name,
+            })),
+          }),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setRoutingResult(data);
+      } catch (e) {
+        console.warn("[routing] fetch failed:", e);
+      } finally {
+        if (!cancelled) setRoutingLoading(false);
+      }
+    };
+    fetchRouting();
+    return () => { cancelled = true; };
+  }, [cartItems]);
 
   const showShipmentToast = (msg) => {
     setShipmentToast(msg);
@@ -188,7 +225,9 @@ export default function CheckoutPage() {
   );
   const subtotal = mapResult.subtotal;
   const pointsDiscount = mapResult.appliedDiscount;
-  const shipping = subtotal >= 99 ? 0 : 5;
+  const standardShipping = subtotal >= 99 ? 0 : 5.99;
+  const expressUpsell = 8.99;
+  const shipping = shippingOption === "express" ? standardShipping + expressUpsell : standardShipping;
   const tax = subtotal * 0.07;
   const total = Math.max(mapResult.finalTotal + shipping + tax, 0);
   const toCents = (value) => Math.round(value * 100);
@@ -223,6 +262,9 @@ export default function CheckoutPage() {
         billing_address: shippingAddress,
         subtotal: toCents(subtotal),
         shipping: toCents(shipping),
+        shipping_option: shippingOption,             // "standard" | "express"
+        routing_vendor: routingResult?.cartVendor ?? null, // internal — never shown to customer
+        split_required: routingResult?.splitRequired ?? false,
         tax: toCents(tax),
         discount: toCents(pointsDiscount),
         points_redeemed: points,
@@ -453,6 +495,68 @@ export default function CheckoutPage() {
       text-align: center;
       color: #8a8784;
     }
+    /* ── Shipping option picker ── */
+    .ship-opts { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+    .ship-opt {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 16px;
+      background: #1a1919;
+      border: 1px solid #2a2828;
+      border-radius: 2px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      user-select: none;
+    }
+    .ship-opt:hover { border-color: #4a4848; }
+    .ship-opt.selected { border-color: #e8621a; background: #1f1513; }
+    .ship-opt-dot {
+      width: 16px; height: 16px; flex-shrink: 0;
+      border-radius: 50%;
+      border: 2px solid #3a3838;
+      display: flex; align-items: center; justify-content: center;
+      transition: border-color 0.15s;
+    }
+    .ship-opt.selected .ship-opt-dot { border-color: #e8621a; }
+    .ship-opt-dot-inner {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #e8621a;
+      display: none;
+    }
+    .ship-opt.selected .ship-opt-dot-inner { display: block; }
+    .ship-opt-body { flex: 1; min-width: 0; }
+    .ship-opt-name {
+      font-family: var(--font-stencil), monospace;
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      color: #f0ebe3;
+    }
+    .ship-opt-eta {
+      font-family: var(--font-stencil), monospace;
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      color: #8a8784;
+      margin-top: 3px;
+    }
+    .ship-opt-price {
+      font-family: var(--font-caesar), sans-serif;
+      font-size: 18px;
+      letter-spacing: 0.04em;
+      color: #8a8784;
+      flex-shrink: 0;
+    }
+    .ship-opt.selected .ship-opt-price { color: #e8621a; }
+    .ship-free-badge {
+      font-family: var(--font-stencil), monospace;
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      color: #4caf7d;
+      padding: 2px 6px;
+      border: 1px solid #4caf7d;
+      border-radius: 2px;
+    }
     @media (max-width: 980px) {
       .checkout-inner { grid-template-columns: 1fr; }
     }
@@ -492,8 +596,8 @@ export default function CheckoutPage() {
               <span>${subtotal.toFixed(2)}</span>
             </div>
             <div className="summary-row muted">
-              <span>SHIPPING</span>
-              <span>${shipping.toFixed(2)}</span>
+              <span>SHIPPING{shippingOption === "express" ? " (EXPRESS)" : ""}</span>
+              <span>{shipping === 0 ? "FREE" : `$${shipping.toFixed(2)}`}</span>
             </div>
             <div className="summary-row muted">
               <span>TAX</span>
@@ -638,6 +742,57 @@ export default function CheckoutPage() {
               value={ship.address2}
               onChange={(e) => setShip(s => ({ ...s, address2: e.target.value }))}
             />
+          </div>
+
+          {/* Shipping option selector — vendor-blind, customer sees Standard / Express only */}
+          <div className="card" style={{marginBottom:16}}>
+            <div className="card-title">SHIPPING <span style={{color:"#e8621a"}}>METHOD</span></div>
+            {routingLoading && (
+              <div className="muted" style={{marginBottom:10, letterSpacing:"0.12em"}}>
+                CHECKING AVAILABILITY...
+              </div>
+            )}
+            <div className="ship-opts">
+              {/* Standard */}
+              <div
+                className={`ship-opt${shippingOption === "standard" ? " selected" : ""}`}
+                onClick={() => setShippingOption("standard")}
+                role="radio"
+                aria-checked={shippingOption === "standard"}
+              >
+                <div className="ship-opt-dot"><div className="ship-opt-dot-inner" /></div>
+                <div className="ship-opt-body">
+                  <div className="ship-opt-name">STANDARD GROUND</div>
+                  <div className="ship-opt-eta">3 – 5 BUSINESS DAYS</div>
+                </div>
+                {standardShipping === 0
+                  ? <span className="ship-free-badge">FREE</span>
+                  : <div className="ship-opt-price">${standardShipping.toFixed(2)}</div>
+                }
+              </div>
+
+              {/* Express */}
+              <div
+                className={`ship-opt${shippingOption === "express" ? " selected" : ""}`}
+                onClick={() => setShippingOption("express")}
+                role="radio"
+                aria-checked={shippingOption === "express"}
+              >
+                <div className="ship-opt-dot"><div className="ship-opt-dot-inner" /></div>
+                <div className="ship-opt-body">
+                  <div className="ship-opt-name">EXPRESS</div>
+                  <div className="ship-opt-eta">1 – 2 BUSINESS DAYS</div>
+                </div>
+                <div className="ship-opt-price">
+                  ${(standardShipping + expressUpsell).toFixed(2)}
+                </div>
+              </div>
+            </div>
+            {routingResult?.splitRequired && (
+              <div className="muted" style={{marginTop:10, color:"#c9a84c"}}>
+                YOUR ORDER SHIPS FROM MULTIPLE LOCATIONS
+              </div>
+            )}
           </div>
 
           <div className="card">

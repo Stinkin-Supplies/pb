@@ -197,45 +197,67 @@ export async function GET(req: Request) {
     const total    = productsResult.total ?? 0;
     const facets   = (facetsResult.data as any) ?? { categories: [], brands: [], price_range: { min: 0, max: 0 } };
 
-    return NextResponse.json({
-      products,
-      total,
-      page,
-      pageSize,
-      facets: {
-        categories: facets.categories ?? [],
-        brands:     facets.brands     ?? [],
-        priceRange: facets.price_range ?? { min: 0, max: 0 },
-      },
-    });
-
-  } catch (err: any) {
-    console.error("[/api/products] Error:", err.message);
-    return NextResponse.json(
-      { error: err.message ?? "Failed to fetch products" },
-      { status: 500 }
-    );
+    if (!rows.length) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+    return NextResponse.json(rows[0]);
   }
-}
 
-// ── Row normalizer ────────────────────────────────────────────
-// Mirrors the normalizer in shop/page.jsx — single source of
-// truth for DB → UI field mapping.
-// TODO: extract to lib/normalizers/product.ts (Phase B cleanup)
-function normalizeRow(row: any) {
-  return {
-    id:         row.id,
-    slug:       row.slug,
-    name:       row.name,
-    brand:      row.brand ?? "Unknown",
-    category:   row.category ?? "Uncategorized",
-    price:      Number(row.price ?? 0),
-    was:        Number(row.msrp ?? 0) > Number(row.price ?? 0) ? Number(row.msrp) : null,
-    mapPrice:   row.map_price != null ? Number(row.map_price) : null,
-    badge:      row.is_new ? "new" : null,
-    inStock:    (row.stock_quantity ?? 0) > 0,
-    fitmentIds: null, // populated after ACES import (Phase 5)
-    image:      row.image
-                  ?? (Array.isArray(row.images) && row.images.length > 0 ? row.images[0] : null),
-  };
+  // Multiple products by IDs (for cart)
+  if (ids?.length) {
+    const placeholders = ids.map((_, i) => `$${i + 1}`).join(", ");
+    const { rows } = await pool.query(
+      `SELECT * FROM catalog_unified WHERE id IN (${placeholders}) AND is_active = true`,
+      ids
+    );
+    return NextResponse.json(rows);
+  }
+
+  // Paginated list with filters
+  const page     = parseInt(p.get("page")     || "1");
+  const limit    = parseInt(p.get("limit")    || "24");
+  const offset   = (page - 1) * limit;
+  const brand    = p.get("brand");
+  const category = p.get("category");
+  const vendor   = p.get("vendor");
+  const inStock  = p.get("in_stock") === "true";
+  const harley   = p.get("harley")   === "true";
+  const dragPart = p.get("drag")     === "true";
+  const oldbook  = p.get("oldbook")  === "true";
+
+  const conditions: string[] = ["is_active = true"];
+  const values: any[] = [];
+  let idx = 1;
+
+  if (brand)    { conditions.push(`brand = $${idx++}`);         values.push(brand); }
+  if (category) { conditions.push(`category = $${idx++}`);      values.push(category); }
+  if (vendor)   { conditions.push(`source_vendor = $${idx++}`); values.push(vendor); }
+  if (inStock)  conditions.push("in_stock = true");
+  if (harley)   conditions.push("is_harley_fitment = true");
+  if (dragPart) conditions.push("drag_part = true");
+  if (oldbook)  conditions.push("in_oldbook = true");
+
+  const where = conditions.join(" AND ");
+
+  const [{ rows }, { rows: [{ count }] }] = await Promise.all([
+    pool.query(
+      `SELECT id, sku, name, brand, category, msrp, cost, image_url,
+              in_stock, stock_quantity, source_vendor, slug,
+              is_harley_fitment, fitment_hd_families, fitment_year_start, fitment_year_end,
+              drag_part, in_oldbook, in_fatbook, features
+       FROM catalog_unified
+       WHERE ${where}
+       ORDER BY sort_priority DESC, name ASC
+       LIMIT $${idx} OFFSET $${idx + 1}`,
+      [...values, limit, offset]
+    ),
+    pool.query(`SELECT COUNT(*) FROM catalog_unified WHERE ${where}`, values),
+  ]);
+
+  return NextResponse.json({
+    products:    rows,
+    total:       parseInt(count),
+    page,
+    total_pages: Math.ceil(parseInt(count) / limit),
+  });
 }

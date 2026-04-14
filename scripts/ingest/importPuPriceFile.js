@@ -537,7 +537,7 @@ async function main() {
   if (failed === 0) {
     log('\n🔗  Merging PU vendor rows into catalog...');
     try {
-      execSync('node scripts/ingest/phase2-merge.js', { stdio: 'inherit' });
+      execSync('node scripts/ingest/phase2-merge.cjs', { stdio: 'inherit' });
     } catch (err) {
       failed = products.length;
       console.error('❌  Catalog merge failed:', err.message);
@@ -548,7 +548,10 @@ async function main() {
   if (!SKIP_REINDEX && failed === 0) {
     log('\n🔍  Triggering Typesense reindex...');
     try {
-      execSync('node scripts/ingest/indexTypesense.js', { stdio: 'inherit' });
+      execSync(
+        'npx dotenv -e .env.local -- node -e "import(\'./scripts/ingest/index_assembly.js\').then(m=>m.buildTypesenseIndex({recreate:true}))"',
+        { stdio: 'inherit' }
+      );
     } catch (err) {
       console.error('❌  Reindex failed:', err.message);
     }
