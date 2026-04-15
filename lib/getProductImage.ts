@@ -10,18 +10,15 @@ const BRAND_FALLBACKS: Record<string, string> = {
   "drag specialties": "/brands/drag-specialties.png",
 };
 
+function isLeMans(url: string) {
+  return url.includes("lemansnet.com");
+}
+
 function isRealImage(url: string) {
   if (!url || !url.startsWith("http")) return false;
-
   const lower = url.toLowerCase();
-
-  // reject zip files only
   if (lower.includes(".zip")) return false;
-
-  // accept known CDN domains directly — these work in browser without proxy
-  if (lower.includes("lemansnet.com")) return true;
-
-  // accept standard image extensions
+  if (isLeMans(url)) return true;
   return (
     lower.endsWith(".jpg")  ||
     lower.endsWith(".jpeg") ||
@@ -30,6 +27,14 @@ function isRealImage(url: string) {
     lower.endsWith(".gif")  ||
     lower.endsWith(".svg")
   );
+}
+
+export function proxyImageUrl(url: string): string {
+  if (!url) return FALLBACK_IMAGE;
+  if (isLeMans(url)) {
+    return `/api/image-proxy?url=${encodeURIComponent(url)}`;
+  }
+  return url;
 }
 
 export function filterImageUrls(urls?: (string | null)[] | null) {
@@ -41,10 +46,10 @@ export function getProductImage(product?: ProductImageInput | null) {
   if (!product) return FALLBACK_IMAGE;
 
   const direct = typeof product.image === "string" ? product.image.trim() : "";
-  if (direct && isRealImage(direct)) return direct;
+  if (direct && isRealImage(direct)) return proxyImageUrl(direct);
 
   const first = filterImageUrls(product.images)[0] ?? null;
-  if (first) return first;
+  if (first) return proxyImageUrl(first);
 
   const brandSource = (product.brand_name ?? product.brand) ?? "";
   const brand = typeof brandSource === "string" ? brandSource.trim().toLowerCase() : "";

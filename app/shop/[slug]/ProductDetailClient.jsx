@@ -678,7 +678,7 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
     if (raw.length > 0) {
       return raw.map(url => isWpsCdn(url) ? `/api/image-proxy?url=${encodeURIComponent(url)}` : url);
     }
-    return [fallback];
+    return ["/images/placeholder.jpg"];
   })();
 
   const toProxySrc = (src) =>
@@ -805,7 +805,7 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
   }
 
   function RelatedCardImage({ product }) {
-    const src = toProxySrc(product.primaryImage ?? product.gallery?.[0] ?? fallback);
+    const src = toProxySrc(product.primaryImage ?? product.gallery?.[0] ?? "/images/placeholder.jpg");
     const isPlaceholder = src === "/placeholder-product.png" || src === "/images/placeholder.jpg";
     return (
       <div className="related-img">
