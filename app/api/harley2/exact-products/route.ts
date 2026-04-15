@@ -1,122 +1,91 @@
-import { NextRequest, NextResponse } from "next/server";
-import getCatalogDb from "@/lib/db/catalog";
-import { adminSupabase } from "@/lib/supabase/admin";
-import { normalizeHarleyProductRow } from "@/lib/harley/catalog";
+// app/api/harley/models/route.ts
+// Returns all hd_models rows for a given family, for the year+model dropdown
 
-export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams;
-  const generic = searchParams.get("generic")?.trim();
-  const submodel = searchParams.get('submodel');
-  const year = parseInt(searchParams.get('year') || '0');
-  const category = searchParams.get('category');
-  const brand = searchParams.get('brand');
+import { NextRequest, NextResponse } from 'next/server';
+import pg from 'pg';
 
-  if ((!submodel && !generic) || !year) {
-    return NextResponse.json({ error: 'Missing generic model or year' }, { status: 400 });
+const pool = new pg.Pool({
+  host:     process.env.CATALOG_DB_HOST     || '5.161.100.126',
+  port:     parseInt(process.env.CATALOG_DB_PORT || '5432'),
+  database: process.env.CATALOG_DB_NAME     || 'stinkin_catalog',
+  user:     process.env.CATALOG_DB_USER     || 'catalog_app',
+  password: process.env.CATALOG_DB_PASSWORD || 'smelly',
+});
+
+export async function GET(req: NextRequest) {
+  const family = req.nextUrl.searchParams.get('family');
+  if (!family) {
+    return NextResponse.json({ error: 'family required' }, { status: 400 });
   }
-
-  let genericModel = generic;
-
-  if (submodel && !genericModel) {
-    const { data, error } = await adminSupabase
-      .from("vehicles")
-      .select("model, submodel, year")
-      .eq("make", "Harley-Davidson")
-      .eq("submodel", submodel)
-      .eq("year", year)
-      .order("model", { ascending: true })
-      .limit(1);
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    genericModel = data?.[0]?.model ?? null;
-  }
-
-  if (!genericModel) {
-    return NextResponse.json({ error: "Exact model not found" }, { status: 404 });
-  }
-
-  const db = getCatalogDb();
-  const params: Array<string | number> = [genericModel, year];
-  let idx = 3;
-  const conditions = [
-    "cp.is_active = true",
-    "LOWER(cf.make) = LOWER('Harley-Davidson')",
-    "LOWER(cf.model) = LOWER($1)",
-    "cf.year_start <= $2",
-    "cf.year_end >= $2",
-  ];
-  if (category) {
-    conditions.push(`cp.category = $${idx}`);
-    params.push(category);
-    idx++;
-  }
-  if (brand) {
-    conditions.push(`cp.brand = $${idx}`);
-    params.push(brand);
-    idx++;
-  }
-
-  params.push(48);
 
   try {
-    const { rows } = await db.query(
-      `
+    // For platform families (Softail, Touring, etc.) we want all models.
+    // For engine families (M8, Twin Cam, Evolution) we join via engine_key.
+    // Simplest: query by family name directly, with engine family fallback.
+    const { rows } = await pool.query<{
+      model_code: string;
+      model_name: string;
+      family: string;
+      year_start: number;
+      year_end: number | null;
+      engine_key: string | null;
+      engine_nickname: string | null;
+    }>(`
       SELECT
-        cp.id,
-        cp.sku,
-        cp.slug,
-        cp.name,
-        cp.brand,
-        cp.category,
-        COALESCE(cp.price, cp.msrp, cp.cost, 0) AS price,
-        cp.msrp,
-        cp.map_price,
-        cp.description,
-        cp.is_active,
-        COALESCE((
-          SELECT cm.url
-          FROM public.catalog_media cm
-          WHERE cm.product_id = cp.id
-          ORDER BY cm.priority ASC
-          LIMIT 1
-        ), NULL) AS image_url,
-        COALESCE((
-          SELECT ARRAY_AGG(cm.url ORDER BY cm.priority ASC)
-          FROM public.catalog_media cm
-          WHERE cm.product_id = cp.id
-        ), '{}'::text[]) AS image_urls,
-        COALESCE((
-          SELECT SUM(vo.total_qty)
-          FROM public.vendor_offers vo
-          WHERE vo.catalog_product_id = cp.id
-            AND vo.is_active = true
-        ), 0) AS stock_quantity,
-        COALESCE((
-          SELECT BOOL_OR(vo.is_active)
-          FROM public.vendor_offers vo
-          WHERE vo.catalog_product_id = cp.id
-        ), false) AS in_stock,
-        cp.source_vendor,
-        cp.is_harley_fitment,
-        cp.fitment_year_start,
-        cp.fitment_year_end
-      FROM public.catalog_products cp
-      JOIN public.catalog_fitment cf ON cf.product_id = cp.id
-      WHERE ${conditions.join(" AND ")}
-      ORDER BY cp.sort_priority DESC, cp.name ASC
-      LIMIT $${idx}
-      `,
-      params
-    );
+        m.model_code,
+        m.model_name,
+        m.family,
+        m.year_start,
+        m.year_end,
+        m.engine_key,
+        e.nickname AS engine_nickname
+      FROM hd_models m
+      LEFT JOIN hd_engine_types e ON e.engine_key = m.engine_key
+      WHERE
+        -- Direct family match (Softail, Touring, Dyna, Sportster, Trike, Street, Revolution_Max)
+        m.family = $1
+        OR
+        -- Engine-era families: M8 → milwaukee_eight, Twin Cam → twin_cam, etc.
+        m.engine_key = (
+          SELECT engine_key FROM hd_family_engine_map WHERE family = $1 LIMIT 1
+        )
+      ORDER BY m.year_start DESC, m.model_code ASC
+    `, [family]);
 
-    return NextResponse.json({
-      products: rows.map(normalizeHarleyProductRow),
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ error: message }, { status: 500 });
+    // Build a year → models map for the dropdown
+    // Each year entry lists every model that was in production that year
+    const currentYear = new Date().getFullYear();
+    const yearMap = new Map<number, { model_code: string; model_name: string; engine_nickname: string | null }[]>();
+
+    for (const row of rows) {
+      const endYear = row.year_end ?? currentYear;
+      for (let y = row.year_start; y <= endYear; y++) {
+        if (!yearMap.has(y)) yearMap.set(y, []);
+        yearMap.get(y)!.push({
+          model_code: row.model_code,
+          model_name: row.model_name,
+          engine_nickname: row.engine_nickname,
+        });
+      }
+    }
+
+    // Convert to sorted array (newest first) and deduplicate model codes per year
+    const years = Array.from(yearMap.entries())
+      .sort((a, b) => b[0] - a[0])
+      .map(([year, models]) => {
+        // Deduplicate by model_code (XL883L appears twice due to name change)
+        const seen = new Set<string>();
+        const unique = models.filter(m => {
+          if (seen.has(m.model_code)) return false;
+          seen.add(m.model_code);
+          return true;
+        });
+        return { year, models: unique };
+      });
+
+    return NextResponse.json({ family, years });
+  } catch (err) {
+    console.error('[harley/models]', err);
+    return NextResponse.json({ error: 'Database error' }, { status: 500 });
   }
 }
