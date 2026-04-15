@@ -10,7 +10,7 @@ export type HarleyCategory = {
 };
 
 export type HarleyFamily = {
-  name: string;        // must match fitment_hd_families array values exactly
+  name: string;        // must match fitment_hd_families values exactly
   display_name: string;
   subtitle: string;
   year_range: string;
@@ -36,19 +36,21 @@ export const HARLEY_CATEGORIES: HarleyCategory[] = [
 ];
 
 // HD family names must match fitment_hd_families values in catalog_unified
+// AND family column in hd_models table
 export const HARLEY_FAMILIES: HarleyFamily[] = [
-  { name: "Sportster",  display_name: "Sportster",  subtitle: "883 · 1200 · Iron · Forty-Eight",      year_range: "1986–2023" },
-  { name: "Softail",    display_name: "Softail",    subtitle: "Fat Boy · Heritage · Breakout · FXST",  year_range: "1984–2024" },
-  { name: "Touring",    display_name: "Touring",    subtitle: "Road King · Street Glide · Road Glide", year_range: "1980–2024" },
-  { name: "Dyna",       display_name: "Dyna",       subtitle: "Low Rider · Street Bob · Wide Glide",   year_range: "1991–2017" },
-  { name: "M8",         display_name: "M8",         subtitle: "Milwaukee-Eight · 2017+",               year_range: "2017–2024" },
-  { name: "Twin Cam",   display_name: "Twin Cam",   subtitle: "88 · 96 · 103 · 110 · 1999–2017",       year_range: "1999–2017" },
-  { name: "Evolution",  display_name: "Evolution",  subtitle: "Evo · 1340 · 1984–1999",                year_range: "1984–1999" },
-  { name: "Big Twin",   display_name: "Big Twin",   subtitle: "Broad coverage · FL · FX",              year_range: "1936–2017" },
-  { name: "Shovelhead", display_name: "Shovelhead", subtitle: "1966–1984 iron head",                   year_range: "1966–1984" },
-  { name: "Panhead",    display_name: "Panhead",    subtitle: "1948–1965 classic",                     year_range: "1948–1965" },
-  { name: "V-Rod",      display_name: "V-Rod",      subtitle: "VRSC · Revolution engine",              year_range: "2002–2017" },
-  { name: "Trike",      display_name: "Trike",      subtitle: "Tri Glide · Freewheeler",               year_range: "2009–2024" },
+  { name: "Sportster",      display_name: "Sportster",      subtitle: "883 · 1200 · Iron · Forty-Eight",       year_range: "1986–2023" },
+  { name: "Softail",        display_name: "Softail",        subtitle: "Fat Boy · Heritage · Breakout · FXST",  year_range: "1984–2024" },
+  { name: "Touring",        display_name: "Touring",        subtitle: "Road King · Street Glide · Road Glide", year_range: "1980–2026" },
+  { name: "Dyna",           display_name: "Dyna",           subtitle: "Low Rider · Street Bob · Wide Glide",   year_range: "1991–2017" },
+  { name: "M8",             display_name: "M8",             subtitle: "Milwaukee-Eight · 2017+",               year_range: "2017–2026" },
+  { name: "Twin Cam",       display_name: "Twin Cam",       subtitle: "88 · 96 · 103 · 110 · 1999–2017",       year_range: "1999–2017" },
+  { name: "Evolution",      display_name: "Evolution",      subtitle: "Evo · 1340 · 1984–1999",                year_range: "1984–1999" },
+  { name: "Big Twin",       display_name: "Big Twin",       subtitle: "Broad coverage · FL · FX",              year_range: "1936–2017" },
+  { name: "Shovelhead",     display_name: "Shovelhead",     subtitle: "1966–1984 iron head",                   year_range: "1966–1984" },
+  { name: "Panhead",        display_name: "Panhead",        subtitle: "1948–1965 classic",                     year_range: "1948–1965" },
+  { name: "V-Rod",          display_name: "V-Rod",          subtitle: "VRSC · Revolution engine",              year_range: "2002–2017" },
+  { name: "Trike",          display_name: "Trike",          subtitle: "Tri Glide · Freewheeler",               year_range: "2009–2026" },
+  { name: "Revolution_Max", display_name: "Revolution Max", subtitle: "Pan America · Sportster S · Nightster",  year_range: "2021–2026" },
 ];
 
 export const YEAR_MIN = 1948;

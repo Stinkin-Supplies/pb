@@ -61,6 +61,53 @@ export default async function ProductDetailPage({ params }) {
     console.error("[PDP] product fetch failed:", err.message);
   }
 
+  // Fallback: catalog_unified for PU-only products not in catalog_products
+  if (!productRow) {
+    try {
+      const { rows: urows } = await catalogDb.query(
+        `SELECT
+          cu.id,
+          cu.sku,
+          cu.slug,
+          cu.name,
+          COALESCE(cu.display_brand, cu.brand) AS brand,
+          cu.category,
+          cu.description,
+          cu.weight,
+          cu.brand_part_number   AS manufacturer_part_number,
+          COALESCE(cu.msrp, cu.cost, 0) AS price,
+          cu.msrp,
+          cu.map_price,
+          cu.is_active,
+          cu.is_discontinued,
+          cu.created_at,
+          CASE WHEN cu.image_url IS NOT NULL
+               THEN ARRAY[cu.image_url]
+               ELSE '{}'::text[]
+          END AS images,
+          COALESCE(cu.stock_quantity, 0) AS stock_quantity,
+          ARRAY[cu.source_vendor]        AS vendor_codes,
+          cu.upc,
+          cu.features,
+          cu.fitment_year_start,
+          cu.fitment_year_end,
+          cu.fitment_hd_families,
+          cu.is_harley_fitment,
+          cu.is_universal,
+          cu.in_oldbook,
+          cu.in_fatbook,
+          cu.drag_part
+        FROM public.catalog_unified cu
+        WHERE cu.slug = $1
+        LIMIT 1`,
+        [slug]
+      );
+      if (urows[0]) { productRow = urows[0]; productRow._fromUnified = true; }
+    } catch (err) {
+      console.error('[PDP] unified fallback failed:', err.message);
+    }
+  }
+
   if (!productRow) notFound();
 
   // ── Fetch variants, fitment, specs in parallel ────────────
