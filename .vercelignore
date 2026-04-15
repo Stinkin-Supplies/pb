@@ -1,0 +1,5 @@
+scripts/data/
+scripts/node_modules/
+*.xml
+*.csv
+*.zip
