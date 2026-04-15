@@ -3,7 +3,7 @@ import { getHarleyStyle } from "@/lib/harley/config";
 
 export async function GET(request: NextRequest) {
   const styleName = request.nextUrl.searchParams.get("style");
-  const style = getHarleyStyle(styleName);
+  const style = getHarleyStyle(styleName) as any;
 
   if (!style) {
     return NextResponse.json({ error: "Style not found" }, { status: 404 });

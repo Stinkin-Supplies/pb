@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   const styleName = searchParams.get("style");
   const category = searchParams.get("category");
 
-  const style = getHarleyStyle(styleName);
+  const style = getHarleyStyle(styleName) as any;
   if (!style) return NextResponse.json({ error: "Missing style" }, { status: 400 });
 
   const db = getCatalogDb();
