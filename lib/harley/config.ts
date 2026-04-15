@@ -99,3 +99,4 @@ export const HARLEY_STYLES: HarleyStyle[] = HARLEY_FAMILIES.map(f => ({
 }));
 
 export const HARLEY_STYLE_LOOKUP = FAMILY_LOOKUP;
+export const getHarleyStyle = getHarleyFamily;
