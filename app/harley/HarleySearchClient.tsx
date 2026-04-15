@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
@@ -9,7 +9,6 @@ import { getProductImage, filterImageUrls } from "@/lib/getProductImage";
 import {
   HARLEY_CATEGORIES,
   HARLEY_FAMILIES,
-  YEAR_MIN,
   YEAR_MAX,
   type HarleyCategory,
   type HarleyFamily,
@@ -18,115 +17,10 @@ import { normalizeHarleyProductRow, type HarleyProduct } from "@/lib/harley/cata
 
 type Step = "model" | "year" | "categories";
 
-const YEARS = Array.from({ length: YEAR_MAX - YEAR_MIN + 1 }, (_, i) => YEAR_MAX - i);
-
-// ─── LAYERED STACK ────────────────────────────────────────────────────────────
-function LayeredStack({
-  families,
-  selected,
-  onSelect,
-  onExpandAll,
-}: {
-  families: HarleyFamily[];
-  selected: HarleyFamily | null;
-  onSelect: (f: HarleyFamily) => void;
-  onExpandAll: () => void;
-}) {
-  const [hovered, setHovered] = useState<number | null>(null);
-  const VISIBLE = 5;
-  const CARD_H = 76;
-  const PEEK = 13;
-
-  return (
-    <div style={{ width: "100%" }}>
-      <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 9, letterSpacing: "0.2em", textTransform: "uppercase", color: "#4a4846", marginBottom: 12 }}>
-        Model family
-      </div>
-      <div style={{ position: "relative", height: CARD_H + (VISIBLE - 1) * PEEK + 8, marginBottom: 12 }}>
-        {families.slice(0, VISIBLE).map((family, i) => {
-          const isTop = i === 0;
-          const isHov = hovered === i;
-          const isSelected = selected?.name === family.name;
-          const zIndex = VISIBLE - i;
-          const baseY = i * PEEK;
-
-          return (
-            <motion.button
-              key={family.name}
-              onHoverStart={() => setHovered(i)}
-              onHoverEnd={() => setHovered(null)}
-              onClick={isTop ? onExpandAll : () => onSelect(family)}
-              animate={{
-                y: isHov && !isTop ? baseY - 6 : baseY,
-                scale: isTop ? 1 : 1 - i * 0.015,
-                opacity: 1 - i * 0.12,
-              }}
-              transition={{ type: "spring", stiffness: 380, damping: 32 }}
-              style={{
-                position: "absolute",
-                top: 0, left: 0, right: 0,
-                height: CARD_H,
-                zIndex,
-                background: isSelected
-                  ? "linear-gradient(90deg, rgba(232,98,26,0.2), rgba(232,98,26,0.07))"
-                  : isTop
-                    ? "linear-gradient(90deg, rgba(32,30,28,0.99), rgba(24,22,21,0.97))"
-                    : "linear-gradient(90deg, rgba(22,21,19,0.97), rgba(18,17,16,0.95))",
-                border: `1px solid ${isSelected ? "rgba(232,98,26,0.8)" : isTop ? "rgba(58,55,52,0.9)" : "rgba(42,40,38,0.7)"}`,
-                borderRadius: 2,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "0 20px",
-                gap: 14,
-                textAlign: "left",
-                boxShadow: isTop
-                  ? "0 6px 28px rgba(0,0,0,0.5)"
-                  : `0 ${2 + i * 2}px ${6 + i * 4}px rgba(0,0,0,${0.22 + i * 0.07})`,
-              }}
-            >
-              {isTop && !selected && (
-                <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: "linear-gradient(180deg, transparent, rgba(232,98,26,0.8), transparent)", borderRadius: "2px 0 0 2px" }} />
-              )}
-              <div style={{ minWidth: 0 }}>
-                <div style={{
-                  fontFamily: "var(--font-caesar, serif)",
-                  fontSize: 28,
-                  lineHeight: 1,
-                  letterSpacing: "0.05em",
-                  color: isSelected ? "#e8621a" : isTop ? "#f0ebe3" : "#c4c0bc",
-                  marginBottom: 5,
-                }}>
-                  {isTop && !selected ? "All Models" : family.display_name}
-                </div>
-                <div style={{
-                  fontFamily: "var(--font-stencil, monospace)",
-                  fontSize: 9,
-                  letterSpacing: "0.1em",
-                  textTransform: "uppercase",
-                  color: "#5a5856",
-                }}>
-                  {isTop && !selected ? `${families.length} model families` : family.subtitle}
-                </div>
-              </div>
-              <div style={{
-                fontFamily: "var(--font-stencil, monospace)",
-                fontSize: 8,
-                color: isTop ? "#6a6866" : "#3a3836",
-                letterSpacing: "0.1em",
-                textTransform: "uppercase",
-                whiteSpace: "nowrap",
-              }}>
-                {isTop && !selected ? "tap to browse ↓" : family.year_range}
-              </div>
-            </motion.button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+type YearModel = {
+  year: number;
+  models: { model_code: string; model_name: string; engine_nickname: string | null }[];
+};
 
 // ─── MODEL GRID ───────────────────────────────────────────────────────────────
 function ModelGrid({
@@ -187,24 +81,44 @@ function ModelGrid({
   );
 }
 
-// ─── YEAR PANEL ───────────────────────────────────────────────────────────────
-function YearPanel({
+// ─── YEAR DROPDOWN ────────────────────────────────────────────────────────────
+function YearDropdown({
   family,
+  yearModels,
+  loadingModels,
   selectedYear,
   onYearChange,
   onConfirm,
   loading,
 }: {
   family: HarleyFamily;
-  selectedYear: number;
+  yearModels: YearModel[];
+  loadingModels: boolean;
+  selectedYear: number | null;
   onYearChange: (y: number) => void;
   onConfirm: () => void;
   loading: boolean;
 }) {
-  const range = family.year_range.split("–");
-  const minY = parseInt(range[0]);
-  const maxY = parseInt(range[1]) || YEAR_MAX;
-  const years = YEARS.filter(y => y >= minY && y <= maxY);
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const selected = yearModels.find(ym => ym.year === selectedYear);
+
+  // Build label for selected option
+  function yearLabel(ym: YearModel) {
+    const codes = ym.models.slice(0, 3).map(m => m.model_code).join(" · ");
+    const overflow = ym.models.length > 3 ? ` +${ym.models.length - 3}` : "";
+    return `${ym.year} — ${codes}${overflow}`;
+  }
 
   return (
     <motion.div
@@ -216,58 +130,148 @@ function YearPanel({
       <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 9, letterSpacing: "0.2em", textTransform: "uppercase", color: "#4a4846", marginBottom: 12 }}>
         Year — {family.display_name}
       </div>
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(68px, 1fr))",
-        gap: 6,
-        maxHeight: 280,
-        overflowY: "auto",
-        marginBottom: 16,
-        paddingRight: 4,
-      }}>
-        {years.map(year => (
-          <motion.button
-            key={year}
-            onClick={() => onYearChange(year)}
-            whileTap={{ scale: 0.95 }}
-            style={{
-              background: selectedYear === year ? "#e8621a" : "rgba(16,15,14,0.95)",
-              border: `1px solid ${selectedYear === year ? "#e8621a" : "rgba(38,36,34,0.8)"}`,
-              borderRadius: 2,
-              color: selectedYear === year ? "#0a0908" : "#a09b92",
-              fontFamily: "var(--font-stencil, monospace)",
-              fontSize: 11,
-              letterSpacing: "0.08em",
-              padding: "10px 6px",
-              cursor: "pointer",
-              fontWeight: selectedYear === year ? 700 : 400,
-            }}
-          >
-            {year}
-          </motion.button>
-        ))}
+
+      {/* Custom dropdown */}
+      <div ref={ref} style={{ position: "relative", marginBottom: 16 }}>
+        <button
+          onClick={() => !loadingModels && setOpen(o => !o)}
+          style={{
+            width: "100%",
+            background: "rgba(16,15,14,0.97)",
+            border: `1px solid ${open ? "rgba(232,98,26,0.6)" : "rgba(52,50,48,0.8)"}`,
+            borderRadius: 2,
+            padding: "14px 16px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            cursor: loadingModels ? "wait" : "pointer",
+            gap: 12,
+          }}
+        >
+          <div style={{ minWidth: 0 }}>
+            {loadingModels ? (
+              <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: "#4a4846" }}>
+                Loading models…
+              </span>
+            ) : selected ? (
+              <>
+                <span style={{ fontFamily: "var(--font-caesar, serif)", fontSize: 26, letterSpacing: "0.04em", color: "#e8621a", marginRight: 10 }}>
+                  {selected.year}
+                </span>
+                <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", color: "#7a7876" }}>
+                  {selected.models.slice(0, 4).map(m => m.model_code).join(" · ")}
+                  {selected.models.length > 4 ? ` +${selected.models.length - 4}` : ""}
+                </span>
+              </>
+            ) : (
+              <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: "#4a4846" }}>
+                Select a year
+              </span>
+            )}
+          </div>
+          <span style={{ color: "#4a4846", fontSize: 10, flexShrink: 0, transition: "transform 0.15s", transform: open ? "rotate(180deg)" : "rotate(0deg)" }}>▼</span>
+        </button>
+
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.12 }}
+              style={{
+                position: "absolute",
+                top: "calc(100% + 4px)",
+                left: 0,
+                right: 0,
+                background: "#0e0d0c",
+                border: "1px solid rgba(52,50,48,0.9)",
+                borderRadius: 2,
+                zIndex: 50,
+                maxHeight: 320,
+                overflowY: "auto",
+                boxShadow: "0 12px 40px rgba(0,0,0,0.7)",
+              }}
+            >
+              {yearModels.map((ym) => {
+                const isActive = ym.year === selectedYear;
+                return (
+                  <button
+                    key={ym.year}
+                    onClick={() => { onYearChange(ym.year); setOpen(false); }}
+                    style={{
+                      width: "100%",
+                      background: isActive ? "rgba(232,98,26,0.12)" : "transparent",
+                      border: "none",
+                      borderBottom: "1px solid rgba(36,34,32,0.5)",
+                      padding: "11px 16px",
+                      display: "flex",
+                      alignItems: "baseline",
+                      gap: 12,
+                      cursor: "pointer",
+                      textAlign: "left",
+                    }}
+                    onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = "rgba(232,98,26,0.06)"; }}
+                    onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
+                  >
+                    {/* Year */}
+                    <span style={{
+                      fontFamily: "var(--font-caesar, serif)",
+                      fontSize: 22,
+                      letterSpacing: "0.04em",
+                      color: isActive ? "#e8621a" : "#f0ebe3",
+                      lineHeight: 1,
+                      minWidth: 48,
+                      flexShrink: 0,
+                    }}>
+                      {ym.year}
+                    </span>
+                    {/* Model codes */}
+                    <span style={{
+                      fontFamily: "var(--font-stencil, monospace)",
+                      fontSize: 8,
+                      letterSpacing: "0.1em",
+                      textTransform: "uppercase",
+                      color: isActive ? "#c07040" : "#5a5856",
+                      lineHeight: 1.5,
+                    }}>
+                      {ym.models.map(m => m.model_code).join(" · ")}
+                    </span>
+                  </button>
+                );
+              })}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
+
+      {/* Confirm button */}
       <motion.button
         onClick={onConfirm}
-        disabled={loading}
-        whileHover={{ y: -2 }}
-        whileTap={{ scale: 0.97 }}
+        disabled={loading || !selectedYear}
+        whileHover={selectedYear ? { y: -2 } : {}}
+        whileTap={selectedYear ? { scale: 0.97 } : {}}
         style={{
           width: "100%",
-          background: "#e8621a",
-          color: "#0a0908",
-          border: "1px solid #e8621a",
+          background: selectedYear ? "#e8621a" : "rgba(36,34,32,0.5)",
+          color: selectedYear ? "#0a0908" : "#3a3836",
+          border: `1px solid ${selectedYear ? "#e8621a" : "rgba(36,34,32,0.5)"}`,
           borderRadius: 2,
           fontFamily: "var(--font-stencil, monospace)",
           fontSize: 10,
           letterSpacing: "0.14em",
           textTransform: "uppercase",
           padding: "14px 20px",
-          cursor: loading ? "not-allowed" : "pointer",
+          cursor: loading || !selectedYear ? "not-allowed" : "pointer",
           opacity: loading ? 0.6 : 1,
+          transition: "background 0.15s, color 0.15s, border-color 0.15s",
         }}
       >
-        {loading ? "Loading…" : `Find ${selectedYear} ${family.display_name} Parts →`}
+        {loading
+          ? "Loading…"
+          : selectedYear
+            ? `Find ${selectedYear} ${family.display_name} Parts →`
+            : "Select a year above"}
       </motion.button>
     </motion.div>
   );
@@ -384,7 +388,9 @@ export default function HarleySearchClient() {
   const [step, setStep] = useState<Step>("model");
   const [allOpen, setAllOpen] = useState(false);
   const [selectedFamily, setSelectedFamily] = useState<HarleyFamily | null>(null);
-  const [selectedYear, setSelectedYear] = useState<number>(YEAR_MAX);
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [yearModels, setYearModels] = useState<YearModel[]>([]);
+  const [loadingModels, setLoadingModels] = useState(false);
   const [activeCatSlug, setActiveCatSlug] = useState<string | null>(null);
   const [productsByCategory, setProductsByCategory] = useState<Record<string, HarleyProduct[]>>({});
   const [catCounts, setCatCounts] = useState<Record<string, number>>({});
@@ -396,6 +402,24 @@ export default function HarleySearchClient() {
   const activeCategory = useMemo(() => activeCatSlug ? HARLEY_CATEGORIES.find(c => c.slug === activeCatSlug) ?? null : null, [activeCatSlug]);
   const activeProducts = useMemo(() => activeCatSlug ? (productsByCategory[activeCatSlug] ?? []) : [], [activeCatSlug, productsByCategory]);
   const totalProducts = useMemo(() => Object.values(catCounts).reduce((a, b) => a + b, 0), [catCounts]);
+
+  // Fetch year+model data when a family is selected
+  const fetchYearModels = useCallback(async (family: HarleyFamily) => {
+    setLoadingModels(true);
+    setYearModels([]);
+    setSelectedYear(null);
+    try {
+      const res = await fetch(`/api/harley/models?family=${encodeURIComponent(family.name)}`);
+      const data = await res.json();
+      setYearModels(data.years ?? []);
+      // Pre-select the most recent year
+      if (data.years?.length) setSelectedYear(data.years[0].year);
+    } catch {
+      setYearModels([]);
+    } finally {
+      setLoadingModels(false);
+    }
+  }, []);
 
   const loadProducts = useCallback(async (family: HarleyFamily, year: number) => {
     setLoading(true);
@@ -431,12 +455,15 @@ export default function HarleySearchClient() {
       setStep("year");
       setAllOpen(false);
     });
+    fetchYearModels(family);
   };
 
   const reset = () => {
     startTransition(() => {
       setStep("model");
       setSelectedFamily(null);
+      setSelectedYear(null);
+      setYearModels([]);
       setProductsByCategory({});
       setCatCounts({});
       setActiveCatSlug(null);
@@ -453,8 +480,6 @@ export default function HarleySearchClient() {
 
         {/* ── FULL-WIDTH HERO ── */}
         <div style={{ paddingTop: 32, paddingBottom: 24, borderBottom: "1px solid rgba(36,34,32,0.6)", marginBottom: 32 }}>
-
-          {/* Big title — full width */}
           <div style={{ marginBottom: 24 }}>
             <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 9, letterSpacing: "0.28em", color: "#e8621a", textTransform: "uppercase", marginBottom: 10 }}>
               Harley-Davidson Parts
@@ -466,11 +491,15 @@ export default function HarleySearchClient() {
             </h1>
           </div>
 
-          {/* Status strip */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             {step !== "model" && (
               <button onClick={reset} style={{ background: "transparent", color: "#6b6460", border: "1px solid rgba(36,34,32,0.7)", borderRadius: 2, fontFamily: "var(--font-stencil, monospace)", fontSize: 8, letterSpacing: "0.14em", textTransform: "uppercase", padding: "8px 12px", cursor: "pointer" }}>
                 ← Change Model
+              </button>
+            )}
+            {step === "year" && selectedFamily && (
+              <button onClick={() => setStep("year")} style={{ background: "transparent", color: "#6b6460", border: "none", fontFamily: "var(--font-stencil, monospace)", fontSize: 8, letterSpacing: "0.14em", textTransform: "uppercase", padding: "8px 0", cursor: "default" }}>
+                {selectedFamily.display_name}
               </button>
             )}
             {totalProducts > 0 && (
@@ -499,27 +528,53 @@ export default function HarleySearchClient() {
                 marginBottom: 32,
               }}
             >
-              {/* LEFT: Year picker (shows when family selected) or instructions */}
+              {/* LEFT: Year dropdown (shows when family selected) or centered prompt */}
               <div style={{ borderRight: "1px solid rgba(36,34,32,0.5)", paddingRight: 28 }}>
                 <AnimatePresence mode="wait">
                   {step === "year" && selectedFamily ? (
-                    <YearPanel
+                    <YearDropdown
                       key="year"
                       family={selectedFamily}
+                      yearModels={yearModels}
+                      loadingModels={loadingModels}
                       selectedYear={selectedYear}
                       onYearChange={setSelectedYear}
-                      onConfirm={() => loadProducts(selectedFamily, selectedYear)}
+                      onConfirm={() => selectedYear && loadProducts(selectedFamily, selectedYear)}
                       loading={loading}
                     />
                   ) : (
-                    <motion.div key="prompt" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                      <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 9, letterSpacing: "0.2em", textTransform: "uppercase", color: "#4a4846", marginBottom: 12 }}>
-                        Year
+                    <motion.div
+                      key="prompt"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        minHeight: 220,
+                        textAlign: "center",
+                        padding: "0 16px",
+                      }}
+                    >
+                      <div style={{
+                        fontFamily: "var(--font-caesar, serif)",
+                        fontSize: "clamp(36px, 4vw, 56px)",
+                        color: "#e8621a",
+                        letterSpacing: "0.04em",
+                        lineHeight: 1.05,
+                        marginBottom: 12,
+                      }}>
+                        Select a model
                       </div>
-                      <div style={{ fontFamily: "var(--font-caesar, serif)", fontSize: 36, color: "#2a2826", letterSpacing: "0.04em", lineHeight: 1 }}>
-                        Select a model →
-                      </div>
-                      <div style={{ marginTop: 12, fontFamily: "var(--font-stencil, monospace)", fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", color: "#3a3836" }}>
+                      <div style={{
+                        fontFamily: "var(--font-stencil, monospace)",
+                        fontSize: 9,
+                        letterSpacing: "0.2em",
+                        textTransform: "uppercase",
+                        color: "#3a3836",
+                      }}>
                         then pick your year
                       </div>
                     </motion.div>
@@ -527,25 +582,61 @@ export default function HarleySearchClient() {
                 </AnimatePresence>
               </div>
 
-              {/* RIGHT: Layered stack → expands to full grid */}
+              {/* RIGHT: Grid or stack */}
               <div style={{ paddingLeft: 28 }}>
                 <AnimatePresence mode="wait">
-                  {allOpen ? (
+                  {allOpen || step === "year" ? (
                     <motion.div key="grid" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                         <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 9, letterSpacing: "0.2em", textTransform: "uppercase", color: "#4a4846" }}>All model families</div>
-                        <button onClick={() => setAllOpen(false)} style={{ background: "transparent", border: "none", color: "#4a4846", fontFamily: "var(--font-stencil, monospace)", fontSize: 8, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer" }}>↑ Collapse</button>
+                        {allOpen && step === "model" && (
+                          <button onClick={() => setAllOpen(false)} style={{ background: "transparent", border: "none", color: "#4a4846", fontFamily: "var(--font-stencil, monospace)", fontSize: 8, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer" }}>↑ Collapse</button>
+                        )}
                       </div>
                       <ModelGrid families={HARLEY_FAMILIES} selected={selectedFamily} onSelect={handleSelectFamily} />
                     </motion.div>
                   ) : (
-                    <motion.div key="stack" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                      <LayeredStack
-                        families={HARLEY_FAMILIES}
-                        selected={selectedFamily}
-                        onSelect={handleSelectFamily}
-                        onExpandAll={() => setAllOpen(true)}
-                      />
+                    // Compact family list (not expanded)
+                    <motion.div key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                      <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 9, letterSpacing: "0.2em", textTransform: "uppercase", color: "#4a4846", marginBottom: 12 }}>
+                        Model family
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {HARLEY_FAMILIES.slice(0, 6).map((family) => (
+                          <motion.button
+                            key={family.name}
+                            onClick={() => handleSelectFamily(family)}
+                            whileHover={{ x: 3, borderColor: "rgba(232,98,26,0.4)" }}
+                            style={{
+                              background: "rgba(16,15,14,0.95)",
+                              border: "1px solid rgba(38,36,34,0.8)",
+                              borderRadius: 2,
+                              padding: "12px 16px",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              cursor: "pointer",
+                              textAlign: "left",
+                            }}
+                          >
+                            <div>
+                              <div style={{ fontFamily: "var(--font-caesar, serif)", fontSize: 22, lineHeight: 1, letterSpacing: "0.04em", color: "#f0ebe3", marginBottom: 3 }}>
+                                {family.display_name}
+                              </div>
+                              <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 8, letterSpacing: "0.1em", textTransform: "uppercase", color: "#5a5856" }}>
+                                {family.year_range}
+                              </div>
+                            </div>
+                            <span style={{ color: "#3a3836", fontSize: 12 }}>›</span>
+                          </motion.button>
+                        ))}
+                        <button
+                          onClick={() => setAllOpen(true)}
+                          style={{ background: "transparent", border: "1px dashed rgba(38,36,34,0.6)", borderRadius: 2, padding: "10px 16px", fontFamily: "var(--font-stencil, monospace)", fontSize: 8, letterSpacing: "0.14em", textTransform: "uppercase", color: "#4a4846", cursor: "pointer", textAlign: "center" }}
+                        >
+                          All {HARLEY_FAMILIES.length} families ↓
+                        </button>
+                      </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -561,7 +652,7 @@ export default function HarleySearchClient() {
 
               {/* Breadcrumb */}
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
-                {[selectedYear.toString(), selectedFamily?.display_name, activeCategory?.label].filter(Boolean).map((label, i) => (
+                {[selectedYear?.toString(), selectedFamily?.display_name, activeCategory?.label].filter(Boolean).map((label, i) => (
                   <span key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     {i > 0 && <span style={{ color: "#2a2826" }}>›</span>}
                     <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: i === 2 ? "#e8621a" : "#6b6460" }}>{label}</span>
@@ -569,7 +660,7 @@ export default function HarleySearchClient() {
                 ))}
               </div>
 
-              {/* Category tiles — horizontal scroll */}
+              {/* Category tiles */}
               <div style={{ overflowX: "auto", paddingBottom: 10, marginBottom: 28 }}>
                 <div style={{ display: "flex", gap: 8, minWidth: "max-content" }}>
                   {HARLEY_CATEGORIES.map(cat => (
