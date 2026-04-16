@@ -200,7 +200,7 @@ export async function buildTypesenseIndex({ recreate = true } = {}) {
   const [{ count }] = await sql`
     SELECT COUNT(DISTINCT cp.id) 
     FROM catalog_products cp
-    INNER JOIN catalog_media m ON m.product_id = cp.id AND m.media_type = 'image'
+    LEFT JOIN catalog_media m ON m.product_id = cp.id AND m.media_type = 'image'
     WHERE cp.is_active = true AND cp.is_discontinued = false
   `;
   const total = Number(count);
@@ -216,7 +216,7 @@ export async function buildTypesenseIndex({ recreate = true } = {}) {
       SELECT DISTINCT cp.id, cp.sku, cp.slug, cp.name, cp.brand, cp.manufacturer_part_number, cp.description,
              cp.category, cp.computed_price, cp.stock_quantity
       FROM catalog_products cp
-	      INNER JOIN catalog_media m ON m.product_id = cp.id AND m.media_type = 'image'
+	      LEFT JOIN catalog_media m ON m.product_id = cp.id AND m.media_type = 'image'
 	      WHERE cp.is_active = true AND cp.is_discontinued = false
 	      ORDER BY cp.id
 	      LIMIT ${BATCH_SIZE} OFFSET ${offset}
