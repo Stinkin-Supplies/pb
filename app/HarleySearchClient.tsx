@@ -22,15 +22,37 @@ type YearModel = {
   models: { model_code: string; model_name: string; engine_nickname: string | null }[];
 };
 
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    const update = () => setMatches(media.matches);
+    update();
+
+    if (typeof media.addEventListener === "function") {
+      media.addEventListener("change", update);
+      return () => media.removeEventListener("change", update);
+    }
+
+    media.addListener(update);
+    return () => media.removeListener(update);
+  }, [query]);
+
+  return matches;
+}
+
 // ─── MODEL GRID ───────────────────────────────────────────────────────────────
 function ModelGrid({
   families,
   selected,
   onSelect,
+  compact = false,
 }: {
   families: HarleyFamily[];
   selected: HarleyFamily | null;
   onSelect: (f: HarleyFamily) => void;
+  compact?: boolean;
 }) {
   return (
     <motion.div
@@ -40,7 +62,7 @@ function ModelGrid({
       transition={{ duration: 0.2 }}
       style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))",
+        gridTemplateColumns: compact ? "repeat(2, minmax(0, 1fr))" : "repeat(auto-fill, minmax(190px, 1fr))",
         gap: 8,
       }}
     >
@@ -58,20 +80,20 @@ function ModelGrid({
               background: isSelected ? "rgba(232,98,26,0.12)" : "rgba(16,15,14,0.95)",
               border: `1px solid ${isSelected ? "rgba(232,98,26,0.7)" : "rgba(38,36,34,0.8)"}`,
               borderRadius: 2,
-              padding: "16px 14px",
+              padding: compact ? "12px 10px" : "16px 14px",
               cursor: "pointer",
               textAlign: "left",
               position: "relative",
             }}
           >
             {isSelected && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: "#e8621a" }} />}
-            <div style={{ fontFamily: "var(--font-caesar, serif)", fontSize: 22, lineHeight: 1, letterSpacing: "0.04em", color: isSelected ? "#e8621a" : "#f0ebe3", marginBottom: 5 }}>
+            <div style={{ fontFamily: "var(--font-caesar, serif)", fontSize: compact ? 18 : 22, lineHeight: 1, letterSpacing: "0.04em", color: isSelected ? "#e8621a" : "#f0ebe3", marginBottom: 5 }}>
               {family.display_name}
             </div>
-            <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 8, letterSpacing: "0.1em", textTransform: "uppercase", color: "#5a5856", marginBottom: 3 }}>
+            <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: compact ? 7 : 8, letterSpacing: "0.1em", textTransform: "uppercase", color: "#5a5856", marginBottom: 3 }}>
               {family.subtitle}
             </div>
-            <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 8, color: "#3a3836", letterSpacing: "0.08em" }}>
+            <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: compact ? 7 : 8, color: "#3a3836", letterSpacing: "0.08em" }}>
               {family.year_range}
             </div>
           </motion.button>
@@ -346,24 +368,25 @@ function ProductCard({ product, onOpen, index }: { product: HarleyProduct; onOpe
 
 // ─── PRODUCT MODAL ────────────────────────────────────────────────────────────
 function ProductModal({ product, onClose }: { product: HarleyProduct | null; onClose: () => void }) {
+  const isMobile = useMediaQuery("(max-width: 768px)");
   const imageSrc = product ? getProductImage({ image: product.image_url ?? null, images: filterImageUrls(product.image_urls ?? []), brand: product.brand }) : null;
   return (
     <AnimatePresence>
       {product && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.84)", backdropFilter: "blur(14px)", zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.84)", backdropFilter: "blur(14px)", zIndex: 60, display: "flex", alignItems: isMobile ? "flex-end" : "center", justifyContent: "center", padding: isMobile ? 10 : 20 }}>
           <motion.div initial={{ scale: 0.96, y: 20, opacity: 0 }} animate={{ scale: 1, y: 0, opacity: 1 }} exit={{ scale: 0.96, y: 20, opacity: 0 }} transition={{ duration: 0.2 }}
             onClick={e => e.stopPropagation()}
-            style={{ width: "min(1040px, 100%)", maxHeight: "min(90svh, 900px)", overflow: "auto", border: "1px solid rgba(52,50,48,0.9)", background: "radial-gradient(circle at 0% 0%, rgba(232,98,26,0.13), transparent 28%), #0e0d0c", display: "grid", gridTemplateColumns: "minmax(260px, 0.9fr) minmax(0, 1.1fr)" }}>
-            <motion.div layoutId={`img-${product.id}`} style={{ position: "relative", minHeight: 300, background: "#fff" }}>
-              {imageSrc && <Image src={imageSrc} alt={product.name} fill sizes="45vw" style={{ objectFit: "contain", padding: 20 }} unoptimized />}
+            style={{ width: "min(1040px, 100%)", maxHeight: isMobile ? "92svh" : "min(90svh, 900px)", overflow: "auto", border: "1px solid rgba(52,50,48,0.9)", background: "radial-gradient(circle at 0% 0%, rgba(232,98,26,0.13), transparent 28%), #0e0d0c", display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(260px, 0.9fr) minmax(0, 1.1fr)", borderRadius: isMobile ? 12 : 0 }}>
+            <motion.div layoutId={`img-${product.id}`} style={{ position: "relative", minHeight: isMobile ? 240 : 300, background: "#fff" }}>
+              {imageSrc && <Image src={imageSrc} alt={product.name} fill sizes={isMobile ? "100vw" : "45vw"} style={{ objectFit: "contain", padding: isMobile ? 12 : 20 }} unoptimized />}
             </motion.div>
-            <div style={{ padding: 28, display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ padding: isMobile ? "16px 14px 18px" : 28, display: "flex", flexDirection: "column", gap: 14 }}>
               <button onClick={onClose} style={{ alignSelf: "flex-start", border: "1px solid rgba(52,50,48,0.8)", background: "transparent", color: "#8a8784", fontFamily: "var(--font-stencil, monospace)", fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", padding: "10px 12px", cursor: "pointer", borderRadius: 2 }}>← Close</button>
               <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: "#6b6460" }}>{product.brand} · {product.category}</div>
-              <div style={{ fontFamily: "var(--font-caesar, serif)", fontSize: "clamp(26px, 4vw, 48px)", lineHeight: 0.98, letterSpacing: "0.04em", color: "#f0ebe3" }}>{product.name}</div>
-              <div style={{ fontFamily: "var(--font-caesar, serif)", fontSize: 34, color: "#e8621a" }}>${Number(product.price || 0).toFixed(2)}</div>
-              {product.description && <div style={{ color: "#a09b92", lineHeight: 1.7, fontSize: 14 }}>{product.description}</div>}
+              <div style={{ fontFamily: "var(--font-caesar, serif)", fontSize: isMobile ? "clamp(24px, 8vw, 34px)" : "clamp(26px, 4vw, 48px)", lineHeight: 0.98, letterSpacing: "0.04em", color: "#f0ebe3" }}>{product.name}</div>
+              <div style={{ fontFamily: "var(--font-caesar, serif)", fontSize: isMobile ? 28 : 34, color: "#e8621a" }}>${Number(product.price || 0).toFixed(2)}</div>
+              {product.description && <div style={{ color: "#a09b92", lineHeight: 1.6, fontSize: isMobile ? 13 : 14 }}>{product.description}</div>}
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 8, letterSpacing: "0.12em", textTransform: "uppercase", border: "1px solid rgba(52,50,48,0.7)", padding: "6px 10px", borderRadius: 999, color: product.in_stock ? "#22c55e" : "#6b6460" }}>{product.in_stock ? "In Stock" : "Out of Stock"}</span>
                 <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 8, letterSpacing: "0.12em", textTransform: "uppercase", border: "1px solid rgba(52,50,48,0.7)", padding: "6px 10px", borderRadius: 999, color: "#8a8784" }}>SKU {product.sku}</span>
@@ -372,8 +395,8 @@ function ProductModal({ product, onClose }: { product: HarleyProduct | null; onC
                 )}
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 4 }}>
-                <Link href={`/shop/${product.slug}`} style={{ display: "inline-flex", alignItems: "center", gap: 8, textDecoration: "none", background: "#e8621a", color: "#0a0908", border: "1px solid #e8621a", borderRadius: 2, fontFamily: "var(--font-stencil, monospace)", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", padding: "12px 18px" }}>Open Full Page</Link>
-                <button onClick={onClose} style={{ display: "inline-flex", alignItems: "center", background: "transparent", color: "#a09b92", border: "1px solid rgba(52,50,48,0.8)", borderRadius: 2, fontFamily: "var(--font-stencil, monospace)", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", padding: "12px 18px", cursor: "pointer" }}>Keep Browsing</button>
+                <Link href={`/shop/${product.slug}`} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, textDecoration: "none", background: "#e8621a", color: "#0a0908", border: "1px solid #e8621a", borderRadius: 2, fontFamily: "var(--font-stencil, monospace)", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", padding: "12px 18px", flex: isMobile ? "1 1 100%" : "0 0 auto" }}>Open Full Page</Link>
+                <button onClick={onClose} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", background: "transparent", color: "#a09b92", border: "1px solid rgba(52,50,48,0.8)", borderRadius: 2, fontFamily: "var(--font-stencil, monospace)", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", padding: "12px 18px", cursor: "pointer", flex: isMobile ? "1 1 100%" : "0 0 auto" }}>Keep Browsing</button>
               </div>
             </div>
           </motion.div>
@@ -385,6 +408,7 @@ function ProductModal({ product, onClose }: { product: HarleyProduct | null; onC
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 export default function HarleySearchClient() {
+  const isMobile = useMediaQuery("(max-width: 768px)");
   const [step, setStep] = useState<Step>("model");
   const [allOpen, setAllOpen] = useState(false);
   const [selectedFamily, setSelectedFamily] = useState<HarleyFamily | null>(null);
@@ -484,7 +508,7 @@ export default function HarleySearchClient() {
             <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 9, letterSpacing: "0.28em", color: "#e8621a", textTransform: "uppercase", marginBottom: 10 }}>
               Harley-Davidson Parts
             </div>
-            <h1 style={{ fontFamily: "var(--font-caesar, serif)", fontSize: "clamp(52px, 8vw, 110px)", lineHeight: 0.9, letterSpacing: "0.04em", margin: 0, maxWidth: "100%" }}>
+            <h1 style={{ fontFamily: "var(--font-caesar, serif)", fontSize: isMobile ? "clamp(34px, 12vw, 52px)" : "clamp(52px, 8vw, 110px)", lineHeight: 0.9, letterSpacing: "0.04em", margin: 0, maxWidth: "100%" }}>
               {step === "model" && <>Find parts for your <span style={{ color: "#e8621a" }}>Harley</span></>}
               {step === "year" && <>{selectedFamily?.display_name} — <span style={{ color: "#e8621a" }}>what year?</span></>}
               {step === "categories" && <>{selectedYear} <span style={{ color: "#e8621a" }}>{selectedFamily?.display_name}</span></>}
@@ -523,13 +547,13 @@ export default function HarleySearchClient() {
               transition={{ duration: 0.22 }}
               style={{
                 display: "grid",
-                gridTemplateColumns: "1fr 1fr",
+                gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
                 gap: 2,
                 marginBottom: 32,
               }}
             >
               {/* LEFT: Year dropdown (shows when family selected) or centered prompt */}
-              <div style={{ borderRight: "1px solid rgba(36,34,32,0.5)", paddingRight: 28 }}>
+              <div style={{ borderRight: isMobile ? "none" : "1px solid rgba(36,34,32,0.5)", paddingRight: isMobile ? 0 : 28, marginBottom: isMobile ? 20 : 0 }}>
                 <AnimatePresence mode="wait">
                   {step === "year" && selectedFamily ? (
                     <YearDropdown
@@ -583,7 +607,7 @@ export default function HarleySearchClient() {
               </div>
 
               {/* RIGHT: Grid or stack */}
-              <div style={{ paddingLeft: 28 }}>
+              <div style={{ paddingLeft: isMobile ? 0 : 28 }}>
                 <AnimatePresence mode="wait">
                   {allOpen || step === "year" ? (
                     <motion.div key="grid" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -593,7 +617,7 @@ export default function HarleySearchClient() {
                           <button onClick={() => setAllOpen(false)} style={{ background: "transparent", border: "none", color: "#4a4846", fontFamily: "var(--font-stencil, monospace)", fontSize: 8, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer" }}>↑ Collapse</button>
                         )}
                       </div>
-                      <ModelGrid families={HARLEY_FAMILIES} selected={selectedFamily} onSelect={handleSelectFamily} />
+                      <ModelGrid families={HARLEY_FAMILIES} selected={selectedFamily} onSelect={handleSelectFamily} compact={isMobile} />
                     </motion.div>
                   ) : (
                     // Compact family list (not expanded)
@@ -661,7 +685,7 @@ export default function HarleySearchClient() {
               </div>
 
               {/* Category tiles */}
-              <div style={{ overflowX: "auto", paddingBottom: 10, marginBottom: 28 }}>
+              <div style={{ overflowX: "auto", paddingBottom: 10, marginBottom: 28, WebkitOverflowScrolling: "touch" }}>
                 <div style={{ display: "flex", gap: 8, minWidth: "max-content" }}>
                   {HARLEY_CATEGORIES.map(cat => (
                     <CategoryTile key={cat.slug} category={cat} count={catCounts[cat.slug] ?? 0} active={activeCatSlug === cat.slug} onClick={() => setActiveCatSlug(cat.slug)} />
@@ -689,7 +713,7 @@ export default function HarleySearchClient() {
 
                     {activeProducts.length > 0 ? (
                       <LayoutGroup>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(172px, 1fr))", gap: 10 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, minmax(0, 1fr))" : "repeat(auto-fill, minmax(172px, 1fr))", gap: 10 }}>
                           {activeProducts.map((product, i) => (
                             <ProductCard key={product.id} product={product} onOpen={setSelectedProduct} index={i} />
                           ))}
