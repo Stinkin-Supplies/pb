@@ -12,31 +12,35 @@ Last Updated: April 16, 2026
 | 2 | Added 9,699 orphaned HD products to allowlist | 78,072 in_allowlist, 0 missing |
 | 3 | Loaded 61,639 PU dealer prices into catalog_pricing | 87.9% PU pricing coverage |
 | 4 | Fixed index_assembly.js INNER JOIN → LEFT JOIN | All products index regardless of images |
-| 5 | Reindexed Typesense | **74,119 indexed** (was 12,443), 0 failed |
+| 5 | Promoted 19,271 WPS products from vendor_products | WPS: 7,948 → 27,219 in catalog |
+| 6 | Extracted 22,181 WPS images from images_raw JSON | Loaded into catalog_media |
+| 7 | Added 14,165 allowlist entries for new WPS products | All properly categorized |
+| 8 | Reindexed Typesense | **93,390 indexed** (was 12,443 at start of session), 0 failed |
 
 ---
 
 ## 🔴 HIGH PRIORITY
 
-### 114,244 WPS products in vendor_products never promoted to catalog
-- **What:** vendor.vendor_products has 122,192 WPS rows, catalog_products only has 7,948 WPS
-- **Confirmed eligible:** status='STK', drop_ship_eligible=true (exhaust springs, petcock kits, etc.)
+### ~99,403 PU products in vendor_products never promoted to catalog
+- **What:** vendor.vendor_products has 173,741 PU rows, catalog_products has 70,124 PU
+- **Note:** Unlike WPS, PU products in vendor_products may overlap with what's already in catalog via pu_products table — need to check join key
 - **Investigate:**
   ```sql
-  SELECT vp.status, vp.drop_ship_eligible, COUNT(*)
+  -- Check how PU vendor_products relates to catalog_products
+  SELECT vp.vendor_part_number, vp.manufacturer_part_number, vp.brand, vp.title, vp.status
   FROM vendor.vendor_products vp
   LEFT JOIN catalog_products cp ON cp.sku = vp.vendor_part_number
-  WHERE vp.vendor_code = 'wps' AND cp.id IS NULL
-  GROUP BY vp.status, vp.drop_ship_eligible
-  ORDER BY count DESC;
-  ```
-- **Fix:** Find/rewrite WPS promotion script — filter to HD brands + tires + tools only before promoting
-- **Note:** vendor_code is lowercase 'wps' not 'WPS'
+  WHERE vp.vendor_code = 'pu' AND cp.id IS NULL
+  LIMIT 20;
 
-### 99,403 PU products in vendor_products never promoted to catalog
-- **What:** vendor.vendor_products has 173,741 PU rows, catalog_products only has 70,124
-- **Fix:** Same investigation as WPS — find promotion script, run for missing rows
-- **Note:** vendor_code is lowercase 'pu' not 'PU'
+  -- Brand breakdown of missing PU products
+  SELECT vp.brand, COUNT(*) as missing
+  FROM vendor.vendor_products vp
+  LEFT JOIN catalog_products cp ON cp.sku = vp.vendor_part_number
+  WHERE vp.vendor_code = 'pu' AND cp.id IS NULL
+  GROUP BY vp.brand ORDER BY missing DESC LIMIT 30;
+  ```
+- **Priority:** High — potential for significant catalog expansion
 
 ---
 
@@ -47,29 +51,38 @@ Last Updated: April 16, 2026
 - **Investigate:**
   ```sql
   SELECT cp.sku, cp.brand, cp.name,
-         pp.dealer_price as pu_pricing_price,
-         pp.part_number as pu_pricing_match
+         pp.part_number as pu_pricing_match,
+         pp.dealer_price as pu_pricing_price
   FROM catalog_products cp
   LEFT JOIN catalog_pricing pr ON pr.sku = cp.sku AND pr.supplier = 'PU'
   LEFT JOIN pu_pricing pp ON pp.part_number = cp.sku
   WHERE cp.source_vendor = 'pu' AND pr.sku IS NULL
   LIMIT 20;
   ```
-- **Fix options:** SKU format mismatch (punctuated vs plain), NULL price in source, different source file needed
+- **Fix options:** SKU format mismatch (punctuated vs plain), NULL price in source, different source file
+
+### WPS pricing gap — 27,219 WPS products, only 22,278 have pricing
+- **What:** 19,271 newly promoted WPS products have no pricing in catalog_pricing
+- **Fix:** WPS pricing is in catalog_pricing with supplier='WPS' — need to check if newly promoted SKUs exist there
+  ```sql
+  SELECT COUNT(*) FROM catalog_pricing pr
+  JOIN catalog_products cp ON cp.sku = pr.sku
+  WHERE cp.source_vendor = 'wps' AND pr.supplier = 'WPS';
+  ```
+- **Note:** WPS pricing CSV has 123,034 rows — likely covers most new products already
 
 ### catalog_unified rebuild needed
-- **What:** 138,872 rows — built before metric purge, stale
-- **Fix:** Full rebuild after catalog_products pipeline gaps are closed
+- **What:** 138,872 rows — built before all fixes, completely stale
+- **Fix:** Full rebuild after PU pipeline gap is investigated
+- **Blocks:** Storefront browsing by category/brand
 
 ### catalog_images legacy table consolidation
-- **What:** catalog_images (29,683 rows) is legacy — catalog_media (38,512) is active
+- **What:** catalog_images (29,683 rows) is legacy — catalog_media (38,512+) is active
 - **Risk:** Frontend product detail page may still read catalog_images → missing images
-- **Fix:** Migrate unique catalog_images rows to catalog_media, then DROP catalog_images
-- **Warning:** Dual FK issue — drop both constraints before any bulk ops (see Build Tracker)
+- **Fix:** Migrate unique rows to catalog_media, then DROP catalog_images
+- **Warning:** Dual FK — drop both constraints before bulk ops (see Build Tracker)
 
-### 52 PU products with NULL computed_price
-- **What:** 70,072 of 70,124 PU products have computed_price — 52 are NULL, won't index
-- **Investigate:**
+### 52 PU products with NULL computed_price (won't index)
   ```sql
   SELECT cp.sku, cp.brand, cp.name, cp.pricing_rule_id, pr.dealer_price
   FROM catalog_products cp
@@ -95,7 +108,7 @@ Last Updated: April 16, 2026
 - **Frontend:** Add oem_numbers to Typesense query_by, display on product detail pages
 
 ### Fitment extraction pipeline
-- catalog_fitment has 11,891 rows (~15% of products)
+- catalog_fitment has 11,891 rows (~12% of 97K products)
 - Fitment buried in vendor description text fields
 - Need regex/NLP/AI extraction → catalog_fitment (make, model, year_start, year_end)
 - Harley model reference table in Supabase (harley.models, ~1,670 records) ready to link
@@ -105,7 +118,7 @@ Last Updated: April 16, 2026
 - Method: Python HYPERLINK formula extraction (same as HardDrive catalog)
 
 ### catalog_product_enrichment orphans (~94K rows)
-- 172,656 enrichment rows vs 78,072 catalog_products
+- 172,656 enrichment rows vs 97K catalog_products
   ```sql
   DELETE FROM catalog_product_enrichment
   WHERE product_id NOT IN (SELECT id FROM catalog_products);
@@ -113,6 +126,19 @@ Last Updated: April 16, 2026
 
 ### PU OEM cross-reference scraping
 - PU provides OEM-to-PU part number cross-reference — difficult to scrape cleanly
+
+---
+
+## 📊 SESSION SCOREBOARD
+
+| Metric | Start of Session | End of Session |
+|--------|-----------------|----------------|
+| Typesense indexed | 12,443 | **93,390** |
+| catalog_products | 96,522 | **97,343** |
+| Metric/junk products | 18,450 | **0** |
+| WPS in catalog | 7,948 | **27,219** |
+| PU pricing coverage | 0% | **87.9%** |
+| Images in catalog_media | 28,445 | **50,626+** |
 
 ---
 
@@ -125,6 +151,8 @@ Last Updated: April 16, 2026
 | `DISABLE TRIGGER ALL` permission denied | catalog_app is not superuser — use DROP/ADD constraint |
 | Next.js dev server holds read locks | Stop dev server before bulk DDL/DML |
 | vendor_code casing | Always lowercase: 'wps' and 'pu' |
+| ETIMEDOUT on Typesense | Transient — just retry. Docker instance healthy on :8108 |
+| Typesense systemd service dead | Irrelevant — Docker container is what runs it |
 
 ---
 
