@@ -347,7 +347,7 @@ function ProductCard({ product:p, index, view, onAdd }) {
               {p.brandCount > 1 ? "OPTIONS" : "ADD"}
             </button>
           ) : (
-            <GridNotifyButton sku={p.sku ?? p.slug} productName={p.name} vendor={p.vendor ?? "wps"}/>
+            <GridNotifyButton sku={p.slug?.match(/([A-Z]{3}-\d{6})$/i)?.[1] ?? p.sku} productName={p.name} vendor={p.vendor ?? "wps"}/>
           )}
         </div>
       </div>
