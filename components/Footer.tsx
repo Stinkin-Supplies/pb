@@ -19,7 +19,13 @@ export default function Footer() {
         <img
           src="https://www.securitymetrics.com/portal/app/ngsm/assets/img/GreyContent_Credit_Card_Safe_White_Rec.png"
           alt="SecurityMetrics card safe certification logo"
-          style={{ height: "40px", width: "auto" }}
+          style={{
+            height: "40px",
+            width: "auto",
+            backgroundColor: "#ffffff",
+            borderRadius: "4px",
+            padding: "4px 8px",
+          }}
         />
       </a>
     </footer>
