@@ -500,11 +500,39 @@ const css = `
   }
 
   @media (max-width: 860px) {
-    .pdp-main { grid-template-columns: 1fr; gap: 28px; }
-    .info-name { font-size: 30px; }
-    .price-main { font-size: 40px; }
+    .pdp-breadcrumb { padding: 10px 16px; }
+    .pdp-main { grid-template-columns: 1fr; gap: 20px; padding: 20px 16px 28px; }
+    .info-name { font-size: 28px; }
+    .price-main { font-size: 36px; }
+    .purchase-row { flex-wrap: wrap; }
+    .qty-wrap { width: 100%; }
+    .qty-btn { width: 42px; }
+    .qty-val { flex: 1; width: auto; }
+    .add-to-cart-btn, .wishlist-btn { width: 100%; }
+    .wishlist-btn { flex: 1 1 100%; }
     .pdp-features-list { grid-template-columns: 1fr; }
     .pdp-tab-btn { padding: 12px 14px; font-size: 9px; }
+    .pdp-tab-strip { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .pdp-tab { white-space: nowrap; padding: 12px 16px; }
+    .fitment-table thead td,
+    .fitment-table tbody td { padding: 8px 10px; font-size: 11px; }
+    .specs-table td { padding: 8px 10px; font-size: 12px; }
+    .pdp-specs-table td:first-child { width: 118px; white-space: normal; }
+    .related-section { padding: 0 16px 48px; }
+    .related-head { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .related-title { font-size: 24px; }
+    .related-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .toast { left: 16px; right: 16px; bottom: 16px; text-align: center; }
+  }
+
+  @media (max-width: 520px) {
+    .info-name { font-size: 24px; }
+    .gallery-main { aspect-ratio: 1 / 1; }
+    .gallery-thumb { width: 64px; height: 64px; }
+    .perks-strip { grid-template-columns: 1fr; }
+    .variant-btns { gap: 8px; }
+    .variant-btn { width: 100%; justify-content: center; }
+    .related-grid { grid-template-columns: 1fr; }
   }
 `;
 
