@@ -1,6 +1,7 @@
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import CartRoot from "@/components/CartRoot";
+import Footer from "@/components/Footer";
 import type { Metadata } from "next";
 import type { CSSProperties, ReactNode } from "react";
 import "./globals.css";
@@ -27,6 +28,7 @@ export default function RootLayout({
       <body>
         <CartRoot>
           {children}
+          <Footer />
           <Analytics />
           <SpeedInsights />
         </CartRoot>
