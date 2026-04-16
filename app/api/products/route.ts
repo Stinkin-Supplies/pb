@@ -52,7 +52,7 @@ function normalizeProductRow(row: any) {
 
   return {
     id: row.id,
-    sku: row.sku,
+    sku: row.slug?.match(/([A-Z]{3}-\d{6})$/i)?.[1] ?? row.sku,
     slug: row.slug,
     name: row.name,
     brand: row.brand ?? "",

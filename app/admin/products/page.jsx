@@ -259,7 +259,7 @@ export default async function AdminProductsPage({ searchParams }) {
               items.map((p) => (
                 <tr key={p.sku ?? p.slug}>
                   <td>
-                    <div>{p.sku ?? <span className="muted">—</span>}</div>
+                    <div>{p.slug?.match(/([A-Z]{3}-\d{6})$/i)?.[1] ?? p.sku ?? <span className="muted">—</span>}</div>
                     <div className="muted" style={{ fontSize: 10 }}>
                       <Link href={`/shop/${p.slug}`} className="muted" style={{ textDecoration: "none" }}>
                         /shop/{p.slug}
