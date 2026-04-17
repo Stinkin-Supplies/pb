@@ -8,6 +8,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { proxyImageUrl, proxyImageUrls } from "@/lib/utils/image-proxy";
 import {
   typesenseClient,
   COLLECTION,
@@ -77,8 +78,8 @@ function normalizeGroupDoc(doc: any) {
     stockQty:     doc.stock_total  ?? 0,
 
     // Image
-    image:        doc.image_url    ?? null,
-    images:       doc.image_url ? [doc.image_url] : [],
+    image:        proxyImageUrl(doc.image_url),
+    images:       proxyImageUrls(doc.image_url ? [doc.image_url] : []),
 
     // Brand options (multi-member groups)
     availableBrands: doc.available_brands ?? [],
@@ -140,8 +141,8 @@ function normalizeProductDoc(doc: any) {
     mapPrice:     doc.map_price  ?? null,
     inStock:      doc.in_stock   ?? false,
     stockQty:     doc.stock_quantity ?? 0,
-    image:        doc.image_url  ?? (doc.image_urls?.[0] ?? null),
-    images:       doc.image_urls ?? [],
+    image:        proxyImageUrl(doc.image_url ?? doc.image_urls?.[0]),
+    images:       proxyImageUrls(doc.image_urls ?? (doc.image_url ? [doc.image_url] : [])),
     badge:        doc.closeout   ? "sale" : null,
     vendor:       doc.source_vendor ?? null,
     source_vendor: doc.source_vendor ?? null,
