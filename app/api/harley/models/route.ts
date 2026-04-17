@@ -1,6 +1,4 @@
 // app/api/harley/models/route.ts
-// Returns all hd_models rows for a given family, for the year+model dropdown
-
 import { NextRequest, NextResponse } from 'next/server';
 import pg from 'pg';
 
@@ -12,6 +10,9 @@ const pool = new pg.Pool({
   password: process.env.CATALOG_DB_PASSWORD || 'smelly',
 });
 
+// Families that have direct rows in hd_models — use family match only
+const DIRECT_FAMILIES = new Set(['Touring', 'Softail', 'Sportster', 'Dyna', 'FXR', 'Trike', 'Street', 'Revolution_Max']);
+
 export async function GET(req: NextRequest) {
   const family = req.nextUrl.searchParams.get('family');
   if (!family) {
@@ -19,41 +20,44 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // For platform families (Softail, Touring, etc.) we want all models.
-    // For engine families (M8, Twin Cam, Evolution) we join via engine_key.
-    // Simplest: query by family name directly, with engine family fallback.
-    const { rows } = await pool.query<{
-      model_code: string;
-      model_name: string;
-      family: string;
-      year_start: number;
-      year_end: number | null;
-      engine_key: string | null;
-      engine_nickname: string | null;
-    }>(`
-      SELECT
-        m.model_code,
-        m.model_name,
-        m.family,
-        m.year_start,
-        m.year_end,
-        m.engine_key,
-        e.nickname AS engine_nickname
-      FROM hd_models m
-      LEFT JOIN hd_engine_types e ON e.engine_key = m.engine_key
-      WHERE
-        -- Direct family match (Softail, Touring, Dyna, Sportster, Trike, Street, Revolution_Max)
-        m.family = $1
-        OR
-        -- Engine-era families: M8 → milwaukee_eight, Twin Cam → twin_cam, etc.
-        m.engine_key = (
+    let rows;
+
+    if (DIRECT_FAMILIES.has(family)) {
+      // Direct family match only — don't use engine_key fallback
+      ({ rows } = await pool.query(`
+        SELECT
+          m.model_code,
+          m.model_name,
+          m.family,
+          m.year_start,
+          m.year_end,
+          m.engine_key,
+          e.nickname AS engine_nickname
+        FROM hd_models m
+        LEFT JOIN hd_engine_types e ON e.engine_key = m.engine_key
+        WHERE m.family = $1
+        ORDER BY m.year_start DESC, m.model_code ASC
+      `, [family]));
+    } else {
+      // Engine-era families (M8, Twin Cam, Evolution, etc.) — use engine_key map
+      ({ rows } = await pool.query(`
+        SELECT
+          m.model_code,
+          m.model_name,
+          m.family,
+          m.year_start,
+          m.year_end,
+          m.engine_key,
+          e.nickname AS engine_nickname
+        FROM hd_models m
+        LEFT JOIN hd_engine_types e ON e.engine_key = m.engine_key
+        WHERE m.engine_key = (
           SELECT engine_key FROM hd_family_engine_map WHERE family = $1 LIMIT 1
         )
-      ORDER BY m.year_start DESC, m.model_code ASC
-    `, [family]);
+        ORDER BY m.year_start DESC, m.model_code ASC
+      `, [family]));
+    }
 
-    // Build a year → models map for the dropdown
-    // Each year entry lists every model that was in production that year
     const currentYear = new Date().getFullYear();
     const yearMap = new Map<number, { model_code: string; model_name: string; engine_nickname: string | null }[]>();
 
@@ -69,11 +73,9 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Convert to sorted array (newest first) and deduplicate model codes per year
     const years = Array.from(yearMap.entries())
       .sort((a, b) => b[0] - a[0])
       .map(([year, models]) => {
-        // Deduplicate by model_code (XL883L appears twice due to name change)
         const seen = new Set<string>();
         const unique = models.filter(m => {
           if (seen.has(m.model_code)) return false;
