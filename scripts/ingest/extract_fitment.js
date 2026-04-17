@@ -48,14 +48,16 @@ const MODEL_PATTERNS = [
   { re: /\bTOURING/i,      family: 'Touring' },
   { re: /\bBAGGER/i,       family: 'Touring' },
 
-  // Dyna
+  // Dyna (FXD, 1991-2017)
   { re: /\bFXDWG\b/i,      family: 'Dyna' },
   { re: /\bFXDB[A-Z]*/i,   family: 'Dyna' },
   { re: /\bFXDL[A-Z]*/i,   family: 'Dyna' },
   { re: /\bFXDC[A-Z]*/i,   family: 'Dyna' },
   { re: /\bFXD\b/i,        family: 'Dyna' },
-  { re: /\bFXR\b/i,        family: 'Dyna' },
   { re: /\bDYNA\b/i,       family: 'Dyna' },
+
+  // FXR — distinct from Dyna, rubber-mount (1982-1994)
+  { re: /\bFXR[A-Z]*/i,    family: 'FXR' },
 
   // Sportster — require specific suffixes to avoid matching helmet/clothing sizes
   { re: /\bXLH[A-Z0-9]*/i, family: 'Sportster' },  // XLH, XLH883
@@ -142,6 +144,19 @@ function parseYearRanges(text) {
 
 // ─── Name-based extraction ────────────────────────────────────────────────────
 
+// M8 (Milwaukee-Eight) year floor by family — engine debuted 2017 Touring, 2018 Softail
+const M8_YEAR_FLOOR = {
+  Touring:    2017,
+  Softail:    2018,
+  Sportster:  2021,  // Sportster S / Revolution Max era
+  Dyna:       null,  // Dyna was discontinued before M8
+  FXR:        null,
+};
+
+function m8YearFloor(family) {
+  return M8_YEAR_FLOOR[family] ?? 2017;
+}
+
 /**
  * Parse fitment from a product name.
  * Looks for year range adjacent to (or near) a model code.
@@ -152,10 +167,18 @@ function extractFromName(name) {
   if (!families.length) return results;
 
   const years = parseYearRanges(name);
+  const hasM8  = /\bM[-\s]?8\b/i.test(name);
+
   if (!years.length) {
-    // Model code but no year — add Universal-ish entry with no years
     for (const family of families) {
-      results.push({ family, year_start: null, year_end: null, source: 'name_model_only' });
+      // M8 implies a known year floor even when no explicit year is in the name
+      const inferredStart = hasM8 ? m8YearFloor(family) : null;
+      results.push({
+        family,
+        year_start: inferredStart,
+        year_end:   null,
+        source:     inferredStart ? 'name_m8_inferred' : 'name_model_only',
+      });
     }
     return results;
   }
@@ -286,7 +309,7 @@ async function run() {
     for (const r of rows) bySource[r.source] = (bySource[r.source] ?? 0) + 1;
     console.log('[Fitment] By source:', bySource);
 
-    await sql.end();
+    process.exit(0);
     return;
   }
 
@@ -305,7 +328,7 @@ async function run() {
           ${r.year_end},
           ${`Extracted from ${r.source}: ${r.name}`}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (product_id, make, model, year_start, year_end) DO NOTHING
       `;
       inserted++;
     }
@@ -313,7 +336,7 @@ async function run() {
   }
 
   console.log(`\n[Fitment] Done. Inserted ${inserted} fitment rows for ${extracted} products.`);
-  await sql.end();
+  process.exit(0);
 }
 
 run().catch(err => {

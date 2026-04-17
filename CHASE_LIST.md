@@ -1,19 +1,44 @@
 # Stinkin' Supplies — Chase List
 **Running log of loose ends to follow up on**
-Last Updated: April 17, 2026 — start of session
+Last Updated: April 17, 2026 — end of session
 
 ---
 
-## ✅ DONE APRIL 17 START
-- Reindexed Typesense: 94,400 indexed, 0 failed (96.4s) — pricing updates live in search
+## 🚀 NEXT SESSION — START HERE
+
+```bash
+# 1. Reindex Typesense to pick up fitment + OEM data added this session
+npx dotenv -e .env.local -- node -e "import('./scripts/ingest/index_assembly.js').then(m => m.buildTypesenseIndex({ recreate: true, resume: false }))"
+```
+Expected: ~94,400 indexed. Needs stable WiFi.
+
+Then tackle:
+1. Tire catalog images — `tire_master_image.xlsx`
+2. WPS FatBook PDF OEM extraction
 
 ---
 
-## 🚀 NEXT UP
+## ✅ DONE APRIL 17
+
+| Task | Result |
+|------|--------|
+| Reindexed Typesense (start of session) | 94,400 indexed, 0 failed |
+| OEM crossref expansion | 19 → **93,548 rows** (from pu_brand_enrichment) |
+| catalog_images migration | 21,075 rows → catalog_media, table dropped |
+| catalog_media | 38K → **58,544 rows** |
+| Products with images | 31,130 → **44,508** |
+| index_assembly.js | Added oem_numbers[] field + catalog_oem_crossref JOIN |
+| client.ts query_by | Updated to name, brand, sku, mpn, specs_blob, search_blob, oem_numbers |
+| nginx client_max_body_size | 1MB → 20MB (Typesense proxy fix) |
+| catalog_product_enrichment orphan cleanup | 95,633 orphaned rows deleted (172,656 → 77,023) |
+| Fitment extraction pipeline | 11,891 → **18,653 rows** / 600 → **7,256 products** covered |
+| — FXR separated from Dyna | FXR is own family (1982-1994) |
+| — M8 year inference | Milwaukee-Eight → Touring 2017-Up, Softail 2018-Up, Sportster 2021-Up |
+| Added NULLS NOT DISTINCT unique index | catalog_fitment deduplicated, safe for re-runs |
 
 ---
 
-## ✅ COMPLETED THIS SESSION (April 16)
+## ✅ COMPLETED APRIL 16
 
 | Fix | Result |
 |-----|--------|
@@ -33,9 +58,6 @@ Last Updated: April 17, 2026 — start of session
 
 ## 🔴 HIGH PRIORITY
 
-### ~~Reindex Typesense~~ ✅ DONE April 17
-- 94,400 indexed, 0 failed
-
 ### 9 PU products with NULL computed_price
 - Genuinely no pricing data anywhere — may need manual price entry or removal
 ```sql
@@ -46,71 +68,7 @@ WHERE computed_price IS NULL AND is_active = true;
 
 ---
 
-## 🟡 MEDIUM PRIORITY
-
-### OEM cross-reference expansion — QUICK WIN
-- catalog_oem_crossref has only 19 rows
-- pu_brand_enrichment has oem_part_number data ready to load
-```sql
-INSERT INTO catalog_oem_crossref (sku, oem_number, oem_manufacturer, source_file)
-SELECT pbe.sku, pbe.oem_part_number, pbe.brand, pbe.source_file
-FROM pu_brand_enrichment pbe
-WHERE pbe.oem_part_number IS NOT NULL AND pbe.oem_part_number != ''
-ON CONFLICT (sku, oem_number, oem_manufacturer) DO NOTHING;
-```
-Then reindex so oem_numbers appear in search.
-
-### catalog_images legacy table consolidation
-- catalog_images (29,683 rows) is legacy — catalog_media is active
-- Frontend product detail page may still read catalog_images
-- Fix: migrate unique rows to catalog_media, DROP catalog_images
-- Warning: dual FK — drop both constraints before bulk ops
-```sql
--- Step 1: migrate rows not already in catalog_media
-INSERT INTO catalog_media (product_id, url, media_type, priority)
-SELECT ci.product_id, ci.url, 'image', 1
-FROM catalog_images ci
-WHERE ci.product_id IS NOT NULL
-  AND NOT EXISTS (
-    SELECT 1 FROM catalog_media cm 
-    WHERE cm.product_id = ci.product_id AND cm.url = ci.url
-  )
-ON CONFLICT (product_id, url) DO NOTHING;
-
--- Step 2: drop FKs, drop table
-ALTER TABLE catalog_images DROP CONSTRAINT catalog_images_product_id_fkey;
-ALTER TABLE catalog_images DROP CONSTRAINT catalog_images_catalog_product_id_fkey;
-DROP TABLE catalog_images;
-```
-
-### 8,485 PU products with no dealer_price in catalog_pricing
-- Exist in catalog, have computed_price via msrp/cost but no dealer cost on file
-- Low urgency — products are sellable, just no cost basis recorded
-```sql
-SELECT cp.sku, cp.brand, cp.name, cp.msrp, cp.cost, cp.computed_price
-FROM catalog_products cp
-LEFT JOIN catalog_pricing pr ON pr.sku = cp.sku AND pr.supplier = 'PU'
-WHERE cp.source_vendor = 'pu' AND pr.sku IS NULL
-LIMIT 20;
-```
-
----
-
 ## 🔵 LOW PRIORITY / FUTURE
-
-### Fitment extraction pipeline
-- catalog_fitment has 11,891 rows (~12% of 94K products)
-- Fitment buried in vendor description text fields
-- Need regex/NLP/AI extraction → catalog_fitment (make, model, year_start, year_end)
-- Harley model reference table in Supabase (harley.models ~1,670 records) ready to connect
-- After pipeline: rebuild catalog_unified to populate fitment_year_start/end/families/codes columns
-
-### catalog_product_enrichment orphan cleanup
-- 172,656 enrichment rows vs 98K catalog_products — ~74K orphaned
-```sql
-DELETE FROM catalog_product_enrichment
-WHERE product_id NOT IN (SELECT id FROM catalog_products);
-```
 
 ### Tire catalog images
 - tire_master_image.xlsx not yet processed
@@ -120,20 +78,28 @@ WHERE product_id NOT IN (SELECT id FROM catalog_products);
 - Bigger lift for catalog_oem_crossref WPS side
 - Requires PDF parsing pipeline
 
+### catalog_fitment — messy model name variants in pre-existing data
+- Pre-existing rows have many granular/variant model names (FXRT Sport Glide, FXRS Low Rider, TLE SIDECAR vs TLE - SIDECAR, etc.)
+- Low urgency — main families (Touring, Softail, Dyna, Sportster, FXR) are clean
+- Could normalize with a UPDATE pass when bandwidth allows
+
 ---
 
-## 📊 END OF SESSION STATE
+## 📊 CURRENT STATE (End of April 17)
 
 | Metric | Value |
 |--------|-------|
-| Typesense indexed | 94,400 (needs reindex) |
+| Typesense indexed | 94,400 (**needs reindex** for fitment + OEM) |
 | catalog_products | 98,353 |
 | WPS in catalog | 27,219 (100% priced) |
 | PU in catalog | 71,134 (99.99% priced) |
-| catalog_unified | 94,400 (fresh) |
-| Products with images | 31,130 |
+| catalog_unified | 94,400 |
+| Products with images | **44,508** |
+| catalog_media | **58,544 rows** |
+| catalog_oem_crossref | **93,548 rows** |
+| catalog_fitment | **18,653 rows / 7,256 products** |
+| catalog_product_enrichment | **77,023 rows** (cleaned) |
 | Search | ✅ Working |
-| Metric products | 0 |
 
 ---
 
@@ -142,7 +108,6 @@ WHERE product_id NOT IN (SELECT id FROM catalog_products);
 | Issue | Solution |
 |-------|----------|
 | `NOT IN (large subquery)` hangs | Use `NOT EXISTS` or temp table |
-| catalog_images dual FK blocks deletes | DROP both FKs, delete, ADD back |
 | `DISABLE TRIGGER ALL` denied | catalog_app not superuser — use DROP/ADD constraint |
 | Next.js holds read locks | Stop dev server before bulk DDL/DML |
 | vendor_code casing | Always lowercase: 'wps'/'pu' |
@@ -151,10 +116,14 @@ WHERE product_id NOT IN (SELECT id FROM catalog_products);
 | PU drop_ship_eligible | All false — unreliable, ignore |
 | PU SKU format | catalog uses punctuated (1401-1193), pu_pricing.part_number is plain (14011193) — join via punctuated_part_number |
 | Typesense on hotspot | Fails — needs stable WiFi for Promise.all parallel queries |
+| Typesense batch size | 1000 docs/batch safe now (nginx 20MB limit) |
 | psql paste cuts off | Watch for `-*>` continuation prompt |
 | Temp table lost after ROLLBACK | Recreate before retrying |
 | catalog_unified not a view | Regular table — TRUNCATE + INSERT to rebuild |
+| catalog_fitment unique index | NULLS NOT DISTINCT on (product_id, make, model, year_start, year_end) — safe to re-run extract_fitment.js |
+| FXR ≠ Dyna | FXR = rubber-mount 1982-1994, Dyna = FXD 1991-2017, separate families |
+| M8 = Milwaukee-Eight | 2017+ Touring, 2018+ Softail, 2021+ Sportster S |
 
 ---
 
-*Updated: April 16, 2026 — end of session*
+*Updated: April 17, 2026 — end of session*
