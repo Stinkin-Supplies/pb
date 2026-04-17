@@ -113,16 +113,28 @@ function buildDocument(product, { specs, fitment, media, offers, oem }) {
   const inStock      = stock > 0;
   const freeShipping = price !== null && price >= 99;
 
-  // Primary image — lowest priority, skip ZIP URLs
+  // Primary image — proxy LeMans ZIP URLs, skip bare .zip extensions
+  const proxyUrl = url => {
+    if (!url) return null;
+    if (url.startsWith('http://asset.lemansnet.com/z/')) return `/api/img?u=${encodeURIComponent(url)}`;
+    if (url.endsWith('.zip')) return null;
+    return url;
+  };
+
   const primaryImage = media
-    .filter(m => m.url && !m.url.endsWith('.zip'))
-    .sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99))[0]?.url ?? null;
+    .map(m => proxyUrl(m.url))
+    .filter(Boolean)
+    .sort((a, b) => {
+      const ai = media.findIndex(m => proxyUrl(m.url) === a);
+      const bi = media.findIndex(m => proxyUrl(m.url) === b);
+      return (media[ai]?.priority ?? 99) - (media[bi]?.priority ?? 99);
+    })[0] ?? null;
 
   // All images array — sorted by priority
   const images = media
-    .filter(m => m.url && !m.url.endsWith('.zip'))
     .sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99))
-    .map(m => m.url);
+    .map(m => proxyUrl(m.url))
+    .filter(Boolean);
 
   // Fitment arrays (deduped, years expanded from ranges)
   const fitmentMakes  = [...new Set(fitment.map(f => f.make).filter(Boolean))];
