@@ -21,6 +21,7 @@ export default async function ProductDetailPage({ params }) {
       `SELECT
         cp.id,
         cp.sku,
+        cp.internal_sku,
         cp.slug,
         cp.name,
         cp.brand,
@@ -205,7 +206,7 @@ function normalizeProductRow(row) {
     images:       Array.isArray(row.images) && row.images.length > 0
                     ? row.images
                     : row.image ? [row.image] : [],
-    sku:          row.slug?.match(/([A-Z]{3}-\d{6})$/i)?.[1] ?? row.sku ?? null,
+    sku:          row.internal_sku ?? row.sku ?? null,
     vendor:       Array.isArray(row.vendor_codes) ? (row.vendor_codes[0] ?? null) : null,
     vendor_slug:  Array.isArray(row.vendor_codes) ? (row.vendor_codes[0] ?? null) : null,
     description:  row.description ?? null,

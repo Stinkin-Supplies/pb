@@ -783,7 +783,7 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
     if (product.sourceVendor === "PU" || product.vendor === "PU") return false;
     return true;
   };
-  const displaySku = isVendorSku(product.sku) ? product.sku : null;
+  const displaySku = product.internal_sku ?? product.sku;
 
   const specsRows = [
     displaySku            && { label: "SKU",              value: displaySku },
