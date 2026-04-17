@@ -172,6 +172,7 @@ export default async function ProductDetailPage({ params }) {
   }
 
   const specs = catalogSpecs.filter(s => !["Catalog", "Product Code"].includes(s.attribute)).map(s => ({ label: s.attribute, value: s.value }));
+  console.log("[PDP DEBUG] images:", JSON.stringify(productRow?.images), "slug:", productRow?.slug);
   const normalized = normalizeProductRow(productRow);
 
   return (
