@@ -108,34 +108,66 @@ Use this file as the root-level record of changes, verification, and follow-up i
 
 ---
 
-## Current State (April 17, 2026)
+## 2026-04-17 — Enrichment Backfill + LeMans Image Proxy
+
+### Summary
+- Backfilled descriptions, specs, and catalog_unified sync
+- Discovered and fixed root cause of broken PDP images (LeMans ZIP URLs)
+- Built on-demand image proxy (`/api/img`) for LeMans ZIP archives
+- Reindexed Typesense with proxy URLs
+- Rebased all commits to linear main history
+
+### Changed Files
+- `app/api/img/route.ts` — NEW: on-demand LeMans ZIP image proxy
+- `lib/utils/image-proxy.ts` — NEW: shared `proxyImageUrl` / `proxyImageUrls` utilities
+- `app/shop/[slug]/page.jsx` — removed debug log; applied proxy to gallery/primaryImage
+- `app/api/search/route.ts` — applied proxy in `normalizeGroupDoc` and `normalizeProductDoc`
+- `lib/harley/catalog.ts` — applied proxy in `normalizeHarleyProductRow`
+- `scripts/ingest/index_assembly.js` — replaced `.endsWith('.zip')` filter with LeMans prefix check + proxy URL generation
+
+### Data Changes
+| Operation | Result |
+|-----------|--------|
+| Description backfill (from vendor_products) | +12,677 descriptions → 80,273/98,353 (82%) |
+| Specs extraction (from catalog_product_enrichment.attributes) | +141,463 spec rows, products with specs: 65,488 → 71,276 |
+| catalog_unified description sync | 12,668 rows updated |
+| catalog_media — working non-ZIP images | 24,686 products |
+| catalog_media — LeMans ZIP images (now proxy-served) | ~19,824 additional products |
+
+### Image Architecture
+The `catalog_media` table contains two types of image URLs:
+1. **Direct URLs** — regular HTTPS CDN links, served as-is
+2. **LeMans ZIP URLs** — `http://asset.lemansnet.com/z/<base64>` — these are ZIP archives containing a single PNG; they CANNOT be used as `<img src>` directly
+
+**Fix:** `app/api/img/route.ts` acts as an on-demand proxy:
+- Validates URL host is `asset.lemansnet.com` (SSRF protection)
+- Downloads ZIP, extracts first image entry with `adm-zip`
+- Caches result to disk (SHA-256 key, `$IMG_CACHE_DIR` or `/tmp/stinkin-img-cache`)
+- Returns `Cache-Control: public, max-age=31536000, immutable`
+
+### Deployment Note
+Set `IMG_CACHE_DIR=/var/cache/stinkin-images` in `.env.local` on the Hetzner server so the image cache persists across restarts.
+
+---
+
+## Current State (April 17, 2026 — end of session)
 
 | Metric | Value |
 |--------|-------|
-| catalog_products | 98,353 (0 NULL internal_sku) |
+| catalog_products | 98,353 |
 | — WPS | 27,219 (100% priced) |
 | — PU | 71,134 (99.99% priced) |
 | catalog_unified | 94,400 rows |
 | — is_harley_fitment = true | 7,237 rows |
-| Typesense indexed | 94,400 (**needs reindex**) |
-| Products with images | 44,508 |
+| Typesense indexed | ~44,500 (reindexed with proxy URLs) |
+| Products with direct images | 24,686 |
+| Products with proxied LeMans images | ~19,824 |
+| Products with descriptions | 80,273 / 98,353 (82%) |
+| Products with specs | 71,276 |
 | catalog_media | 58,544 rows |
 | catalog_oem_crossref | 93,548 rows |
 | catalog_fitment | 18,653 rows / 7,256 products |
-| Harley families in catalog_unified | Touring 4,580 / Softail 1,621 / FXR 1,412 / Dyna 1,144 / Sportster 970 / V-Rod 29 |
 | Search | ✅ Working |
 | Fitment filtering (/harley) | ✅ Working |
-| PDP internal SKU display | ✅ Fixed |
-| PDP images | ⚠️ Broken (debug in progress) |
-
-### ⚠️ Before Deploying
-- Remove `console.log("[PDP DEBUG]...")` from `app/shop/[slug]/page.jsx` line ~175
-- Resolve PDP image bug (images array returning empty)
-- Run Typesense reindex
-
-### First Thing Next Session
-```bash
-# Remove debug log first
-# Then reindex
-npx dotenv -e .env.local -- node -e "import('./scripts/ingest/index_assembly.js').then(m => m.buildTypesenseIndex({ recreate: true, resume: false }))"
-```
+| PDP images | ✅ Fixed (LeMans proxy working) |
+| Debug logs | ✅ Removed |

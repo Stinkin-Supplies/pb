@@ -1,7 +1,7 @@
 # Stinkin' Supplies — Master Reference
 **Last Updated:** April 17, 2026
 **Database:** Hetzner Postgres — stinkin_catalog
-**Status:** Catalog clean ✅ | Search working ✅ | Pricing 99.99% ✅ | Fitment + OEM expanded ✅
+**Status:** Catalog clean ✅ | Search working ✅ | Pricing 99.99% ✅ | Images proxied ✅ | Descriptions 82% ✅
 
 ---
 
@@ -13,8 +13,11 @@
 | — WPS products | 27,219 | ✅ 100% priced |
 | — PU products | 71,134 | ✅ 99.99% priced |
 | catalog_unified | 94,400 rows | ✅ Current |
-| Typesense indexed | 94,400 | ✅ Current (fitment + OEM live) |
-| Products with images | 44,508 | ✅ |
+| Typesense indexed | ~44,500 | ✅ Reindexed with proxy URLs |
+| Products with direct images | 24,686 | ✅ |
+| Products with proxied LeMans images | ~19,824 | ✅ via `/api/img` proxy |
+| Products with descriptions | 80,273 (82%) | ✅ Backfilled April 17 |
+| Products with specs | 71,276 | ✅ Extracted April 17 |
 | catalog_media | 58,544 rows | ✅ Canonical image table |
 | catalog_oem_crossref | 93,548 rows | ✅ Expanded April 17 |
 | catalog_fitment | 18,653 rows / 7,256 products | ⚠️ ~7.7% coverage |
@@ -262,6 +265,21 @@ npx dotenv -e .env.local -- node -e "import('./scripts/ingest/index_assembly.js'
 
 ---
 
+## IMAGE PROXY
+
+LeMans CDN serves ZIP archives, not direct image URLs. Pattern: `http://asset.lemansnet.com/z/<base64>` where base64 decodes to a UUID path like `/3/5/0/350604D0-...` containing a single PNG.
+
+**Proxy route:** `GET /api/img?u=<encoded_lemans_url>`
+- Validates host is `asset.lemansnet.com` (SSRF protection)
+- Downloads ZIP, extracts first image entry via `adm-zip`
+- SHA-256-keyed disk cache (`IMG_CACHE_DIR` env var, default `/tmp/stinkin-img-cache`)
+- Returns `Cache-Control: public, max-age=31536000, immutable`
+- `proxyImageUrl()` in `lib/utils/image-proxy.ts` handles the URL transform everywhere
+
+**Deployment:** Set `IMG_CACHE_DIR=/var/cache/stinkin-images` in `.env.local` on Hetzner for a persistent cache.
+
+---
+
 ## KNOWN ISSUES
 
 ### 🔴 Active
@@ -296,4 +314,4 @@ npx dotenv -e .env.local -- node -e "import('./scripts/ingest/index_assembly.js'
 
 ---
 
-*Master Reference maintained by Claude — Last update: April 17, 2026*
+*Master Reference maintained by Claude — Last update: April 17, 2026 (enrichment backfill + image proxy)*
