@@ -6,15 +6,12 @@ Last Updated: April 17, 2026 — end of session
 
 ## 🚀 NEXT SESSION — START HERE
 
-```bash
-# 1. Reindex Typesense to pick up fitment + OEM data added this session
-npx dotenv -e .env.local -- node -e "import('./scripts/ingest/index_assembly.js').then(m => m.buildTypesenseIndex({ recreate: true, resume: false }))"
-```
-Expected: ~94,400 indexed. Needs stable WiFi.
+Enrichment backfill + LeMans image proxy are done. Reindex already ran.
 
-Then tackle:
-1. Tire catalog images — `tire_master_image.xlsx`
-2. WPS FatBook PDF OEM extraction
+Optional follow-ups:
+1. Set `IMG_CACHE_DIR=/var/cache/stinkin-images` in `.env.local` on Hetzner (makes proxy cache persist across server restarts)
+2. Tire catalog images — `tire_master_image.xlsx`
+3. WPS FatBook PDF OEM extraction
 
 ---
 
@@ -85,21 +82,25 @@ WHERE computed_price IS NULL AND is_active = true;
 
 ---
 
-## 📊 CURRENT STATE (End of April 17)
+## 📊 CURRENT STATE (End of April 17 — after enrichment + proxy)
 
 | Metric | Value |
 |--------|-------|
-| Typesense indexed | 94,400 (**needs reindex** for fitment + OEM) |
+| Typesense indexed | ~44,500 (reindexed with proxy URLs) |
 | catalog_products | 98,353 |
 | WPS in catalog | 27,219 (100% priced) |
 | PU in catalog | 71,134 (99.99% priced) |
 | catalog_unified | 94,400 |
-| Products with images | **44,508** |
+| Products with direct images | **24,686** |
+| Products with proxied LeMans images | **~19,824** |
+| Products with descriptions | **80,273 / 98,353 (82%)** |
+| Products with specs | **71,276** |
 | catalog_media | **58,544 rows** |
 | catalog_oem_crossref | **93,548 rows** |
 | catalog_fitment | **18,653 rows / 7,256 products** |
 | catalog_product_enrichment | **77,023 rows** (cleaned) |
 | Search | ✅ Working |
+| PDP images | ✅ Fixed (LeMans proxy `/api/img`) |
 
 ---
 
