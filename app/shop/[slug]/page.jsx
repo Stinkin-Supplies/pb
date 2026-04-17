@@ -171,7 +171,7 @@ export default async function ProductDetailPage({ params }) {
     console.error("[PDP] catalog DB secondary fetch failed:", e.message);
   }
 
-  const specs = catalogSpecs.map(s => ({ label: s.attribute, value: s.value }));
+  const specs = catalogSpecs.filter(s => !["Catalog", "Product Code"].includes(s.attribute)).map(s => ({ label: s.attribute, value: s.value }));
   const normalized = normalizeProductRow(productRow);
 
   return (

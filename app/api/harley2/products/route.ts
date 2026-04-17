@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
       SELECT
         cu.id,
         cu.sku,
+        cu.internal_sku,
         cu.slug,
         cu.name,
         cu.display_brand          AS brand,

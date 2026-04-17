@@ -26,7 +26,7 @@ export function normalizeHarleyProductRow(row: any): HarleyProduct {
 
   return {
     id: String(row.id),
-    sku: row.slug?.match(/([A-Z]{3}-\d{6})$/i)?.[1] ?? row.sku ?? String(row.id),
+    sku: row.internal_sku ?? row.sku ?? String(row.id),
     slug: row.slug ?? row.sku ?? String(row.id),
     name: row.name ?? "",
     brand: row.brand ?? row.display_brand ?? "",
