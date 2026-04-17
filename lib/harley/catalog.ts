@@ -1,3 +1,5 @@
+import { proxyImageUrl, proxyImageUrls } from "@/lib/utils/image-proxy";
+
 export type HarleyProduct = {
   id: string;
   sku: string;
@@ -36,8 +38,8 @@ export function normalizeHarleyProductRow(row: any): HarleyProduct {
     map_price: row.map_price != null ? Number(row.map_price) : null,
     in_stock: row.in_stock ?? stockQuantity > 0,
     stock_quantity: stockQuantity,
-    image_url: row.image_url ?? row.image ?? null,
-    image_urls: row.image_urls ?? row.images ?? null,
+    image_url: proxyImageUrl(row.image_url ?? row.image),
+    image_urls: proxyImageUrls(row.image_urls ?? row.images),
     description: row.description ?? null,
     vendor: row.vendor ?? row.source_vendor ?? null,
     source_vendor: row.source_vendor ?? row.vendor ?? null,
@@ -50,3 +52,4 @@ export function normalizeHarleyProductRow(row: any): HarleyProduct {
 export function productImageSource(product: HarleyProduct) {
   return product.image_url ?? product.image_urls?.[0] ?? null;
 }
+

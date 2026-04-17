@@ -8,6 +8,7 @@
 import { notFound } from "next/navigation";
 import getCatalogDb from "@/lib/db/catalog";
 import ProductDetailClient from "./ProductDetailClient";
+import { proxyImageUrl } from "@/lib/utils/image-proxy";
 
 export default async function ProductDetailPage({ params }) {
   const { slug } = await params;
@@ -172,7 +173,6 @@ export default async function ProductDetailPage({ params }) {
   }
 
   const specs = catalogSpecs.filter(s => !["Catalog", "Product Code"].includes(s.attribute)).map(s => ({ label: s.attribute, value: s.value }));
-  console.log("[PDP DEBUG] images:", JSON.stringify(productRow?.images), "slug:", productRow?.slug);
   const normalized = normalizeProductRow(productRow);
 
   return (
@@ -204,10 +204,10 @@ function normalizeProductRow(row) {
     inStock:      Number(row.stock_quantity ?? 0) > 0,
     stockQty:     Number(row.stock_quantity ?? 0),
     fitmentIds:   null,
-    gallery:      Array.isArray(row.images) && row.images.length > 0
+    gallery:      (Array.isArray(row.images) && row.images.length > 0
                     ? row.images
-                    : row.image ? [row.image] : [],
-    primaryImage: Array.isArray(row.images) && row.images.length > 0 ? row.images[0] : row.image ?? null,
+                    : row.image ? [row.image] : []).map(u => proxyImageUrl(u) ?? u),
+    primaryImage: proxyImageUrl(Array.isArray(row.images) && row.images.length > 0 ? row.images[0] : row.image ?? null),
     sku:          row.internal_sku ?? row.sku ?? null,
     vendor:       Array.isArray(row.vendor_codes) ? (row.vendor_codes[0] ?? null) : null,
     vendor_slug:  Array.isArray(row.vendor_codes) ? (row.vendor_codes[0] ?? null) : null,
