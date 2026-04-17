@@ -49,32 +49,27 @@ const GROUPS_SEARCH_PARAMS = {
     "closeout",
     "group_signal",
   ].join(","),
-  sort_by:          "sort_priority:desc,_text_match:desc",
+  sort_by:          "stock_quantity:desc,_text_match:desc",
   per_page:         24,
   max_facet_values: 50,
 };
 
 // products collection — legacy per-SKU (fallback)
 const PRODUCTS_SEARCH_PARAMS = {
-  query_by:  "name,brand,description,features,oem_part_number,upc",
-  filter_by: "is_active:true",
+  query_by:  "name,brand,sku,mpn,specs_blob,search_blob,oem_numbers",
+  // filter_by removed — all indexed docs are active
   facet_by:  [
     "brand",
     "category",
-    "source_vendor",
     "in_stock",
-    "has_image",
-    "is_harley_fitment",
-    "fitment_hd_families",
-    "fitment_hd_models",
-    "fitment_hd_codes",
-    "in_oldbook",
-    "in_fatbook",
-    "drag_part",
-    "closeout",
-    "product_code",
+    "free_shipping",
+    "vendors",
+    "fitment_make",
+    "fitment_model",
+    "fitment_year",
+    "sport_types",
   ].join(","),
-  sort_by:          "sort_priority:desc,_text_match:desc",
+  sort_by:          "stock_quantity:desc,_text_match:desc",
   per_page:         24,
   max_facet_values: 50,
 };
@@ -164,7 +159,7 @@ export function buildFilters(params: {
   productCode?:  string;
   groupSignal?:  string;
 }): string {
-  const filters: string[] = IS_GROUPS_COLLECTION ? [] : ["is_active:true"];
+  const filters: string[] = [];
 
   if (params.inStock)      filters.push("in_stock:true");
   if (params.hasImage)     filters.push("has_image:true");

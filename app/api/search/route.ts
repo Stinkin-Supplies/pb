@@ -185,9 +185,9 @@ export async function GET(req: NextRequest) {
     "price-desc": `${priceField}:desc`,
     "name_asc":   "name_sort:asc",
     "name-asc":   "name_sort:asc",
-    "newest":     "sort_priority:desc",
+    "newest":     "stock_quantity:desc",
   };
-  const sortBy = sortMap[sortRaw] || "sort_priority:desc,_text_match:desc";
+  const sortBy = sortMap[sortRaw] || "stock_quantity:desc,_text_match:desc";
 
   const filterBy = buildFilters({
     inStock:      p.get("in_stock") === "true" || p.get("inStock") === "true",
