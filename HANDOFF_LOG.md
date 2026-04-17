@@ -2,148 +2,54 @@
 
 Use this file as the root-level record of changes, verification, and follow-up items.
 
-## Entry Template
+---
 
-```md
-## YYYY-MM-DD
-
-### Summary
-- Short description of the change set.
-
-### Changed Files
-- `path/to/file.ext`
-- `path/to/other-file.ext`
-
-### Details
-- What was changed and why.
-- Any important implementation notes or constraints.
-
-### Verification
-- Commands run.
-- Build/test results.
-
-### Open Items
-- Remaining work.
-- Risks or assumptions.
-```
-
-## Current State
-
-- `/shop` now opens the Harley-first experience.
-- `/shop/classic` preserves the legacy catalog grid.
-- `/harley` is available as a dedicated Harley-focused landing route.
-- `npm run build` currently passes.
-- Live cloud database audit artifacts were generated in the repo root:
-  - `DB_AUDIT_REPORT.md`
-  - `DB_SAMPLE_ROWS.json`
-- The current implementation direction is to make Harley-first shopping the main flow while preserving the classic catalog fallback until verification is complete.
-
-## Database Audit Summary
-
-- Live DB schemas currently in use: `public` and `vendor`.
-- User tables discovered: 51 total.
-- Top row-count tables are concentrated in catalog, staging, and normalization layers:
-  - `public.catalog_inventory`
-  - `public.catalog_allowlist`
-  - `public.catalog_specs`
-  - `vendor.vendor_products`
-  - `public.catalog_product_enrichment`
-  - `vendor.pu_pricefile_staging`
-  - `public.pu_products`
-  - `public.pu_pricing`
-  - `public.catalog_unified`
-  - `public.product_group_members`
-  - `public.product_groups`
-  - `public.catalog_pricing`
-  - `public.raw_vendor_wps_products`
-  - `public.catalog_products`
-  - `public.pu_brand_enrichment`
-- Core relational integrity exists, but a lot of cleanup still depends on app conventions and import pipelines rather than foreign keys alone.
-- The canonical customer-facing layer is still `catalog_unified`, with `catalog_products`, `vendor_products`, `vendor_offers`, `catalog_specs`, and `catalog_inventory` feeding it.
-
-## Cleanup Priorities
-
-- Normalize and backfill `catalog_unified` where fields are null-heavy:
-  - `category`
-  - `image_url`
-  - `fitment_year_start`
-  - `fitment_year_end`
-  - `display_brand`
-  - `manufacturer_brand`
-- Improve product identity coverage in `catalog_products`:
-  - `manufacturer_part_number`
-  - `oem_part_number`
-  - brand naming consistency
-- Fix linkage gaps in `product_group_members` so group rows resolve to canonical products more often.
-- Materialize pricing consistently so `vendor_offers.computed_price` is not effectively empty.
-- Treat raw/staging tables as source history, not customer-facing truth, and avoid cleaning them destructively.
-- For Harley-specific accuracy, add exact submodel enrichment on top of the existing generic fitment layer instead of replacing it.
-
-## Harley Shop Direction
-
-- The shop should become Harley-first without losing the existing catalog flow.
-- Two browsing modes are required:
-  - exact fitment search by year + submodel
-  - style browsing for broader product discovery
-- The desired style set includes:
-  - chopper
-  - touring
-  - Evo
-  - Shovelhead
-  - Panhead
-  - Softail
-  - Sportster
-  - Dyna
-  - FXR
-  - M8
-  - Big Twin
-- Product scope should stay limited to the two approved catalogs:
-  - Parts Unlimited: `oldbook` and `fatbook`
-  - WPS: `HardDrive`
-- Duplicate display should be handled in the unified catalog layer, not only in the UI.
-- The four requested animations remain part of the target implementation:
-  - layered stack for style selection
-  - expandable cards for categories
-  - shared layout product detail
-  - corner nav for related categories
-
-## Recommended Next Build Steps
-
-- Enrich fitment with a companion `catalog_submodels` table for JP Cycles-style submodel precision.
-- Keep `catalog_fitment` as the generic base layer.
-- Add or confirm API routes for styles, submodels, categories, products, exact-products, and related categories.
-- Keep `/shop/classic` available until browser verification confirms the Harley-first flow is stable.
-- Once verified, decide whether to retire the fallback path or keep it as a hidden support route.
-
-## 2026-04-14
+## 2026-04-17 — Fitment Filtering + PDP Fixes
 
 ### Summary
-- Fixed broken build issues in the products API route, product detail page, and shop client prerender state.
+- Wired `catalog_fitment` data into `catalog_unified` so the Harley shop actually returns products
+- Normalized 40+ granular family name variants into 6 clean families
+- Rebuilt `lib/harley/config.ts` to match only families with real fitment data
+- Fixed FXR year dropdown (missing `hd_models` rows + models API engine_key collision)
+- Generated `internal_sku` for all 20,281 products that were missing it
+- Fixed PDP to display `internal_sku` instead of vendor SKU
+- Fixed PDP image rendering (WPS URLs were being incorrectly proxied)
+- Fixed PDP specs table showing `CATALOG: Fatbook/Oldbook/Tire` rows
+- Fixed `normalizeHarleyProductRow` SKU extraction (slug regex → internal_sku)
 
 ### Changed Files
-- `app/api/products/route.ts`
-- `app/shop/[slug]/ProductDetailClient.jsx`
-- `app/shop/ShopClient.jsx`
+- `lib/harley/config.ts` — stripped to 6 real families: Touring, Softail, Dyna, Sportster, FXR, V-Rod
+- `app/api/harley/models/route.ts` — fixed engine_key fallback bleeding Softail rows into FXR
+- `app/api/harley2/products/route.ts` — added `cu.internal_sku` to SELECT
+- `app/shop/[slug]/page.jsx` — added `cp.internal_sku` to SELECT; fixed `gallery`/`primaryImage` mapping; fixed `sku` field to use `internal_sku`; filtered Catalog/Product Code from specs
+- `app/shop/[slug]/ProductDetailClient.jsx` — fixed `displaySku` to use `internal_sku`; fixed WPS image proxy (direct now, proxy only for LeMans)
+- `lib/harley/catalog.ts` — fixed SKU extraction to use `internal_sku`
 
-### Details
-- Rebuilt `app/api/products/route.ts` into a valid GET handler after the file was left in a broken merged state.
-- Removed stale and duplicated control flow from the products API route.
-- Fixed JSX parsing in `app/shop/[slug]/ProductDetailClient.jsx` by removing stray closing tags.
-- Removed the duplicate `activeTab` state declaration in `ProductDetailClient.jsx`.
-- Added missing `openSections` state in `app/shop/ShopClient.jsx` so category/shop pages can prerender without crashing.
+### Database Changes
+- `catalog_unified` — populated `is_harley_fitment`, `fitment_hd_families`, `fitment_year_start`, `fitment_year_end` from `catalog_fitment` (7,237 rows updated)
+- `catalog_unified` — normalized 40+ granular family name variants → 6 clean families (Touring, Softail, Dyna, Sportster, FXR, V-Rod)
+- `catalog_unified` — backfilled `internal_sku` for 20,281 rows
+- `catalog_products` — generated `internal_sku` for all 20,281 NULL products (prefix by category)
+- `hd_models` — inserted 11 FXR model rows (FXRS, FXRT, FXRD, FXRDG, FXRP, FXLR, FXRS-SP, FXRS-CON, FXR, FXEF, FXSB)
+- `hd_family_engine_map` — FXR entry confirmed present
 
 ### Verification
-- `npm run build` completed successfully.
-- Prior failures were:
-  - syntax errors in `app/api/products/route.ts`
-  - JSX parse issues in `app/shop/[slug]/ProductDetailClient.jsx`
-  - missing `openSections` state during prerender on `/shop/category/[category]`
+- `curl localhost:3000/api/harley2/products?family=Touring&year=2013&category=Exhaust` → returns products ✅
+- `curl localhost:3000/api/harley/models?family=FXR` → returns 1982–1994 correct models ✅
+- `catalog_unified` fitment families: Touring 4,580 | Softail 1,621 | FXR 1,412 | Dyna 1,144 | Sportster 970 | V-Rod 29
+- `catalog_products` NULL internal_sku: 0 ✅
 
 ### Open Items
-- The repo contains Typesense and OEM cross-reference scaffolding, but external execution steps against Postgres and Typesense cannot be confirmed from the filesystem alone.
-- Append future implementation notes here when changing core catalog, search, sync, or admin flows.
+1. **PDP image still broken** — `images: []` returned despite `catalog_media` having valid URLs. Debug console.log added at line ~175 of `page.jsx` — **remove before deploy**. Root cause not yet confirmed: subquery returns empty array even though direct psql join works. Suspect connection pool or schema search_path issue.
+2. **Typesense needs reindex** — fitment + OEM data added April 17 not yet in index. Run reindex on stable WiFi (first thing next session).
+3. **catalog_fitment sparse** — 7.7% coverage. Pre-existing granular rows (FXRT Sport Glide, TLE SIDECAR variants etc.) still exist in `catalog_fitment` but are normalized in `catalog_unified`. Low priority.
+4. **Tire catalog images** — `tire_master_image.xlsx` not yet processed.
+5. **WPS FatBook PDF OEM extraction** — WPS side of catalog_oem_crossref still sparse.
+6. **9 PU products with NULL computed_price** — genuinely unpriceable, may need manual entry or removal.
 
-## 2026-04-14 Harley Shop Swap
+---
+
+## 2026-04-14 — Harley Shop Swap
 
 ### Summary
 - Replaced the default `/shop` experience with a Harley-first shop flow while keeping the legacy grid available.
@@ -174,4 +80,62 @@ Use this file as the root-level record of changes, verification, and follow-up i
 
 ### Open Items
 - The Harley experience is now wired, but the exact fitment behavior still depends on how much submodel data exists in the `vehicles` and catalog fitment tables.
-- If you want, the next step is browser-level review and small layout polish after you inspect `/shop` and `/shop/classic`.
+
+---
+
+## 2026-04-14 — Build Fixes
+
+### Summary
+- Fixed broken build issues in the products API route, product detail page, and shop client prerender state.
+
+### Changed Files
+- `app/api/products/route.ts`
+- `app/shop/[slug]/ProductDetailClient.jsx`
+- `app/shop/ShopClient.jsx`
+
+### Details
+- Rebuilt `app/api/products/route.ts` into a valid GET handler after the file was left in a broken merged state.
+- Removed stale and duplicated control flow from the products API route.
+- Fixed JSX parsing in `app/shop/[slug]/ProductDetailClient.jsx` by removing stray closing tags.
+- Removed the duplicate `activeTab` state declaration in `ProductDetailClient.jsx`.
+- Added missing `openSections` state in `app/shop/ShopClient.jsx` so category/shop pages can prerender without crashing.
+
+### Verification
+- `npm run build` completed successfully.
+
+### Open Items
+- The repo contains Typesense and OEM cross-reference scaffolding, but external execution steps against Postgres and Typesense cannot be confirmed from the filesystem alone.
+
+---
+
+## Current State (April 17, 2026)
+
+| Metric | Value |
+|--------|-------|
+| catalog_products | 98,353 (0 NULL internal_sku) |
+| — WPS | 27,219 (100% priced) |
+| — PU | 71,134 (99.99% priced) |
+| catalog_unified | 94,400 rows |
+| — is_harley_fitment = true | 7,237 rows |
+| Typesense indexed | 94,400 (**needs reindex**) |
+| Products with images | 44,508 |
+| catalog_media | 58,544 rows |
+| catalog_oem_crossref | 93,548 rows |
+| catalog_fitment | 18,653 rows / 7,256 products |
+| Harley families in catalog_unified | Touring 4,580 / Softail 1,621 / FXR 1,412 / Dyna 1,144 / Sportster 970 / V-Rod 29 |
+| Search | ✅ Working |
+| Fitment filtering (/harley) | ✅ Working |
+| PDP internal SKU display | ✅ Fixed |
+| PDP images | ⚠️ Broken (debug in progress) |
+
+### ⚠️ Before Deploying
+- Remove `console.log("[PDP DEBUG]...")` from `app/shop/[slug]/page.jsx` line ~175
+- Resolve PDP image bug (images array returning empty)
+- Run Typesense reindex
+
+### First Thing Next Session
+```bash
+# Remove debug log first
+# Then reindex
+npx dotenv -e .env.local -- node -e "import('./scripts/ingest/index_assembly.js').then(m => m.buildTypesenseIndex({ recreate: true, resume: false }))"
+```
