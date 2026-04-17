@@ -203,9 +203,10 @@ function normalizeProductRow(row) {
     inStock:      Number(row.stock_quantity ?? 0) > 0,
     stockQty:     Number(row.stock_quantity ?? 0),
     fitmentIds:   null,
-    images:       Array.isArray(row.images) && row.images.length > 0
+    gallery:      Array.isArray(row.images) && row.images.length > 0
                     ? row.images
                     : row.image ? [row.image] : [],
+    primaryImage: Array.isArray(row.images) && row.images.length > 0 ? row.images[0] : row.image ?? null,
     sku:          row.internal_sku ?? row.sku ?? null,
     vendor:       Array.isArray(row.vendor_codes) ? (row.vendor_codes[0] ?? null) : null,
     vendor_slug:  Array.isArray(row.vendor_codes) ? (row.vendor_codes[0] ?? null) : null,
