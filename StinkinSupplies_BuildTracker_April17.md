@@ -1,14 +1,59 @@
 # Stinkin' Supplies — Build Tracker
-**Last Updated:** April 16, 2026 — END OF SESSION
-**Status:** Catalog clean ✅ | Search working ✅ | Pricing 99.99% ✅ | Reindex needed after pricing fixes
+**Last Updated:** April 17, 2026 — END OF SESSION
+**Status:** Catalog clean ✅ | Search working ✅ | Pricing 99.99% ✅ | Fitment expanded ✅ | OEM expanded ✅ | **Reindex needed**
 
 ---
 
-## 🎯 SESSION COMPLETE — MAJOR REMEDIATION DONE
+## ✅ COMPLETED APRIL 17
+
+### Session Start
+- [x] Reindexed Typesense: 94,400 indexed, 0 failed (96.4s) — pricing updates live
+
+### OEM Cross-Reference
+- [x] Inserted 93,529 rows from pu_brand_enrichment → catalog_oem_crossref
+- [x] catalog_oem_crossref: 19 → **93,548 rows**
+- [x] Updated index_assembly.js: added `oem_numbers[]` schema field + `catalog_oem_crossref` JOIN
+- [x] Updated client.ts query_by: now searches oem_numbers in Typesense
+
+### catalog_images → catalog_media Migration
+- [x] Migrated 21,075 unique rows from catalog_images → catalog_media
+- [x] Dropped catalog_images table (legacy, dual-FK, no longer needed)
+- [x] catalog_media: 38,512 → **58,544 rows**
+- [x] Products with images: 31,130 → **44,508**
+
+### Infrastructure
+- [x] nginx `client_max_body_size` raised from 1MB → 20MB on Typesense proxy
+  - Was silently failing second Typesense batch (1000 docs × ~1KB ≈ 1MB limit)
+  - Fixed on `/etc/nginx/sites-enabled/typesense` on stinkdb
+
+### catalog_product_enrichment Cleanup
+- [x] Identified true orphans: all 172,656 rows had NULL product_id (joins by SKU, not ID)
+- [x] Deleted 95,633 rows where SKU NOT IN catalog_products
+- [x] catalog_product_enrichment: 172,656 → **77,023 rows**
+
+### Fitment Extraction Pipeline
+- [x] Wrote `scripts/ingest/extract_fitment.js` — regex extraction from name + description
+- [x] Correctly handles year formats: `YY-YY`, `YY-UP`, `YYYY-UP`, `YYYY-YYYY`
+- [x] Model families: Touring (FL/FLH/FLT/FLHT/FLHR/FLHX), Softail (FXST/FLST), Dyna (FXD), FXR (separate from Dyna), Sportster (XLH/XLS/SPORTSTER)
+- [x] M8 inference: `M8` in name → Touring 2017-Up / Softail 2018-Up / Sportster 2021-Up
+- [x] Fixed XL false positives — bare `XL` removed (matched helmet sizes); now requires XLH/XLS/XL+digits
+- [x] Fixed FXR vs Dyna — FXR is own family (rubber-mount 1982-1994)
+- [x] Added `NULLS NOT DISTINCT` unique index on catalog_fitment — safe for re-runs
+- [x] catalog_fitment: 11,891 → **18,653 rows**
+- [x] Products with fitment: ~600 → **7,256**
+
+**Fitment by family:**
+| Family | Products |
+|--------|---------|
+| Touring | 4,201 |
+| Softail | 1,462 |
+| Dyna | 1,081 |
+| Sportster | 942 |
+| FXR | 388 |
 
 ---
 
-## ✅ ALL COMPLETED THIS SESSION (April 16)
+## ✅ COMPLETED APRIL 16
 
 ### Database Cleanup
 - [x] Full DB audit — identified all gaps
@@ -29,70 +74,53 @@
 - [x] PU: 70,124 → 71,134 in catalog
 
 ### Pricing — COMPLETE
-- [x] Loaded 62,065 PU dealer prices into catalog_pricing
-- [x] Computed prices via punctuated SKU join for 43 additional products
-- [x] Computed prices from msrp/cost for 584 more PU products
 - [x] WPS computed_price: **27,219/27,219 = 100%**
 - [x] PU computed_price: **67,172/67,181 = 99.99%** (9 products truly unpriceable)
-- [x] Pricing formula: map_protected (margin_min=10%, margin_target=25%, msrp_ceiling)
 
 ### Images
-- [x] Fixed index_assembly.js INNER JOIN → LEFT JOIN
-- [x] Added 1,538 PU images from pu_brand_enrichment.image_uri
-- [x] 31,130 products with images in catalog_media
+- [x] 31,130 products with images (now 44,508 after April 17)
 
 ### catalog_unified — REBUILT
-- [x] Truncated stale 138,872-row table
-- [x] Rebuilt: 94,400 rows (WPS: 27,219 | PU: 67,181)
-- [x] Inventory aggregated from 7 warehouses
-- [x] image_url from catalog_media, features from pu_brand_enrichment
+- [x] 94,400 rows (WPS: 27,219 | PU: 67,181)
 
 ### Search — FIXED & VERIFIED
-- [x] Fixed lib/typesense/client.ts query_by (removed description, oem_part_number, upc)
-- [x] Fixed lib/typesense/client.ts facet_by (removed 10 invalid fields)
-- [x] Fixed lib/typesense/client.ts buildFilters (removed hardcoded is_active:true)
-- [x] Fixed app/api/search/route.ts (removed sort_priority from sortMap + default)
-- [x] Fixed scripts/lib/db.js connectionTimeoutMillis 5000 → 30000
 - [x] Search verified: Drag Specialties 7,394 | S&S Cycle 1,389 | Shinko 515 | Zero metric results
-
-### Typesense
-- [x] Last index: 94,400 products, 0 failed
-- [ ] **NEEDS REINDEX** — pricing fixes after last index, reindex to pick up computed_price updates
 
 ---
 
 ## 🚀 FIRST THING NEXT SESSION
 
 ```bash
-# 1. Reindex Typesense to pick up all pricing updates
+# Reindex Typesense — picks up new fitment facets + OEM search
 npx dotenv -e .env.local -- node -e "import('./scripts/ingest/index_assembly.js').then(m => m.buildTypesenseIndex({ recreate: true, resume: false }))"
 ```
 
-Then tackle these in order (see CHASE_LIST.md):
-1. OEM cross-reference expansion — quick win, one SQL INSERT
-2. catalog_images legacy consolidation → catalog_media, drop table
-3. Fitment extraction pipeline
+Then:
+1. Tire catalog images — tire_master_image.xlsx (same HYPERLINK extraction as HardDrive)
+2. WPS FatBook PDF OEM extraction
 
 ---
 
-## 📊 FINAL METRICS (April 16)
+## 📊 FINAL METRICS (April 17)
 
 | Metric | Value |
 |--------|-------|
 | catalog_products | 98,353 |
 | — WPS | 27,219 (100% priced) |
 | — PU | 71,134 (99.99% priced) |
-| catalog_unified | 94,400 (fresh) |
-| Typesense indexed | 94,400 (needs reindex for price updates) |
-| Products with images | 31,130 |
+| catalog_unified | 94,400 |
+| Typesense indexed | 94,400 (**needs reindex** for fitment + OEM) |
+| Products with images | **44,508** |
+| catalog_media | **58,544 rows** |
 | catalog_pricing WPS | 27,219 (100%) |
 | catalog_pricing PU | 62,065 (87%+) |
 | computed_price WPS | 27,219 (100%) |
 | computed_price PU | 67,172 (99.99%) |
+| catalog_oem_crossref | **93,548 rows** |
+| catalog_fitment | **18,653 rows / 7,256 products (~7.7%)** |
+| catalog_product_enrichment | **77,023 rows** |
 | catalog_allowlist | 494K+ rows |
 | catalog_inventory | 697,796 rows |
-| catalog_fitment | 11,891 rows (~12%) |
-| catalog_oem_crossref | 19 rows |
 
 ---
 
@@ -114,36 +142,34 @@ WPS → pricing_rule_id=2 | PU → pricing_rule_id=3
 ```
 
 ### Image Sources
-- catalog_media = canonical (not catalog_images — legacy, to be dropped)
+- catalog_media = canonical (catalog_images DROPPED April 17)
 - WPS: from vendor.vendor_products.images_raw JSON
 - PU: from pu_brand_enrichment.image_uri
-
-### catalog_unified Rebuild
-```sql
-TRUNCATE catalog_unified;
-INSERT INTO catalog_unified (...) SELECT ...
-FROM catalog_products cp
-LEFT JOIN (inventory rollup) inv ON inv.sku = cp.sku
-LEFT JOIN pu_brand_enrichment pbe ON pbe.sku = cp.sku
-WHERE cp.is_active = true;
-```
 
 ### PU SKU Format
 - catalog_products.sku uses PUNCTUATED format (e.g. 1401-1193)
 - pu_pricing.part_number uses PLAIN format (e.g. 14011193)
-- pu_pricing.punctuated_part_number matches catalog format
-- Always join via punctuated_part_number for pricing lookups
+- Always join via punctuated_part_number
 
-### PU drop_ship_eligible
-- ALL PU products false — flag is unreliable, ignore for promotions
+### Fitment Model Families
+- Touring: FL, FLH, FLT, FLHT, FLHR, FLHX + variants
+- Softail: FXST, FLST + variants
+- Dyna: FXD, FXDWG, FXDB + variants (1991-2017)
+- FXR: FXRS, FXRT, FXRD + variants (1982-1994) — **separate from Dyna**
+- Sportster: XLH, XLS, XL+digits, SPORTSTER
+- M8 (Milwaukee-Eight): 2017+ Touring, 2018+ Softail, 2021+ Sportster S
 
 ---
 
 ## 🔧 KEY COMMANDS
 
 ```bash
-# Reindex Typesense (stable WiFi required — hotspot drops parallel queries)
+# Reindex Typesense (stable WiFi required)
 npx dotenv -e .env.local -- node -e "import('./scripts/ingest/index_assembly.js').then(m => m.buildTypesenseIndex({ recreate: true, resume: false }))"
+
+# Run fitment extraction (safe to re-run — NULLS NOT DISTINCT unique index)
+npx dotenv -e .env.local -- node scripts/ingest/extract_fitment.js --dry-run
+npx dotenv -e .env.local -- node scripts/ingest/extract_fitment.js
 
 # Rebuild allowlist
 npx dotenv -e .env.local -- node scripts/ingest/build-catalog-allowlist.cjs
@@ -153,39 +179,15 @@ psql "postgresql://catalog_app:smelly@5.161.100.126:5432/stinkin_catalog"
 ssh stinkdb
 ```
 
-### Bulk Delete Pattern
-```sql
-CREATE TEMP TABLE ids_to_delete AS SELECT id FROM catalog_products WHERE ...;
-CREATE INDEX ON ids_to_delete(id);
-BEGIN;
-ALTER TABLE catalog_images DROP CONSTRAINT catalog_images_product_id_fkey;
-ALTER TABLE catalog_images DROP CONSTRAINT catalog_images_catalog_product_id_fkey;
-DELETE FROM vendor_offers WHERE catalog_product_id IN (SELECT id FROM ids_to_delete);
-DELETE FROM map_audit_log WHERE catalog_product_id IN (SELECT id FROM ids_to_delete);
-DELETE FROM routing_decisions WHERE catalog_product_id IN (SELECT id FROM ids_to_delete);
-DELETE FROM catalog_images WHERE product_id IN (SELECT id FROM ids_to_delete);
-DELETE FROM catalog_images WHERE catalog_product_id IN (SELECT id FROM ids_to_delete);
-DELETE FROM catalog_media WHERE product_id IN (SELECT id FROM ids_to_delete);
-DELETE FROM catalog_specs WHERE product_id IN (SELECT id FROM ids_to_delete);
-DELETE FROM catalog_fitment WHERE product_id IN (SELECT id FROM ids_to_delete);
-DELETE FROM catalog_products WHERE id IN (SELECT id FROM ids_to_delete);
-ALTER TABLE catalog_images ADD CONSTRAINT catalog_images_product_id_fkey
-  FOREIGN KEY (product_id) REFERENCES catalog_products(id) ON DELETE CASCADE;
-ALTER TABLE catalog_images ADD CONSTRAINT catalog_images_catalog_product_id_fkey
-  FOREIGN KEY (catalog_product_id) REFERENCES catalog_products(id);
-COMMIT;
-```
-
 ---
 
 ## 🐛 KNOWN ISSUES
 
 1. **9 PU products with NULL computed_price** — no pricing data anywhere, genuinely unpriceable
-2. **catalog_images legacy table** — dual FK, needs migration to catalog_media then DROP
-3. **catalog_fitment sparse** — 12% coverage, needs extraction pipeline
-4. **catalog_oem_crossref** — 19 rows, needs expansion
-5. **Typesense indexer** — sensitive to flaky connections (Promise.all 4 parallel queries). Use stable WiFi.
-6. **catalog_app not superuser** — cannot DISABLE TRIGGER ALL
+2. **catalog_fitment sparse** — 7.7% coverage; pre-existing rows have messy model name variants (FXRT Sport Glide, TLE SIDECAR variants, etc.) — low priority
+3. **Typesense needs reindex** — fitment + OEM data not yet in search index
+4. **Typesense indexer** — sensitive to flaky connections (Promise.all 5 parallel queries). Use stable WiFi.
+5. **catalog_app not superuser** — cannot DISABLE TRIGGER ALL
 
 ---
 
@@ -193,12 +195,11 @@ COMMIT;
 
 - DB: `postgresql://catalog_app:smelly@5.161.100.126:5432/stinkin_catalog`
 - SSH: `ssh stinkdb`
-- Master Reference: `StinkinSupplies_MasterRef_April16.md`
+- Master Reference: `MasterRef_April16.md`
 - Chase List: `CHASE_LIST.md`
-- Catalog Filter Rules: `StinkinSupplies_CatalogFilter_Doc.docx`
-- Git Branch: `claude/wizardly-perlman`
+- Git Branch: `claude/naughty-lovelace` (worktree)
 - Project: `/Users/home/Desktop/Stinkin-Supplies`
 
 ---
 
-*Build Tracker — Last update: April 16, 2026 end of session*
+*Build Tracker — Last update: April 17, 2026 end of session*
