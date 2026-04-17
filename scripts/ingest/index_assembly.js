@@ -1,7 +1,7 @@
 /**
  * Stage 3 — Typesense v2 Index Assembly
  * Reads:  catalog_products, catalog_specs, catalog_fitment,
- *         catalog_media, vendor_offers
+ *         catalog_media, vendor_offers, catalog_oem_crossref
  * Writes: Typesense 'products' collection
  *
  * Schema v2 features:
@@ -84,6 +84,9 @@ const SCHEMA = {
     // Sport-type facets
     { name: 'sport_types',    type: 'string[]', facet: true, optional: true },
 
+    // OEM cross-reference numbers (searchable)
+    { name: 'oem_numbers',    type: 'string[]', optional: true },
+
     // Vendors
     { name: 'vendors',        type: 'string[]', facet: true, optional: true },
   ],
@@ -103,7 +106,7 @@ function buildSportTypes(product) {
   return types;
 }
 
-function buildDocument(product, { specs, fitment, media, offers }) {
+function buildDocument(product, { specs, fitment, media, offers, oem }) {
   // stock_quantity is the correct column name
   const price        = product.computed_price ? Number(product.computed_price) : null;
   const stock        = Number(product.stock_quantity ?? 0);
@@ -152,6 +155,9 @@ function buildDocument(product, { specs, fitment, media, offers }) {
   // vendor_code is the correct column name on vendor_offers
   const vendors = [...new Set(offers.map(o => o.vendor_code).filter(Boolean))];
 
+  // OEM cross-reference numbers
+  const oemNumbers = [...new Set(oem.map(o => o.oem_number).filter(Boolean))];
+
   return {
     id:             String(product.id),
     sku:            product.sku          ?? '',
@@ -173,6 +179,7 @@ function buildDocument(product, { specs, fitment, media, offers }) {
     fitment_year:   fitmentYears.length  ? fitmentYears  : undefined,
     sport_types:    sportTypes.length    ? sportTypes    : undefined,
     vendors:        vendors.length       ? vendors       : undefined,
+    oem_numbers:    oemNumbers.length    ? oemNumbers    : undefined,
   };
 }
 
@@ -227,7 +234,7 @@ export async function buildTypesenseIndex({ recreate = true } = {}) {
     const ids = products.map(p => p.id);
 
     // Batch-fetch related data — note catalog_product_id on vendor_offers
-    const [specs, fitment, media, offers] = await Promise.all([
+    const [specs, fitment, media, offers, oemRefs] = await Promise.all([
       sql`SELECT product_id, attribute, value
           FROM catalog_specs
           WHERE product_id = ANY(${ids})`,
@@ -244,6 +251,11 @@ export async function buildTypesenseIndex({ recreate = true } = {}) {
       sql`SELECT catalog_product_id, vendor_code
           FROM vendor_offers
           WHERE catalog_product_id = ANY(${ids})`,
+
+      sql`SELECT cp.id AS product_id, oem.oem_number
+          FROM catalog_oem_crossref oem
+          JOIN catalog_products cp ON cp.sku = oem.sku
+          WHERE cp.id = ANY(${ids})`,
     ]);
 
     // Group by the correct key for each table
@@ -251,6 +263,7 @@ export async function buildTypesenseIndex({ recreate = true } = {}) {
     const fitmentMap = groupBy(fitment, 'product_id');
     const mediaMap   = groupBy(media,   'product_id');
     const offersMap  = groupBy(offers,  'catalog_product_id'); // different key
+    const oemMap     = groupBy(oemRefs, 'product_id');
 
     const documents = [];
     for (const product of products) {
@@ -260,6 +273,7 @@ export async function buildTypesenseIndex({ recreate = true } = {}) {
           fitment: fitmentMap[product.id] ?? [],
           media:   mediaMap[product.id]   ?? [],
           offers:  offersMap[product.id]  ?? [],
+          oem:     oemMap[product.id]     ?? [],
         });
         documents.push(doc);
       } catch (err) {
