@@ -253,7 +253,7 @@ function GridNotifyButton({ sku, productName, vendor }) {
 
 // ── ProductCard ───────────────────────────────────────────────
 function ProductCard({ product:p, index, view, onAdd }) {
-  const imageSrc = p.primary_image ?? p.image ?? p.primaryImage ?? "/placeholder-part.png";
+  const imageSrc = p.image ?? p.primary_image ?? p.primaryImage ?? null;
   return (
     <Link href={`/shop/${p.slug}`} className="pcard"
       style={{ background:"#111010", border:"1px solid #2a2828", borderRadius:2, overflow:"hidden",
@@ -267,10 +267,16 @@ function ProductCard({ product:p, index, view, onAdd }) {
         <div style={{ position:"absolute", inset:0,
           backgroundImage:"linear-gradient(rgba(232,98,26,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(232,98,26,0.04) 1px,transparent 1px)",
           backgroundSize:"16px 16px" }}/>
-        <Image src={imageSrc} alt={p.name} fill
-          sizes="(max-width:768px) 50vw, 25vw"
-          style={{ objectFit:"contain", padding:"10px", zIndex:1 }}
-          priority={index < 6} unoptimized/>
+        {imageSrc ? (
+          <Image src={imageSrc} alt={p.name} fill
+            sizes="(max-width:768px) 50vw, 25vw"
+            style={{ objectFit:"contain", padding:"10px", zIndex:1 }}
+            priority={index < 6} unoptimized/>
+        ) : (
+          <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", zIndex:1 }}>
+            <div style={S({ fontSize:8, color:"#3a3838", letterSpacing:"0.1em" })}>NO IMAGE</div>
+          </div>
+        )}
         {p.badge && (
           <span style={{ position:"absolute", top:7, left:7, zIndex:2,
             ...S({ fontSize:7, fontWeight:700, letterSpacing:"0.1em", padding:"2px 6px", borderRadius:1 }),
