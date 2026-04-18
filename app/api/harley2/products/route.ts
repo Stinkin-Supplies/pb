@@ -14,16 +14,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Missing family or year" }, { status: 400 });
   }
 
-  // Resolve category label → DB category values
+  // Resolve UI category label/slug → DB category values
   let dbCategories: string[] | null = null;
   if (category) {
     const match = HARLEY_CATEGORIES.find(
-      c => c.label === category || c.slug === category
+      (c) => c.label === category || c.slug === category
     );
     dbCategories = match?.dbCategories ?? [category];
   }
 
   const db = getCatalogDb();
+
+  // Build parameterized query
+  // $1 = family (text)
+  // $2 = year   (integer)
+  // $3 = year   (integer, repeated for end check)
   const values: Array<string | number | string[]> = [family, year, year];
   let idx = 4;
   const extraConditions: string[] = [];
@@ -49,9 +54,9 @@ export async function GET(request: NextRequest) {
         cu.internal_sku,
         cu.slug,
         cu.name,
-        cu.display_brand          AS brand,
+        cu.display_brand                                      AS brand,
         cu.category,
-        COALESCE(cu.computed_price, cu.msrp, cu.cost, 0) AS price,
+        COALESCE(cu.computed_price, cu.msrp, cu.cost, 0)     AS price,
         cu.msrp,
         cu.map_price,
         cu.description,
@@ -61,28 +66,44 @@ export async function GET(request: NextRequest) {
         cu.stock_quantity,
         cu.in_stock,
         cu.source_vendor,
-        cu.is_harley_fitment,
-        cu.fitment_year_start,
-        cu.fitment_year_end,
-        cu.fitment_hd_families,
-        cu.fitment_hd_models
+
+        -- Fitment comes from catalog_products (source of truth)
+        cp.fitment_hd_families,
+        cp.fitment_year_start,
+        cp.fitment_year_end,
+        cp.fitment,
+        (cp.fitment IS NOT NULL)                              AS is_harley_fitment
+
       FROM catalog_unified cu
-      WHERE cu.is_harley_fitment = true
-        AND cu.is_active = true
+      -- JOIN catalog_products for fitment source-of-truth
+      JOIN catalog_products cp ON cp.sku = cu.sku
+
+      WHERE cu.is_active = true
         AND cu.category IS NOT NULL
-        AND $1 = ANY(cu.fitment_hd_families)
-        AND (cu.fitment_year_start IS NULL OR cu.fitment_year_start <= $2)
-        AND (cu.fitment_year_end   IS NULL OR cu.fitment_year_end   >= $3)
+        -- Family filter: exact match in the families array
+        AND $1 = ANY(cp.fitment_hd_families)
+        -- Year filter: NULL years are treated as "all years"
+        AND (cp.fitment_year_start IS NULL OR cp.fitment_year_start <= $2)
+        AND (cp.fitment_year_end   IS NULL OR cp.fitment_year_end   >= $3)
         ${where}
-      ORDER BY cu.in_stock DESC, cu.stock_quantity DESC, cu.computed_price DESC
+
+      ORDER BY
+        cu.in_stock DESC,
+        cu.stock_quantity DESC,
+        COALESCE(cu.computed_price, 0) DESC
+
       LIMIT $${idx}
       `,
       values
     );
 
-    return NextResponse.json({ products: rows.map(normalizeHarleyProductRow) });
+    return NextResponse.json({
+      products: rows.map(normalizeHarleyProductRow),
+      count: rows.length,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    console.error("[harley2/products]", message);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
