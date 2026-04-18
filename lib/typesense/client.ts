@@ -1,10 +1,7 @@
 /**
  * lib/typesense/client.ts
- * Typesense client — points at Hetzner self-hosted instance
- *
- * Collection switch:
- *   TYPESENSE_COLLECTION=product_groups  → new deduped group search (default)
- *   TYPESENSE_COLLECTION=products        → legacy per-SKU search
+ * Typesense client — Hetzner self-hosted Docker instance
+ * Collection: products (catalog_unified, 132K documents)
  */
 
 import Typesense from "typesense";
@@ -12,34 +9,30 @@ import Typesense from "typesense";
 export const typesenseClient = new Typesense.Client({
   nodes: [
     {
-      host:     process.env.TYPESENSE_HOST     || "5.161.100.126",
-      port:     parseInt(process.env.TYPESENSE_PORT || "8108"),
-      protocol: process.env.TYPESENSE_PROTOCOL || "http",
+      host:     process.env.TYPESENSE_HOST     || "5.161.100.126.nip.io",
+      port:     parseInt(process.env.TYPESENSE_PORT || "443"),
+      protocol: process.env.TYPESENSE_PROTOCOL || "https",
     },
   ],
-  apiKey:                   process.env.TYPESENSE_SEARCH_KEY || "",
-  connectionTimeoutSeconds: 10,
+  apiKey:                   process.env.TYPESENSE_SEARCH_KEY || process.env.TYPESENSE_API_KEY || "",
+  connectionTimeoutSeconds: 15,
 });
 
-export const COLLECTION = process.env.TYPESENSE_COLLECTION || "product_groups";
+export const COLLECTION = process.env.TYPESENSE_COLLECTION || "products";
 
-// True when we're using the new deduped group collection
-export const IS_GROUPS_COLLECTION = COLLECTION === "product_groups";
+// ── Default search params ─────────────────────────────────────────────────────
 
-// ── Search params ─────────────────────────────────────────────────────────────
-
-// product_groups collection — vendor-blind, deduped results
-const GROUPS_SEARCH_PARAMS = {
-  query_by: "name,brand,available_brands,oem_numbers,page_references,description,features",
-  facet_by: [
+export const DEFAULT_SEARCH_PARAMS = {
+  query_by:         "name,brand,description,features,oem_part_number",
+  // Base filter: only active products that are Drag Specialties OR in Oldbook/Fatbook
+  filter_by:        "is_active:true && (drag_part:true || in_oldbook:true || in_fatbook:true)",
+  facet_by:         [
     "brand",
     "category",
-    "available_brands",
-    "vendors",
+    "source_vendor",
     "in_stock",
     "has_image",
     "is_harley_fitment",
-    "is_universal",
     "fitment_hd_families",
     "fitment_hd_models",
     "fitment_hd_codes",
@@ -47,96 +40,14 @@ const GROUPS_SEARCH_PARAMS = {
     "in_fatbook",
     "drag_part",
     "closeout",
-    "group_signal",
+    "product_code",
   ].join(","),
-  sort_by:          "stock_quantity:desc,_text_match:desc",
+  sort_by:          "sort_priority:desc,_text_match:desc",
   per_page:         24,
   max_facet_values: 50,
 };
 
-// products collection — legacy per-SKU (fallback)
-const PRODUCTS_SEARCH_PARAMS = {
-  query_by:  "name,brand,sku,mpn,specs_blob,search_blob,oem_numbers",
-  // filter_by removed — all indexed docs are active
-  facet_by:  [
-    "brand",
-    "category",
-    "in_stock",
-    "free_shipping",
-    "vendors",
-    "fitment_make",
-    "fitment_model",
-    "fitment_year",
-    "sport_types",
-  ].join(","),
-  sort_by:          "stock_quantity:desc,_text_match:desc",
-  per_page:         24,
-  max_facet_values: 50,
-};
-
-export const DEFAULT_SEARCH_PARAMS = IS_GROUPS_COLLECTION
-  ? GROUPS_SEARCH_PARAMS
-  : PRODUCTS_SEARCH_PARAMS;
-
-// ── Collection schema ─────────────────────────────────────────
-export const SCHEMA = {
-  name:                 COLLECTION,
-  enable_nested_fields: false,
-  fields: [
-    { name: 'id',           type: 'string' as const },
-    { name: 'sku',          type: 'string' as const },
-    { name: 'slug',         type: 'string' as const },
-    { name: 'name',         type: 'string' as const },
-    { name: 'brand',        type: 'string' as const, facet: true  },
-    { name: 'category',     type: 'string' as const, facet: true  },
-    { name: 'price',        type: 'float'  as const, facet: true  },
-    { name: 'our_price',    type: 'float'  as const, facet: true  },
-    { name: 'map_price',    type: 'float'  as const, optional: true },
-    { name: 'msrp',         type: 'float'  as const, optional: true },
-    { name: 'is_active',    type: 'bool'   as const, facet: true  },
-    { name: 'stock_quantity', type: 'int64' as const, facet: true  },
-    { name: 'in_stock',     type: 'bool'   as const, facet: true },
-    { name: 'image',        type: 'string' as const, optional: true, index: false },
-    { name: 'description',  type: 'string' as const, optional: true },
-    { name: 'vendor_codes',   type: 'string[]' as const, facet: true, optional: true },
-    { name: 'weight',         type: 'float'  as const, optional: true },
-    { name: 'created_at',     type: 'int64'  as const },
-    // v2 fitment + specs facets
-    { name: 'fitment_make',   type: 'string[]' as const, facet: true, optional: true },
-    { name: 'fitment_model',  type: 'string[]' as const, facet: true, optional: true },
-    { name: 'fitment_year',   type: 'int32[]'  as const, facet: true, optional: true },
-    { name: 'specs',          type: 'string[]' as const, facet: true, optional: true },
-  ],
-  default_sorting_field: 'created_at',
-}
-
-// ── Document type ─────────────────────────────────────────────
-export type ProductDocument = {
-  id:           string
-  sku:          string
-  slug:         string
-  name:         string
-  brand:        string
-  category:     string
-  price:        number
-  our_price:    number
-  map_price?:   number
-  msrp?:        number
-  is_active:    boolean
-  stock_quantity: number
-  in_stock:     boolean
-  image?:       string
-  description?: string
-  vendor_codes?: string[]
-  weight?:       number
-  created_at:    number
-  fitment_make?:  string[]
-  fitment_model?: string[]
-  fitment_year?:  number[]
-  specs?:         string[]
-}
-
-// ── Helper: build filter string ───────────────────────────────────────────────
+// ── Filter builder ────────────────────────────────────────────────────────────
 
 export function buildFilters(params: {
   inStock?:      boolean;
@@ -159,28 +70,25 @@ export function buildFilters(params: {
   productCode?:  string;
   groupSignal?:  string;
 }): string {
-  const filters: string[] = [];
+  // Base: active + scoped to Drag/Oldbook/Fatbook
+  const filters: string[] = [
+    "is_active:true",
+    "(drag_part:true || in_oldbook:true || in_fatbook:true)",
+  ];
 
   if (params.inStock)      filters.push("in_stock:true");
   if (params.hasImage)     filters.push("has_image:true");
   if (params.brand)        filters.push(`brand:=${params.brand}`);
   if (params.category)     filters.push(`category:=${params.category}`);
+  if (params.sourceVendor) filters.push(`source_vendor:=${params.sourceVendor}`);
   if (params.isHarley)     filters.push("is_harley_fitment:true");
-  if (params.isUniversal)  filters.push("is_universal:true");
   if (params.hdFamily)     filters.push(`fitment_hd_families:=${params.hdFamily}`);
   if (params.hdCode)       filters.push(`fitment_hd_codes:=${params.hdCode}`);
   if (params.inOldbook)    filters.push("in_oldbook:true");
   if (params.inFatbook)    filters.push("in_fatbook:true");
   if (params.dragPart)     filters.push("drag_part:true");
   if (params.closeout)     filters.push("closeout:true");
-  if (params.groupSignal)  filters.push(`group_signal:=${params.groupSignal}`);
-
-  if (!IS_GROUPS_COLLECTION) {
-    if (params.sourceVendor) filters.push(`source_vendor:=${params.sourceVendor}`);
-    if (params.productCode)  filters.push(`product_code:=${params.productCode}`);
-  } else {
-    if (params.sourceVendor) filters.push(`vendors:=${params.sourceVendor}`);
-  }
+  if (params.productCode)  filters.push(`product_code:=${params.productCode}`);
 
   if (params.yearStart && params.yearEnd) {
     filters.push(`fitment_year_start:<=${params.yearEnd}`);
@@ -190,9 +98,10 @@ export function buildFilters(params: {
   if (params.minPrice !== undefined || params.maxPrice !== undefined) {
     const min = params.minPrice ?? 0;
     const max = params.maxPrice ?? 99999;
-    const priceField = IS_GROUPS_COLLECTION ? "price_min" : "computed_price";
-    filters.push(`${priceField}:[${min}..${max}]`);
+    filters.push(`msrp:[${min}..${max}]`);
   }
 
-  return filters.filter(Boolean).join(" && ");
+  return filters.join(" && ");
 }
+
+export const IS_GROUPS_COLLECTION = false;
