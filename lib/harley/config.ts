@@ -4,6 +4,7 @@ export type HarleyCategory = {
   label: string;
   description: string;
   icon: string;
+  dbCategories: string[];  // exact category values in catalog_unified
 };
 
 export type HarleyFamily = {
@@ -14,21 +15,21 @@ export type HarleyFamily = {
 };
 
 export const HARLEY_CATEGORIES: HarleyCategory[] = [
-  { slug: "engine",           label: "Engine",                      description: "Top end, bottom end, cams, and power.",      icon: "⚙️" },
-  { slug: "controls",         label: "Controls & Handlebars",       description: "Bars, levers, grips, cables, and switches.",  icon: "🖐" },
-  { slug: "seats",            label: "Seats",                       description: "Saddles, pads, and long-haul comfort.",       icon: "💺" },
-  { slug: "exhaust",          label: "Exhaust",                     description: "Pipes, slip-ons, headers, and heat shields.", icon: "💨" },
-  { slug: "wheels-tires",     label: "Wheels & Tires",              description: "Rubber, rims, and rolling stock.",            icon: "⭕" },
-  { slug: "electrical",       label: "Electrical",                  description: "Batteries, charging, wiring, and switches.",  icon: "⚡" },
-  { slug: "suspension",       label: "Suspension",                  description: "Forks, shocks, and handling.",                icon: "🔩" },
-  { slug: "brakes",           label: "Brakes",                      description: "Pads, rotors, lines, and calipers.",          icon: "🛑" },
-  { slug: "frame-body",       label: "Frame & Body",                description: "Fenders, fairings, trim, and hardware.",      icon: "🏗" },
-  { slug: "fuel-systems",     label: "Fuel Systems",                description: "Carbs, fuel delivery, and air filters.",      icon: "⛽" },
-  { slug: "drivetrain",       label: "Drivetrain",                  description: "Clutch, belt, chain, and sprockets.",         icon: "🔗" },
-  { slug: "gaskets-seals",    label: "Gaskets/Seals",               description: "Head gaskets, case seals, and o-rings.",      icon: "🔴" },
-  { slug: "luggage",          label: "Luggage & Bags",              description: "Saddlebags, tank bags, and touring gear.",    icon: "🧳" },
-  { slug: "windshields",      label: "Windshields",                 description: "Shields, fairings, and wind management.",     icon: "🔲" },
-  { slug: "oils-chemicals",   label: "Oils & Chemicals",            description: "Engine oil, fluids, and treatments.",         icon: "🛢" },
+  { slug: "engine",         label: "Engine",               description: "Top end, bottom end, cams, and power.",      icon: "⚙️", dbCategories: ["Engine"] },
+  { slug: "controls",       label: "Controls & Handlebars", description: "Bars, levers, grips, cables, and switches.", icon: "🖐",  dbCategories: ["Handlebars", "Hand Controls", "Levers", "Grips", "Cable/Hydraulic Control Lines", "Throttle", "Switches"] },
+  { slug: "seats",          label: "Seats",                description: "Saddles, pads, and long-haul comfort.",       icon: "💺", dbCategories: ["Seat"] },
+  { slug: "exhaust",        label: "Exhaust",              description: "Pipes, slip-ons, headers, and heat shields.", icon: "💨", dbCategories: ["Exhaust"] },
+  { slug: "wheels-tires",   label: "Wheels & Tires",       description: "Rubber, rims, and rolling stock.",            icon: "⭕", dbCategories: ["Tire & Wheel", "Tires", "Wheels", "Tubes", "Tire/Wheel Accessories", "Wheel Components"] },
+  { slug: "electrical",     label: "Electrical",           description: "Batteries, charging, wiring, and switches.",  icon: "⚡", dbCategories: ["Electrical", "Batteries", "Illumination", "Starters"] },
+  { slug: "suspension",     label: "Suspension",           description: "Forks, shocks, and handling.",                icon: "🔩", dbCategories: ["Suspension", "Steering"] },
+  { slug: "brakes",         label: "Brakes",               description: "Pads, rotors, lines, and calipers.",          icon: "🛑", dbCategories: ["Brakes"] },
+  { slug: "frame-body",     label: "Frame & Body",         description: "Fenders, fairings, trim, and hardware.",      icon: "🏗",  dbCategories: ["Body", "Mirrors", "Mounts/Brackets", "Hardware/Fasteners/Fittings", "Guards/Braces", "Clamps"] },
+  { slug: "fuel-systems",   label: "Fuel Systems",         description: "Carbs, fuel delivery, and air filters.",      icon: "⛽", dbCategories: ["Intake/Carb/Fuel System", "Air Filters", "Jets"] },
+  { slug: "drivetrain",     label: "Drivetrain",           description: "Clutch, belt, chain, and sprockets.",         icon: "🔗", dbCategories: ["Clutch", "Drive", "Sprockets", "Chains", "Belts", "Foot Controls"] },
+  { slug: "gaskets-seals",  label: "Gaskets/Seals",        description: "Head gaskets, case seals, and o-rings.",      icon: "🔴", dbCategories: ["Gaskets/Seals"] },
+  { slug: "luggage",        label: "Luggage & Bags",       description: "Saddlebags, tank bags, and touring gear.",    icon: "🧳", dbCategories: ["Luggage", "Accessories", "Straps/Tie-Downs"] },
+  { slug: "windshields",    label: "Windshields",          description: "Shields, fairings, and wind management.",     icon: "🔲", dbCategories: ["Windshield/Windscreen"] },
+  { slug: "oils-chemicals", label: "Oils & Chemicals",     description: "Engine oil, fluids, and treatments.",         icon: "🛢",  dbCategories: ["Oils & Chemicals", "Chemicals", "Oil Filters"] },
 ];
 
 // Only families with actual fitment data in catalog_fitment
