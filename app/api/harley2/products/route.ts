@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import getCatalogDb from "@/lib/db/catalog";
 import { normalizeHarleyProductRow } from "@/lib/harley/catalog";
+import { HARLEY_CATEGORIES } from "@/lib/harley/config";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
-  const family   = searchParams.get("family")?.trim();   // e.g. "Sportster"
+  const family   = searchParams.get("family")?.trim();
   const year     = Number(searchParams.get("year") || "0");
   const category = searchParams.get("category")?.trim() || null;
   const limit    = Math.min(Number(searchParams.get("limit") || "24"), 48);
@@ -13,14 +14,23 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Missing family or year" }, { status: 400 });
   }
 
+  // Resolve category label → DB category values
+  let dbCategories: string[] | null = null;
+  if (category) {
+    const match = HARLEY_CATEGORIES.find(
+      c => c.label === category || c.slug === category
+    );
+    dbCategories = match?.dbCategories ?? [category];
+  }
+
   const db = getCatalogDb();
-  const values: Array<string | number> = [family, year, year];
+  const values: Array<string | number | string[]> = [family, year, year];
   let idx = 4;
   const extraConditions: string[] = [];
 
-  if (category) {
-    extraConditions.push(`cu.category = $${idx}`);
-    values.push(category);
+  if (dbCategories) {
+    extraConditions.push(`cu.category = ANY($${idx}::text[])`);
+    values.push(dbCategories);
     idx++;
   }
 
@@ -41,7 +51,7 @@ export async function GET(request: NextRequest) {
         cu.name,
         cu.display_brand          AS brand,
         cu.category,
-        COALESCE(cu.msrp, cu.cost, 0) AS price,
+        COALESCE(cu.computed_price, cu.msrp, cu.cost, 0) AS price,
         cu.msrp,
         cu.map_price,
         cu.description,
@@ -64,7 +74,7 @@ export async function GET(request: NextRequest) {
         AND (cu.fitment_year_start IS NULL OR cu.fitment_year_start <= $2)
         AND (cu.fitment_year_end   IS NULL OR cu.fitment_year_end   >= $3)
         ${where}
-      ORDER BY cu.in_stock DESC, cu.msrp DESC
+      ORDER BY cu.in_stock DESC, cu.stock_quantity DESC, cu.computed_price DESC
       LIMIT $${idx}
       `,
       values
