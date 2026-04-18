@@ -21,11 +21,6 @@ const SORT_OPTIONS = [
   { value:"name_asc",   label:"A → Z"           },
 ];
 
-// HD fitment year range
-const YEAR_MIN = 1979;
-const YEAR_MAX = 2025;
-const YEARS    = Array.from({ length: YEAR_MAX - YEAR_MIN + 1 }, (_, i) => YEAR_MIN + i);
-
 const css = `
   *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
   :root {
@@ -133,7 +128,6 @@ function buildQS(filters, sort, page) {
   if (filters.brand)             p.set("brand",         filters.brand);
   if (filters.minPrice != null)  p.set("minPrice",      String(filters.minPrice));
   if (filters.maxPrice != null)  p.set("maxPrice",      String(filters.maxPrice));
-  if (filters.inStock)           p.set("inStock",       "true");
   if (filters.fitmentMake)       p.set("fitmentMake",   filters.fitmentMake);
   if (filters.fitmentModel)      p.set("fitmentModel",  filters.fitmentModel);
   if (filters.fitmentYear)       p.set("fitmentYear",   String(filters.fitmentYear));
@@ -379,7 +373,6 @@ export default function ShopClient({
   const urlBrand        = searchParams.get("brand");
   const urlMinPrice     = searchParams.get("minPrice");
   const urlMaxPrice     = searchParams.get("maxPrice");
-  const urlInStock      = searchParams.get("inStock") === "true";
   const urlSort         = searchParams.get("sort") ?? "newest";
   const urlPage         = parseInt(searchParams.get("page") ?? "0", 10);
   const urlFitmentMake  = searchParams.get("fitmentMake")  || null;
@@ -397,7 +390,6 @@ export default function ShopClient({
     brand:        urlBrand    ?? initialBrand    ?? null,
     minPrice:     urlMinPrice ? Number(urlMinPrice) : null,
     maxPrice:     urlMaxPrice ? Number(urlMaxPrice) : null,
-    inStock:      urlInStock,
     fitmentMake:  urlFitmentMake,
     fitmentModel: urlFitmentModel,
     fitmentYear:  urlFitmentYear,
@@ -407,7 +399,6 @@ export default function ShopClient({
   const [fitmentMakes,  setFitmentMakes]  = useState([]);
   const [fitmentModels, setFitmentModels] = useState([]);
   const [fitmentYears,  setFitmentYears]  = useState([]);
-  const [fitmentOpen,   setFitmentOpen]   = useState(!!(urlFitmentMake));
 
   // Load makes once on mount
   useEffect(() => {
@@ -441,9 +432,7 @@ export default function ShopClient({
   const [view,     setView]     = useState("grid");
   const [filterOpen, setFilterOpen] = useState(false);
   const [openSections, setOpenSections] = useState(() => new Set([
-    "availability",
     "fitment",
-    "catalog",
     "category",
     "brand",
     "price",
@@ -470,7 +459,6 @@ export default function ShopClient({
     if (filters.brand)            params.set("brand",       filters.brand);
     if (filters.minPrice != null) params.set("minPrice",    String(filters.minPrice));
     if (filters.maxPrice != null) params.set("maxPrice",    String(filters.maxPrice));
-    if (filters.inStock)          params.set("inStock",     "true");
     if (filters.fitmentMake)      params.set("fitmentMake",  filters.fitmentMake);
     if (filters.fitmentModel)     params.set("fitmentModel", filters.fitmentModel);
     if (filters.fitmentYear)      params.set("fitmentYear",  String(filters.fitmentYear));
@@ -515,13 +503,13 @@ export default function ShopClient({
   }, [filters, sort, page, fetchProducts]);
 
   const setFilter = useCallback((key, val) => {
-    setFiltersState(prev => ({ ...prev, [key]:val }));
+    setFilters(prev => ({ ...prev, [key]:val }));
     window.scrollTo({ top:0, behavior:"smooth" });
     setPage(0);
   }, []);
 
   const applyPrice = useCallback(() => {
-    setFiltersState(prev => ({
+    setFilters(prev => ({
       ...prev,
       minPrice: minInput ? Number(minInput) : null,
       maxPrice: maxInput ? Number(maxInput) : null,
@@ -530,7 +518,7 @@ export default function ShopClient({
   }, [minInput, maxInput]);
 
   const clearAll = useCallback(() => {
-    setFilters({ category:null, brand:null, minPrice:null, maxPrice:null, inStock:false, fitmentMake:null, fitmentModel:null, fitmentYear:null });
+    setFilters({ category:null, brand:null, minPrice:null, maxPrice:null, fitmentMake:null, fitmentModel:null, fitmentYear:null });
     setMinInput(""); setMaxInput("");
     setPage(0);
   }, []);
@@ -540,7 +528,6 @@ export default function ShopClient({
     filters.brand                  && { key:"brand",       label:filters.brand    },
     filters.minPrice != null       && { key:"minPrice",    label:`$${filters.minPrice}+` },
     filters.maxPrice != null       && { key:"maxPrice",    label:`≤$${filters.maxPrice}` },
-    filters.inStock                && { key:"inStock",     label:"In Stock"        },
     filters.fitmentMake            && {
       key:"fitment",
       label: [filters.fitmentYear, filters.fitmentMake, filters.fitmentModel].filter(Boolean).join(" "),
@@ -549,10 +536,8 @@ export default function ShopClient({
 
   const removeChip = key => {
     if (key === "minPrice" || key === "maxPrice") {
-      setFiltersState(p => ({ ...p, minPrice:null, maxPrice:null }));
+      setFilters(p => ({ ...p, minPrice:null, maxPrice:null }));
       setMinInput(""); setMaxInput("");
-    } else if (key === "inStock") {
-      setFilter("inStock", false);
     } else if (key === "fitment") {
       setFilters(p => ({ ...p, fitmentMake:null, fitmentModel:null, fitmentYear:null }));
     } else {
@@ -564,9 +549,7 @@ export default function ShopClient({
   const activeFilterCount = chips.length;
 
   // ── Section active states ──────────────────────────────────
-  const availActive  = filters.inStock;
-  const fitmentActive= filters.harley || filters.yearFrom != null || filters.yearTo != null;
-  const catalogActive= filters.drag || filters.oldbook;
+  const fitmentActive= !!(filters.fitmentMake);
   const catActive    = !!filters.category;
   const brandActive  = !!filters.brand;
   const priceActive  = filters.minPrice != null || filters.maxPrice != null;
@@ -637,95 +620,88 @@ export default function ShopClient({
             <button className="filter-close-btn" onClick={() => setFilterOpen(false)}>✕ CLOSE</button>
           </div>
 
-          {/* ── 1. AVAILABILITY ── */}
-          <SbSection id="availability" label="AVAILABILITY"
-            isActive={availActive} open={openSections.has("availability")} onToggle={toggleSection}>
-            <div style={{ padding:"8px 0 12px" }}>
-              <div className="toggle-row"
-                style={{ background:filters.inStock ? "rgba(232,98,26,0.06)" : "transparent", transition:"background 0.15s" }}>
-                <div>
-                  <div className="toggle-label" style={{ color:filters.inStock ? "#f0ebe3" : "#c4c0bc" }}>
-                    In Stock Only
-                  </div>
-                  <div style={S({ fontSize:8, color:"#8a8784", letterSpacing:"0.08em", marginTop:2 })}>
-                    HIDE OUT-OF-STOCK
-                  </div>
-                </div>
-                <Toggle on={filters.inStock} onChange={val => { setFilter("inStock", val); setFilterOpen(false); }}/>
-              </div>
-            </div>
-          </SbSection>
-
-          {/* ── 2. FITMENT ── */}
+          {/* ── 1. FITMENT ── */}
           <SbSection id="fitment" label="FITMENT"
             isActive={fitmentActive} open={openSections.has("fitment")} onToggle={toggleSection}>
-            <div style={{ padding:"8px 14px 14px", display:"flex", flexDirection:"column", gap:10 }}>
+            <div style={{ padding:"8px 14px 14px", display:"flex", flexDirection:"column", gap:6 }}>
+              {/* Make */}
+              <select
+                value={filters.fitmentMake ?? ""}
+                onChange={e => {
+                  const val = e.target.value || null;
+                  setFilters(p => ({ ...p, fitmentMake:val, fitmentModel:null, fitmentYear:null }));
+                  setPage(0);
+                }}
+                style={{ width:"100%", background:"#1a1919", border:"1px solid #2a2828",
+                         color: filters.fitmentMake ? "#f0ebe3" : "#8a8784",
+                         ...S({fontSize:11,letterSpacing:"0.06em",padding:"7px 10px",
+                         borderRadius:2,marginBottom:2,cursor:"pointer"}) }}
+              >
+                <option value="">SELECT MAKE</option>
+                {fitmentMakes.map(m => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
 
-              {/* Year range */}
-              <div>
-                <div style={S({ fontSize:8, color:"#8a8784", letterSpacing:"0.14em", marginBottom:6 })}>
-                  MODEL YEAR RANGE
-                </div>
-                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6 }}>
-                  <div>
-                    <div style={S({ fontSize:7, color:"#3a3838", letterSpacing:"0.1em", marginBottom:3 })}>FROM</div>
-                    <select className="year-select"
-                      value={filters.yearFrom ?? ""}
-                      onChange={e => { setFilter("yearFrom", e.target.value ? Number(e.target.value) : null); setFilterOpen(false); }}>
-                      <option value="">Any</option>
-                      {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <div style={S({ fontSize:7, color:"#3a3838", letterSpacing:"0.1em", marginBottom:3 })}>TO</div>
-                    <select className="year-select"
-                      value={filters.yearTo ?? ""}
-                      onChange={e => { setFilter("yearTo", e.target.value ? Number(e.target.value) : null); setFilterOpen(false); }}>
-                      <option value="">Any</option>
-                      {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-                    </select>
-                  </div>
-                </div>
-              </div>
+              {/* Model */}
+              {filters.fitmentMake && (
+                <select
+                  value={filters.fitmentModel ?? ""}
+                  onChange={e => {
+                    const val = e.target.value || null;
+                    setFilters(p => ({ ...p, fitmentModel:val, fitmentYear:null }));
+                    setPage(0);
+                  }}
+                  style={{ width:"100%", background:"#1a1919", border:"1px solid #2a2828",
+                           color: filters.fitmentModel ? "#f0ebe3" : "#8a8784",
+                           ...S({fontSize:11,letterSpacing:"0.06em",padding:"7px 10px",
+                           borderRadius:2,marginBottom:2,cursor:"pointer"}) }}
+                >
+                  <option value="">SELECT MODEL</option>
+                  {fitmentModels.map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              )}
 
-              {/* H-D Only toggle */}
-              <div className="toggle-row" style={{ padding:"6px 0" }}>
-                <div>
-                  <div className="toggle-label">Harley-Davidson Only</div>
-                  <div style={S({ fontSize:8, color:"#8a8784", letterSpacing:"0.08em", marginTop:2 })}>
-                    VERIFIED H-D FITMENT
-                  </div>
-                </div>
-                <Toggle on={!!filters.harley} onChange={val => { setFilter("harley", val); setFilterOpen(false); }}/>
-              </div>
+              {/* Year */}
+              {filters.fitmentModel && (
+                <select
+                  value={filters.fitmentYear ?? ""}
+                  onChange={e => {
+                    const val = e.target.value ? parseInt(e.target.value, 10) : null;
+                    setFilters(p => ({ ...p, fitmentYear:val }));
+                    setPage(0);
+                  }}
+                  style={{ width:"100%", background:"#1a1919", border:"1px solid #2a2828",
+                           color: filters.fitmentYear ? "#f0ebe3" : "#8a8784",
+                           ...S({fontSize:11,letterSpacing:"0.06em",padding:"7px 10px",
+                           borderRadius:2,marginBottom:2,cursor:"pointer"}) }}
+                >
+                  <option value="">ANY YEAR</option>
+                  {fitmentYears.map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              )}
 
+              {filters.fitmentMake && (
+                <button
+                  onClick={() => {
+                    setFilters(p => ({ ...p, fitmentMake:null, fitmentModel:null, fitmentYear:null }));
+                    setPage(0);
+                  }}
+                  style={{ width:"100%", background:"transparent", border:"1px solid #2a2828",
+                           color:"#8a8784", ...S({fontSize:9,letterSpacing:"0.1em",
+                           padding:"5px",borderRadius:2,cursor:"pointer",marginTop:2}) }}
+                >
+                  CLEAR VEHICLE
+                </button>
+              )}
             </div>
           </SbSection>
 
-          {/* ── 3. CATALOG TYPE ── */}
-          <SbSection id="catalog" label="CATALOG TYPE"
-            isActive={catalogActive} open={openSections.has("catalog")} onToggle={toggleSection}>
-            <div style={{ padding:"8px 0 12px" }}>
-              {[
-                { key:"drag",    label:"Drag Specialties", sub:"DS CATALOG" },
-                { key:"oldbook", label:"H-D Catalog",       sub:"OEM REFERENCE" },
-              ].map(({ key, label, sub }) => (
-                <div key={key} className="toggle-row">
-                  <div>
-                    <div className="toggle-label" style={{ color:filters[key] ? "#f0ebe3" : "#c4c0bc" }}>
-                      {label}
-                    </div>
-                    <div style={S({ fontSize:8, color:"#8a8784", letterSpacing:"0.08em", marginTop:2 })}>
-                      {sub}
-                    </div>
-                  </div>
-                  <Toggle on={!!filters[key]} onChange={val => { setFilter(key, val); setFilterOpen(false); }}/>
-                </div>
-              ))}
-            </div>
-          </SbSection>
-
-          {/* ── 4. CATEGORY ── */}
+          {/* ── 2. CATEGORY ── */}
           <SbSection id="category" label="CATEGORY"
             isActive={catActive} open={openSections.has("category")} onToggle={toggleSection}>
             <FacetList
@@ -734,7 +710,7 @@ export default function ShopClient({
             />
           </SbSection>
 
-          {/* ── 5. BRAND ── */}
+          {/* ── 3. BRAND ── */}
           <SbSection id="brand" label="BRAND"
             isActive={brandActive} open={openSections.has("brand")} onToggle={toggleSection}>
             <FacetList
@@ -743,7 +719,7 @@ export default function ShopClient({
             />
           </SbSection>
 
-          {/* ── 6. PRICE ── */}
+          {/* ── 4. PRICE RANGE ── */}
           <SbSection id="price" label="PRICE RANGE"
             isActive={priceActive} open={openSections.has("price")} onToggle={toggleSection}>
             <div style={{ padding:"10px 14px 14px" }}>
@@ -767,108 +743,6 @@ export default function ShopClient({
               </button>
             </div>
           </SbSection>
-
-          {/* Availability */}
-          <div>
-            <div style={S({fontSize:9,color:"#e8621a",letterSpacing:"0.2em",
-                           padding:"12px 14px 8px",display:"block"})}>AVAILABILITY</div>
-            <div style={{ padding:"4px 14px 16px", display:"flex",
-                          alignItems:"center", justifyContent:"space-between" }}>
-              <span style={{ fontSize:13, fontWeight:500, color:"#c4c0bc" }}>In Stock Only</span>
-              <Toggle on={filters.inStock} onChange={val => setFilter("inStock", val)}/>
-            </div>
-          </div>
-
-          {/* Fits My Bike */}
-          <div>
-            <button
-              onClick={() => setFitmentOpen(v => !v)}
-              style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between",
-                       background:"none", border:"none", cursor:"pointer",
-                       padding:"12px 14px 8px", borderBottom: fitmentOpen ? "none" : "1px solid #1a1919" }}
-            >
-              <span style={S({fontSize:9,color:"#e8621a",letterSpacing:"0.2em"})}>FITS MY BIKE</span>
-              <span style={{ color:"#8a8784", fontSize:12 }}>{fitmentOpen ? "▲" : "▼"}</span>
-            </button>
-            {fitmentOpen && (
-              <div style={{ padding:"8px 12px 16px", borderBottom:"1px solid #1a1919" }}>
-                {/* Make */}
-                <select
-                  value={filters.fitmentMake ?? ""}
-                  onChange={e => {
-                    const val = e.target.value || null;
-                    setFilters(p => ({ ...p, fitmentMake:val, fitmentModel:null, fitmentYear:null }));
-                    setPage(0);
-                  }}
-                  style={{ width:"100%", background:"#1a1919", border:"1px solid #2a2828",
-                           color: filters.fitmentMake ? "#f0ebe3" : "#8a8784",
-                           ...S({fontSize:11,letterSpacing:"0.06em",padding:"7px 10px",
-                           borderRadius:2,marginBottom:6,cursor:"pointer"}) }}
-                >
-                  <option value="">SELECT MAKE</option>
-                  {fitmentMakes.map(m => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
-
-                {/* Model */}
-                {filters.fitmentMake && (
-                  <select
-                    value={filters.fitmentModel ?? ""}
-                    onChange={e => {
-                      const val = e.target.value || null;
-                      setFilters(p => ({ ...p, fitmentModel:val, fitmentYear:null }));
-                      setPage(0);
-                    }}
-                    style={{ width:"100%", background:"#1a1919", border:"1px solid #2a2828",
-                             color: filters.fitmentModel ? "#f0ebe3" : "#8a8784",
-                             ...S({fontSize:11,letterSpacing:"0.06em",padding:"7px 10px",
-                             borderRadius:2,marginBottom:6,cursor:"pointer"}) }}
-                  >
-                    <option value="">SELECT MODEL</option>
-                    {fitmentModels.map(m => (
-                      <option key={m} value={m}>{m}</option>
-                    ))}
-                  </select>
-                )}
-
-                {/* Year */}
-                {filters.fitmentModel && (
-                  <select
-                    value={filters.fitmentYear ?? ""}
-                    onChange={e => {
-                      const val = e.target.value ? parseInt(e.target.value, 10) : null;
-                      setFilters(p => ({ ...p, fitmentYear:val }));
-                      setPage(0);
-                    }}
-                    style={{ width:"100%", background:"#1a1919", border:"1px solid #2a2828",
-                             color: filters.fitmentYear ? "#f0ebe3" : "#8a8784",
-                             ...S({fontSize:11,letterSpacing:"0.06em",padding:"7px 10px",
-                             borderRadius:2,marginBottom:8,cursor:"pointer"}) }}
-                  >
-                    <option value="">ANY YEAR</option>
-                    {fitmentYears.map(y => (
-                      <option key={y} value={y}>{y}</option>
-                    ))}
-                  </select>
-                )}
-
-                {filters.fitmentMake && (
-                  <button
-                    onClick={() => {
-                      setFilters(p => ({ ...p, fitmentMake:null, fitmentModel:null, fitmentYear:null }));
-                      setPage(0);
-                    }}
-                    style={{ width:"100%", background:"transparent", border:"1px solid #2a2828",
-                             color:"#8a8784", ...S({fontSize:9,letterSpacing:"0.1em",
-                             padding:"5px",borderRadius:2,cursor:"pointer"}) }}
-                  >
-                    CLEAR VEHICLE
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
         </aside>
 
         {/* ── PRODUCT GRID ──────────────────────────────────── */}
