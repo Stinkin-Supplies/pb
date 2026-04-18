@@ -68,6 +68,7 @@ const PRODUCTS_SEARCH_PARAMS = {
     "fitment_model",
     "fitment_year",
     "sport_types",
+    "computed_price(stats)",
   ].join(","),
   sort_by:          "stock_quantity:desc,_text_match:desc",
   per_page:         24,
@@ -190,7 +191,7 @@ export function buildFilters(params: {
   if (params.minPrice !== undefined || params.maxPrice !== undefined) {
     const min = params.minPrice ?? 0;
     const max = params.maxPrice ?? 99999;
-    const priceField = IS_GROUPS_COLLECTION ? "price_min" : "msrp";
+    const priceField = IS_GROUPS_COLLECTION ? "price_min" : "computed_price";
     filters.push(`${priceField}:[${min}..${max}]`);
   }
 
