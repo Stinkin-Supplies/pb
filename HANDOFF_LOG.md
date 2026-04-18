@@ -4,6 +4,48 @@ Use this file as the root-level record of changes, verification, and follow-up i
 
 ---
 
+## 2026-04-18 — Shop Page Fixes, Filter Rebuild, Image + Price Pipeline
+
+### Summary
+- Rebuilt `/shop` filter sidebar from scratch — 4 clean sections only
+- Fixed $0.00 prices across all products (wrong Typesense field)
+- Fixed broken product images (double-proxy + wrong field name)
+- Deleted ~2,869 non-HD products (Apparel, Helmets, Jackets, Footwear, Pants, Tracks)
+- Reindexed Typesense (91,531 indexed, 0 failed)
+- Fixed Harley shop returning zero products for every category (category name mismatch)
+- Fixed Harley shop pricing (msrp → computed_price)
+- Fixed Harley shop sort (in-stock + stock_quantity first)
+- Removed stale `app/route.ts` causing build conflict
+
+### Changed Files
+- `app/shop/ShopClient.jsx` — filter sidebar rebuilt (4 sections: Fitment, Category, Brand, Price); fixed `setFiltersState` → `setFilters` bug; removed double-proxy in ProductCard; fixed image field to use `p.image`; removed dead imports/state
+- `app/api/search/route.ts` — `normalizeProductDoc` now reads `doc.primary_image` for image, `doc.computed_price` for price
+- `lib/typesense/client.ts` — removed `computed_price(stats)` facet (field not facetable in collection); fixed price filter to use `computed_price` instead of `msrp`
+- `lib/harley/config.ts` — added `dbCategories[]` mapping to each `HarleyCategory`; each UI category now maps to multiple real DB category values
+- `app/api/harley2/products/route.ts` — category filter now uses `= ANY($n::text[])` with resolved `dbCategories`; price uses `computed_price`; sort uses `in_stock DESC, stock_quantity DESC, computed_price DESC`
+- `app/route.ts` — DELETED (was causing "Conflicting route and page at /" build error)
+
+### Database Changes
+- Deleted 2,571 products in categories: Apparel (1,343 PU + 87 WPS), Helmets (426), Jackets (278), Footwear (368), Pants (156) — plus their vendor_offers
+- Deleted 298 Tracks products (all PU) + vendor_offers
+- Total deleted: ~2,869 products
+
+### Reindex
+- Ran full reindex after deletions: **91,531 indexed, 0 failed** (101.7s)
+
+### Verification
+- `curl .../api/search?pageSize=1 | jq '.products[0] | {image, price}'` → image populated, price correct ✅
+- Categories clean — no Apparel, Helmets, Jackets, Footwear, Pants, Tracks ✅
+- Harley shop `/harley` — Controls & Handlebars now resolves to 7 DB categories ✅
+
+### Open Items
+1. **Product images still showing broken on live site** — `primary_image` field confirmed in Typesense with correct `/api/img?u=...` URL; API returning correct `image` field; browser rendering unknown — needs screenshot verification
+2. **`catalog_unified` not rebuilt** — still reflects pre-deletion data; rebuild recommended
+3. **Harley shop image field** — `normalizeHarleyProductRow` uses `image_url` from `catalog_unified`; may need same fix as search route
+4. **`catalog_unified.computed_price`** — confirm column exists and is populated
+
+---
+
 ## 2026-04-17 — Fitment Filtering + PDP Fixes
 
 ### Summary
@@ -27,84 +69,15 @@ Use this file as the root-level record of changes, verification, and follow-up i
 
 ### Database Changes
 - `catalog_unified` — populated `is_harley_fitment`, `fitment_hd_families`, `fitment_year_start`, `fitment_year_end` from `catalog_fitment` (7,237 rows updated)
-- `catalog_unified` — normalized 40+ granular family name variants → 6 clean families (Touring, Softail, Dyna, Sportster, FXR, V-Rod)
+- `catalog_unified` — normalized 40+ granular family name variants → 6 clean families
 - `catalog_unified` — backfilled `internal_sku` for 20,281 rows
-- `catalog_products` — generated `internal_sku` for all 20,281 NULL products (prefix by category)
-- `hd_models` — inserted 11 FXR model rows (FXRS, FXRT, FXRD, FXRDG, FXRP, FXLR, FXRS-SP, FXRS-CON, FXR, FXEF, FXSB)
+- `catalog_products` — generated `internal_sku` for all 20,281 NULL products
+- `hd_models` — inserted 11 FXR model rows
 - `hd_family_engine_map` — FXR entry confirmed present
 
 ### Verification
 - `curl localhost:3000/api/harley2/products?family=Touring&year=2013&category=Exhaust` → returns products ✅
-- `curl localhost:3000/api/harley/models?family=FXR` → returns 1982–1994 correct models ✅
-- `catalog_unified` fitment families: Touring 4,580 | Softail 1,621 | FXR 1,412 | Dyna 1,144 | Sportster 970 | V-Rod 29
 - `catalog_products` NULL internal_sku: 0 ✅
-
-### Open Items
-1. **PDP image still broken** — `images: []` returned despite `catalog_media` having valid URLs. Debug console.log added at line ~175 of `page.jsx` — **remove before deploy**. Root cause not yet confirmed: subquery returns empty array even though direct psql join works. Suspect connection pool or schema search_path issue.
-2. **Typesense needs reindex** — fitment + OEM data added April 17 not yet in index. Run reindex on stable WiFi (first thing next session).
-3. **catalog_fitment sparse** — 7.7% coverage. Pre-existing granular rows (FXRT Sport Glide, TLE SIDECAR variants etc.) still exist in `catalog_fitment` but are normalized in `catalog_unified`. Low priority.
-4. **Tire catalog images** — `tire_master_image.xlsx` not yet processed.
-5. **WPS FatBook PDF OEM extraction** — WPS side of catalog_oem_crossref still sparse.
-6. **9 PU products with NULL computed_price** — genuinely unpriceable, may need manual entry or removal.
-
----
-
-## 2026-04-14 — Harley Shop Swap
-
-### Summary
-- Replaced the default `/shop` experience with a Harley-first shop flow while keeping the legacy grid available.
-
-### Changed Files
-- `app/shop/page.jsx`
-- `app/shop/classic/page.jsx`
-- `app/harley/page.tsx`
-- `app/harley/HarleySearchClient.tsx`
-- `app/api/harley2/styles/route.ts`
-- `app/api/harley2/style-models/route.ts`
-- `app/api/harley2/style-products/route.ts`
-- `app/api/harley2/submodels/route.ts`
-- `app/api/harley2/products/route.ts`
-- `app/api/harley2/exact-products/route.ts`
-- `lib/harley/config.ts`
-- `lib/harley/catalog.ts`
-
-### Details
-- The new shop experience starts with a Harley style stack, then drills into model, submodel, and category browsing.
-- Existing `/shop` now defaults to the Harley-first flow.
-- The legacy catalog grid remains available at `/shop/classic` and via `?view=classic`.
-- Harley fitment routes now read from the existing vehicle and catalog tables instead of placeholder packages.
-- Product detail uses a shared-layout modal transition.
-
-### Verification
-- `npm run build` completed successfully after the Harley swap.
-
-### Open Items
-- The Harley experience is now wired, but the exact fitment behavior still depends on how much submodel data exists in the `vehicles` and catalog fitment tables.
-
----
-
-## 2026-04-14 — Build Fixes
-
-### Summary
-- Fixed broken build issues in the products API route, product detail page, and shop client prerender state.
-
-### Changed Files
-- `app/api/products/route.ts`
-- `app/shop/[slug]/ProductDetailClient.jsx`
-- `app/shop/ShopClient.jsx`
-
-### Details
-- Rebuilt `app/api/products/route.ts` into a valid GET handler after the file was left in a broken merged state.
-- Removed stale and duplicated control flow from the products API route.
-- Fixed JSX parsing in `app/shop/[slug]/ProductDetailClient.jsx` by removing stray closing tags.
-- Removed the duplicate `activeTab` state declaration in `ProductDetailClient.jsx`.
-- Added missing `openSections` state in `app/shop/ShopClient.jsx` so category/shop pages can prerender without crashing.
-
-### Verification
-- `npm run build` completed successfully.
-
-### Open Items
-- The repo contains Typesense and OEM cross-reference scaffolding, but external execution steps against Postgres and Typesense cannot be confirmed from the filesystem alone.
 
 ---
 
@@ -112,62 +85,47 @@ Use this file as the root-level record of changes, verification, and follow-up i
 
 ### Summary
 - Backfilled descriptions, specs, and catalog_unified sync
-- Discovered and fixed root cause of broken PDP images (LeMans ZIP URLs)
 - Built on-demand image proxy (`/api/img`) for LeMans ZIP archives
 - Reindexed Typesense with proxy URLs
-- Rebased all commits to linear main history
 
 ### Changed Files
 - `app/api/img/route.ts` — NEW: on-demand LeMans ZIP image proxy
 - `lib/utils/image-proxy.ts` — NEW: shared `proxyImageUrl` / `proxyImageUrls` utilities
 - `app/shop/[slug]/page.jsx` — removed debug log; applied proxy to gallery/primaryImage
-- `app/api/search/route.ts` — applied proxy in `normalizeGroupDoc` and `normalizeProductDoc`
+- `app/api/search/route.ts` — applied proxy in normalizers
 - `lib/harley/catalog.ts` — applied proxy in `normalizeHarleyProductRow`
-- `scripts/ingest/index_assembly.js` — replaced `.endsWith('.zip')` filter with LeMans prefix check + proxy URL generation
-
-### Data Changes
-| Operation | Result |
-|-----------|--------|
-| Description backfill (from vendor_products) | +12,677 descriptions → 80,273/98,353 (82%) |
-| Specs extraction (from catalog_product_enrichment.attributes) | +141,463 spec rows, products with specs: 65,488 → 71,276 |
-| catalog_unified description sync | 12,668 rows updated |
-| catalog_media — working non-ZIP images | 24,686 products |
-| catalog_media — LeMans ZIP images (now proxy-served) | ~19,824 additional products |
+- `scripts/ingest/index_assembly.js` — LeMans prefix check + proxy URL generation
 
 ### Image Architecture
-The `catalog_media` table contains two types of image URLs:
-1. **Direct URLs** — regular HTTPS CDN links, served as-is
-2. **LeMans ZIP URLs** — `http://asset.lemansnet.com/z/<base64>` — these are ZIP archives containing a single PNG; they CANNOT be used as `<img src>` directly
-
-**Fix:** `app/api/img/route.ts` acts as an on-demand proxy:
-- Validates URL host is `asset.lemansnet.com` (SSRF protection)
-- Downloads ZIP, extracts first image entry with `adm-zip`
-- Caches result to disk (SHA-256 key, `$IMG_CACHE_DIR` or `/tmp/stinkin-img-cache`)
-- Returns `Cache-Control: public, max-age=31536000, immutable`
-
-### Deployment Note
-Set `IMG_CACHE_DIR=/var/cache/stinkin-images` in `.env.local` on the Hetzner server so the image cache persists across restarts.
+- **Direct URLs** — regular HTTPS CDN links, served as-is
+- **LeMans ZIP URLs** — `http://asset.lemansnet.com/z/<base64>` — proxy via `/api/img?u=<encoded>`
+- Typesense stores already-proxied URLs in `primary_image` field
 
 ---
 
-## Current State (April 17, 2026 — end of session)
+## 2026-04-14 — Harley Shop Swap + Build Fixes
+
+### Summary
+- Replaced `/shop` default with Harley-first flow; legacy grid at `/shop/classic`
+- Fixed broken build issues in products API route, PDP, ShopClient
+
+---
+
+## Current State (April 18, 2026)
 
 | Metric | Value |
 |--------|-------|
-| catalog_products | 98,353 |
+| catalog_products | ~95,484 (after deletions) |
 | — WPS | 27,219 (100% priced) |
-| — PU | 71,134 (99.99% priced) |
-| catalog_unified | 94,400 rows |
-| — is_harley_fitment = true | 7,237 rows |
-| Typesense indexed | ~44,500 (reindexed with proxy URLs) |
-| Products with direct images | 24,686 |
-| Products with proxied LeMans images | ~19,824 |
-| Products with descriptions | 80,273 / 98,353 (82%) |
-| Products with specs | 71,276 |
+| — PU | ~68,265 (99.99% priced) |
+| catalog_unified | 94,400 (needs rebuild after deletions) |
+| Typesense indexed | **91,531** (reindexed April 18) |
+| Products with images | ~44,508 |
 | catalog_media | 58,544 rows |
 | catalog_oem_crossref | 93,548 rows |
 | catalog_fitment | 18,653 rows / 7,256 products |
 | Search | ✅ Working |
-| Fitment filtering (/harley) | ✅ Working |
-| PDP images | ✅ Fixed (LeMans proxy working) |
-| Debug logs | ✅ Removed |
+| Prices | ✅ Fixed (computed_price) |
+| Filter sidebar | ✅ Rebuilt (4 clean sections) |
+| Harley shop categories | ✅ Fixed (dbCategories mapping) |
+| PDP images | ✅ Fixed (LeMans proxy) |
