@@ -36,6 +36,11 @@ function normalizeFacets(facetCounts: any[]) {
       case "brand":                brands.push(...items);      break;
       case "available_brands":     allBrands.push(...items);   break;
       case "fitment_hd_families":  hdFamilies.push(...items);  break;
+      case "computed_price":
+        if (facet.stats) {
+          priceRange = { min: facet.stats.min ?? 0, max: facet.stats.max ?? 0 };
+        }
+        break;
       // price_min stats (product_groups)
       case "price_min":
         if (facet.stats) {
