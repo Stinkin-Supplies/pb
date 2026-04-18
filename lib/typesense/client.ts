@@ -68,7 +68,6 @@ const PRODUCTS_SEARCH_PARAMS = {
     "fitment_model",
     "fitment_year",
     "sport_types",
-    "computed_price(stats)",
   ].join(","),
   sort_by:          "stock_quantity:desc,_text_match:desc",
   per_page:         24,
