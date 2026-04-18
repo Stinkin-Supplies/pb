@@ -704,14 +704,14 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
         ? [product.primaryImage]
         : [];
     if (raw.length > 0) {
-      return raw.map(url => isWpsCdn(url) ? url : (url.includes("lemansnet.com") ? `/api/image-proxy?url=${encodeURIComponent(url)}` : url));
+      return raw.map(url => isWpsCdn(url) ? url : (url.includes("lemansnet.com") ? `/api/img?u=${encodeURIComponent(url)}` : url));
     }
     return ["/images/placeholder.jpg"];
   })();
 
   const toProxySrc = (src) =>
     typeof src === "string" && src.startsWith("http") && src.includes("lemansnet.com")
-      ? `/api/image-proxy?url=${encodeURIComponent(src)}`
+      ? (src.startsWith('/api/') ? src : `/api/img?u=${encodeURIComponent(src)}`)
       : src;
 
   // ── Fitment table data ─────────────────────────────────────
