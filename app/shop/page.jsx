@@ -1,8 +1,8 @@
 // ============================================================
 // app/shop/page.jsx  —  SERVER COMPONENT
 // ============================================================
-// Default shop experience is Harley-first.
-// Add ?view=classic to access the legacy catalog grid.
+// Default shop experience is the full catalog grid.
+// Add ?view=harley to access the Harley-first fitment flow.
 // ============================================================
 
 import HarleySearchClient from "../harley/HarleySearchClient";
@@ -13,12 +13,12 @@ const PAGE_SIZE = 48;
 
 export default async function ShopPage({ searchParams }) {
   const p        = await searchParams;
-  const view     = p?.view     ?? "harley";
+  const view     = p?.view     ?? "classic";
   const category = p?.category ?? null;
   const brand    = p?.brand    ?? null;
   const sort     = p?.sort     ?? "newest";
 
-  if (view !== "classic") {
+  if (view === "harley") {
     return (
       <HarleySearchClient
         initialStyles={HARLEY_STYLES}
