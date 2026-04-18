@@ -9,7 +9,6 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import NavBar from "@/components/NavBar";
 import { useCartSafe } from "@/components/CartContext";
-import { getProductImage } from "@/lib/getProductImage";
 
 const PAGE_SIZE   = 48;
 const DEBOUNCE_MS = 350;
@@ -254,9 +253,7 @@ function GridNotifyButton({ sku, productName, vendor }) {
 
 // ── ProductCard ───────────────────────────────────────────────
 function ProductCard({ product:p, index, view, onAdd }) {
-  const imageSrc = getProductImage(p);
-  const proxied  = typeof imageSrc === "string" && imageSrc.startsWith("http")
-    ? `/api/image-proxy?url=${encodeURIComponent(imageSrc)}` : imageSrc;
+  const imageSrc = p.primary_image ?? p.image ?? p.primaryImage ?? "/placeholder-part.png";
   return (
     <Link href={`/shop/${p.slug}`} className="pcard"
       style={{ background:"#111010", border:"1px solid #2a2828", borderRadius:2, overflow:"hidden",
@@ -270,7 +267,7 @@ function ProductCard({ product:p, index, view, onAdd }) {
         <div style={{ position:"absolute", inset:0,
           backgroundImage:"linear-gradient(rgba(232,98,26,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(232,98,26,0.04) 1px,transparent 1px)",
           backgroundSize:"16px 16px" }}/>
-        <Image src={proxied} alt={p.name} fill
+        <Image src={imageSrc} alt={p.name} fill
           sizes="(max-width:768px) 50vw, 25vw"
           style={{ objectFit:"contain", padding:"10px", zIndex:1 }}
           priority={index < 6} unoptimized/>

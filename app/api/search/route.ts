@@ -135,9 +135,9 @@ function normalizeProductDoc(doc: any) {
     name:         doc.name,
     brand:        doc.brand      ?? "",
     category:     doc.category   ?? "",
-    price:        doc.msrp       ?? doc.cost ?? 0,
-    was:          doc.original_retail && doc.original_retail > (doc.msrp ?? 0)
-                    ? doc.original_retail : null,
+    price:        doc.computed_price ?? doc.our_price ?? doc.price ?? doc.msrp ?? 0,
+    was:          doc.msrp && doc.msrp > (doc.computed_price ?? doc.our_price ?? doc.price ?? 0)
+                    ? doc.msrp : null,
     mapPrice:     doc.map_price  ?? null,
     inStock:      doc.in_stock   ?? false,
     stockQty:     doc.stock_quantity ?? 0,
