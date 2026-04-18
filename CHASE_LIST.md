@@ -1,17 +1,37 @@
 # Stinkin' Supplies — Chase List
 **Running log of loose ends to follow up on**
-Last Updated: April 17, 2026 — end of session
+Last Updated: April 18, 2026 — end of session
 
 ---
 
 ## 🚀 NEXT SESSION — START HERE
 
-Enrichment backfill + LeMans image proxy are done. Reindex already ran.
+1. **Verify images are actually loading on live site** — API confirmed returning correct `/api/img?u=...` URLs but browser rendering needs confirmation. Check DevTools Network tab on `/shop`.
+2. **Rebuild `catalog_unified`** — still has pre-deletion data (~2,869 deleted products). Run:
+   ```sql
+   -- rebuild script (from original pipeline)
+   ```
+3. **Check `normalizeHarleyProductRow`** in `lib/harley/catalog.ts` — uses `image_url` from `catalog_unified`; may need to use `proxyImageUrl()` on it like the search route does
+4. **Confirm `catalog_unified.computed_price` column exists** — Harley products route uses it for ORDER BY
 
-Optional follow-ups:
-1. Set `IMG_CACHE_DIR=/var/cache/stinkin-images` in `.env.local` on Hetzner (makes proxy cache persist across server restarts)
-2. Tire catalog images — `tire_master_image.xlsx`
-3. WPS FatBook PDF OEM extraction
+---
+
+## ✅ DONE APRIL 18
+
+| Task | Result |
+|------|--------|
+| Rebuilt ShopClient filter sidebar | 4 sections: Fitment, Category, Brand, Price Range |
+| Fixed `setFiltersState` → `setFilters` bug | Filter clicks now work |
+| Removed duplicate filter sections (Availability ×2, Fitment ×2) | Clean sidebar |
+| Fixed $0.00 prices | `computed_price` field in Typesense |
+| Fixed image double-proxy | `primary_image` field used directly |
+| Deleted Apparel / Helmets / Jackets / Footwear / Pants / Tracks | ~2,869 products gone |
+| Reindexed Typesense | 91,531 indexed, 0 failed |
+| Deleted stale `app/route.ts` | Build error fixed |
+| Fixed Harley shop zero results | `dbCategories` mapping in config.ts |
+| Fixed Harley shop pricing | `computed_price` instead of `msrp` |
+| Fixed Harley shop sort | in_stock DESC, stock_quantity DESC |
+| Added `computed_price` price filter in buildFilters | Was using `msrp` |
 
 ---
 
@@ -20,43 +40,32 @@ Optional follow-ups:
 | Task | Result |
 |------|--------|
 | Reindexed Typesense (start of session) | 94,400 indexed, 0 failed |
-| OEM crossref expansion | 19 → **93,548 rows** (from pu_brand_enrichment) |
+| OEM crossref expansion | 19 → **93,548 rows** |
 | catalog_images migration | 21,075 rows → catalog_media, table dropped |
 | catalog_media | 38K → **58,544 rows** |
 | Products with images | 31,130 → **44,508** |
-| index_assembly.js | Added oem_numbers[] field + catalog_oem_crossref JOIN |
-| client.ts query_by | Updated to name, brand, sku, mpn, specs_blob, search_blob, oem_numbers |
-| nginx client_max_body_size | 1MB → 20MB (Typesense proxy fix) |
-| catalog_product_enrichment orphan cleanup | 95,633 orphaned rows deleted (172,656 → 77,023) |
-| Fitment extraction pipeline | 11,891 → **18,653 rows** / 600 → **7,256 products** covered |
-| — FXR separated from Dyna | FXR is own family (1982-1994) |
-| — M8 year inference | Milwaukee-Eight → Touring 2017-Up, Softail 2018-Up, Sportster 2021-Up |
-| Added NULLS NOT DISTINCT unique index | catalog_fitment deduplicated, safe for re-runs |
-
----
-
-## ✅ COMPLETED APRIL 16
-
-| Fix | Result |
-|-----|--------|
-| Deleted 18,450 metric products | 0 metric in catalog |
-| Added 9,699 HD products to allowlist | 0 missing from allowlist |
-| Loaded PU pricing (62,065 rows) | 87%+ dealer price coverage |
-| Promoted 19,271 WPS products | WPS: 7,948 → 27,219 |
-| Promoted 1,010 PU products | PU: 70,124 → 71,134 |
-| Computed prices WPS | 27,219/27,219 = 100% |
-| Computed prices PU | 67,172/67,181 = 99.99% |
-| Rebuilt catalog_unified | 94,400 fresh rows |
-| Added 1,538 PU images | 31,130 products with images |
-| Fixed search (query_by, facet_by, sort_by, filter_by) | Search working ✅ |
-| Fixed db.js connectionTimeoutMillis 5000→30000 | Fewer timeout errors |
+| nginx client_max_body_size | 1MB → 20MB |
+| catalog_product_enrichment orphan cleanup | 172,656 → **77,023 rows** |
+| Fitment extraction pipeline | **18,653 rows / 7,256 products** |
+| LeMans image proxy built | `/api/img` route working |
+| Description backfill | 80,273 / 98,353 (82%) |
+| internal_sku generated for all products | 0 NULL remaining |
 
 ---
 
 ## 🔴 HIGH PRIORITY
 
+### catalog_unified rebuild needed
+- ~2,869 deleted products still in catalog_unified
+- Harley shop queries catalog_unified directly — may return deleted products
+- Need to rebuild or at minimum: `DELETE FROM catalog_unified WHERE sku NOT IN (SELECT sku FROM catalog_products WHERE is_active = true)`
+
+### Image rendering on live site
+- API confirmed returning `/api/img?u=...` URLs correctly
+- Browser-side rendering still unconfirmed — need screenshot of live `/shop`
+- If still broken: check Next.js `next.config.js` for allowed image domains
+
 ### 9 PU products with NULL computed_price
-- Genuinely no pricing data anywhere — may need manual price entry or removal
 ```sql
 SELECT sku, brand, name, msrp, cost, map_price
 FROM catalog_products
@@ -68,39 +77,44 @@ WHERE computed_price IS NULL AND is_active = true;
 ## 🔵 LOW PRIORITY / FUTURE
 
 ### Tire catalog images
-- tire_master_image.xlsx not yet processed
+- `tire_master_image.xlsx` not yet processed
 - Same Python HYPERLINK extraction as HardDrive catalog
 
 ### WPS FatBook PDF OEM extraction
-- Bigger lift for catalog_oem_crossref WPS side
-- Requires PDF parsing pipeline
+- WPS side of catalog_oem_crossref still sparse
 
-### catalog_fitment — messy model name variants in pre-existing data
-- Pre-existing rows have many granular/variant model names (FXRT Sport Glide, FXRS Low Rider, TLE SIDECAR vs TLE - SIDECAR, etc.)
-- Low urgency — main families (Touring, Softail, Dyna, Sportster, FXR) are clean
-- Could normalize with a UPDATE pass when bandwidth allows
+### catalog_fitment sparse (7.7% coverage)
+- Pre-existing rows have messy model name variants (FXRT Sport Glide, TLE SIDECAR, etc.)
+- Low urgency — main families clean
+
+### IMG_CACHE_DIR persistence
+- Set `IMG_CACHE_DIR=/var/cache/stinkin-images` in `.env.local` on Hetzner
+- Makes proxy cache persist across server restarts
+
+### computed_price facetable in Typesense
+- Currently `facet: false` — can't show price range hint
+- To fix: update Typesense collection schema, reindex
+- Low priority — price filter inputs work without it
 
 ---
 
-## 📊 CURRENT STATE (End of April 17 — after enrichment + proxy)
+## 📊 CURRENT STATE (End of April 18)
 
 | Metric | Value |
 |--------|-------|
-| Typesense indexed | ~44,500 (reindexed with proxy URLs) |
-| catalog_products | 98,353 |
+| catalog_products | ~95,484 |
 | WPS in catalog | 27,219 (100% priced) |
-| PU in catalog | 71,134 (99.99% priced) |
-| catalog_unified | 94,400 |
-| Products with direct images | **24,686** |
-| Products with proxied LeMans images | **~19,824** |
-| Products with descriptions | **80,273 / 98,353 (82%)** |
-| Products with specs | **71,276** |
-| catalog_media | **58,544 rows** |
-| catalog_oem_crossref | **93,548 rows** |
-| catalog_fitment | **18,653 rows / 7,256 products** |
-| catalog_product_enrichment | **77,023 rows** (cleaned) |
+| PU in catalog | ~68,265 (99.99% priced) |
+| catalog_unified | 94,400 (stale — needs rebuild) |
+| Typesense indexed | **91,531** |
+| Products with images | ~44,508 |
+| catalog_media | 58,544 rows |
+| catalog_oem_crossref | 93,548 rows |
+| catalog_fitment | 18,653 rows / 7,256 products |
 | Search | ✅ Working |
-| PDP images | ✅ Fixed (LeMans proxy `/api/img`) |
+| Prices | ✅ Fixed |
+| Filter sidebar | ✅ Rebuilt |
+| Harley shop categories | ✅ Fixed |
 
 ---
 
@@ -109,22 +123,22 @@ WHERE computed_price IS NULL AND is_active = true;
 | Issue | Solution |
 |-------|----------|
 | `NOT IN (large subquery)` hangs | Use `NOT EXISTS` or temp table |
-| `DISABLE TRIGGER ALL` denied | catalog_app not superuser — use DROP/ADD constraint |
+| `DISABLE TRIGGER ALL` denied | catalog_app not superuser |
 | Next.js holds read locks | Stop dev server before bulk DDL/DML |
 | vendor_code casing | Always lowercase: 'wps'/'pu' |
-| catalog_unified source_vendor | UPPERCASE 'WPS'/'PU' (different from catalog_products) |
+| catalog_unified source_vendor | UPPERCASE 'WPS'/'PU' |
 | pu_products.map_price | VARCHAR 'Y'/'N' flag — not a price |
-| PU drop_ship_eligible | All false — unreliable, ignore |
-| PU SKU format | catalog uses punctuated (1401-1193), pu_pricing.part_number is plain (14011193) — join via punctuated_part_number |
-| Typesense on hotspot | Fails — needs stable WiFi for Promise.all parallel queries |
-| Typesense batch size | 1000 docs/batch safe now (nginx 20MB limit) |
-| psql paste cuts off | Watch for `-*>` continuation prompt |
-| Temp table lost after ROLLBACK | Recreate before retrying |
+| PU SKU format | Punctuated in catalog (1401-1193), plain in pu_pricing (14011193) |
+| Typesense on hotspot | Fails — needs stable WiFi |
+| Typesense batch size | 1000 docs/batch safe (nginx 20MB limit) |
 | catalog_unified not a view | Regular table — TRUNCATE + INSERT to rebuild |
-| catalog_fitment unique index | NULLS NOT DISTINCT on (product_id, make, model, year_start, year_end) — safe to re-run extract_fitment.js |
-| FXR ≠ Dyna | FXR = rubber-mount 1982-1994, Dyna = FXD 1991-2017, separate families |
+| catalog_fitment unique index | NULLS NOT DISTINCT — safe to re-run extract_fitment.js |
+| FXR ≠ Dyna | FXR = rubber-mount 1982-1994, Dyna = FXD 1991-2017 |
 | M8 = Milwaukee-Eight | 2017+ Touring, 2018+ Softail, 2021+ Sportster S |
+| Typesense `primary_image` field | Already proxied — do NOT run proxyImageUrl() on it again |
+| vendor_offers non-cascade | Must DELETE vendor_offers before DELETE catalog_products |
+| Harley category slugs | Map to multiple DB categories via `dbCategories[]` in config.ts |
 
 ---
 
-*Updated: April 17, 2026 — end of session*
+*Updated: April 18, 2026 — end of session*
