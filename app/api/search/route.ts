@@ -83,8 +83,8 @@ function normalizeGroupDoc(doc: any) {
     stockQty:     doc.stock_total  ?? 0,
 
     // Image
-    image:  doc.primary_image ?? null,
-    images: doc.images ?? [],
+    image:  proxyImageUrl(doc.image_url ?? doc.primary_image) ?? null,
+    images: proxyImageUrls(doc.image_urls ?? doc.images ?? []),
 
     // Brand options (multi-member groups)
     availableBrands: doc.available_brands ?? [],
@@ -146,8 +146,8 @@ function normalizeProductDoc(doc: any) {
     mapPrice:     doc.map_price  ?? null,
     inStock:      doc.in_stock   ?? false,
     stockQty:     doc.stock_quantity ?? 0,
-    image:  doc.primary_image ?? null,
-    images: doc.images ?? [],    badge:        doc.closeout   ? "sale" : null,
+    image:  proxyImageUrl(doc.image_url ?? doc.primary_image) ?? null,
+    images: proxyImageUrls(doc.image_urls ?? doc.images ?? []),    badge:        doc.closeout   ? "sale" : null,
     vendor:       doc.source_vendor ?? null,
     source_vendor: doc.source_vendor ?? null,
     features:          doc.features          ?? [],
