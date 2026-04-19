@@ -140,7 +140,7 @@ function normalizeProductDoc(doc: any) {
     name:         doc.name,
     brand:        doc.brand      ?? "",
     category:     doc.category   ?? "",
-    price:        doc.computed_price ?? doc.our_price ?? doc.price ?? doc.msrp ?? 0,
+    price:        parseFloat(doc.msrp ?? doc.computed_price ?? doc.our_price ?? doc.price ?? 0) || 0,
     was:          doc.msrp && doc.msrp > (doc.computed_price ?? doc.our_price ?? doc.price ?? 0)
                     ? doc.msrp : null,
     mapPrice:     doc.map_price  ?? null,

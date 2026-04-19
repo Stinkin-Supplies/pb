@@ -25,7 +25,7 @@ export const COLLECTION = process.env.TYPESENSE_COLLECTION || "products";
 export const DEFAULT_SEARCH_PARAMS = {
   query_by:         "name,brand,description,features,oem_part_number",
   // Base filter: only active products that are Drag Specialties OR in Oldbook/Fatbook
-  filter_by:        "is_active:true && (drag_part:true || in_oldbook:true || in_fatbook:true || in_harddrive:true || in_street:true)",
+  filter_by:        "is_active:true && (drag_part:true || in_oldbook:true || in_fatbook:true || in_harddrive:true)",
   facet_by:         [
     "brand",
     "category",
@@ -73,7 +73,7 @@ export function buildFilters(params: {
   // Base: active + scoped to Drag/Oldbook/Fatbook
   const filters: string[] = [
     "is_active:true",
-    "(drag_part:true || in_oldbook:true || in_fatbook:true || in_harddrive:true || in_street:true)",
+    "(drag_part:true || in_oldbook:true || in_fatbook:true || in_harddrive:true)",
   ];
 
   if (params.inStock)      filters.push("in_stock:true");
