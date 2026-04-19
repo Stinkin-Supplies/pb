@@ -32,8 +32,8 @@ export class ProgressBar {
     const message = customMessage || `${current.toLocaleString()} / ${this.total.toLocaleString()}`;
     
     // Clear line and write progress
-    process.stdout.clearLine(0);
-    process.stdout.cursorTo(0);
+    try { process.stdout.clearLine(0); } catch(e) {}
+    try { process.stdout.cursorTo(0); } catch(e) {}
     process.stdout.write(
       `${this.description}: [${bar}] ${percentage}% | ${message} | ${elapsedStr} elapsed | ETA: ${etaStr}`
     );
@@ -98,16 +98,16 @@ export class BatchProgressBar {
     const etaStr = this.formatTime(eta);
     const elapsedStr = this.formatTime(elapsed);
     
-    process.stdout.clearLine(0);
-    process.stdout.cursorTo(0);
+    try { process.stdout.clearLine(0); } catch(e) {}
+    try { process.stdout.cursorTo(0); } catch(e) {}
     process.stdout.write(
       `${this.description}: [${bar}] ${percentage}% | Batch ${batchNum}/${this.totalBatches} | ${processedItems.toLocaleString()}/${totalItems.toLocaleString()} items | ${elapsedStr} | ETA: ${etaStr}`
     );
   }
 
   finish() {
-    process.stdout.clearLine(0);
-    process.stdout.cursorTo(0);
+    try { process.stdout.clearLine(0); } catch(e) {}
+    try { process.stdout.cursorTo(0); } catch(e) {}
     const elapsed = Date.now() - this.startTime;
     const totalItems = this.totalBatches * this.itemsPerBatch;
     console.log(`${this.description}: ✅ Complete | ${totalItems.toLocaleString()} items | ${this.formatTime(elapsed)}`);
