@@ -104,6 +104,8 @@ const SCHEMA = {
     { name: 'is_universal',        type: 'bool',     facet: true },
 
     // Catalog flags
+    { name: 'in_street',    type: 'bool', facet: true },
+    { name: 'in_harddrive',      type: 'bool',     facet: true },
     { name: 'in_oldbook',        type: 'bool',     facet: true },
     { name: 'in_fatbook',        type: 'bool',     facet: true },
     { name: 'drag_part',         type: 'bool',     facet: true },
@@ -187,7 +189,8 @@ function transform(row) {
     is_harley_fitment:   row.is_harley_fitment || false,
     is_universal:        row.is_universal || false,
 
-    in_oldbook:       row.in_oldbook || false,
+    in_harddrive:     row.in_harddrive || false,
+      in_oldbook:       row.in_oldbook || false,
     in_fatbook:       row.in_fatbook || false,
     drag_part:        row.drag_part  || false,
     closeout:         row.closeout   || false,
