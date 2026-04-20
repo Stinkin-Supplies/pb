@@ -109,9 +109,10 @@ export default async function ProductDetailPage({ params }) {
     try {
       const { rows: urows } = await catalogDb.query(
         `SELECT
-          cu.id,
+          COALESCE(cp.id, cu.id)               AS id,
+          cp.id                                AS cp_id,
           cu.sku,
-          cu.internal_sku,
+          COALESCE(cp.internal_sku, cu.internal_sku) AS internal_sku,
           cu.slug,
           cu.name,
           COALESCE(cu.display_brand, cu.brand) AS brand,
@@ -161,6 +162,7 @@ export default async function ProductDetailPage({ params }) {
           cu.length_in,
           cu.width_in
         FROM public.catalog_unified cu
+        LEFT JOIN public.catalog_products cp ON cp.sku = cu.sku
         WHERE cu.slug = $1
           AND cu.is_active = true
           AND (cu.drag_part = true OR cu.in_fatbook = true OR cu.in_oldbook = true OR cu.in_harddrive = true)
