@@ -1,95 +1,39 @@
 # Stinkin' Supplies — Session Handoff
-**Date:** April 19, 2026 (Updated Evening)
-**Status:** ✅ Shop working, prices showing, correct products — PU data quality issues remain
+**Date:** April 20, 2026
+**Status:** ✅ PU catalog enriched | ✅ Orphans deleted | ✅ Fitment expanded | ✅ Reindexed 51,141 docs
 
 ---
 
 ## ✅ WHAT'S WORKING NOW
 
-- **Shop** — 33,751 correct products (Drag/Oldbook/Fatbook/HardDrive), no metric/snow/ATV
-- **Search** — Typesense live, filters working, 91,531 docs indexed
-- **Prices** — WPS pricing imported from `2026-04-17.json` (123K records), showing correctly
-- **Images** — WPS images loading from CDN, LeMans zip extraction via `/api/img`
-- **Product Detail** — prices, MAP, stock, cart, points all working
-- **Sidebar filters** — categories, brands, price range, Shop by Type toggles
-- **Production** — https://stinksupp.vercel.app live and working
+- **Shop** — 51,141 products (27,132 WPS + 24,009 PU), all flagged and legitimate
+- **Search** — Typesense live, 51,141 docs, 0 errors
+- **PU enrichment** — features, dimensions, images, OEM numbers, catalog page refs all backfilled
+- **Fitment** — catalog_fitment expanded to 26,008 rows across all HD model families
+- **OEM numbers** — catalog_unified.oem_numbers[] populated, GIN indexed, searchable in Typesense
+- **Catalog page refs** — all 24,009 PU products have fatbook/oldbook page_reference strings
+- **Production** — https://stinksupp.vercel.app
 
 ---
 
 ## 🚨 CURRENT ISSUES
 
-### Issue 1: PU Products Missing Prices
-PU products show $0.00 — their pricing is in `pu_products_filtered` (`dealer_price`, `jobber_price`, `retail_price`) but not being used in `catalog_unified`.
+### Issue 1: import_pu_brand_xml.js has dead OEM backfill step
+Step 4 of the script tries to UPDATE `cu.oem_part_number` which doesn't exist on catalog_unified.
+OEM is correctly handled via `catalog_oem_crossref` → `oem_numbers[]` instead.
+**Fix:** Remove the `cuOEM` query block from `import_pu_brand_xml.js` step 4, or just ignore
+the error — it doesn't affect any data since OEM was populated separately.
 
-**Fix:**
-```sql
-UPDATE catalog_unified cu
-SET 
-  msrp = p.retail_price::numeric,
-  cost = p.dealer_price::numeric
-FROM pu_products_filtered p
-WHERE (cu.sku = p.sku OR cu.sku = p.sku_punctuated)
-  AND cu.source_vendor = 'PU'
-  AND p.retail_price IS NOT NULL
-  AND p.retail_price != ''
-  AND p.retail_price != '0';
-```
-Then reindex: `TYPESENSE_API_KEY=xyz node scripts/ingest/index_unified.js --recreate`
+### Issue 2: Image rendering on live site still unconfirmed
+API returns correct `/api/img?u=...` URLs but browser-side rendering not verified.
+Check DevTools Network tab on `/shop` for PU products.
 
-**Verify price columns exist:**
-```sql
-SELECT column_name FROM information_schema.columns 
-WHERE table_name = 'pu_products_filtered' 
-AND column_name IN ('dealer_price','jobber_price','retail_price','msrp');
-```
+### Issue 3: catalog_unified.oem_numbers only covers 3,898 products
+Only products with entries in catalog_oem_crossref get OEM numbers.
+WPS FatBook PDF OEM extraction still pending (low priority).
 
-### Issue 2: PU Products Missing Categories
-42K PU products have NULL category — only WPS products have categories.
-This means PU products don't show up in category filters.
-
-**Fix options (pick one):**
-1. Map `product_code` → category label:
-   - E (Drag Specialties) → "Drag Specialties"
-   - A (Street) → "Street/Motorcycle"  
-   - C (Common) → "Common Parts"
-2. Use brand → category mapping from brand XML enrichment
-3. Use Claude API to auto-categorize from product names (best quality)
-
-**Quick SQL fix:**
-```sql
-UPDATE catalog_unified SET category = 'Drag Specialties' 
-WHERE source_vendor = 'PU' AND product_code = 'E' AND category IS NULL;
-
-UPDATE catalog_unified SET category = 'Street/Motorcycle'
-WHERE source_vendor = 'PU' AND product_code = 'A' AND category IS NULL;
-
-UPDATE catalog_unified SET category = 'Common Parts'
-WHERE source_vendor = 'PU' AND product_code = 'C' AND category IS NULL;
-```
-
-### Issue 3: PU Product Images Not Showing on PDP
-Product detail page shows broken image icon for PU products.
-The `image_url` in `catalog_unified` for PU products is a LeMans zip URL.
-`proxyImageUrl()` in `lib/utils/image-proxy.ts` handles this correctly → routes to `/api/img?u=`.
-But the PDP (`app/shop/[slug]/page.jsx`) may not be calling `proxyImageUrl()`.
-
-**Check:** `app/shop/[slug]/page.jsx` → `normalizeProduct()` function → image handling.
-Should use: `proxyImageUrl(row.image_url ?? row.image_urls?.[0]) ?? null`
-
-### Issue 4: Brand Name Duplicates in Sidebar
-Same brand appears twice with different casing (e.g. "COLONY" and "Colony", "S&S CYCLE" and "S&S Cycle").
-This is because WPS uses UPPERCASE and PU uses Title Case.
-
-**Fix in catalog_unified:**
-```sql
-UPDATE catalog_unified SET brand = UPPER(brand);
-```
-Then reindex.
-
-### Issue 5: PDP Image Broken
-Product detail page shows broken image for many products.
-The PDP queries `catalog_unified` but image handling may not proxy correctly.
-Check `app/shop/[slug]/page.jsx` `normalizeProduct()` function.
+### Issue 4: 9 PU products with NULL computed_price
+Genuinely unpriceable — no pricing data anywhere. Low priority.
 
 ---
 
@@ -98,10 +42,10 @@ Check `app/shop/[slug]/page.jsx` `normalizeProduct()` function.
 ### Servers
 ```
 Hetzner:    5.161.100.126
-SSH:        ssh stinkdb  (user: deploy, password: smelly)
+SSH:        ssh stinkdb
 PostgreSQL: :5432  stinkin_catalog  (user: catalog_app, password: smelly)
-Typesense:  Docker container "typesense" (typesense/typesense:30.1, API key: xyz)
-nginx:      :443  HTTPS → Typesense  (5.161.100.126.nip.io, Let's Encrypt auto-renew)
+Typesense:  Docker "typesense" (typesense/typesense:30.1, API key: xyz)
+nginx:      :443 HTTPS → Typesense (5.161.100.126.nip.io)
 ```
 
 ### Vercel
@@ -111,192 +55,122 @@ URL:      https://stinksupp.vercel.app
 Deploy:   npx vercel --prod
 ```
 
-### Key Env Vars
+---
+
+## 📊 DATABASE STATE (End of April 20)
+
+### catalog_unified
 ```
-TYPESENSE_HOST=5.161.100.126.nip.io
-TYPESENSE_PORT=443
-TYPESENSE_PROTOCOL=https
-TYPESENSE_API_KEY=xyz
-TYPESENSE_SEARCH_KEY=xyz
-TYPESENSE_COLLECTION=products
-CATALOG_DATABASE_URL=postgresql://catalog_app:smelly@5.161.100.126:5432/stinkin_catalog
+Total:       51,141 rows
+WPS:         27,132 (9,742 HardDrive + 17,390 tires/tools)
+PU:          24,009 (11,225 fatbook | 3,607 oldbook | 9,177 both)
+```
+
+### PU Enrichment Coverage
+```
+features backfilled:       17,434 products
+dimensions (H/W/L):        12,102 products
+weight:                    24,007 products
+images in catalog_media:   23,827 new URLs inserted
+UPC:                        4,389 products
+country_of_origin:         12,102 products
+catalog page references:   24,009 products (all PU)
+oem_numbers[]:              3,898 products (crossref populated)
+```
+
+### catalog_fitment
+```
+Total rows:    26,008
+New this session: 8,536 (from pu_fitment → catalog_fitment)
+
+By model:
+  Touring      8,146
+  Softail      3,993
+  All Models   3,633
+  Dyna         2,633
+  Sportster    2,573
+  Big Twin     1,033
+  FXR            522
+  M8             446
+  Trike          395
+  Twin Cam       285
+  Evolution      237
+  V-Rod          213
+  + others
+```
+
+### catalog_oem_crossref
+```
+Total rows: ~97,422 (93,548 WPS + 3,874 PU inserted this session)
 ```
 
 ---
 
-## 📊 DATABASE STATE
+## 📂 NEW SCRIPTS (April 20)
 
-### Table Counts
-```
-catalog_products          96,522  — WPS original (do not modify)
-pu_products_filtered      81,431  — PU filtered to A/E/C codes only
-pu_brand_enrichment       90,539  — Brand XML enrichment (123 brands)
-pu_fitment                30,615  — Fitment parsed from product names
-catalog_unified          138,872  — THE SOURCE OF TRUTH
-catalog_media             38,512  — WPS product images
-```
+All in `scripts/ingest/`:
 
-### catalog_unified Flag Counts (current)
-```sql
-SELECT
-  COUNT(*) FILTER (WHERE drag_part)    AS drag,      -- 24,009
-  COUNT(*) FILTER (WHERE in_oldbook)   AS oldbook,   -- 12,784
-  COUNT(*) FILTER (WHERE in_fatbook)   AS fatbook,   -- 20,402
-  COUNT(*) FILTER (WHERE in_harddrive) AS harddrive  --  9,742
-FROM catalog_unified;
--- Total shop SKUs (union): 33,751
-```
+| Script | Purpose |
+|--------|---------|
+| `import_pu_brand_xml.js` | Parse all XML files in scripts/data/pu_pricefile/ → pu_brand_enrichment + catalog_media + catalog_unified backfill. Handles PIES and Catalog Content formats. |
+| `backfill_pu_dimensions.js` | Copy merch dims + weight from pu_brand_enrichment → catalog_unified. Also backfills UPC + country_of_origin from pu_products_filtered. |
+| `backfill_pu_fitment_structured.js` | Promote pu_fitment rows → catalog_fitment (one row per family/year span). |
+| `backfill_pu_catalog_refs.js` | Build fatbook/oldbook page_reference strings in catalog_unified. |
+| `run_pu_enrichment.js` | Master runner for all 4 scripts in order. |
 
-### What Shows in the Shop
-Filter: `is_active:true && (drag_part:true || in_oldbook:true || in_fatbook:true || in_harddrive:true)`
-- WPS HardDrive catalog: 9,742 H-D specific parts
-- PU Drag Specialties: 24,009 Drag parts
-- PU Oldbook (H-D catalog): 12,784 H-D parts
-- PU Fatbook (metric street): 20,402 street parts
-
-### catalog_unified Key Columns
-```
-id, sku, slug, source_vendor (WPS/PU), product_code (A/E/C for PU)
-name, brand, category (NULL for most PU products ← ISSUE)
-msrp (WPS: from 2026-04-17.json, PU: needs fix), cost
-image_url, image_urls[]
-in_stock, stock_quantity
-warehouse_wi, warehouse_ny, warehouse_tx, warehouse_nv, warehouse_nc
-drag_part, in_oldbook, in_fatbook, in_harddrive
-is_harley_fitment, fitment_hd_families[], fitment_year_start/end
-features[], description, oem_part_number
-sort_priority, slug, is_active, is_discontinued
-```
-
----
-
-## 📂 SCRIPTS
-
-All in `~/Desktop/Stinkin-Supplies/scripts/ingest/`
-
-| Script | Status | Purpose |
-|--------|--------|---------|
-| `index_unified.js` | ✅ | Indexes catalog_unified → Typesense (run after ANY data change) |
-| `update_wps_pricing.js` | ✅ | Updates WPS msrp/cost from JSON pricing file |
-| `update_wps_catalog_flags.js` | ✅ | Sets in_harddrive/in_street from wps-master-product.csv |
-| `merge_vendors.js` | ⚠️ | Merges WPS+PU → catalog_unified (SKU join bug for flags, use SQL patch instead) |
-| `import_pu_brand_catalogs_WORKING.js` | ✅ | Imports PU brand XML files |
-| `import_pu_filtered.js` | ✅ | Imports PU price file (A/E/C codes only) |
-| `parse_fitment.js` | ✅ | Parses fitment from product names |
-| `download_pu_pricefile.js` | ✅ | Downloads fresh PU price file |
-| `progress_bar.js` | ✅ | ProgressBar utility (clearLine wrapped in try/catch) |
-
-### Data Files: `scripts/data/`
-```
-wps-master-product.csv     — WPS product catalog with catalog flags
-2026-04-17.json            — WPS dealer pricing (123K records)
-pu_pricefile/              — PU XML brand catalogs + price files
-```
-
----
-
-## 🌐 FRONTEND
-
-### Key Files
-| File | Status | Notes |
-|------|--------|-------|
-| `app/api/search/route.ts` | ✅ | Typesense search, normalizes docs, IS_GROUPS_COLLECTION=false |
-| `app/api/img/route.ts` | ✅ | LeMans zip extraction, disk cache, adm-zip |
-| `app/api/image-proxy/route.ts` | ✅ | WPS CDN redirect, fflate fallback |
-| `lib/typesense/client.ts` | ✅ | Base filter includes all 4 catalog flags |
-| `lib/utils/image-proxy.ts` | ✅ | proxyImageUrl() routes LeMans → /api/img, WPS → CDN |
-| `app/shop/ShopClient.jsx` | ✅ | Shop by Type toggles (Harley/Drag/H-D Catalog) |
-| `app/shop/page.jsx` | ✅ | SSR via /api/search |
-| `app/shop/[slug]/page.jsx` | ⚠️ | Queries catalog_unified, image proxy may need fix |
-
-### Image Architecture
-```
-LeMans (PU):  catalog_unified.image_url = "http://asset.lemansnet.com/z/..."
-              → proxyImageUrl() → /api/img?u={url} → adm-zip extract → serve PNG
-
-WPS:          catalog_unified.image_url = "https://cdn.wpsstatic.com/..."
-              → proxyImageUrl() → /api/image-proxy?url={url} → 302 redirect to CDN
-              OR directly from catalog_media table
-```
-
-### IS_GROUPS_COLLECTION Note
-`lib/typesense/client.ts` has `export const IS_GROUPS_COLLECTION = false;` appended at bottom.
-This is needed because `app/api/search/route.ts` imports it.
-The file was originally written for a `product_groups` collection that was never used.
-Do NOT remove this line.
-
----
-
-## 📖 PU DATA REFERENCE
-
-### Product Codes
-| Code | Type | Count |
-|------|------|-------|
-| A | Street/Motorcycle | 38,400 |
-| E | Drag Specialties | 39,255 |
-| C | Common Parts | 7,821 |
-
-### PU API Credentials
-```
-Dealer:   D00108
-Username: website
-Password: Smelly26
-```
-
-### pu_products_filtered Key Columns
-```
-sku, sku_punctuated, product_code, brand, name, description
-dealer_price, jobber_price, retail_price  ← pricing source for PU
-drag_part (bool), oldbook_year_page, fatbook_year_page
-features[], fitment data
-```
-
----
-
-## 🔧 QUICK COMMANDS
-
+### Re-run enrichment (e.g. after new XML files downloaded):
 ```bash
-# Check Typesense health
-curl https://5.161.100.126.nip.io/health
-
-# Restart Typesense if down
-ssh stinkdb "sudo docker restart typesense && sleep 30 && curl http://localhost:8108/health"
-
-# DB shell
-psql "postgresql://catalog_app:smelly@5.161.100.126:5432/stinkin_catalog"
-
-# Full reindex (run after ANY data changes to catalog_unified)
-cd ~/Desktop/Stinkin-Supplies
+npx dotenv -e .env.local -- node scripts/ingest/run_pu_enrichment.js
+# Then reindex:
 TYPESENSE_API_KEY=xyz node scripts/ingest/index_unified.js --recreate
+```
 
-# Deploy
-npx vercel --prod
-
-# Check shop counts
+### Re-run OEM aggregation (after new brand XML or crossref data):
+```bash
+# Insert PU OEM numbers into crossref
 psql "postgresql://catalog_app:smelly@5.161.100.126:5432/stinkin_catalog" -c "
-SELECT COUNT(*) FILTER (WHERE drag_part) AS drag,
-       COUNT(*) FILTER (WHERE in_oldbook) AS oldbook,
-       COUNT(*) FILTER (WHERE in_fatbook) AS fatbook,
-       COUNT(*) FILTER (WHERE in_harddrive) AS harddrive
-FROM catalog_unified;"
+CREATE TEMP TABLE pu_oem_staging AS
+SELECT cu.sku, pbe.oem_part_number, pbe.brand
+FROM pu_brand_enrichment pbe
+JOIN catalog_unified cu ON cu.sku = pbe.sku
+WHERE pbe.oem_part_number IS NOT NULL AND pbe.oem_part_number != ''
+  AND cu.source_vendor = 'PU';
+INSERT INTO catalog_oem_crossref (sku, oem_number, oem_manufacturer, source_file)
+SELECT sku, oem_part_number, brand, 'pu_brand_enrichment'
+FROM pu_oem_staging
+ON CONFLICT (sku, oem_number, oem_manufacturer) DO NOTHING;
+"
 
-# Test search API
-curl -s "https://stinksupp.vercel.app/api/search?q=softail&per_page=3" | python3 -m json.tool | grep -E '"found"|"name"'
+# Re-aggregate into catalog_unified.oem_numbers[]
+psql "postgresql://catalog_app:smelly@5.161.100.126:5432/stinkin_catalog" -c "
+UPDATE catalog_unified cu
+SET oem_numbers = sub.nums
+FROM (
+  SELECT sku, array_agg(DISTINCT oem_number) AS nums
+  FROM catalog_oem_crossref GROUP BY sku
+) sub
+WHERE cu.sku = sub.sku;
+"
 ```
 
 ---
 
 ## 🗺️ NEXT SESSION PRIORITIES
 
-1. **Fix PU prices** — SQL UPDATE from pu_products_filtered.retail_price → catalog_unified.msrp
-2. **Fix PU categories** — SQL UPDATE based on product_code (E→Drag Specialties, A→Street, C→Common)
-3. **Fix brand name casing** — UPPER(brand) across all unified products, then reindex
-4. **Fix PDP images** — check normalizeProduct() in app/shop/[slug]/page.jsx
-5. **WPS tire catalog** — add `tire_catalog` flag from wps-master-product.csv (noted for future)
+1. **Verify PU product images rendering on live site** — check DevTools on /shop for PU products
+2. **Fix import_pu_brand_xml.js** — remove dead `cuOEM` UPDATE block (cu.oem_part_number doesn't exist)
+3. **Deploy to Vercel** — `npx vercel --prod` to push enriched data to production
+4. **PDP display** — surface features[], dimensions, page_reference, oem_numbers[] on product detail page
+5. **WPS FatBook PDF OEM extraction** — low priority, expands oem_numbers coverage
 
 ---
 
-## 💡 FUTURE FEATURES NOTED
-- WPS Tire catalog flag (`tire_catalog` in wps-master-product.csv) — add as separate shop section
-- Real domain instead of 5.161.100.126.nip.io for Typesense
-- WPS enrichment (currently 0.7% complete — run enrich_wps_batch.js in background)
+## 💡 OPERATIONAL GOTCHAS (April 20 additions)
+
+| Issue | Solution |
+|-------|----------|
+| REPLACE() join on large tables | Always hangs — use temp table + direct SKU join instead |
+| import_pu_brand_xml.js is slow | 27min for 38K rows — use --brand=EBC to filter to one brand |
+| catalog_unified has no oem_part_number column | Use oem_numbers[] (array) instead — populated from catalog_oem_crossref |
+| PU XML files have no ProductAttribute blocks | No structured specs (Type/Material/etc) available from PU data exports |
+| catalog_unified.oem_numbers[] | GIN indexed — query with @> operator: WHERE oem_numbers @> ARRAY['4185408'] |
