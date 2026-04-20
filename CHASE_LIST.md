@@ -1,120 +1,109 @@
 # Stinkin' Supplies — Chase List
 **Running log of loose ends to follow up on**
-Last Updated: April 18, 2026 — end of session
+Last Updated: April 20, 2026 — end of session
 
 ---
 
 ## 🚀 NEXT SESSION — START HERE
 
-1. **Verify images are actually loading on live site** — API confirmed returning correct `/api/img?u=...` URLs but browser rendering needs confirmation. Check DevTools Network tab on `/shop`.
-2. **Rebuild `catalog_unified`** — still has pre-deletion data (~2,869 deleted products). Run:
-   ```sql
-   -- rebuild script (from original pipeline)
-   ```
-3. **Check `normalizeHarleyProductRow`** in `lib/harley/catalog.ts` — uses `image_url` from `catalog_unified`; may need to use `proxyImageUrl()` on it like the search route does
-4. **Confirm `catalog_unified.computed_price` column exists** — Harley products route uses it for ORDER BY
+1. **Verify PU images rendering on live site** — check DevTools Network tab on `/shop` for PU products. Look for `/api/img?u=` requests and confirm 200 responses.
+2. **Deploy to Vercel** — enrichment data is in DB and Typesense but Vercel may not have been redeployed: `npx vercel --prod`
+3. **Fix import_pu_brand_xml.js** — remove dead `cuOEM` UPDATE block (step 4) that tries to set `cu.oem_part_number` which doesn't exist. Low priority since it only errors on re-runs.
+4. **Surface enriched data on PDP** — features[], dimensions (H/W/L/weight), page_reference, oem_numbers[] not yet displayed on product detail page.
 
 ---
 
-## ✅ DONE APRIL 18
+## ✅ DONE APRIL 20
+
+| Task | Result |
+|------|--------|
+| Deleted 40,390 orphan PU products from catalog_unified | All-false-flag products gone |
+| Wrote + ran import_pu_brand_xml.js | 38,522 products enriched from 134 XML files |
+| PU features backfilled | 17,434 products |
+| PU dimensions (H/W/L) backfilled | 12,102 products |
+| PU weight backfilled | 24,007 products |
+| PU images inserted into catalog_media | 23,827 new URLs |
+| PU UPC backfilled | 4,389 products |
+| PU country_of_origin backfilled | 12,102 products |
+| Wrote + ran backfill_pu_fitment_structured.js | 8,536 new fitment rows, 26,008 total |
+| Wrote + ran backfill_pu_catalog_refs.js | 24,009 products with page_reference |
+| PU OEM numbers → catalog_oem_crossref | 3,874 rows inserted |
+| oem_numbers[] aggregated into catalog_unified | 3,898 products |
+| Reindexed Typesense | 51,141 docs, 0 errors |
+
+---
+
+## ✅ DONE APRIL 19
 
 | Task | Result |
 |------|--------|
 | Rebuilt ShopClient filter sidebar | 4 sections: Fitment, Category, Brand, Price Range |
-| Fixed `setFiltersState` → `setFilters` bug | Filter clicks now work |
-| Removed duplicate filter sections (Availability ×2, Fitment ×2) | Clean sidebar |
-| Fixed $0.00 prices | `computed_price` field in Typesense |
-| Fixed image double-proxy | `primary_image` field used directly |
-| Deleted Apparel / Helmets / Jackets / Footwear / Pants / Tracks | ~2,869 products gone |
+| Fixed $0.00 prices | computed_price field in Typesense |
+| Fixed image double-proxy | primary_image field used directly |
+| Deleted Apparel / Helmets / metric products | ~2,869 products gone |
 | Reindexed Typesense | 91,531 indexed, 0 failed |
-| Deleted stale `app/route.ts` | Build error fixed |
-| Fixed Harley shop zero results | `dbCategories` mapping in config.ts |
-| Fixed Harley shop pricing | `computed_price` instead of `msrp` |
-| Fixed Harley shop sort | in_stock DESC, stock_quantity DESC |
-| Added `computed_price` price filter in buildFilters | Was using `msrp` |
-
----
-
-## ✅ DONE APRIL 17
-
-| Task | Result |
-|------|--------|
-| Reindexed Typesense (start of session) | 94,400 indexed, 0 failed |
-| OEM crossref expansion | 19 → **93,548 rows** |
-| catalog_images migration | 21,075 rows → catalog_media, table dropped |
-| catalog_media | 38K → **58,544 rows** |
-| Products with images | 31,130 → **44,508** |
-| nginx client_max_body_size | 1MB → 20MB |
-| catalog_product_enrichment orphan cleanup | 172,656 → **77,023 rows** |
-| Fitment extraction pipeline | **18,653 rows / 7,256 products** |
-| LeMans image proxy built | `/api/img` route working |
-| Description backfill | 80,273 / 98,353 (82%) |
-| internal_sku generated for all products | 0 NULL remaining |
+| Fixed Harley shop zero results | dbCategories mapping in config.ts |
+| Fixed Harley shop pricing | computed_price instead of msrp |
 
 ---
 
 ## 🔴 HIGH PRIORITY
 
-### catalog_unified rebuild needed
-- ~2,869 deleted products still in catalog_unified
-- Harley shop queries catalog_unified directly — may return deleted products
-- Need to rebuild or at minimum: `DELETE FROM catalog_unified WHERE sku NOT IN (SELECT sku FROM catalog_products WHERE is_active = true)`
+### PDP enrichment display
+Features, dimensions, page_reference, oem_numbers[] are now in the DB but not shown on PDP.
+`app/shop/[slug]/page.jsx` queries `catalog_unified` — all columns are available, just need UI.
 
-### Image rendering on live site
-- API confirmed returning `/api/img?u=...` URLs correctly
-- Browser-side rendering still unconfirmed — need screenshot of live `/shop`
-- If still broken: check Next.js `next.config.js` for allowed image domains
-
-### 9 PU products with NULL computed_price
-```sql
-SELECT sku, brand, name, msrp, cost, map_price
-FROM catalog_products
-WHERE computed_price IS NULL AND is_active = true;
-```
+### Image rendering on live site (unconfirmed)
+API returns correct `/api/img?u=...` URLs. Browser-side rendering not verified.
+If broken: check `next.config.js` for allowed image domains.
 
 ---
 
 ## 🔵 LOW PRIORITY / FUTURE
 
-### Tire catalog images
-- `tire_master_image.xlsx` not yet processed
-- Same Python HYPERLINK extraction as HardDrive catalog
-
 ### WPS FatBook PDF OEM extraction
-- WPS side of catalog_oem_crossref still sparse
+WPS side of catalog_oem_crossref still sparse — only 3,898 total products have OEM numbers.
+Would significantly expand fitment/OEM search coverage.
 
-### catalog_fitment sparse (7.7% coverage)
-- Pre-existing rows have messy model name variants (FXRT Sport Glide, TLE SIDECAR, etc.)
-- Low urgency — main families clean
+### Tire catalog images
+`tire_master_image.xlsx` not yet processed.
 
-### IMG_CACHE_DIR persistence
-- Set `IMG_CACHE_DIR=/var/cache/stinkin-images` in `.env.local` on Hetzner
-- Makes proxy cache persist across server restarts
+### catalog_fitment sparse for non-HD models
+"All Models" catch-all used for some PU products — real model data may be in pu_fitment.hd_models[].
+Could expand to per-model rows for better fitment filtering.
+
+### import_pu_brand_xml.js performance
+27 minutes per run (one query per row for pu_brand_enrichment upsert).
+Could batch into multi-row upserts like the catalog_specs/catalog_media steps.
+Use `--brand=EBC` flag to limit to one brand for testing.
 
 ### computed_price facetable in Typesense
-- Currently `facet: false` — can't show price range hint
-- To fix: update Typesense collection schema, reindex
-- Low priority — price filter inputs work without it
+Currently `facet: false` — price range hint doesn't populate.
+Low priority — price filter inputs work without it.
+
+### IMG_CACHE_DIR persistence
+Set `IMG_CACHE_DIR=/var/cache/stinkin-images` in `.env.local` on Hetzner.
 
 ---
 
-## 📊 CURRENT STATE (End of April 18)
+## 📊 CURRENT STATE (End of April 20)
 
 | Metric | Value |
 |--------|-------|
-| catalog_products | ~95,484 |
-| WPS in catalog | 27,219 (100% priced) |
-| PU in catalog | ~68,265 (99.99% priced) |
-| catalog_unified | 94,400 (stale — needs rebuild) |
-| Typesense indexed | **91,531** |
-| Products with images | ~44,508 |
-| catalog_media | 58,544 rows |
-| catalog_oem_crossref | 93,548 rows |
-| catalog_fitment | 18,653 rows / 7,256 products |
+| catalog_unified | 51,141 rows (clean) |
+| — WPS | 27,132 (9,742 HardDrive + 17,390 tires/tools) |
+| — PU | 24,009 (fatbook/oldbook/both, all drag_part=true) |
+| Typesense indexed | 51,141 (0 errors) |
+| catalog_fitment | 26,008 rows |
+| catalog_oem_crossref | ~97,422 rows |
+| catalog_unified.oem_numbers[] | 3,898 products |
+| PU products with features | 17,434 |
+| PU products with dimensions | 12,102 |
+| PU products with images | 23,827 new in catalog_media |
+| PU catalog page refs | 24,009 (100%) |
 | Search | ✅ Working |
 | Prices | ✅ Fixed |
-| Filter sidebar | ✅ Rebuilt |
-| Harley shop categories | ✅ Fixed |
+| Filter sidebar | ✅ Working |
 
 ---
 
@@ -123,6 +112,7 @@ WHERE computed_price IS NULL AND is_active = true;
 | Issue | Solution |
 |-------|----------|
 | `NOT IN (large subquery)` hangs | Use `NOT EXISTS` or temp table |
+| REPLACE() join on large tables | Always hangs — use temp table + direct SKU join |
 | `DISABLE TRIGGER ALL` denied | catalog_app not superuser |
 | Next.js holds read locks | Stop dev server before bulk DDL/DML |
 | vendor_code casing | Always lowercase: 'wps'/'pu' |
@@ -130,15 +120,15 @@ WHERE computed_price IS NULL AND is_active = true;
 | pu_products.map_price | VARCHAR 'Y'/'N' flag — not a price |
 | PU SKU format | Punctuated in catalog (1401-1193), plain in pu_pricing (14011193) |
 | Typesense on hotspot | Fails — needs stable WiFi |
-| Typesense batch size | 1000 docs/batch safe (nginx 20MB limit) |
 | catalog_unified not a view | Regular table — TRUNCATE + INSERT to rebuild |
 | catalog_fitment unique index | NULLS NOT DISTINCT — safe to re-run extract_fitment.js |
 | FXR ≠ Dyna | FXR = rubber-mount 1982-1994, Dyna = FXD 1991-2017 |
-| M8 = Milwaukee-Eight | 2017+ Touring, 2018+ Softail, 2021+ Sportster S |
-| Typesense `primary_image` field | Already proxied — do NOT run proxyImageUrl() on it again |
+| Typesense primary_image field | Already proxied — do NOT run proxyImageUrl() on it again |
 | vendor_offers non-cascade | Must DELETE vendor_offers before DELETE catalog_products |
-| Harley category slugs | Map to multiple DB categories via `dbCategories[]` in config.ts |
+| catalog_unified.oem_numbers[] | GIN indexed — query: WHERE oem_numbers @> ARRAY['4185408'] |
+| import_pu_brand_xml.js | 27min full run — use --brand=BRANDNAME to limit scope |
+| PU XML has no ProductAttribute | No structured specs (Type/Material) in PU data exports |
 
 ---
 
-*Updated: April 18, 2026 — end of session*
+*Updated: April 20, 2026 — end of session*
