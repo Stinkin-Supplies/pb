@@ -1138,30 +1138,22 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
             </section>
           )}
 
-          {(product.pageReference || product.oemNumbers?.length > 0) && (
+          {product.oemNumbers?.length > 0 && (
             <section className="enriched-section">
-              <h2 className="enriched-heading">Catalog / OEM Info</h2>
+              <h2 className="enriched-heading">OEM Information</h2>
               <dl className="enriched-grid">
-                {product.pageReference && (
-                  <>
-                    <dt className="enriched-term">Catalog Page</dt>
-                    <dd className="enriched-value">{product.pageReference}</dd>
-                  </>
-                )}
-                {product.oemNumbers?.length > 0 && (
-                  <>
-                    <dt className="enriched-term">OEM Numbers</dt>
-                    <dd className="enriched-value">
-                      <div className="enriched-chips">
-                        {product.oemNumbers.map((n, i) => (
-                          <span key={i} className="enriched-chip">
-                            {n}
-                          </span>
-                        ))}
-                      </div>
-                    </dd>
-                  </>
-                )}
+                <>
+                  <dt className="enriched-term">OEM Numbers</dt>
+                  <dd className="enriched-value">
+                    <div className="enriched-chips">
+                      {product.oemNumbers.map((n, i) => (
+                        <span key={i} className="enriched-chip">
+                          {n}
+                        </span>
+                      ))}
+                    </div>
+                  </dd>
+                </>
               </dl>
             </section>
           )}
