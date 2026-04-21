@@ -138,6 +138,13 @@
       "optional": true
     },
     {
+      "name": "specs_blob",
+      "type": "string",
+      "index": true,
+      "facet": false,
+      "optional": true
+    },
+    {
       "name": "images",
       "type": "string[]",
       "index": false,
@@ -149,6 +156,13 @@
       "type": "string",
       "index": false,
       "facet": false,
+      "optional": true
+    },
+    {
+      "name": "has_image",
+      "type": "bool",
+      "index": true,
+      "facet": true,
       "optional": true
     },
     {
