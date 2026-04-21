@@ -49,9 +49,9 @@ export function buildFilters(params: {
   groupSignal?:  string;
 }): string {
   // Base: active products only
-  const filters: string[] = [
-    "is_active:true",
-  ];
+  const filters: string[] = [];
+
+  if (params.inStock)      filters.push("in_stock:true");
 
   if (params.inStock)      filters.push("in_stock:true");
   if (params.hasImage)     filters.push("has_image:true");
