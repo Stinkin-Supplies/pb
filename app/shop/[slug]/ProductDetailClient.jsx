@@ -827,9 +827,9 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
                 {product.badge.toUpperCase()}
               </span>
             )}
-            {resolvedGallery.length > 0 && toProxySrc(resolvedGallery[activeImg] ?? resolvedGallery[0]) ? (
+            {resolvedGallery.length > 0 && (resolvedGallery[activeImg] ?? resolvedGallery[0]) ? (
               <Image
-                src={toProxySrc(resolvedGallery[activeImg] ?? resolvedGallery[0])}
+                src={resolvedGallery[activeImg] ?? resolvedGallery[0]}
                 alt={product.name}
                 fill
                 sizes="(max-width: 768px) 100vw, 70vw"
@@ -850,7 +850,7 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
                   onClick={() => setActiveImg(i)}
                 >
                   <Image
-                    src={toProxySrc(img)}
+                    src={img}
                     alt={`${product.name} view ${i + 1}`}
                     fill
                     sizes="72px"
