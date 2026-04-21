@@ -760,6 +760,11 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
     );
   }
 
+  const toProxySrc = (src) =>
+    typeof src === "string" && src.startsWith("http") && src.includes("lemansnet.com")
+      ? `/api/img?u=${encodeURIComponent(src)}`
+      : (src ?? null);
+
   function RelatedCardImage({ product }) {
     const src = toProxySrc(product.primaryImage ?? product.gallery?.[0] ?? "/images/placeholder.jpg");
     const isPlaceholder = src === "/placeholder-product.png" || src === "/images/placeholder.jpg";
