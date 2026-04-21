@@ -832,7 +832,7 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
               alt={product.name}
               fill
               sizes="(max-width: 768px) 100vw, 70vw"
-              style={{ objectFit:"contain", position:"relative", zIndex:1 }}
+              style={{ objectFit:"contain", zIndex:1 }}
             />
           </div>
 
