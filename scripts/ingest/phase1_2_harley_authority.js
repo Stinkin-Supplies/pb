@@ -362,14 +362,10 @@ async function main() {
       const m = allModels[i];
       await client.query(`
         INSERT INTO harley_model_years (model_id, year)
-        SELECT $1, y
-        FROM GENERATE_SERIES($2, $3) y
+        SELECT $1::int, y
+        FROM GENERATE_SERIES($2::int, $3::int) y
         ON CONFLICT (model_id, year) DO NOTHING
       `, [m.id, m.start_year, m.end_year]);
-      yearCount += (m.end_year - m.start_year + 1);
-      progress('Phase2-Years', i + 1, allModels.length, t, ` ~${yearCount} year rows`);
-    }
-    done('Phase2-Years', `~${yearCount} model-year rows exploded`);
 
     // ── Summary ──
     const { rows: [summary] } = await client.query(`

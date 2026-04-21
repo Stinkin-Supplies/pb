@@ -168,7 +168,55 @@ export async function GET(req: Request) {
     values.push(`%${search}%`);
     paramIdx++;
   }
-  if (fitmentMake) {
+  if (fitmentMake && fitmentMake.toLowerCase() === 'harley-davidson') {
+    // Phase 7 — use canonical catalog_fitment_v2 (ID-based, no range ambiguity)
+    if (fitmentYear && fitmentModel) {
+      // Exact: specific model + year
+      conditions.push(`
+        EXISTS (
+          SELECT 1 FROM catalog_fitment_v2 cfv
+          JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id
+          JOIN harley_models hm ON hm.id = hmy.model_id
+          WHERE cfv.product_id = cp.id
+            AND hm.model_code = $${paramIdx++}
+            AND hmy.year = $${paramIdx++}
+        )
+      `);
+      values.push(fitmentModel, fitmentYear);
+    } else if (fitmentModel) {
+      // Model only
+      conditions.push(`
+        EXISTS (
+          SELECT 1 FROM catalog_fitment_v2 cfv
+          JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id
+          JOIN harley_models hm ON hm.id = hmy.model_id
+          WHERE cfv.product_id = cp.id
+            AND hm.model_code = $${paramIdx++}
+        )
+      `);
+      values.push(fitmentModel);
+    } else if (fitmentYear) {
+      // Year only
+      conditions.push(`
+        EXISTS (
+          SELECT 1 FROM catalog_fitment_v2 cfv
+          JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id
+          WHERE cfv.product_id = cp.id
+            AND hmy.year = $${paramIdx++}
+        )
+      `);
+      values.push(fitmentYear);
+    } else {
+      // Make only — any Harley fitment
+      conditions.push(`
+        EXISTS (
+          SELECT 1 FROM catalog_fitment_v2 cfv
+          WHERE cfv.product_id = cp.id
+        )
+      `);
+    }
+  } else if (fitmentMake) {
+    // Non-Harley makes — keep old catalog_fitment path
     const makeIdx = paramIdx++;
     values.push(fitmentMake);
     let fitmentClauses = `AND LOWER(cf.make) = LOWER($${makeIdx})`;
@@ -185,7 +233,7 @@ export async function GET(req: Request) {
       `EXISTS (SELECT 1 FROM public.catalog_fitment cf WHERE cf.product_id = cp.id ${fitmentClauses})`
     );
   }
-
+  
   const where = conditions.join(" AND ");
   const orderMap: Record<string, string> = {
     newest: "cp.created_at DESC",
