@@ -66,6 +66,8 @@ async function loadOEMCrossrefs() {
  * Build a single Typesense document from database rows
  */
 function buildDocument(product, specs, media, fitment, offers, oem_refs) {
+  const uniq = (values) => [...new Set(values.filter(Boolean))];
+
   // Extract vendor codes - vendor_code is the vendor identifier
   const vendorCodes = {};
   offers.forEach(offer => {
@@ -99,10 +101,11 @@ function buildDocument(product, specs, media, fitment, offers, oem_refs) {
   const specsFacets = specs
     .filter(s => s.attribute && s.value)
     .map(s => `${s.attribute}:${s.value}`);
+  const specsBlob = specsFacets.length > 0 ? specsFacets.join(' | ') : undefined;
 
   // Extract fitment data
-  const fitmentMakes = [...new Set(fitment.map(f => f.make))];
-  const fitmentModels = [...new Set(fitment.map(f => f.model))];
+  const fitmentMakes = uniq(fitment.map(f => f.make));
+  const fitmentModels = uniq(fitment.map(f => f.model));
   const fitmentYears = [];
   
   fitment.forEach(f => {
@@ -144,6 +147,7 @@ function buildDocument(product, specs, media, fitment, offers, oem_refs) {
     .map(m => m.url);
   
   const primaryImage = images.length > 0 ? images[0] : null;
+  const hasImage = images.length > 0;
 
   // Build search blob (lowercased keywords for better matching)
   const searchBlob = [
@@ -151,6 +155,8 @@ function buildDocument(product, specs, media, fitment, offers, oem_refs) {
     product.brand,
     product.category,
     product.sku,
+    product.product_code,
+    product.description,
     ...oemNumbers,
     ...specsFacets.map(s => s.split(':')[1]), // Just the values
     ...fitmentApplications
@@ -194,10 +200,12 @@ function buildDocument(product, specs, media, fitment, offers, oem_refs) {
     
     // Specs
     specs_facets: specsFacets.length > 0 ? specsFacets : undefined,
+    specs_blob: specsBlob,
     
     // Media
     images: images.length > 0 ? images : undefined,
     primary_image: primaryImage,
+    has_image: hasImage,
     
     // Catalog metadata
     catalogs: catalogs.length > 0 ? catalogs : undefined,

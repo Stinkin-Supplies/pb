@@ -22,6 +22,8 @@ function normalizeFacets(facetCounts: any[]) {
   const categories:   { name: string; count: number }[] = [];
   const brands:       { name: string; count: number }[] = [];
   const hdFamilies:   { name: string; count: number }[] = [];
+  const fitmentMakes: { name: string; count: number }[] = [];
+  const fitmentModels:{ name: string; count: number }[] = [];
   const allBrands:    { name: string; count: number }[] = [];   // available_brands facet
   let priceRange = { min: 0, max: 0 };
 
@@ -35,6 +37,11 @@ function normalizeFacets(facetCounts: any[]) {
       case "category":             categories.push(...items);  break;
       case "brand":                brands.push(...items);      break;
       case "available_brands":     allBrands.push(...items);   break;
+      case "fitment_make":         fitmentMakes.push(...items); break;
+      case "fitment_model":
+        fitmentModels.push(...items);
+        hdFamilies.push(...items);
+        break;
       case "fitment_hd_families":  hdFamilies.push(...items);  break;
       case "computed_price":
         if (facet.stats) {
@@ -56,7 +63,7 @@ function normalizeFacets(facetCounts: any[]) {
     }
   }
 
-  return { categories, brands, allBrands, hdFamilies, priceRange };
+  return { categories, brands, allBrands, hdFamilies, fitmentMakes, fitmentModels, priceRange };
 }
 
 // Normalize a product_groups document to the shape ShopClient/SearchClient expect
@@ -104,6 +111,7 @@ function normalizeGroupDoc(doc: any) {
     oemPartNumber:    doc.oem_number      ?? null,
     oem_numbers:      doc.oem_numbers     ?? [],
     page_references:  doc.page_references ?? [],
+    oemNumbers:       doc.oem_numbers     ?? [],
 
     // Fitment
     features:          doc.features           ?? [],
@@ -115,6 +123,8 @@ function normalizeGroupDoc(doc: any) {
     fitmentHdModels:   doc.fitment_hd_models   ?? [],
     fitmentYearStart:  doc.fitment_year_start  ?? null,
     fitmentYearEnd:    doc.fitment_year_end    ?? null,
+    fitmentMakes:      doc.fitment_make        ?? [],
+    fitmentModels:     doc.fitment_model       ?? [],
 
     // Catalog flags
     inOldbook:    doc.in_oldbook   ?? false,
