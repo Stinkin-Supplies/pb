@@ -536,18 +536,6 @@ async function main() {
     `);
     console.log(`  dimensions:        ${cuDims.rowCount} rows`);
 
-    const cuOEM = await client.query(`
-      UPDATE catalog_unified cu
-      SET oem_part_number = pbe.oem_part_number
-      FROM pu_brand_enrichment pbe
-      WHERE (cu.sku = pbe.sku OR REPLACE(cu.sku,'-','') = REPLACE(pbe.sku,'-',''))
-        AND cu.source_vendor = 'PU'
-        AND (cu.oem_part_number IS NULL OR cu.oem_part_number = '')
-        AND pbe.oem_part_number IS NOT NULL
-        AND pbe.oem_part_number != ''
-    `);
-    console.log(`  oem_part_number:   ${cuOEM.rowCount} rows`);
-
     const cuCountry = await client.query(`
       UPDATE catalog_unified cu
       SET country_of_origin = pbe.country_of_origin
