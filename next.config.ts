@@ -41,8 +41,8 @@ const nextConfig: NextConfig = {
       },
     ],
     localPatterns: [
-      { pathname: "/api/img", search: "**" },
-      { pathname: "/api/image-proxy", search: "**" },
+      { pathname: "/api/img" },
+      { pathname: "/api/image-proxy" },
     ],
     formats: ["image/avif", "image/webp"],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920],

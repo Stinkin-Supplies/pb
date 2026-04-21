@@ -730,6 +730,28 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
     product.inOldbook     && { label: "OLDBOOK",          value: "YES" },
   ].filter(Boolean);
 
+  const renderVendorSpecValue = (value) => {
+    try {
+      const parsed = typeof value === "string" ? JSON.parse(value) : value;
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map((item) => {
+            if (typeof item === "string") return item;
+            if (item && typeof item === "object") return item.name ?? item.label ?? item.value ?? "";
+            return "";
+          })
+          .filter(Boolean)
+          .join(", ");
+      }
+      if (parsed && typeof parsed === "object") {
+        return parsed.name ?? parsed.label ?? parsed.value ?? JSON.stringify(parsed);
+      }
+      return parsed ?? value ?? "";
+    } catch {
+      return value ?? "";
+    }
+  };
+
   // Inline notify button for related cards
   function RelatedNotifyButton({ sku, productName, vendor }) {
     const [state, setState] = useState("idle");
@@ -1170,7 +1192,7 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
 	                    {product.specs.map((s, i) => (
 	                      <tr key={i}>
 	                        <td>{s.label ?? s.attribute}</td>
-	                        <td>{s.value}</td>
+	                        <td>{renderVendorSpecValue(s.value)}</td>
 	                      </tr>
 	                    ))}
 	                  </tbody>
