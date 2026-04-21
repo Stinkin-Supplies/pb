@@ -240,7 +240,15 @@ export default async function ProductDetailPage({ params }) {
   }
 
   const specs      = catalogSpecs
-    .filter(s => !["Catalog", "Product Code"].includes(s.attribute))
+    .filter(s => !["Catalog", "Product Code", "Data", "DATA"].includes(s.attribute))
+    .filter(s => {
+      try {
+        JSON.parse(s.value);
+        return false;
+      } catch {
+        return true;
+      }
+    })
     .map(s => ({ label: s.attribute, value: s.value }));
 
   const normalized = normalizeProductRow(productRow);
@@ -261,10 +269,10 @@ function normalizeProductRow(row) {
   const rawWas = row.msrp != null ? Number(row.msrp) : null;
   const was    = rawWas != null && rawWas > price ? rawWas : null;
 
-  // Build image array — proxyImageUrl handles both LeMans zip and WPS CDN URLs
+  // Normalize image URLs to https before proxying/rendering.
   const rawImages = Array.isArray(row.images) && row.images.length > 0
-    ? row.images
-    : row.image ? [row.image] : [];
+    ? row.images.map(u => u?.replace('http://', 'https://')).filter(Boolean)
+    : row.image ? [row.image.replace('http://', 'https://')] : [];
 
   const gallery      = rawImages.map(u => proxyImageUrl(u) ?? u).filter(Boolean);
   const primaryImage = gallery[0] ?? null;
@@ -338,7 +346,7 @@ export async function generateMetadata({ params }) {
         description: `Shop ${row.name} by ${row.brand}. Free shipping on orders over $99.`,
       };
     }
-  } catch (_) {}
+  } catch {}
   const name = slug.replace(/-/g, " ");
   return {
     title:       `${name} | Stinkin' Supplies`,
