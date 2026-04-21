@@ -282,6 +282,81 @@ const css = `
   }
   .perk-text strong { color: #f0ebe3; display: block; }
 
+  /* enriched data block */
+  .enriched-section {
+    padding-top: 18px;
+    margin-bottom: 18px;
+    border-top: 1px solid #2a2828;
+  }
+  .enriched-section + .enriched-section {
+    margin-top: 0;
+  }
+  .enriched-heading {
+    font-family: var(--font-stencil), monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    color: #e8621a;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .enriched-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 8px;
+  }
+  .enriched-list li {
+    display: flex;
+    gap: 8px;
+    font-family: var(--font-stencil), monospace;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    line-height: 1.5;
+    color: #c4c0bc;
+  }
+  .enriched-bullet {
+    color: #e8621a;
+    flex-shrink: 0;
+  }
+  .enriched-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 14px;
+  }
+  .enriched-term {
+    font-family: var(--font-stencil), monospace;
+    font-size: 8px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #8a8784;
+    margin-bottom: 2px;
+  }
+  .enriched-value {
+    font-family: var(--font-stencil), monospace;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    color: #f0ebe3;
+    line-height: 1.5;
+  }
+  .enriched-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .enriched-chip {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid #2a2828;
+    border-radius: 999px;
+    padding: 4px 8px;
+    background: #111010;
+    color: #c4c0bc;
+    font-family: var(--font-stencil), monospace;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+  }
+
   /* divider */
   .pdp-divider {
     border: none; border-top: 1px solid #2a2828;
@@ -706,52 +781,6 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
   // Total feature count for the tab label
   const featuresCount = featuresIsHtml ? 1 : featuresArray.length;
 
-  // ── Specs rows ─────────────────────────────────────────────
-  // Only display the SKU if it looks like an internal vendor-formatted number
-  // (WPS-style SKUs have a letter prefix: e.g. "DS275118", "NGK-DR9EA").
-  // Raw PU manufacturer codes like "DR9EA" (no dash, short, no vendor prefix)
-  // are suppressed — they belong in the OEM cross-ref, not the product header.
-  const displaySku = product.internal_sku ?? product.sku;
-
-  const specsRows = [
-    displaySku            && { label: "SKU",              value: displaySku },
-    product.upc           && { label: "UPC",              value: product.upc },
-    product.weight        && { label: "WEIGHT",           value: `${product.weight} lbs` },
-    (product.lengthIn || product.widthIn || product.heightIn) && {
-      label: "DIMENSIONS",
-      value: [product.lengthIn, product.widthIn, product.heightIn].filter(Boolean).join(" × ") + " in"
-    },
-    product.uom           && { label: "UNIT",             value: product.uom },
-    product.countryOfOrigin && { label: "ORIGIN",         value: product.countryOfOrigin },
-    product.oemPartNumber && { label: "OEM PART #",       value: product.oemPartNumber },
-    product.category      && { label: "CATEGORY",         value: product.category },
-    product.vendor        && { label: "VENDOR",           value: product.vendor },
-    product.inFatbook     && { label: "FATBOOK",          value: "YES" },
-    product.inOldbook     && { label: "OLDBOOK",          value: "YES" },
-  ].filter(Boolean);
-
-  const renderVendorSpecValue = (value) => {
-    try {
-      const parsed = typeof value === "string" ? JSON.parse(value) : value;
-      if (Array.isArray(parsed)) {
-        return parsed
-          .map((item) => {
-            if (typeof item === "string") return item;
-            if (item && typeof item === "object") return item.name ?? item.label ?? item.value ?? "";
-            return "";
-          })
-          .filter(Boolean)
-          .join(", ");
-      }
-      if (parsed && typeof parsed === "object") {
-        return parsed.name ?? parsed.label ?? parsed.value ?? JSON.stringify(parsed);
-      }
-      return parsed ?? value ?? "";
-    } catch {
-      return value ?? "";
-    }
-  };
-
   // Inline notify button for related cards
   function RelatedNotifyButton({ sku, productName, vendor }) {
     const [state, setState] = useState("idle");
@@ -1053,36 +1082,105 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
         </div>
       </div>
 
+          {/* Enriched data */}
+          {featuresCount > 0 && (
+            <section className="enriched-section">
+              <h2 className="enriched-heading">Features</h2>
+              {featuresHtml ? (
+                <div
+                  className="prose prose-invert max-w-none text-sm text-gray-300"
+                  style={{ lineHeight: 1.7, color: "#c4c0bc", fontSize: 14 }}
+                  dangerouslySetInnerHTML={{ __html: featuresHtml }}
+                />
+              ) : (
+                <ul className="enriched-list">
+                  {featuresArray.map((feature, i) => (
+                    <li key={i}>
+                      <span className="enriched-bullet">▸</span>
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
+
+          {(product.heightIn || product.widthIn || product.lengthIn || product.weight) && (
+            <section className="enriched-section">
+              <h2 className="enriched-heading">Specs / Dimensions</h2>
+              <dl className="enriched-grid">
+                {product.heightIn && (
+                  <>
+                    <dt className="enriched-term">Height</dt>
+                    <dd className="enriched-value">{product.heightIn} in</dd>
+                  </>
+                )}
+                {product.widthIn && (
+                  <>
+                    <dt className="enriched-term">Width</dt>
+                    <dd className="enriched-value">{product.widthIn} in</dd>
+                  </>
+                )}
+                {product.lengthIn && (
+                  <>
+                    <dt className="enriched-term">Length</dt>
+                    <dd className="enriched-value">{product.lengthIn} in</dd>
+                  </>
+                )}
+                {product.weight && (
+                  <>
+                    <dt className="enriched-term">Weight</dt>
+                    <dd className="enriched-value">{product.weight} lb</dd>
+                  </>
+                )}
+              </dl>
+            </section>
+          )}
+
+          {(product.pageReference || product.oemNumbers?.length > 0) && (
+            <section className="enriched-section">
+              <h2 className="enriched-heading">Catalog / OEM Info</h2>
+              <dl className="enriched-grid">
+                {product.pageReference && (
+                  <>
+                    <dt className="enriched-term">Catalog Page</dt>
+                    <dd className="enriched-value">{product.pageReference}</dd>
+                  </>
+                )}
+                {product.oemNumbers?.length > 0 && (
+                  <>
+                    <dt className="enriched-term">OEM Numbers</dt>
+                    <dd className="enriched-value">
+                      <div className="enriched-chips">
+                        {product.oemNumbers.map((n, i) => (
+                          <span key={i} className="enriched-chip">
+                            {n}
+                          </span>
+                        ))}
+                      </div>
+                    </dd>
+                  </>
+                )}
+              </dl>
+            </section>
+          )}
+
           {/* Tab shortcuts */}
-          {(product.specs?.length > 0 || fitment.length > 0) && (
+          {fitment.length > 0 && (
             <div style={{ display:"flex", gap:8, marginTop:16 }}>
-              {product.specs?.length > 0 && (
-                <button
-                  onClick={() => { setActiveTab("specs"); document.getElementById("pdp-tabs")?.scrollIntoView({ behavior:"smooth", block:"start" }); }}
-                  style={{ background:"transparent", border:"1px solid #2a2828", color:"#8a8784",
-                           fontFamily:"var(--font-stencil),monospace", fontSize:9, letterSpacing:"0.12em",
-                           padding:"5px 12px", borderRadius:2, cursor:"pointer", transition:"all 0.15s" }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor="#e8621a"; e.currentTarget.style.color="#e8621a"; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor="#2a2828"; e.currentTarget.style.color="#8a8784"; }}
-                >
-                  VIEW SPECS ↓
-                </button>
-              )}
-              {fitment.length > 0 && (
-                <button
-                  onClick={() => { setActiveTab("fitment"); document.getElementById("pdp-tabs")?.scrollIntoView({ behavior:"smooth", block:"start" }); }}
-                  style={{ background:"transparent", border:"1px solid #2a2828", color:"#8a8784",
-                           fontFamily:"var(--font-stencil),monospace", fontSize:9, letterSpacing:"0.12em",
-                           padding:"5px 12px", borderRadius:2, cursor:"pointer", transition:"all 0.15s" }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor="#e8621a"; e.currentTarget.style.color="#e8621a"; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor="#2a2828"; e.currentTarget.style.color="#8a8784"; }}
-                >
-                  VIEW FITMENT ↓
-                </button>
-              )}
+              <button
+                onClick={() => { setActiveTab("fitment"); document.getElementById("pdp-tabs")?.scrollIntoView({ behavior:"smooth", block:"start" }); }}
+                style={{ background:"transparent", border:"1px solid #2a2828", color:"#8a8784",
+                         fontFamily:"var(--font-stencil),monospace", fontSize:9, letterSpacing:"0.12em",
+                         padding:"5px 12px", borderRadius:2, cursor:"pointer", transition:"all 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor="#e8621a"; e.currentTarget.style.color="#e8621a"; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor="#2a2828"; e.currentTarget.style.color="#8a8784"; }}
+              >
+                VIEW FITMENT ↓
+              </button>
             </div>
           )}
-	      {/* ── TABS: Description | Features | Specs | Fitment ── */}
+	      {/* ── TABS: Description | Features | Fitment ── */}
 	      <div id="pdp-tabs" className="pdp-tabs-section">
 	        <div className="pdp-tab-strip">
 	          <button
@@ -1097,14 +1195,6 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
 	              onClick={() => setActiveTab("features")}
 	            >
 	              FEATURES ({featuresCount})
-	            </button>
-	          )}
-	          {(specsRows.length > 0 || product.specs?.length > 0) && (
-	            <button
-	              className={`pdp-tab ${activeTab === "specs" ? "active" : ""}`}
-	              onClick={() => setActiveTab("specs")}
-	            >
-	              SPECS ({specsRows.length + (product.specs?.length ?? 0)})
 	            </button>
 	          )}
 	          <button
@@ -1156,105 +1246,6 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
 	                  </li>
 	                ))}
 	              </ul>
-	            )}
-	          </div>
-	        )}
-
-	        {/* SPECS */}
-	        {activeTab === "specs" && (
-	          <div>
-	            {/* Enriched specs rows (dimensions, weight, origin, OEM, etc.) */}
-	            {specsRows.length > 0 && (
-	              <table className="specs-table pdp-specs-table" style={{ marginBottom: product.specs?.length > 0 ? 32 : 0 }}>
-	                <tbody>
-	                  {specsRows.map((s, i) => (
-	                    <tr key={i}>
-	                      <td>{s.label}</td>
-	                      <td>{s.value}</td>
-	                    </tr>
-	                  ))}
-	                </tbody>
-	              </table>
-	            )}
-	            {/* catalog_specs rows from vendor data */}
-	            {product.specs?.length > 0 && (
-	              <>
-	                {specsRows.length > 0 && (
-	                  <div style={{
-	                    fontFamily:"var(--font-stencil),monospace", fontSize:8,
-	                    color:"#8a8784", letterSpacing:"0.18em", marginBottom:10
-	                  }}>
-	                    VENDOR SPECS
-	                  </div>
-	                )}
-	                <table className="specs-table pdp-specs-table">
-	                  <tbody>
-	                    {product.specs.map((s, i) => (
-	                      <tr key={i}>
-	                        <td>{s.label ?? s.attribute}</td>
-	                        <td>{renderVendorSpecValue(s.value)}</td>
-	                      </tr>
-	                    ))}
-	                  </tbody>
-	                </table>
-	              </>
-	            )}
-	            {specsRows.length === 0 && !product.specs?.length && (
-	              <div className="fitment-empty">NO SPECS AVAILABLE</div>
-	            )}
-	            {/* OEM numbers */}
-	            {product.oemNumbers?.length > 0 && (
-	              <div className="pdp-oem-strip">
-	                <div className="pdp-oem-label">OEM CROSS-REFERENCE</div>
-	                <div className="pdp-oem-chips">
-	                  {product.oemNumbers.map((n, i) => (
-	                    <span key={i} className="pdp-oem-chip">{n}</span>
-	                  ))}
-	                </div>
-	              </div>
-	            )}
-	            {/* Catalog page references */}
-	            {(product.pageReference || product.fatbookPage || product.oldbookPage) && (
-	              <div style={{ marginTop:24, paddingTop:20, borderTop:"1px solid #2a2828" }}>
-	                <div style={{
-	                  fontFamily:"var(--font-stencil),monospace", fontSize:8,
-	                  color:"#8a8784", letterSpacing:"0.18em", marginBottom:10
-	                }}>
-	                  CATALOG REFERENCE
-	                </div>
-	                <div style={{ display:"flex", gap:12, flexWrap:"wrap" }}>
-	                  {product.pageReference && (
-	                    <span style={{
-	                      fontFamily:"var(--font-stencil),monospace", fontSize:10,
-	                      letterSpacing:"0.1em", padding:"4px 10px",
-	                      background:"#111010", border:"1px solid #2a2828",
-	                      borderRadius:2, color:"#c8c3bc"
-	                    }}>
-	                      {product.pageReference}
-	                    </span>
-	                  )}
-	                  {product.fatbookPage && product.fatbookPage !== product.pageReference && (
-	                    <span style={{
-	                      fontFamily:"var(--font-stencil),monospace", fontSize:10,
-	                      letterSpacing:"0.1em", padding:"4px 10px",
-	                      background:"#111010", border:"1px solid #2a2828",
-	                      borderRadius:2, color:"#c8c3bc"
-	                    }}>
-	                      FATBOOK P.{product.fatbookPage}
-	                    </span>
-	                  )}
-	                  {product.oldbookPage && (
-	                    <span style={{
-	                      fontFamily:"var(--font-stencil),monospace", fontSize:10,
-	                      letterSpacing:"0.1em", padding:"4px 10px",
-	                      background:"#111010", border:"1px solid #2a2828",
-	                      borderRadius:2, color:"#c8c3bc"
-	                    }}>
-	                      OLDBOOK P.{product.oldbookPage}
-	                    </span>
-	                  )}
-	                </div>
-	              </div>
 	            )}
 	          </div>
 	        )}
