@@ -679,30 +679,14 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
     }
   };
 
-  // ── Image helpers ──────────────────────────────────────────
-  const WPS_DOMAINS = ["cdn.wpsstatic.com", "asset.lemansnet.com"];
-  const isWpsCdn = (url) => {
-    try { return WPS_DOMAINS.some(d => new URL(url).hostname.includes(d)); }
-    catch { return false; }
-  };
-
   const resolvedGallery = (() => {
     const rawGallery = Array.isArray(product.gallery) ? product.gallery.filter(Boolean) : [];
-    const raw = rawGallery.length > 0
+    return rawGallery.length > 0
       ? rawGallery
       : (typeof product.primaryImage === "string" && product.primaryImage.length > 0)
         ? [product.primaryImage]
         : [];
-    if (raw.length > 0) {
-      return raw.map(url => isWpsCdn(url) ? url : (url.includes("lemansnet.com") ? `/api/img?u=${encodeURIComponent(url)}` : url));
-    }
-    return [];
   })();
-
-  const toProxySrc = (src) =>
-    typeof src === "string" && src.startsWith("http") && src.includes("lemansnet.com")
-      ? (src.startsWith('/api/') ? src : `/api/img?u=${encodeURIComponent(src)}`)
-      : src;
 
   // ── Features data ──────────────────────────────────────────
   // product.features can be:
