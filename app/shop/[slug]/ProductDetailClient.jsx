@@ -780,6 +780,7 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
   const featuresHtml  = featuresIsHtml ? featuresRaw[0] : null;
   // Total feature count for the tab label
   const featuresCount = featuresIsHtml ? 1 : featuresArray.length;
+  const displaySku = product.internal_sku ?? product.sku;
 
   // Inline notify button for related cards
   function RelatedNotifyButton({ sku, productName, vendor }) {
