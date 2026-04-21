@@ -786,7 +786,7 @@ export default function ShopClient({
               <span style={S({ fontSize:9, color:"#8a8784", letterSpacing:"0.12em" })}>
                 SHOWING{" "}
                 <span style={{ color:"#f0ebe3" }}>
-                  {(page * PAGE_SIZE + 1).toLocaleString()}–{Math.min((page + 1) * PAGE_SIZE, total).toLocaleString()}
+                  {(page * PAGE_SIZE + 1).toLocaleString('en-US')}–{Math.min((page + 1) * PAGE_SIZE, total).toLocaleString('en-US')}
                 </span>
                 {" "}OF{" "}
                 <span style={{ color:"#e8621a" }}>{total.toLocaleString()}</span>
