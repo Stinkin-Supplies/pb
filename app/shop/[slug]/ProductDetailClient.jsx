@@ -843,9 +843,10 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
           </span>
         ) : (
           <Image
-            src={src} alt={product.name}
-            width={200} height={200}
-            style={{ width:"100%", height:"100%", objectFit:"cover", opacity: product.inStock ? 1 : 0.5 }}
+            src={src}
+            alt={product.name}
+            fill
+            style={{ objectFit:"cover", opacity: product.inStock ? 1 : 0.5 }}
             unoptimized
           />
         )}
