@@ -696,7 +696,7 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
     if (raw.length > 0) {
       return raw.map(url => isWpsCdn(url) ? url : (url.includes("lemansnet.com") ? `/api/img?u=${encodeURIComponent(url)}` : url));
     }
-    return ["/images/placeholder.jpg"];
+    return [];
   })();
 
   const toProxySrc = (src) =>
@@ -827,13 +827,17 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
                 {product.badge.toUpperCase()}
               </span>
             )}
-            <Image
-              src={toProxySrc(resolvedGallery[activeImg] ?? resolvedGallery[0])}
-              alt={product.name}
-              fill
-              sizes="(max-width: 768px) 100vw, 70vw"
-              style={{ objectFit:"contain", zIndex:1 }}
-            />
+            {resolvedGallery.length > 0 && toProxySrc(resolvedGallery[activeImg] ?? resolvedGallery[0]) ? (
+              <Image
+                src={toProxySrc(resolvedGallery[activeImg] ?? resolvedGallery[0])}
+                alt={product.name}
+                fill
+                sizes="(max-width: 768px) 100vw, 70vw"
+                style={{ objectFit:"contain", zIndex:1 }}
+              />
+            ) : (
+              <div className="gallery-placeholder">NO IMAGE AVAILABLE</div>
+            )}
           </div>
 
           {/* Thumbnails */}
