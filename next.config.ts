@@ -40,6 +40,10 @@ const nextConfig: NextConfig = {
         hostname: "**.supabase.co",
       },
     ],
+    localPatterns: [
+      { pathname: "/api/img", search: "**" },
+      { pathname: "/api/image-proxy", search: "**" },
+    ],
     formats: ["image/avif", "image/webp"],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920],
     imageSizes: [64, 128, 256, 384, 512],
