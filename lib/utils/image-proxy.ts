@@ -1,7 +1,7 @@
 export function proxyImageUrl(url: string | null | undefined): string | null {
   if (!url) return null;
   if (url.startsWith('/api/img') || url.startsWith('/api/image-proxy')) return url;
-  if (url.startsWith('http://asset.lemansnet.com/z/')) {
+  if (url.startsWith('http://asset.lemansnet.com/z/') || url.startsWith('https://asset.lemansnet.com/z/')) {
     return `/api/img?u=${encodeURIComponent(url)}`;
   }
   if (url.endsWith('.zip')) return null;
