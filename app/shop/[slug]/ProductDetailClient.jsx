@@ -13,7 +13,7 @@
 //   - Related products strip
 // ============================================================
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import NavBar from "@/components/NavBar";
@@ -104,7 +104,7 @@ const css = `
     border: 1px solid #2a2828;
     border-radius: 2px;
     display: flex; align-items: center; justify-content: center;
-    cursor: pointer; transition: border-color 0.2s; overflow: hidden;
+    position: relative; cursor: pointer; transition: border-color 0.2s; overflow: hidden;
     flex-shrink: 0;
   }
   .gallery-thumb.active { border-color: #e8621a; }
@@ -536,10 +536,17 @@ const css = `
   }
 `;
 
-export default function ProductDetailClient({ product, variants = [], fitment = [], relatedProducts = [], fetchError = null }) {
+export default function ProductDetailClient({ product, variants = [], fitment = [], relatedProducts = [] }) {
   const [activeImg,  setActiveImg]  = useState(0);
   const [qty,        setQty]        = useState(1);
-  const [activeTab,  setActiveTab]  = useState("description");
+  const [activeTab,  setActiveTab]  = useState(() => {
+    if (!product.description && !product.features?.length) {
+      if (product.fitmentHdFamilies?.length || product.fitmentYearStart) {
+        return "fitment";
+      }
+    }
+    return "description";
+  });
 
   // Group variants by option_name: { Size: ["S","M","L"], Color: ["Red","Black"] }
   const variantGroups = variants.reduce((acc, v) => {
@@ -562,7 +569,6 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
   // ── Brand / vendor option cards ───────────────────────────────
   const [groupOptions, setGroupOptions] = useState(null);
   const [selectedSku,  setSelectedSku]  = useState(product.sku);
-  const [groupMeta,    setGroupMeta]    = useState(null); // { oem_numbers, page_references }
 
   useEffect(() => {
     let cancelled = false;
@@ -571,11 +577,6 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (cancelled || !data) return;
-        // Store OEM numbers + page references for the specs tab
-        setGroupMeta({
-          oem_numbers:     data.oem_numbers     ?? [],
-          page_references: data.page_references ?? [],
-        });
         if (data.options?.length > 1) {
           setGroupOptions(data.options);
           const canon = data.options.find(o => o.is_canonical) ?? data.options[0];
@@ -597,9 +598,7 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
     ? (activeOption.display_brand || activeOption.brand || product.display_brand || product.brand)
     : (product.display_brand || product.brand);
 
-  const supabaseRef = useRef(null);
-  if (!supabaseRef.current) supabaseRef.current = createBrowserSupabaseClient();
-  const supabase = supabaseRef.current;
+  const [supabase] = useState(() => createBrowserSupabaseClient());
 
   // ── Fitment check ──────────────────────────────────────────
   const fitmentStatus =
@@ -611,15 +610,6 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
     "no-fit":  `✗ DOES NOT FIT YOUR ${SAVED_VEHICLE.year} ${SAVED_VEHICLE.make}`,
     "no-data": `FITMENT DATA PENDING — ADD TO VERIFY`,
   }[fitmentStatus];
-
-  // ── Auto-select tab based on available data ────────────────
-  useEffect(() => {
-    if (!product.description && !product.features?.length) {
-      if (product.fitmentHdFamilies?.length || product.fitmentYearStart) {
-        setActiveTab("fitment");
-      }
-    }
-  }, [product]);
 
   // ── Add to cart ────────────────────────────────────────────
   const handleAdd = () => {
@@ -661,7 +651,7 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
     };
     load();
     return () => { mounted = false; };
-  }, [product.id]);
+  }, [product.id, product.sku, supabase]);
 
   const handleWishlistToggle = async () => {
     if (wishlistBusy) return;
@@ -714,39 +704,6 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
       ? (src.startsWith('/api/') ? src : `/api/img?u=${encodeURIComponent(src)}`)
       : src;
 
-  // ── Fitment table data ─────────────────────────────────────
-  const hasFitmentData =
-    product.isUniversal ||
-    product.fitmentHdFamilies?.length > 0 ||
-    product.fitmentHdModels?.length > 0 ||
-    product.fitmentYearStart != null;
-
-  // Build fitment rows from HD families + year ranges
-  const fitmentRows = (() => {
-    const families  = product.fitmentHdFamilies ?? [];
-    const models    = product.fitmentHdModels   ?? [];
-    const codes     = product.fitmentHdCodes    ?? [];
-    const yearStart = product.fitmentYearStart;
-    const yearEnd   = product.fitmentYearEnd;
-
-    if (!families.length && !models.length) return [];
-
-    // If we have models use those, otherwise use families
-    const entries = models.length > 0 ? models : families;
-    return entries.map((entry, i) => ({
-      make:   "Harley-Davidson",
-      model:  entry,
-      code:   codes[i] ?? null,
-      years:  yearStart && yearEnd
-                ? (yearStart === yearEnd ? String(yearStart) : `${yearStart}–${yearEnd}`)
-                : yearStart
-                  ? `${yearStart}+`
-                  : yearEnd
-                    ? `Up to ${yearEnd}`
-                    : "Verify Application",
-    }));
-  })();
-
   // ── Features data ──────────────────────────────────────────
   // product.features can be:
   //   a) an array of plain-text strings  ["trivalent plating...", "pure alumina..."]
@@ -765,24 +722,11 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
   // Total feature count for the tab label
   const featuresCount = featuresIsHtml ? 1 : featuresArray.length;
 
-  // ── Tab visibility ─────────────────────────────────────────
-  const tabs = [
-    { key: "description", label: "DESCRIPTION" },
-    { key: "features",    label: "FEATURES",    count: featuresCount || null },
-    { key: "fitment",     label: "FITMENT",     highlight: hasFitmentData },
-    { key: "specs",       label: "SPECS" },
-  ];
-
   // ── Specs rows ─────────────────────────────────────────────
   // Only display the SKU if it looks like an internal vendor-formatted number
   // (WPS-style SKUs have a letter prefix: e.g. "DS275118", "NGK-DR9EA").
   // Raw PU manufacturer codes like "DR9EA" (no dash, short, no vendor prefix)
   // are suppressed — they belong in the OEM cross-ref, not the product header.
-  const isVendorSku = (s) => {
-    if (!s) return false;
-    if (product.sourceVendor === "PU" || product.vendor === "PU") return false;
-    return true;
-  };
   const displaySku = product.internal_sku ?? product.sku;
 
   const specsRows = [
@@ -883,10 +827,12 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
                 {product.badge.toUpperCase()}
               </span>
             )}
-            <img
+            <Image
               src={toProxySrc(resolvedGallery[activeImg] ?? resolvedGallery[0])}
               alt={product.name}
-              style={{ width:"100%", height:"100%", objectFit:"contain", position:"relative", zIndex:1 }}
+              fill
+              sizes="(max-width: 768px) 100vw, 70vw"
+              style={{ objectFit:"contain", position:"relative", zIndex:1 }}
             />
           </div>
 
@@ -899,7 +845,13 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
                   className={`gallery-thumb ${activeImg === i ? "active" : ""}`}
                   onClick={() => setActiveImg(i)}
                 >
-                  <img src={toProxySrc(img)} alt={`${product.name} view ${i + 1}`} />
+                  <Image
+                    src={toProxySrc(img)}
+                    alt={`${product.name} view ${i + 1}`}
+                    fill
+                    sizes="72px"
+                    style={{ objectFit:"cover" }}
+                  />
                 </div>
               ))}
             </div>
@@ -1115,93 +1067,215 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
               )}
             </div>
           )}
-      {/* ── TABS: Description | Specs | Fitment ── */}
-      <div id="pdp-tabs" className="pdp-tabs-section">
-        <div className="pdp-tab-strip">
-          <button
-            className={`pdp-tab ${activeTab === "description" ? "active" : ""}`}
-            onClick={() => setActiveTab("description")}
-          >
-            DESCRIPTION
-          </button>
-          {product.specs?.length > 0 && (
-            <button
-              className={`pdp-tab ${activeTab === "specs" ? "active" : ""}`}
-              onClick={() => setActiveTab("specs")}
-            >
-              SPECS ({product.specs.length})
-            </button>
-          )}
-          <button
-            className={`pdp-tab ${activeTab === "fitment" ? "active" : ""}`}
-            onClick={() => setActiveTab("fitment")}
-          >
-            FITMENT {fitment.length > 0 ? `(${fitment.length})` : ""}
-          </button>
-        </div>
+	      {/* ── TABS: Description | Features | Specs | Fitment ── */}
+	      <div id="pdp-tabs" className="pdp-tabs-section">
+	        <div className="pdp-tab-strip">
+	          <button
+	            className={`pdp-tab ${activeTab === "description" ? "active" : ""}`}
+	            onClick={() => setActiveTab("description")}
+	          >
+	            DESCRIPTION
+	          </button>
+	          {featuresCount > 0 && (
+	            <button
+	              className={`pdp-tab ${activeTab === "features" ? "active" : ""}`}
+	              onClick={() => setActiveTab("features")}
+	            >
+	              FEATURES ({featuresCount})
+	            </button>
+	          )}
+	          {(specsRows.length > 0 || product.specs?.length > 0) && (
+	            <button
+	              className={`pdp-tab ${activeTab === "specs" ? "active" : ""}`}
+	              onClick={() => setActiveTab("specs")}
+	            >
+	              SPECS ({specsRows.length + (product.specs?.length ?? 0)})
+	            </button>
+	          )}
+	          <button
+	            className={`pdp-tab ${activeTab === "fitment" ? "active" : ""}`}
+	            onClick={() => setActiveTab("fitment")}
+	          >
+	            FITMENT {fitment.length > 0 ? `(${fitment.length})` : ""}
+	          </button>
+	        </div>
 
-        {activeTab === "description" && (
-          <div>
-            {product.description ? (
-              <div
-                className="prose prose-invert max-w-none text-sm text-gray-300"
-                style={{ lineHeight:1.8, color:"#c4c0bc", fontSize:14 }}
-                dangerouslySetInnerHTML={{ __html: product.description }}
-              />
-            ) : (
-              <div style={{ fontFamily:"var(--font-stencil),monospace", fontSize:12, color:"#8a8784", letterSpacing:"0.05em", lineHeight:1.8 }}>
-                <p>{product.name} by {product.brand}.</p>
-                {product.weight && <p style={{ marginTop:8 }}>WEIGHT: {product.weight} LBS</p>}
-                <p style={{ marginTop:8 }}>CATEGORY: {product.category?.toUpperCase()}</p>
-              </div>
-            )}
-          </div>
-        )}
+	        {/* DESCRIPTION */}
+	        {activeTab === "description" && (
+	          <div>
+	            {product.description ? (
+	              <div
+	                className="prose prose-invert max-w-none text-sm text-gray-300"
+	                style={{ lineHeight:1.8, color:"#c4c0bc", fontSize:14 }}
+	                dangerouslySetInnerHTML={{ __html: product.description }}
+	              />
+	            ) : (
+	              <div style={{ fontFamily:"var(--font-stencil),monospace", fontSize:12, color:"#8a8784", letterSpacing:"0.05em", lineHeight:1.8 }}>
+	                <p>{product.name} by {product.brand}.</p>
+	                {product.weight && <p style={{ marginTop:8 }}>WEIGHT: {product.weight} LBS</p>}
+	                <p style={{ marginTop:8 }}>CATEGORY: {product.category?.toUpperCase()}</p>
+	              </div>
+	            )}
+	          </div>
+	        )}
 
-        {activeTab === "specs" && product.specs?.length > 0 && (
-          <table className="specs-table">
-            <tbody>
-              {product.specs.map((s, i) => (
-                <tr key={i}>
-                  <td>{s.label ?? s.attribute}</td>
-                  <td>{s.value}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+	        {/* FEATURES */}
+	        {activeTab === "features" && featuresCount > 0 && (
+	          <div>
+	            {featuresHtml ? (
+	              <div
+	                style={{ lineHeight:1.8, color:"#c4c0bc", fontSize:14 }}
+	                dangerouslySetInnerHTML={{ __html: featuresHtml }}
+	              />
+	            ) : (
+	              <ul style={{ listStyle:"none", padding:0, margin:0 }}>
+	                {featuresArray.map((f, i) => (
+	                  <li key={i} style={{
+	                    display:"flex", alignItems:"flex-start", gap:10,
+	                    padding:"9px 0", borderBottom:"1px solid #1a1919",
+	                    fontFamily:"var(--font-stencil),monospace",
+	                    fontSize:12, color:"#c4c0bc", letterSpacing:"0.04em", lineHeight:1.6
+	                  }}>
+	                    <span style={{ color:"#e8621a", flexShrink:0, marginTop:2 }}>▸</span>
+	                    {f}
+	                  </li>
+	                ))}
+	              </ul>
+	            )}
+	          </div>
+	        )}
 
-        {activeTab === "fitment" && (
-          fitment.length > 0 ? (
-            <table className="fitment-table">
-              <thead>
-                <tr>
-                  <td>MAKE</td>
-                  <td>MODEL</td>
-                  <td>YEARS</td>
-                </tr>
-              </thead>
-              <tbody>
-                {fitment.map((f, i) => (
-                  <tr key={i}>
-                    <td>{f.make ?? "—"}</td>
-                    <td>{f.model ?? "—"}</td>
-                    <td>
-                      {f.year_start === f.year_end
-                        ? f.year_start
-                        : `${f.year_start}–${f.year_end}`}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <div className="fitment-empty">
-              FITMENT DATA PENDING — CHECK BACK AFTER ACES SYNC
-            </div>
-          )
-        )}
-      </div>
+	        {/* SPECS */}
+	        {activeTab === "specs" && (
+	          <div>
+	            {/* Enriched specs rows (dimensions, weight, origin, OEM, etc.) */}
+	            {specsRows.length > 0 && (
+	              <table className="specs-table pdp-specs-table" style={{ marginBottom: product.specs?.length > 0 ? 32 : 0 }}>
+	                <tbody>
+	                  {specsRows.map((s, i) => (
+	                    <tr key={i}>
+	                      <td>{s.label}</td>
+	                      <td>{s.value}</td>
+	                    </tr>
+	                  ))}
+	                </tbody>
+	              </table>
+	            )}
+	            {/* catalog_specs rows from vendor data */}
+	            {product.specs?.length > 0 && (
+	              <>
+	                {specsRows.length > 0 && (
+	                  <div style={{
+	                    fontFamily:"var(--font-stencil),monospace", fontSize:8,
+	                    color:"#8a8784", letterSpacing:"0.18em", marginBottom:10
+	                  }}>
+	                    VENDOR SPECS
+	                  </div>
+	                )}
+	                <table className="specs-table pdp-specs-table">
+	                  <tbody>
+	                    {product.specs.map((s, i) => (
+	                      <tr key={i}>
+	                        <td>{s.label ?? s.attribute}</td>
+	                        <td>{s.value}</td>
+	                      </tr>
+	                    ))}
+	                  </tbody>
+	                </table>
+	              </>
+	            )}
+	            {specsRows.length === 0 && !product.specs?.length && (
+	              <div className="fitment-empty">NO SPECS AVAILABLE</div>
+	            )}
+	            {/* OEM numbers */}
+	            {product.oemNumbers?.length > 0 && (
+	              <div className="pdp-oem-strip">
+	                <div className="pdp-oem-label">OEM CROSS-REFERENCE</div>
+	                <div className="pdp-oem-chips">
+	                  {product.oemNumbers.map((n, i) => (
+	                    <span key={i} className="pdp-oem-chip">{n}</span>
+	                  ))}
+	                </div>
+	              </div>
+	            )}
+	            {/* Catalog page references */}
+	            {(product.pageReference || product.fatbookPage || product.oldbookPage) && (
+	              <div style={{ marginTop:24, paddingTop:20, borderTop:"1px solid #2a2828" }}>
+	                <div style={{
+	                  fontFamily:"var(--font-stencil),monospace", fontSize:8,
+	                  color:"#8a8784", letterSpacing:"0.18em", marginBottom:10
+	                }}>
+	                  CATALOG REFERENCE
+	                </div>
+	                <div style={{ display:"flex", gap:12, flexWrap:"wrap" }}>
+	                  {product.pageReference && (
+	                    <span style={{
+	                      fontFamily:"var(--font-stencil),monospace", fontSize:10,
+	                      letterSpacing:"0.1em", padding:"4px 10px",
+	                      background:"#111010", border:"1px solid #2a2828",
+	                      borderRadius:2, color:"#c8c3bc"
+	                    }}>
+	                      {product.pageReference}
+	                    </span>
+	                  )}
+	                  {product.fatbookPage && product.fatbookPage !== product.pageReference && (
+	                    <span style={{
+	                      fontFamily:"var(--font-stencil),monospace", fontSize:10,
+	                      letterSpacing:"0.1em", padding:"4px 10px",
+	                      background:"#111010", border:"1px solid #2a2828",
+	                      borderRadius:2, color:"#c8c3bc"
+	                    }}>
+	                      FATBOOK P.{product.fatbookPage}
+	                    </span>
+	                  )}
+	                  {product.oldbookPage && (
+	                    <span style={{
+	                      fontFamily:"var(--font-stencil),monospace", fontSize:10,
+	                      letterSpacing:"0.1em", padding:"4px 10px",
+	                      background:"#111010", border:"1px solid #2a2828",
+	                      borderRadius:2, color:"#c8c3bc"
+	                    }}>
+	                      OLDBOOK P.{product.oldbookPage}
+	                    </span>
+	                  )}
+	                </div>
+	              </div>
+	            )}
+	          </div>
+	        )}
+
+	        {/* FITMENT */}
+	        {activeTab === "fitment" && (
+	          fitment.length > 0 ? (
+	            <table className="fitment-table">
+	              <thead>
+	                <tr>
+	                  <td>MAKE</td>
+	                  <td>MODEL</td>
+	                  <td>YEARS</td>
+	                </tr>
+	              </thead>
+	              <tbody>
+	                {fitment.map((f, i) => (
+	                  <tr key={i}>
+	                    <td>{f.make ?? "—"}</td>
+	                    <td>{f.model ?? "—"}</td>
+	                    <td>
+	                      {f.year_start === f.year_end
+	                        ? f.year_start
+	                        : `${f.year_start}–${f.year_end}`}
+	                    </td>
+	                  </tr>
+	                ))}
+	              </tbody>
+	            </table>
+	          ) : (
+	            <div className="fitment-empty">
+	              FITMENT DATA PENDING — CHECK BACK AFTER ACES SYNC
+	            </div>
+	          )
+	        )}
+	      </div>
 
       {/* ── RELATED PRODUCTS ── */}
       {relatedProducts.length > 0 && (
