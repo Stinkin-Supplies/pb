@@ -175,7 +175,7 @@ export default async function AdminProductsPage({ searchParams }) {
 
   if (q) {
     where.push(
-      `(cp.sku ILIKE $${idx} OR cp.slug ILIKE $${idx} OR cp.name ILIKE $${idx} OR cp.brand ILIKE $${idx})`
+      `(cu.sku ILIKE $${idx} OR cu.slug ILIKE $${idx} OR cu.name ILIKE $${idx} OR cu.brand ILIKE $${idx})`
     );
     values.push(`%${q}%`);
     idx += 1;
@@ -184,7 +184,7 @@ export default async function AdminProductsPage({ searchParams }) {
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
   const countRes = await catalogDb.query(
-    `SELECT COUNT(*)::int AS count FROM public.catalog_products cp ${whereSql}`,
+    `SELECT COUNT(*)::int AS count FROM public.catalog_unified cu ${whereSql}`,
     values
   );
   const total = countRes.rows[0]?.count ?? 0;
@@ -192,17 +192,17 @@ export default async function AdminProductsPage({ searchParams }) {
   const rowsRes = await catalogDb.query(
     `
       SELECT
-        cp.sku,
-        cp.slug,
-        cp.name,
-        cp.brand,
-        COALESCE(cp.computed_price, cp.price, cp.msrp) AS price,
-        cp.map_price,
-        cp.cost,
-        cp.is_active
-      FROM public.catalog_products cp
+        cu.sku,
+        cu.slug,
+        cu.name,
+        cu.brand,
+        COALESCE(cu.computed_price, cu.msrp) AS price,
+        cu.map_price,
+        cu.cost,
+        cu.is_active
+      FROM public.catalog_unified cu
       ${whereSql}
-      ORDER BY cp.created_at DESC
+      ORDER BY cu.created_at DESC
       LIMIT $${idx} OFFSET $${idx + 1}
     `,
     [...values, pageSize, offset]
