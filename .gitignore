@@ -48,3 +48,4 @@ Downloads/
 .env
 *.dump
 *.sql
+scripts/ingest/master-item-list.csv
