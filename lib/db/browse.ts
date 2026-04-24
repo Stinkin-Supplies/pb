@@ -290,7 +290,8 @@ export async function browseProducts(
   `;
 
   // Facets
-  const facetParams = params.slice(0, p - 3); // exclude limit/offset
+  const filterParamCount = params.length - 2; // subtract the limit + offset we pushed
+  const facetParams = params.slice(0, filterParamCount);
   const categoryFacetQuery = `
     SELECT cu.category AS name, COUNT(DISTINCT cu.id) AS count
     FROM catalog_unified cu
@@ -318,7 +319,7 @@ export async function browseProducts(
 
   const [dataRes, countRes, catRes, brandRes, priceRes] = await Promise.all([
     pool.query(dataQuery, params),
-    pool.query(countQuery, params.slice(0, p - 3)),
+    pool.query(countQuery, facetParams),
     pool.query(categoryFacetQuery, facetParams),
     pool.query(brandFacetQuery, facetParams),
     pool.query(priceRangeQuery, facetParams),
