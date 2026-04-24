@@ -14,7 +14,7 @@ const PAGE_SIZE   = 48;
 const DEBOUNCE_MS = 350;
 
 const SORT_OPTIONS = [
-  { value:"newest",     label:"Newest"          },
+  { value:"relevance",     label:"relevance"          },
   { value:"price_asc",  label:"Price: Low→High" },
   { value:"price_desc", label:"Price: High→Low" },
   { value:"name_asc",   label:"A → Z"           },
