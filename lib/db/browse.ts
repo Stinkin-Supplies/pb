@@ -246,7 +246,7 @@ export async function browseProducts(
       cu.category, cu.subcategory, cu.source_vendor,
       cu.computed_price, cu.msrp, cu.map_price,
       cu.image_url, cu.in_stock, cu.stock_quantity,
-      cu.is_harley_fitment, cu.fits_all_models,
+      cu.is_harley_fitment,
       cu.features, cu.oem_numbers
     FROM catalog_unified cu
     ${fitmentJoin}
