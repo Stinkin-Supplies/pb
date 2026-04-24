@@ -16,7 +16,7 @@ const GOLD_LIGHT = "#d4aa44";
 const PER_PAGE   = 48;
 
 const SORT_OPTIONS = [
-  { value: "newest",     label: "Newest" },
+  { value: "relevance",     label: "relevance" },
   { value: "price_asc",  label: "Price ↑" },
   { value: "price_desc", label: "Price ↓" },
   { value: "name_asc",   label: "A → Z" },

@@ -229,12 +229,14 @@ export async function browseProducts(
   const where =
     conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-  const sortMap: Record<string, string> = {
-    price_asc: "cu.computed_price ASC NULLS LAST",
-    price_desc: "cu.computed_price DESC NULLS LAST",
-    name_asc: "cu.name ASC",
-    newest: "cu.id DESC",
-  };
+    const sortMap: Record<string, string> = {
+      price_asc:  "cu.computed_price ASC NULLS LAST",
+      price_desc: "cu.computed_price DESC NULLS LAST",
+      name_asc:   "cu.name ASC",
+      newest:     "cu.id DESC",
+      relevance:  "cu.in_stock DESC, cu.computed_price ASC NULLS LAST",
+    };
+    
   const orderBy = sortMap[sort] ?? "cu.id DESC";
 
   const offset = (page - 1) * perPage;
