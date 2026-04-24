@@ -6,17 +6,17 @@
  * Scalable: all queries go through /api/browse/products.
  */
 
-import { useState, useEffect, useCallback, useRef, Suspense } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import Link from "next/link";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 
 const GOLD       = "#b8922a";
-const GOLD_LIGHT = "#d4aa44";
 const PER_PAGE   = 48;
 
 const SORT_OPTIONS = [
-  { value: "relevance",     label: "relevance" },
+  { value: "mixed",      label: "Mixed" },
+  { value: "relevance",  label: "Relevance" },
   { value: "price_asc",  label: "Price ↑" },
   { value: "price_desc", label: "Price ↓" },
   { value: "name_asc",   label: "A → Z" },
@@ -458,7 +458,6 @@ function FilterSidebar({ facets, filters, onChange }) {
 
 function BrowsePageInner() {
   const searchParams = useSearchParams();
-  const router = useRouter();
 
   const [products, setProducts] = useState([]);
   const [total, setTotal] = useState(0);
@@ -477,7 +476,7 @@ function BrowsePageInner() {
     in_stock:  false,
     min_price: null,
     max_price: null,
-    sort:      "newest",
+    sort:      "relevance",
   });
 
   const fetchProducts = useCallback(async (f, pg) => {
