@@ -163,7 +163,7 @@ export async function browseProducts(
     maxPrice,
     page = 1,
     perPage = 48,
-    sort = "newest",
+    sort = "mixed",
   } = filters;
 
   const conditions: string[] = [];
@@ -224,6 +224,7 @@ export async function browseProducts(
     conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
     const sortMap: Record<string, string> = {
+      mixed:      "vendor_rank ASC, source_vendor ASC, id DESC",
       price_asc:  "cu.computed_price ASC NULLS LAST",
       price_desc: "cu.computed_price DESC NULLS LAST",
       name_asc:   "cu.name ASC",
@@ -235,8 +236,7 @@ export async function browseProducts(
 
   const offset = (page - 1) * perPage;
 
-  // Main query
-  const dataQuery = `
+  const baseQuery = `
     SELECT DISTINCT
       cu.id, cu.sku, cu.slug, cu.name, cu.brand,
       cu.category, cu.subcategory, cu.source_vendor,
@@ -247,9 +247,39 @@ export async function browseProducts(
     FROM catalog_unified cu
     ${fitmentJoin}
     ${where}
-    ORDER BY ${orderBy}
-    LIMIT $${p++} OFFSET $${p++}
   `;
+
+  // Main query
+  const dataQuery = sort === "mixed"
+    ? `
+      WITH base AS (
+        ${baseQuery}
+      ),
+      ranked AS (
+        SELECT
+          base.*,
+          ROW_NUMBER() OVER (
+            PARTITION BY base.source_vendor
+            ORDER BY base.id DESC
+          ) AS vendor_rank
+        FROM base
+      )
+      SELECT
+        ranked.id, ranked.sku, ranked.slug, ranked.name, ranked.brand,
+        ranked.category, ranked.subcategory, ranked.source_vendor,
+        ranked.computed_price, ranked.msrp, ranked.map_price,
+        ranked.image_url, ranked.in_stock, ranked.stock_quantity,
+        ranked.is_harley_fitment,
+        ranked.features, ranked.oem_numbers
+      FROM ranked
+      ORDER BY ${orderBy}
+      LIMIT $${p++} OFFSET $${p++}
+    `
+    : `
+      ${baseQuery}
+      ORDER BY ${orderBy}
+      LIMIT $${p++} OFFSET $${p++}
+    `;
   params.push(perPage, offset);
 
   // Count query

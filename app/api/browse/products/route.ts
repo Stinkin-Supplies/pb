@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { browseProducts } from "@/lib/db/browse";
+import { browseProducts, type BrowseFilters } from "@/lib/db/browse";
 
 export async function GET(req: NextRequest) {
   const p = req.nextUrl.searchParams;
@@ -23,12 +23,13 @@ export async function GET(req: NextRequest) {
       maxPrice:  p.get("max_price") ? parseFloat(p.get("max_price")!) : undefined,
       page:      p.get("page")      ? parseInt(p.get("page")!) : 1,
       perPage:   p.get("per_page")  ? parseInt(p.get("per_page")!) : 48,
-      sort:      (p.get("sort") as any) || "newest",
+      sort:      (p.get("sort") as BrowseFilters["sort"]) || "mixed",
     });
 
     return NextResponse.json(result);
-  } catch (err: any) {
-    console.error("Browse products error:", err.message);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown browse error";
+    console.error("Browse products error:", message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
