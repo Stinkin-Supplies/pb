@@ -15,11 +15,11 @@ const GOLD       = "#b8922a";
 const PER_PAGE   = 48;
 
 const SORT_OPTIONS = [
-  { value: "mixed",      label: "Mixed" },
   { value: "relevance",  label: "Relevance" },
   { value: "price_asc",  label: "Price ↑" },
   { value: "price_desc", label: "Price ↓" },
   { value: "name_asc",   label: "A → Z" },
+  { value: "newest",     label: "Newest" },
 ];
 
 // ─── Product Card ─────────────────────────────────────────────────────────────
