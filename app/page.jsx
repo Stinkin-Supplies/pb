@@ -281,6 +281,11 @@ function FitmentSelector() {
                   <div style={{ color: "#e0d8cc", fontSize: "11px", marginBottom: "2px" }}>
                     {fam.name}
                   </div>
+                  <div style={{ color: "#6f6a62", fontSize: "9px", marginBottom: "2px" }}>
+                    {fam.start_year && fam.end_year
+                      ? `${fam.start_year}–${fam.end_year}`
+                      : "All years"}
+                  </div>
                   {counts[fam.name] && (
                     <div style={{ color: "#555", fontSize: "9px" }}>
                       {counts[fam.name].toLocaleString()} parts

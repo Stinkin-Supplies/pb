@@ -59,8 +59,8 @@ export interface FitmentSummary {
 export interface HarleyFamily {
   id: number;
   name: string;
-  year_start: number | null;
-  year_end: number | null;
+  start_year: number | null;
+  end_year: number | null;
 }
 
 export interface HarleyModel {
@@ -101,15 +101,9 @@ export interface BrowseResult {
 
 export async function getFamilies(): Promise<HarleyFamily[]> {
   const { rows } = await pool.query(
-    `SELECT id, name, year_start, year_end
+    `SELECT id, name, start_year, end_year
      FROM harley_families
-     ORDER BY
-       CASE
-         WHEN year_start IS NULL THEN 1
-         ELSE 0
-       END,
-       year_start DESC NULLS LAST,
-       name`
+     ORDER BY name`
   );
   return rows;
 }
