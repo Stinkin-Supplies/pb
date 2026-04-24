@@ -1,0 +1,95 @@
+-[ RECORD 1 ]------------+------------------------------
+id                       | 287173
+sku                      | 21030439
+name                     | CHAMPION PLUG RN12YC/24PK
+description              | CHAMPION PLUG RN12YC/24PK
+brand                    | CHAMPION
+category                 | Tire & Wheel
+price                    | 54.70
+cost                     | 54.70
+weight                   | 3.350
+dimensions               | 
+stock_quantity           | 73
+created_at               | 2026-04-01 19:40:00.155372
+updated_at               | 2026-04-11 22:07:36.323043
+manufacturer_part_number | 404S
+vendor_codes             | {pu}
+map_price                | 54.7
+msrp                     | 91.95
+status                   | 
+product_type             | 
+unit_of_measurement      | 
+upc                      | 
+has_map_policy           | f
+drop_ship_eligible       | f
+is_active                | t
+source_vendor            | pu
+pricing_rule_id          | 1
+computed_price           | 68.38
+margin_percent           | 15.00
+last_priced_at           | 2026-04-02 15:23:06.661564+00
+slug                     | plug-rn12yc24pk-acc-117063
+is_discontinued          | f
+product_features         | 
+oem_part_number          | 
+country_of_origin        | 
+internal_sku             | ACC-117063
+display_brand            | Champion
+manufacturer_brand       | Champion
+page_reference           | 
+fitment_hd_families      | 
+fitment_year_start       | 
+fitment_year_end         | 
+fitment                  | 
+harddrive_catalog        | f
+street_catalog_flag      | f
+has_images               | f
+fits_all_models          | f
+-[ RECORD 2 ]------------+------------------------------
+id                       | 433991
+sku                      | RN12YC
+name                     | CHAMPION PLUG RN12YC
+description              | CHAMPION PLUG RN12YC
+brand                    | CHAMPION
+category                 | Tire & Wheel
+price                    | 2.40
+cost                     | 2.40
+weight                   | 0.150
+dimensions               | 
+stock_quantity           | 120
+created_at               | 2026-04-01 22:50:26.226787
+updated_at               | 2026-04-11 22:07:47.598186
+manufacturer_part_number | CCH404
+vendor_codes             | {pu}
+map_price                | 2.4
+msrp                     | 3.95
+status                   | 
+product_type             | 
+unit_of_measurement      | 
+upc                      | 
+has_map_policy           | f
+drop_ship_eligible       | f
+is_active                | t
+source_vendor            | pu
+pricing_rule_id          | 1
+computed_price           | 3.00
+margin_percent           | 14.89
+last_priced_at           | 2026-04-02 15:23:06.661564+00
+slug                     | plug-rn12yc-acc-132046
+is_discontinued          | f
+product_features         | 
+oem_part_number          | 
+country_of_origin        | 
+internal_sku             | ACC-132046
+display_brand            | Champion
+manufacturer_brand       | Champion
+page_reference           | 
+fitment_hd_families      | 
+fitment_year_start       | 
+fitment_year_end         | 
+fitment                  | 
+harddrive_catalog        | f
+street_catalog_flag      | f
+has_images               | f
+fits_all_models          | f
+
