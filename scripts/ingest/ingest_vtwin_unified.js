@@ -47,11 +47,6 @@ function formatInternalSku(raw) {
   return `${match[1]}-${match[2]}`;
 }
 
-function pgArray(arr) {
-  if (!arr || arr.length === 0) return '{}';
-  return '{' + arr.map(v => `"${v.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`).join(',') + '}';
-}
-
 function parseDate(raw) {
   // VTwin date_added format: '20000101' (YYYYMMDD)
   // Guard against '0', '', null, or other garbage
@@ -106,7 +101,7 @@ function buildRow(p) {
     null,                                     // 22 upc
     p.cntry_of_origin || null,                // 23 country_of_origin
     primaryImage,                             // 24 image_url
-    pgArray(imageUrls),                       // 25 image_urls
+    imageUrls.length ? imageUrls : null,       // 25 image_urls
     false,                                    // 26 is_harley_fitment
     false,                                    // 27 is_universal
     false,                                    // 28 in_oldbook
@@ -122,7 +117,7 @@ function buildRow(p) {
     internalSku,                              // 38 internal_sku
     brand,                                    // 39 display_brand
     brand,                                    // 40 manufacturer_brand
-    oemNums.length ? pgArray(oemNums) : null, // 41 oem_numbers
+    oemNums.length ? oemNums : null,          // 41 oem_numbers
     computedPrice,                            // 42 computed_price
   ];
 }
