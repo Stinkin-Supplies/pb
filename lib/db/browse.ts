@@ -82,7 +82,7 @@ export interface BrowseFilters {
   maxPrice?: number;
   page?: number;
   perPage?: number;
-  sort?: "price_asc" | "price_desc" | "name_asc" | "newest";
+  sort?: "relevance" | "price_asc" | "price_desc" | "name_asc" | "newest";
 }
 
 export interface BrowseResult {
@@ -163,7 +163,7 @@ export async function browseProducts(
     maxPrice,
     page = 1,
     perPage = 48,
-    sort = "mixed",
+    sort = "relevance",
   } = filters;
 
   const conditions: string[] = [];
@@ -249,7 +249,7 @@ export async function browseProducts(
   `;
 
   // Main query
-  const dataQuery = sort === "mixed"
+  const dataQuery = sort === "relevance"
     ? `
       WITH base AS (
         ${baseQuery}

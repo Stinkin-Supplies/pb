@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { getCatalogDb } from '@/lib/catalog';
-import ProductManager from './ProductManager';
+import getCatalogDb from '@/lib/db/catalog';
+import ProductManager from './products/ProductManager';
 
 export const dynamic = 'force-dynamic';
 
