@@ -757,7 +757,7 @@ function EditModal({ product, families, onClose, onSaved, onToast }) {
                   <label className="pm-label">Family</label>
                   <select className="pm-select" style={{ width: '100%' }} value={newFamily} onChange={e => setNewFamily(e.target.value)}>
                     <option value="">— Family —</option>
-                    {families.map(f => <option key={f.id} value={f.slug}>{f.name}</option>)}
+                    {families.map(f => <option key={f.id} value={f.name}>{f.name}</option>)}
                   </select>
                 </div>
                 <div>
@@ -850,7 +850,7 @@ function BulkFitmentModal({ count, families, onClose, onDone, onToast }) {
             <label className="pm-label">Family</label>
             <select className="pm-select" style={{ width: '100%' }} value={newFamily} onChange={e => setNewFamily(e.target.value)}>
               <option value="">— Select family —</option>
-              {families.map(f => <option key={f.id} value={f.slug}>{f.name}</option>)}
+              {families.map(f => <option key={f.id} value={f.name}>{f.name}</option>)}
             </select>
           </div>
           <div className="pm-field">

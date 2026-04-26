@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     SELECT hm.id, hm.name, hm.model_code
     FROM harley_models hm
     JOIN harley_families hf ON hf.id = hm.family_id
-    WHERE hf.slug = $1
+    WHERE hf.name = $1
     ORDER BY hm.model_code
   `, [family]);
   return NextResponse.json({ models: res.rows });
