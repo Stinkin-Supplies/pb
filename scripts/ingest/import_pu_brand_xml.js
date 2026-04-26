@@ -572,7 +572,7 @@ async function main() {
 
     console.log('\n✅ import_pu_brand_xml complete');
     console.log('\n⚠️  Run reindex to pick up all changes:');
-    console.log('   npx dotenv -e .env.local -- node -e "import(\'./scripts/ingest/index_assembly.js\').then(m => m.buildTypesenseIndex({ recreate: true, resume: false }))"\n');
+    console.log('   npx dotenv -e .env.local -- node -e "import(\'./scripts/ingest/index_unified.js\').then(m => m.buildTypesenseIndex({ recreate: true, resume: false }))"\n');
 
   } finally {
     client.release();

@@ -252,10 +252,10 @@ FLY Racing, metric brands (Scorpion EXO, GMAX, Highway 21, Motion Pro, Mikuni, e
 
 **Reindex command:**
 ```bash
-npx dotenv -e .env.local -- node -e "import('./scripts/ingest/index_assembly.js').then(m => m.buildTypesenseIndex({ recreate: true, resume: false }))"
+npx dotenv -e .env.local -- node -e "import('./scripts/ingest/index_unified.js').then(m => m.buildTypesenseIndex({ recreate: true, resume: false }))"
 ```
 
-**Indexer sources (index_assembly.js):**
+**Indexer sources (index_unified.js):**
 - catalog_products — core fields
 - catalog_specs — specs_blob
 - catalog_fitment — fitment_make[], fitment_model[], fitment_year[]

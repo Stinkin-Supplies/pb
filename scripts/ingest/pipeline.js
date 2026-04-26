@@ -8,7 +8,7 @@ import { normalizeWps } from './normalize_wps.js';
 import { normalizeAces } from './normalize_aces.js';
 import { normalizePies } from './normalize_pies.js';
 import { runComputedValues } from './computed_values.js';
-import { buildTypesenseIndex } from './index_assembly.js';
+import { buildTypesenseIndex } from './index_unified.js';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
