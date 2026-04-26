@@ -6,7 +6,7 @@
     "stage0": "node ingest/stage0-pu-dealerprice.mjs",
     "stage1": "node ingest/normalize_pu.js",
     "stage2": "node ingest/computed_values.js",
-    "stage3": "node ingest/index_assembly.js",
+    "stage3": "node ingest/index_unified.js",
     "allowlist": "node ingest/build-catalog-allowlist.mjs"
   },
   "dependencies": {

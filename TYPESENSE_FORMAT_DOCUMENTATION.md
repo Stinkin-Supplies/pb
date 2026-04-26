@@ -397,7 +397,7 @@ Your current schema already has:
 
 **Migration script:**
 ```javascript
-// Add to index_assembly.js
+// Add to index_unified.js
 const oemRefs = OEM_CROSSREF.ds_to_oem[product.sku] || [];
 const oemNumbers = oemRefs.map(r => r.oem_number);
 const oemManufacturers = [...new Set(oemRefs.map(r => r.manufacturer))];

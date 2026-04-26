@@ -245,7 +245,7 @@ async function main() {
     console.log(`\n   Total catalog_fitment rows: ${newTotal}`);
 
     console.log('\n⚠️  Remember to reindex Typesense to pick up new fitment facets:');
-    console.log('   npx dotenv -e .env.local -- node -e "import(\'./scripts/ingest/index_assembly.js\').then(m => m.buildTypesenseIndex({ recreate: true, resume: false }))"\n');
+    console.log('   npx dotenv -e .env.local -- node -e "import(\'./scripts/ingest/index_unified.js\').then(m => m.buildTypesenseIndex({ recreate: true, resume: false }))"\n');
 
   } finally {
     client.release();
