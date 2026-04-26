@@ -11,6 +11,7 @@ export function proxy(request: NextRequest) {
   const isPublic =
     pathname.startsWith("/checkout") ||
     pathname.startsWith("/api/webhooks") ||
+    pathname.startsWith("/api/admin/") ||
     pathname === "/";
 
   if (isPublic) return NextResponse.next();
