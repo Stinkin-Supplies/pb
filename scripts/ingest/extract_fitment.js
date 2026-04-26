@@ -419,7 +419,7 @@ async function main() {
     console.log(`  FXR                : ${s.fxr}`);
     console.log(`  V-Rod              : ${s.vrod}`);
     console.log('\n⚠️  Remember to reindex Typesense:\n');
-    console.log('  npx dotenv -e .env.local -- node -e "import(\'./scripts/ingest/index_assembly.js\').then(m => m.buildTypesenseIndex({ recreate: true, resume: false }))"');
+    console.log('  npx dotenv -e .env.local -- node -e "import(\'./scripts/ingest/index_unified.js\').then(m => m.buildTypesenseIndex({ recreate: true, resume: false }))"');
 
   } finally {
     client.release();

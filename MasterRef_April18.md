@@ -210,7 +210,7 @@ Tracks (snowmobile), Bicycle, FLY Racing, metric brands
 
 **Reindex command:**
 ```bash
-npx dotenv -e .env.local -- node -e "import('./scripts/ingest/index_assembly.js').then(m => m.buildTypesenseIndex({ recreate: true, resume: false }))"
+npx dotenv -e .env.local -- node -e "import('./scripts/ingest/index_unified.js').then(m => m.buildTypesenseIndex({ recreate: true, resume: false }))"
 ```
 
 ---
@@ -299,7 +299,7 @@ As of April 18, `lib/harley/config.ts` maps each UI category slug to real DB cat
 
 ```bash
 # Reindex Typesense
-npx dotenv -e .env.local -- node -e "import('./scripts/ingest/index_assembly.js').then(m => m.buildTypesenseIndex({ recreate: true, resume: false }))"
+npx dotenv -e .env.local -- node -e "import('./scripts/ingest/index_unified.js').then(m => m.buildTypesenseIndex({ recreate: true, resume: false }))"
 
 # Fitment extraction (safe to re-run)
 npx dotenv -e .env.local -- node scripts/ingest/extract_fitment.js

@@ -12,7 +12,7 @@
 ### OEM Cross-Reference
 - [x] Inserted 93,529 rows from pu_brand_enrichment → catalog_oem_crossref
 - [x] catalog_oem_crossref: 19 → **93,548 rows**
-- [x] Updated index_assembly.js: added `oem_numbers[]` schema field + `catalog_oem_crossref` JOIN
+- [x] Updated index_unified.js: added `oem_numbers[]` schema field + `catalog_oem_crossref` JOIN
 - [x] Updated client.ts query_by: now searches oem_numbers in Typesense
 
 ### catalog_images → catalog_media Migration
@@ -92,7 +92,7 @@
 
 ```bash
 # Reindex Typesense — picks up new fitment facets + OEM search
-npx dotenv -e .env.local -- node -e "import('./scripts/ingest/index_assembly.js').then(m => m.buildTypesenseIndex({ recreate: true, resume: false }))"
+npx dotenv -e .env.local -- node -e "import('./scripts/ingest/index_unified.js').then(m => m.buildTypesenseIndex({ recreate: true, resume: false }))"
 ```
 
 Then:
@@ -165,7 +165,7 @@ WPS → pricing_rule_id=2 | PU → pricing_rule_id=3
 
 ```bash
 # Reindex Typesense (stable WiFi required)
-npx dotenv -e .env.local -- node -e "import('./scripts/ingest/index_assembly.js').then(m => m.buildTypesenseIndex({ recreate: true, resume: false }))"
+npx dotenv -e .env.local -- node -e "import('./scripts/ingest/index_unified.js').then(m => m.buildTypesenseIndex({ recreate: true, resume: false }))"
 
 # Run fitment extraction (safe to re-run — NULLS NOT DISTINCT unique index)
 npx dotenv -e .env.local -- node scripts/ingest/extract_fitment.js --dry-run

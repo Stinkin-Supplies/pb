@@ -294,7 +294,7 @@ async function main() {
     const products = await fetchProducts();
     await mergeProducts(products);
     await printSummary();
-    console.log('\n✅ Done. Run index_assembly.js --recreate to reindex Typesense.\n');
+    console.log('\n✅ Done. Run index_unified.js --recreate to reindex Typesense.\n');
   } catch (err) {
     console.error('\n❌ Error:', err.message);
     console.error(err.stack);

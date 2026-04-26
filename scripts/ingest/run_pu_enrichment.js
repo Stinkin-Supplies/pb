@@ -55,8 +55,6 @@ console.log('Next step — reindex Typesense to pick up specs, fitment, and upda
 if (DRY_RUN) {
   console.log('  (dry-run — no reindex needed)\n');
 } else {
-  console.log('  For index_assembly.js (full Typesense schema + fitment fields):');
-  console.log('  npx dotenv -e .env.local -- node -e "import(\'./scripts/ingest/index_assembly.js\').then(m => m.buildTypesenseIndex({ recreate: true, resume: false }))"\n');
-  console.log('  OR for index_unified.js (catalog_unified only):');
+  console.log('  Reindex with index_unified.js (catalog_unified only):');
   console.log('  TYPESENSE_API_KEY=xyz node scripts/ingest/index_unified.js --recreate\n');
 }
