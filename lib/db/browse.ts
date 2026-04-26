@@ -31,6 +31,7 @@ export interface CatalogProduct {
   msrp: number | null;
   map_price: number | null;
   image_url: string | null;
+  image_urls?: string[] | null;
   in_stock: boolean;
   stock_quantity: number;
   is_harley_fitment: boolean;
@@ -240,7 +241,7 @@ export async function browseProducts(
       cu.id, cu.sku, cu.slug, cu.name, cu.brand,
       cu.category, cu.subcategory, cu.source_vendor,
       cu.computed_price, cu.msrp, cu.map_price,
-      cu.image_url, cu.in_stock, cu.stock_quantity,
+      cu.image_url, cu.image_urls, cu.in_stock, cu.stock_quantity,
       cu.is_harley_fitment,
       cu.features, cu.oem_numbers
     FROM catalog_unified cu
@@ -267,7 +268,7 @@ export async function browseProducts(
         ranked.id, ranked.sku, ranked.slug, ranked.name, ranked.brand,
         ranked.category, ranked.subcategory, ranked.source_vendor,
         ranked.computed_price, ranked.msrp, ranked.map_price,
-        ranked.image_url, ranked.in_stock, ranked.stock_quantity,
+        ranked.image_url, ranked.image_urls, ranked.in_stock, ranked.stock_quantity,
         ranked.is_harley_fitment,
         ranked.features, ranked.oem_numbers
       FROM ranked

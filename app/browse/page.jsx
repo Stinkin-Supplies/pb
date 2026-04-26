@@ -10,6 +10,7 @@ import { useState, useEffect, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import { getProductImage } from "@/lib/getProductImage";
 
 const GOLD       = "#b8922a";
 const PER_PAGE   = 48;
@@ -26,6 +27,11 @@ const SORT_OPTIONS = [
 
 function ProductCard({ product, index }) {
   const [imgErr, setImgErr] = useState(false);
+  const imageSrc = getProductImage({
+    image: product.image_url ?? null,
+    images: product.image_urls ?? [],
+    brand: product.brand,
+  });
 
   return (
     <motion.div
@@ -57,16 +63,17 @@ function ProductCard({ product, index }) {
             overflow: "hidden",
             position: "relative",
           }}>
-            {product.image_url && !imgErr ? (
+            {imageSrc && !imgErr ? (
               <img
-                src={product.image_url}
+                src={imageSrc}
                 alt={product.name}
                 onError={() => setImgErr(true)}
                 style={{
                   width: "100%",
                   height: "100%",
                   objectFit: "contain",
-                  padding: "16px",
+                  padding: "10px",
+                  imageRendering: "auto",
                 }}
               />
             ) : (
