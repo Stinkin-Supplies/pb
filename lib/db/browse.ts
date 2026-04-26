@@ -271,7 +271,7 @@ export async function browseProducts(
         ranked.is_harley_fitment,
         ranked.features, ranked.oem_numbers
       FROM ranked
-      ORDER BY ${orderBy}
+      ORDER BY ranked.in_stock DESC, ranked.name ASC
       LIMIT $${p++} OFFSET $${p++}
     `
     : `

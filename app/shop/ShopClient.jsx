@@ -368,6 +368,7 @@ export default function ShopClient({
   initialTotal    = 0,
   initialCategory = null,
   initialBrand    = null,
+  initialDebug    = null,
 }) {
   const searchParams = typeof window !== "undefined"
     ? new URLSearchParams(window.location.search) : new URLSearchParams();
@@ -385,6 +386,7 @@ export default function ShopClient({
   const [products, setProducts] = useState(initialProducts);
   const [facets,   setFacets]   = useState(initialFacets);
   const [total,    setTotal]    = useState(initialTotal);
+  const [debug,    setDebug]    = useState(initialDebug);
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState(null);
 
@@ -478,11 +480,21 @@ export default function ShopClient({
     abortRef.current = new AbortController();
     setLoading(true); setError(null);
     try {
-      const res  = await fetch(`/api/search?${buildQS(f, s, p)}`, { signal:abortRef.current.signal });
+      const res  = await fetch(`/api/products?${buildQS(f, s, p)}`, { signal:abortRef.current.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setProducts(data.products ?? []);
       setTotal(data.total ?? 0);
+      setDebug({
+        api: "/api/products",
+        status: res.status,
+        returnedProducts: (data.products ?? []).length,
+        total: data.total ?? 0,
+        page: p,
+        pageSize: PAGE_SIZE,
+        sort: s,
+        filters: f,
+      });
       setFacets({
         categories: data.facets?.categories ?? [],
         brands:     data.facets?.brands     ?? [],
@@ -556,11 +568,26 @@ export default function ShopClient({
   const catActive    = !!filters.category;
   const brandActive  = !!filters.brand;
   const priceActive  = filters.minPrice != null || filters.maxPrice != null;
+  const showDebug    = !!debug;
 
   return (
     <div style={{ background:"#0a0909", minHeight:"100vh", color:"#f0ebe3", fontFamily:"var(--font-stencil),sans-serif" }}>
       <style>{css}</style>
       <NavBar activePage="shop"/>
+
+      {showDebug && (
+        <div style={{
+          background:"rgba(232,98,26,0.12)",
+          borderBottom:"1px solid rgba(232,98,26,0.25)",
+          padding:"8px 20px",
+          fontFamily:"var(--font-stencil),monospace",
+          fontSize:10,
+          letterSpacing:"0.08em",
+          color:"#f0ebe3",
+        }}>
+          DEBUG API /api/products STATUS {debug.status} RETURNED {debug.returnedProducts} TOTAL {debug.total}
+        </div>
+      )}
 
       {/* ── TOOLBAR ─────────────────────────────────────────── */}
       <div style={{ background:"#111010", borderBottom:"1px solid #2a2828", padding:"8px 20px",

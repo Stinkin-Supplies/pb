@@ -149,7 +149,7 @@ export default function BrandDetailPage({ params }) {
         pageSize: String(PAGE_SIZE),
         sort:     s,
       });
-      const res  = await fetch(`/api/search?${qs}`);
+      const res  = await fetch(`/api/products?${qs}`);
       const data = await res.json();
       setProducts(data.products ?? []);
       setTotal(data.total ?? 0);

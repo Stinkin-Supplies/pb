@@ -29,6 +29,7 @@ export default async function ShopPage({ searchParams }) {
   let products = [];
   let total    = 0;
   let facets   = { categories: [], brands: [], priceRange: { min: 0, max: 0 } };
+  let debug   = null;
 
   try {
     const params = new URLSearchParams({ pageSize: String(PAGE_SIZE), sort });
@@ -39,12 +40,22 @@ export default async function ShopPage({ searchParams }) {
       ? `https://${process.env.VERCEL_URL}`
       : "http://localhost:3000";
 
-    const res  = await fetch(`${baseUrl}/api/search?${params}`, { cache: "no-store" });
+    const res  = await fetch(`${baseUrl}/api/products?${params}`, { cache: "no-store" });
     const data = await res.json();
 
     products = data.products ?? [];
     total    = data.total    ?? 0;
     facets   = data.facets   ?? facets;
+    debug    = {
+      api: "/api/products",
+      status: res.status,
+      returnedProducts: products.length,
+      total,
+      pageSize: PAGE_SIZE,
+      category,
+      brand,
+      sort,
+    };
   } catch (err) {
     console.error("[ShopPage]", err.message);
   }
@@ -56,6 +67,7 @@ export default async function ShopPage({ searchParams }) {
       initialTotal={total}
       initialCategory={category}
       initialBrand={brand}
+      initialDebug={debug}
     />
   );
 }

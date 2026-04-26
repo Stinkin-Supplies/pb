@@ -21,7 +21,7 @@ export default async function ClassicShopPage({ searchParams }) {
       ? `https://${process.env.VERCEL_URL}`
       : "http://localhost:3000";
 
-    const res = await fetch(`${baseUrl}/api/search?${params}`, { cache: "no-store" });
+    const res = await fetch(`${baseUrl}/api/products?${params}`, { cache: "no-store" });
     const data = await res.json();
 
     products = data.products ?? [];
