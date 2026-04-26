@@ -1,161 +1,175 @@
 # Stinkin' Supplies — Session Handoff
-**Date:** April 23, 2026
-**Status:** ✅ Fitment v2 migration complete | ✅ 99.9% coverage | ✅ Disk incident resolved | ✅ Engine-era families seeded | ✅ VTwin ingested | ✅ Reindexed 88,301 docs
+**Date:** April 25, 2026
+**Status:** ✅ Vendor enrichment complete | ✅ Fitment pipeline expanded | ✅ New scripts deployed | ⏳ Typesense reindex pending
 
 ---
 
 ## ✅ WHAT'S WORKING NOW
 
-- **Shop** — 50,763 products, images rendering for PU products (18,415 with image_url)
-- **Search** — Typesense live, 50,763 docs, 0 errors
-- **Fitment filtering** — Phase 7 complete: Harley queries use `catalog_fitment_v2` (ID-based, no range logic)
-- **Fitment dropdowns** — Phase 6 complete: `/api/fitment` serves families/models/years from canonical tables
-- **OEM numbers** — 5,411 products have OEM numbers
-- **catalog_fitment_v2** — 2,717,429 rows covering 10,580 specific-fitment products + 3,646 universal (`fits_all_models=true`) = **14,226 total** vs original v1 target of 12,927 ✅
-- **fits_all_models flag** — 3,646 products flagged on catalog_products (sourced from All Models / Universal rows in catalog_fitment)
-- **Harley authority tables** — 15 families, 158 models, 1,415 model-year rows (coverage 1936–2026)
-- **Disk** — 100% full disk resolved; server now 19% used (59GB free)
-- **VTwin** — 37,749 products ingested into catalog_unified (source_vendor=VTWIN)
-- **Typesense** — Reindexed 88,301 docs (WPS + PU + VTwin), 0 failures
+- **Shop** — 88,512 products in catalog_unified (WPS + PU + VTwin)
+- **Search** — Typesense live, 88,301 docs (needs reindex to pick up new enrichment)
+- **Fitment filtering** — catalog_fitment_v2 live (2,717,429 rows, 10,580 products)
+- **Fitment dropdowns** — /api/fitment serves families/models/years from canonical tables
+- **OEM numbers** — 5,411 products have OEM numbers in catalog_unified.oem_numbers[]
+- **catalog_oem_crossref** — ~95,116 rows
+- **Harley authority tables** — 15 families, 158 models, 1,415 model-year rows (1936–2026)
 - **Production** — https://stinksupp.vercel.app
 
 ---
 
-## 🚨 CURRENT ISSUES
+## 📦 WHAT WAS DONE THIS SESSION (April 25)
 
-### Issue 1: Typesense schema mismatch
-`index_assembly.js` defines an old schema missing `drag_part`, `in_fatbook`, `in_harddrive`, `is_active`, `has_image`, `source_vendor`, `features`. Workaround applied (removed `is_active` from `buildFilters` base, removed `description` from `query_by`) but the indexer schema needs a proper update to match what the app expects.
+### 1. WPS Content Enrichment (`enrich_wps_content.js`)
+- Backfilled `description`, `features`, `name`, `upc`, dimensions, `has_map_policy`, `country_of_origin` from `wps_master_item_harddrive.csv`
+- Backfilled `image_url` + `image_urls[]` from `wps-master-image-list.csv`
+- Result: **9,678 content rows updated**, **1,607 images added** to catalog_unified
+- Note: `features` is `text[]` — harddrive plain text wrapped as single-element array
 
-### Issue 2: import_pu_brand_xml.js dead OEM step
-Step 4 tries to UPDATE `cu.oem_part_number` which doesn't exist. Low priority — OEM handled correctly via `catalog_oem_crossref` → `oem_numbers[]`.
+### 2. VTwin Content Enrichment (`enrich_vtwin_content.js`)
+- Backfilled `image_url`, `image_urls[]` (up to 4 per item from FULL_PIC1–4)
+- Backfilled `oem_numbers[]` from OEM_XREF1–3 columns
+- Backfilled `oem_part_number` from VENDOR_PARTNO
+- Synced `cost` (DEALER_PRICE), `msrp` (RETAIL_PRICE), `in_stock` (HAS_STOCK)
+- Backfilled `manufacturer_brand` from MANUFACTURER
+- Join key: `catalog_unified.vendor_sku = vtwin-master.ITEM`
+- Result: **21,797 rows updated** via bulk temp table UPDATE
+- Images: 30,857 VTwin items now have image_url
 
-### Issue 3: Phase 9 (Admin UI) not yet built
-No `/admin/fitment` UI for managing `catalog_fitment_v2` assignments.
+### 3. Drag Specialties XML Enrichment (`ingest_ds_xml.js`)
+- Parsed `Drag-Specialties_Catalog_Content_Export.xml` (6,753 parts)
+- Matched 4,304 DS parts to PU catalog on `partNumber = sku`
+- Enriched: `name`, `description`, `features` (bullet1–24), `image_url`, pricing
+- Unmatched 2,449 DS parts written to `scripts/data/ds_unmatched_parts.csv` (likely from excluded PU product codes)
+- Result: **4,302 rows updated**
 
-### Issue 4: Phase 10 (cutover) not done
-`catalog_fitment` still exists and is still the source for non-HD fitment. Cutover pending Admin UI completion.
+### 4. PU XML Enrichment (`enrich_pu_xml.js`)
+- Processes ALL XML files in `scripts/data/pu_pricefile/` automatically
+- Handles two formats: `Catalog_Content_Export` (bullet1–24) and `PIES_Export` (AAIA standard)
+- Also supports `--dir` flag for alternate directories (ran against `brand_files/` too)
+- Matched 12,736 PU parts across 134 brand XMLs
+- Result: **4,971 rows updated** (name, description, features, image_url, dimensions, pricing)
+
+### 5. Fitment Pipeline — OEM Cross Reference (`build_fitment.js` → catalog_unified columns)
+- Populated `fitment_year_start/end`, `fitment_hd_families`, `fitment_year_ranges` in catalog_unified
+- Sources: VTwin OEM_XREF → hd_parts_data_clean.csv, WPS OEM xref, Fatbook/Oldbook xref
+- Note: This writes to catalog_unified fitment columns only (not catalog_fitment_v2)
+
+### 6. Fitment Pipeline — catalog_fitment_v2 (`build_fitment_v2.js`)
+- Properly populates `catalog_fitment_v2` using `harley_model_years` IDs
+- VTwin: joins via `catalog_products.sku = vtwin-master ITEM` (catalog_products is the real table)
+- WPS: joins via `wps_harley_oem_cross_reference OEM# → WPS# → hd_parts_data_clean`
+- Result: **265,716 VTwin rows** + **65,081 WPS rows** inserted into catalog_fitment_v2
+- Coverage after: VTwin 12.9% (4,858 products), WPS 8.7% (2,328 products), PU unchanged 30.2%
+
+### 7. Fitment Extraction from Product Names (`extract_fitment_from_names.js`)
+- Regex extraction of year ranges and HD family from product name text
+- Handles: `86-06`, `17+`, `'10-'16`, `FLHT/FXD` slash codes, single years, CVO patterns
+- Three sources: year+family, slash model codes, family-only (uses full family year range)
+- Result: **6,185 rows updated** in catalog_unified
+- Coverage after: PU 5,158 with year (was 2,647), WPS 2,266 (was 1,753)
+
+### 8. DB-Driven Fitment Extraction (`extract_fitment_db_driven.js`)
+- New scalable approach using `model_alias_map` + `engine_platform_map` DB tables
+- Add new aliases to DB → re-run script → improved coverage without code changes
+- Result: **14 additional rows** (remaining gap is genuinely unfittable generic parts)
+
+### New DB Tables Created This Session
+- `model_alias_map` — text token → family + model_code + priority (205 aliases)
+- `engine_platform_map` — engine keyword → year range + families (6 entries: M8, Twin Cam, Evo, Shovelhead, TC)
+- Added columns to `catalog_fitment_v2`: `fitment_source`, `confidence_score`, `parsed_snapshot`
 
 ---
 
-## 🏗️ INFRASTRUCTURE
+## 📊 CURRENT STATE (End of April 25)
 
-### Servers
+### catalog_unified fitment coverage
+```
+PU    (24,009): has_year=5,171 | has_families=5,365 | has_ranges=4,911 | 21.5%
+VTWIN (37,749): has_year=5,399 | has_families=5,370 | has_ranges=5,399 | 14.3%
+WPS   (26,754): has_year=2,266 | has_families=2,362 | has_ranges=2,226 |  8.5%
+```
+
+### catalog_fitment_v2
+```
+Total rows:          ~3,048,000+ (was 2,717,429 before this session)
+VTwin covered:       4,858 products (12.9%)
+WPS covered:         2,328 products (8.7%)
+PU covered:          7,250 products (30.2%)
+```
+
+### New Scripts (all in scripts/ingest/)
+```
+enrich_wps_content.js        — WPS content + image backfill
+enrich_vtwin_content.js      — VTwin images, OEM, pricing sync
+ingest_ds_xml.js             — Drag Specialties XML enrichment
+enrich_pu_xml.js             — All PU brand XMLs (both formats, --dir flag)
+build_fitment.js             — OEM xref → catalog_unified fitment columns
+build_fitment_v2.js          — OEM xref → catalog_fitment_v2 (correct table)
+extract_fitment_from_names.js — Regex fitment extraction from product names
+extract_fitment_db_driven.js  — DB alias table driven extraction (scalable)
+```
+
+---
+
+## 🚨 CURRENT ISSUES (carried forward + new)
+
+### Issue 1: Typesense reindex needed
+All enrichment from this session (descriptions, features, images, fitment) is in catalog_unified but Typesense still has the April 23 index. Needs reindex.
+```bash
+node scripts/ingest/index_unified.js --recreate
+```
+
+### Issue 2: Typesense schema mismatch (carried from April 23)
+Reindex with `index_unified.js` to pick up the latest enrichment in `catalog_unified`.
+
+### Issue 3: Phase 9 (Admin UI) not yet built
+No `/admin/fitment` UI for managing catalog_fitment_v2.
+
+### Issue 4: Phase 10 (cutover) not done
+`catalog_fitment` still exists. Cutover to v2 pending Admin UI.
+
+### Issue 5: catalog_unified vs catalog_products sync
+Frontend product data reads from `catalog_unified`. Fitment filtering reads from `catalog_fitment_v2` which references `catalog_products.id`. The enrichment scripts write to `catalog_unified`. These two tables stay in sync via shared `sku` but are separate tables — content enrichment only updated `catalog_unified`.
+
+### Issue 6: PU fitment gap (post-2012)
+`hd_parts_data_clean.csv` covers 1979–2012 only. PU items for 2013+ bikes have no fitment from OEM xref. Needs PU ACES XML files from PU rep to fill this gap.
+
+---
+
+## 🗺️ NEXT SESSION PRIORITIES
+
+1. **Reindex Typesense** — pick up all enriched content from this session
+2. **Reindex Typesense** — use `index_unified.js` to refresh the live collection
+3. **Phase 9 — Admin UI** — `/admin/fitment` page
+4. **Phase 10 — Cutover** — archive catalog_fitment, all writes → v2
+5. **PU ACES fitment files** — request from PU rep, would push PU fitment from 30% → 70%+
+6. **Expand model_alias_map** — add FLTRX, FXDB, FLHTK, FLSTF and other missing codes
+
+---
+
+## 🏗️ INFRASTRUCTURE (unchanged)
+
 ```
 Hetzner:    5.161.100.126
 SSH:        ssh stinkdb
 PostgreSQL: :5432  stinkin_catalog  (user: catalog_app, password: smelly)
 Typesense:  Docker "typesense" (typesense/typesense:30.1, API key: xyz)
 nginx:      :443 HTTPS → Typesense (5.161.100.126.nip.io)
+Vercel:     epluris-projects/pb → https://stinksupp.vercel.app
 ```
 
-### Vercel
-```
-Project:  epluris-projects/pb
-URL:      https://stinksupp.vercel.app
-Deploy:   npx vercel --prod
-```
-
----
-
-## 📊 DATABASE STATE (End of April 23)
-
-### catalog_unified
-```
-Total:       88,512 rows
-WPS:         26,754
-PU:          24,009
-VTwin:       37,749 (ingested April 23)
-image_url:   18,415 PU products + 30,857 VTwin products
-```
-
-### Harley Fitment Authority Tables
-```
-harley_families:     15 rows
-  Modern:            Touring, Softail Evo, Softail M8, Dyna, Sportster,
-                     Trike, Revolution Max, Street, FXR
-  Engine-era:        Twin Cam (1999–2017), Evolution (1984–1999),
-                     Shovelhead (1966–1984), Panhead (1948–1965),
-                     Knucklehead (1936–1947), V-Rod (2002–2017)
-
-harley_models:       158 model codes (includes engine-era canonicals)
-harley_model_years:  1,415 rows (1936–2026)
-
-catalog_fitment_v2:  2,717,429 rows
-Products covered:    10,580 (specific fitment)
-fits_all_models:     3,646 (universal — set on catalog_products)
-Total covered:       14,226 (vs 12,927 v1 target — exceeded ✅)
-Permanently unresolved: 17 products (bad source data — see Known Issues)
-```
-
-### Disk (Hetzner)
-```
-/dev/sda1:  75G total, 14G used, 59G free (19%) as of April 23
-Root cause of April 23 incident: catalog_media had a bloated 29GB btree
-index on (product_id, url). Fixed: dropped + rebuilt as md5 hash index.
-VACUUM FULL catalog_media reclaimed ~43GB.
-```
-
-### catalog_oem_crossref
-```
-Total rows:    ~95,116
-Products with oem_numbers[]: 5,411
-```
-
----
-
-## 📂 SCRIPTS
-
-All in `scripts/ingest/`:
-
-| Script | Purpose |
-|--------|---------|
-| `phase1_2_harley_authority.js` | Creates harley_families/models/model_years tables and seeds canonical data |
-| `phase4_migrate_fitment.js` | Migrates catalog_fitment → catalog_fitment_v2 |
-| `import_wps_harley_oem_crossref.js` | Loads WPS Harley OEM CSV → catalog_oem_crossref |
-
-### Re-run fitment v2 migration (if catalog_fitment changes):
-```bash
-node scripts/ingest/phase4_migrate_fitment.js
-```
-
-### Re-ingest VTwin:
-```bash
-node scripts/ingest/generate_vtwin_skus.js
-node scripts/ingest/ingest_vtwin_unified.js
-```
-
-### Reindex (use stable WiFi):
-```bash
-node scripts/ingest/index_assembly.js --recreate
-```
-
-### Deploy:
-```bash
-npx vercel --prod
-```
-
----
-
-## 🗺️ NEXT SESSION PRIORITIES
-
-1. **Phase 9 — Admin UI** — `/admin/fitment`: Family → Model → Year selector, assign product fitment via `catalog_fitment_v2`
-2. **Phase 10 — Cutover** — stop writing to `catalog_fitment`, archive, all writes → v2
-3. **Fix Typesense schema** — update `index_assembly.js` to include missing fields, reindex
-4. **Verify PU images** — check DevTools on live site for `/api/img` 200 responses
-
----
-
-## 💡 OPERATIONAL GOTCHAS
+## 💡 NEW OPERATIONAL GOTCHAS (April 25)
 
 | Issue | Solution |
 |-------|----------|
-| CROSS JOIN fitment on large product sets | Use temp table for product_ids first to avoid hanging |
-| GENERATE_SERIES with $params | Must cast: GENERATE_SERIES($1::int, $2::int) |
-| index_assembly.js dotenv unreliable | Hardcode CATALOG_DATABASE_URL in script for ingest runs |
-| Vercel 100MB deploy limit | Keep dump files off project root — move to ~/Desktop |
-| catalog_fitment_v2 null-year rows | Use family CROSS JOIN model_years (all years), not year range |
-| Disk fills on Hetzner | Check catalog_media index size first — historical culprit. Then: `sudo journalctl --vacuum-size=200M` |
-| psql pager blocks output | Run `\pset pager off` at start of session |
-| VTwin SKU range | Always generate from 700001+ — WPS/PU use 100k–200k range |
-| VTwin re-ingest | Run generate_vtwin_skus.js first, then ingest_vtwin_unified.js |
-| VTwin date_added | Validate exactly 8 digits before parsing as YYYYMMDD |
+| `features` is `text[]` not `text` | Wrap plain strings as `[string]` before writing |
+| `image_urls` is `text[]` not JSON | Pass JS array, pg driver serializes automatically |
+| `fitment_hd_families` is `text[]` | Pass JS array, not `{Family1,Family2}` string |
+| `fitment_year_ranges` is `jsonb` | Pass as JSON string with `::jsonb` cast |
+| `oem_numbers` is `text[]` | Pass JS array, not JSON string |
+| VTwin join key | `catalog_unified.vendor_sku = vtwin-master.ITEM` (NOT catalog_unified.sku) |
+| `catalog_products.sku` for VTwin | IS the VTwin ITEM number directly (e.g. `10-0040`) |
+| 21k+ individual UPDATE queries | Use temp table + single UPDATE FROM — row-by-row over network hangs |
+| enrich_pu_xml.js --dir flag | `node enrich_pu_xml.js --dir scripts/data/pu_pricefile/brand_files` |
+| DB-driven fitment improvement | INSERT into model_alias_map or engine_platform_map, re-run extract_fitment_db_driven.js |
+| DATABASE_URL not persistent | `export DATABASE_URL="postgresql://catalog_app:smelly@5.161.100.126:5432/stinkin_catalog"` each session |

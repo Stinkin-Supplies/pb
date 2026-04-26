@@ -170,7 +170,7 @@ All other makes → `catalog_fitment` (legacy range query)
 
 **Reindex:**
 ```bash
-node scripts/ingest/index_assembly.js --recreate
+node scripts/ingest/index_unified.js --recreate
 ```
 
 ---
@@ -232,7 +232,7 @@ Street, ATV, Offroad, Snow, Watercraft, Apparel, Helmets, Jackets, Footwear, Pan
 ## KNOWN ISSUES
 
 ### 🔴 Active
-1. **Typesense schema mismatch** — `index_assembly.js` missing drag_part, in_fatbook, is_active, has_image, source_vendor, features
+1. **Typesense reindex** — refresh the live collection with `index_unified.js`
 2. **Phase 9 not done** — no Admin UI for catalog_fitment_v2 management
 3. **Phase 10 not done** — catalog_fitment still exists; cutover pending
 
@@ -271,7 +271,7 @@ Street, ATV, Offroad, Snow, Watercraft, Apparel, Helmets, Jackets, Footwear, Pan
 
 ```bash
 # Reindex Typesense
-node scripts/ingest/index_assembly.js --recreate
+node scripts/ingest/index_unified.js --recreate
 
 # Deploy
 npx vercel --prod

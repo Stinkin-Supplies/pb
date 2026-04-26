@@ -1,59 +1,48 @@
-/**
- * app/api/admin/products/[id]/route.ts
- * PATCH — update category / subcategory on catalog_unified and catalog_products
- */
+import { NextRequest, NextResponse } from 'next/server';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
+import getCatalogDb from '@/lib/db/catalog';
 
-import { NextRequest, NextResponse } from "next/server";
-import { Pool } from "pg";
+async function requireAdmin() {
+  const supabase = await createServerSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+  const { data: profile } = await supabase.from('user_profiles').select('role').eq('id', user.id).single();
+  return profile?.role === 'admin';
+}
 
-const pool = new Pool({
-  connectionString: "postgresql://catalog_app:smelly@5.161.100.126:5432/stinkin_catalog",
-});
-
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params;
-  const productId = parseInt(id);
-  if (isNaN(productId)) {
-    return NextResponse.json({ error: "Invalid product id" }, { status: 400 });
+export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  if (!await requireAdmin()) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const body = await req.json();
-  const { category, subcategory } = body;
+  const { id } = await ctx.params;
+  const body = await request.json();
 
-  if (!category) {
-    return NextResponse.json({ error: "category required" }, { status: 400 });
+  const allowed = ['name', 'description', 'features', 'is_active', 'is_discontinued'];
+  const sets = [];
+  const values = [];
+  let pi = 1;
+
+  for (const key of allowed) {
+    if (key in body) {
+      sets.push(`${key} = $${pi}`);
+      values.push(body[key]);
+      pi++;
+    }
   }
 
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
+  if (!sets.length) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
 
-    // Update catalog_unified (denormalized table)
-    await client.query(
-      `UPDATE catalog_unified
-       SET category = $1, subcategory = $2
-       WHERE id = $3`,
-      [category, subcategory ?? null, productId]
-    );
+  sets.push(`updated_at = NOW()`);
+  values.push(id);
 
-    // Also update catalog_products (source of truth) if the row exists
-    await client.query(
-      `UPDATE catalog_products
-       SET category = $1, subcategory = $2
-       WHERE id = $3`,
-      [category, subcategory ?? null, productId]
-    );
+  const db = getCatalogDb();
+  const res = await db.query(
+    `UPDATE catalog_unified SET ${sets.join(', ')} WHERE id = $${pi} RETURNING id`,
+    values
+  );
 
-    await client.query("COMMIT");
-    return NextResponse.json({ updated: true, category, subcategory });
-  } catch (err: any) {
-    await client.query("ROLLBACK");
-    console.error("Admin product PATCH error:", err.message);
-    return NextResponse.json({ error: err.message }, { status: 500 });
-  } finally {
-    client.release();
-  }
+  if (!res.rows.length) return NextResponse.json({ error: 'Product not found' }, { status: 404 });
+
+  return NextResponse.json({ ok: true });
 }

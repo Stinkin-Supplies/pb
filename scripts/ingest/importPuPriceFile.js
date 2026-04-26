@@ -549,7 +549,7 @@ async function main() {
     log('\n🔍  Triggering Typesense reindex...');
     try {
       execSync(
-        'npx dotenv -e .env.local -- node -e "import(\'./scripts/ingest/index_assembly.js\').then(m=>m.buildTypesenseIndex({recreate:true}))"',
+        'npx dotenv -e .env.local -- node -e "import(\'./scripts/ingest/index_unified.js\').then(m=>m.buildTypesenseIndex({recreate:true}))"',
         { stdio: 'inherit' }
       );
     } catch (err) {
