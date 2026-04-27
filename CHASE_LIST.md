@@ -1,6 +1,6 @@
 # Stinkin' Supplies — Chase List
 **Running log of loose ends to follow up on**
-Last Updated: April 26, 2026 — end of session
+Last Updated: April 27, 2026 — VTwin image + sort fixes
 
 ---
 
@@ -9,6 +9,20 @@ Last Updated: April 26, 2026 — end of session
 1. **Phase 10 — Cutover** — archive `catalog_fitment`, all writes → `catalog_fitment_v2` only
 2. **PU ACES fitment files** — request from PU rep (biggest fitment unlock: 30% → 70%+)
 3. **Expand model_alias_map** — add FLTRX, FXDB, FLHTK, FLSTF, FLHRC, FXDWG
+
+---
+
+## ✅ DONE APRIL 27
+
+| Task | Result |
+|------|--------|
+| Shop default sort | Changed from `newest` → `name_asc` in route.ts, ShopClient.jsx, page.jsx |
+| VTwin thumbnail → full-size fix (DB) | 30,856 catalog_unified rows updated: image_url now FULL_PIC1, 0 thumbnails remaining |
+| VTwin hotlink proxy | vtwinmfg.com added to /api/image-proxy with spoofed Referer; normalizeProductRow wraps URLs |
+| next.config.ts | vtwinmfg.com added to remotePatterns |
+| lib/getProductImage.ts | proxyImageUrl() now routes vtwinmfg.com through /api/image-proxy |
+| ingest_vtwin_unified.js | primaryImage now prefers full_pic1 over thumb_pic |
+| enrich_vtwin_content.js | Removed !row.image_url guard that silently skipped image updates |
 
 ---
 
@@ -107,6 +121,12 @@ Remove dead `cuOEM` UPDATE block (step 4 tries to UPDATE cu.oem_part_number whic
 ### IMG_CACHE_DIR persistence
 Set `IMG_CACHE_DIR=/var/cache/stinkin-images` in `.env.local` on Hetzner.
 
+### enrich_vtwin_content.js DATABASE_URL
+Script uses `process.env.DATABASE_URL` but live DB uses Hetzner credentials. Export the var or switch to the hardcoded connection string before running. See `ingest_vtwin_unified.js` for the pattern.
+
+### source_vendor casing mismatch
+`catalog_products` stores lowercase (`vtwin`, `wps`, `pu`). `catalog_unified` stores uppercase (`VTWIN`, `WPS`, `PU`). Any new vendor-specific queries must use the correct casing per table.
+
 ---
 
 ## 📊 CURRENT STATE (End of April 26)
@@ -139,4 +159,4 @@ Set `IMG_CACHE_DIR=/var/cache/stinkin-images` in `.env.local` on Hetzner.
 
 ---
 
-*Updated: April 26, 2026 — Typesense reindex + admin product manager session*
+*Updated: April 27, 2026 — VTwin image hotlink proxy + sort default + DB thumbnail fix*
