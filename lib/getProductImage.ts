@@ -14,6 +14,10 @@ function isLeMans(url: string) {
   return url.includes("lemansnet.com");
 }
 
+function isVTwin(url: string) {
+  return url.includes("vtwinmfg.com");
+}
+
 function isRealImage(url: string) {
   if (!url || !url.startsWith("http")) return false;
   const lower = url.toLowerCase();
@@ -31,7 +35,7 @@ function isRealImage(url: string) {
 
 export function proxyImageUrl(url: string): string {
   if (!url) return FALLBACK_IMAGE;
-  if (isLeMans(url)) {
+  if (isLeMans(url) || isVTwin(url)) {
     return `/api/image-proxy?url=${encodeURIComponent(url)}`;
   }
   return url;
