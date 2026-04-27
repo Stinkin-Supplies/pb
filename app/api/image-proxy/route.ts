@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Readable } from 'stream'
 
-const ALLOWED_HOSTS = ['cdn.wpsstatic.com', 'asset.lemansnet.com']
+const ALLOWED_HOSTS = ['cdn.wpsstatic.com', 'asset.lemansnet.com', 'www.vtwinmfg.com', 'vtwinmfg.com']
 
 function isAllowedUrl(url: string): boolean {
   try {
@@ -66,6 +66,27 @@ export async function GET(req: NextRequest) {
     // WPS: redirect directly to CDN
     if (hostname === 'cdn.wpsstatic.com' || hostname.endsWith('.wpsstatic.com')) {
       return NextResponse.redirect(url, { status: 302 })
+    }
+
+    // VTwin: fetch with spoofed Referer to bypass hotlink protection
+    if (hostname === 'www.vtwinmfg.com' || hostname === 'vtwinmfg.com') {
+      const upstream = await fetch(url, {
+        headers: {
+          'Referer':    'https://www.vtwinmfg.com/',
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        },
+        cache: 'no-store',
+      })
+      if (!upstream.ok) return placeholder
+      const contentType = upstream.headers.get('content-type') ?? 'image/jpeg'
+      const blob = await upstream.arrayBuffer()
+      return new NextResponse(blob, {
+        status: 200,
+        headers: {
+          'Content-Type':  contentType,
+          'Cache-Control': 'public, max-age=86400, s-maxage=604800',
+        },
+      })
     }
 
     // LeMans: download zip, extract image, serve directly
