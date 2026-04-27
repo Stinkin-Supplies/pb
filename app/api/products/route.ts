@@ -46,6 +46,12 @@ type FacetResponse = {
   priceRange: { min: number; max: number };
 };
 
+function proxyVTwinUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (url.includes('vtwinmfg.com')) return `/api/image-proxy?url=${encodeURIComponent(url)}`;
+  return url;
+}
+
 function normalizeProductRow(row: any) {
   const price = Number(row.price ?? row.msrp ?? row.cost ?? 0);
   const stockQty = Number(row.stock_quantity ?? 0);
@@ -62,8 +68,8 @@ function normalizeProductRow(row: any) {
     mapPrice: row.map_price ?? null,
     inStock: row.in_stock ?? stockQty > 0,
     stockQty,
-    image: row.image_url ?? row.image ?? null,
-    images: row.image_urls ?? (row.image_url ? [row.image_url] : []),
+    image: proxyVTwinUrl(row.image_url ?? row.image ?? null),
+    images: (row.image_urls ?? (row.image_url ? [row.image_url] : [])).map(proxyVTwinUrl),
     badge: row.closeout ? "sale" : null,
     vendor: row.source_vendor ?? null,
     source_vendor: row.source_vendor ?? null,
@@ -120,7 +126,7 @@ export async function GET(req: Request) {
   const fitmentYear = url.searchParams.get("fitmentYear")
     ? parseInt(url.searchParams.get("fitmentYear")!, 10)
     : undefined;
-  const sort = url.searchParams.get("sort") || "newest";
+  const sort = url.searchParams.get("sort") || "name_asc";
   const page = Math.max(0, parseInt(url.searchParams.get("page") || "0", 10));
   const pageSize = Math.min(
     PAGE_SIZE_MAX,
