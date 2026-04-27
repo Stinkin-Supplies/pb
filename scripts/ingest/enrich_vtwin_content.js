@@ -144,7 +144,7 @@ async function main() {
       let manufacturerBrand = null;
 
       // Images
-      if (vt.primary_image && (FORCE || !row.image_url)) {
+      if (vt.primary_image) {
         imageUrl = vt.primary_image;
         if (vt.all_images.length > 0) {
           imageUrls = vt.all_images;

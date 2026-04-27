@@ -16,7 +16,7 @@ export default async function ShopPage({ searchParams }) {
   const view     = p?.view     ?? "classic";
   const category = p?.category ?? null;
   const brand    = p?.brand    ?? null;
-  const sort     = p?.sort     ?? "newest";
+  const sort     = p?.sort     ?? "name_asc";
 
   if (view === "harley") {
     return (

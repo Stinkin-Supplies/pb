@@ -72,7 +72,7 @@ function buildRow(p) {
   const imageUrls = [p.full_pic1, p.full_pic2, p.full_pic3, p.full_pic4]
     .map(v => (v || '').trim()).filter(Boolean);
 
-  const primaryImage = (p.thumb_pic || '').trim() || imageUrls[0] || null;
+  const primaryImage = imageUrls[0] || (p.thumb_pic || '').trim() || null;
   const slug         = slugify(p.description || p.sku).slice(0, 80) + '-' + internalSku.toLowerCase();
   const partAddDate  = parseDate(p.date_added);
 

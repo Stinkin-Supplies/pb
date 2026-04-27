@@ -377,7 +377,7 @@ export default function ShopClient({
   const urlBrand        = searchParams.get("brand");
   const urlMinPrice     = searchParams.get("minPrice");
   const urlMaxPrice     = searchParams.get("maxPrice");
-  const urlSort         = searchParams.get("sort") ?? "newest";
+  const urlSort         = searchParams.get("sort") ?? "name_asc";
   const urlPage         = parseInt(searchParams.get("page") ?? "0", 10);
   const urlFitmentMake  = searchParams.get("fitmentMake")  || null;
   const urlFitmentModel = searchParams.get("fitmentModel") || null;

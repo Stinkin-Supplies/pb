@@ -34,6 +34,15 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "stinksupp.vercel.app",
       },
+      // ── VTwin Manufacturing ──────────────────────────────────
+      {
+        protocol: "https",
+        hostname: "www.vtwinmfg.com",
+      },
+      {
+        protocol: "https",
+        hostname: "vtwinmfg.com",
+      },
       // ── Supabase Storage ─────────────────────────────────────
       {
         protocol: "https",
