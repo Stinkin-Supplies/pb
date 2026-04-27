@@ -1,20 +1,27 @@
 # Stinkin' Supplies — Chase List
 **Running log of loose ends to follow up on**
-Last Updated: April 25, 2026 — end of session
+Last Updated: April 26, 2026 — end of session
 
 ---
 
 ## 🚀 NEXT SESSION — START HERE
 
-1. **Reindex Typesense** — all enrichment from April 25 session needs to be picked up
-   ```bash
-   export DATABASE_URL="postgresql://catalog_app:smelly@5.161.100.126:5432/stinkin_catalog"
-   node scripts/ingest/index_unified.js --recreate
-   ```
-2. **Reindex Typesense** — refresh the live collection with `index_unified.js`
-3. **Phase 9 — Admin UI** — `/admin/fitment`: Family → Model → Year selector, assign/remove fitment via `catalog_fitment_v2`
-4. **Phase 10 — Cutover** — archive `catalog_fitment`, all writes → `catalog_fitment_v2` only
-5. **PU ACES fitment files** — request from PU rep (biggest fitment unlock: 30% → 70%+)
+1. **Phase 10 — Cutover** — archive `catalog_fitment`, all writes → `catalog_fitment_v2` only
+2. **PU ACES fitment files** — request from PU rep (biggest fitment unlock: 30% → 70%+)
+3. **Expand model_alias_map** — add FLTRX, FXDB, FLHTK, FLSTF, FLHRC, FXDWG
+
+---
+
+## ✅ DONE APRIL 26
+
+| Task | Result |
+|------|--------|
+| Typesense reindex | 88,301 docs, 0 errors — picks up all April 25 enrichment |
+| Typesense schema cleanup | index_unified.js confirmed complete; index_assembly.js retired |
+| Phase 9 — Admin product manager | /admin/products live: search, filter, edit, bulk, fitment |
+| proxy.ts fix | /api/admin/ added to isPublic passthrough |
+| harley_families slug fix | No slug column — all queries switched to name |
+| catalog_fitment_v2 unique constraint | UNIQUE (product_id, model_year_id) added directly on DB |
 
 ---
 
@@ -69,14 +76,11 @@ Last Updated: April 25, 2026 — end of session
 
 ## 🔴 HIGH PRIORITY
 
-### Typesense reindex (blocking for new content to appear in search)
-All April 25 enrichment (descriptions, features, images, fitment) is in catalog_unified but not yet in Typesense.
-
-### Typesense schema mismatch
-Missing fields: `drag_part`, `in_fatbook`, `in_harddrive`, `is_active`, `has_image`, `source_vendor`, `features`
+### Phase 10 — Cutover
+Stop writing to `catalog_fitment`. Archive it. All new writes → `catalog_fitment_v2` only.
 
 ### PU ACES fitment files
-The single biggest remaining fitment unlock. PU delivers per-brand ACES XML files separately from product content XMLs. These contain vehicle application data (year/make/model) for every part number. Would push PU from 21.5% year coverage → 70%+. Request from PU rep.
+Biggest remaining fitment unlock. PU delivers per-brand ACES XML files separately from product content XMLs — contain vehicle application data (year/make/model) for every part number. Would push PU from 30.2% → 70%+. Request from PU rep.
 
 ---
 
@@ -86,14 +90,10 @@ The single biggest remaining fitment unlock. PU delivers per-brand ACES XML file
 Missing codes that appeared in product names: `FLTRX`, `FXDB`, `FLHTK`, `FLSTF`, `FLHRC`, `FXDWG`. Add to DB, re-run `extract_fitment_db_driven.js`.
 ```sql
 INSERT INTO model_alias_map (alias_text, model_family, model_code, priority)
-VALUES ('fltrx', 'touring', 'FLTRX', 9), ('fxdb', 'dyna', 'FXDB', 9), ...;
+VALUES ('fltrx', 'touring', 'FLTRX', 9), ('fxdb', 'dyna', 'FXDB', 9),
+       ('flhtk', 'touring', 'FLHTK', 9), ('flstf', 'softail', 'FLSTF', 9),
+       ('flhrc', 'touring', 'FLHRC', 9), ('fxdwg', 'dyna', 'FXDWG', 9);
 ```
-
-### Phase 9 — Admin UI
-`/admin/fitment`: Family → Model → Year selector, add/remove product fitment via `catalog_fitment_v2`.
-
-### Phase 10 — Cutover
-Stop writing to `catalog_fitment`. Archive it. All new writes → `catalog_fitment_v2`.
 
 ### WPS FatBook PDF OEM extraction
 Would expand OEM number coverage significantly. WPS side of catalog_oem_crossref still sparse.
@@ -109,7 +109,7 @@ Set `IMG_CACHE_DIR=/var/cache/stinkin-images` in `.env.local` on Hetzner.
 
 ---
 
-## 📊 CURRENT STATE (End of April 25)
+## 📊 CURRENT STATE (End of April 26)
 
 | Metric | Value |
 |--------|-------|
@@ -117,7 +117,7 @@ Set `IMG_CACHE_DIR=/var/cache/stinkin-images` in `.env.local` on Hetzner.
 | — WPS | 26,754 |
 | — PU | 24,009 |
 | — VTwin | 37,749 |
-| Typesense indexed | 88,301 (stale — needs reindex) |
+| Typesense indexed | 88,301 (fresh — April 26) |
 | catalog_fitment (legacy) | 26,008 rows |
 | catalog_fitment_v2 | ~3,048,000+ rows |
 | — VTwin covered | 4,858 products (12.9%) |
@@ -139,4 +139,4 @@ Set `IMG_CACHE_DIR=/var/cache/stinkin-images` in `.env.local` on Hetzner.
 
 ---
 
-*Updated: April 25, 2026 — vendor enrichment + fitment pipeline session*
+*Updated: April 26, 2026 — Typesense reindex + admin product manager session*
