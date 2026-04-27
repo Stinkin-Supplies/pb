@@ -1,3 +1,11 @@
+// ============================================================
+// app/api/harley2/style-products/route.ts
+// ============================================================
+// Phase 10 — catalog_fitment retired.
+// Fitment now joins catalog_fitment_v2 → harley_model_years
+// → harley_models → harley_families, filtering by family name.
+// ============================================================
+
 import { NextRequest, NextResponse } from "next/server";
 import getCatalogDb from "@/lib/db/catalog";
 import { getHarleyStyle } from "@/lib/harley/config";
@@ -12,11 +20,22 @@ export async function GET(request: NextRequest) {
   if (!style) return NextResponse.json({ error: "Missing style" }, { status: 400 });
 
   const db = getCatalogDb();
-  const params: Array<string | number | string[]> = [style.generic_models];
+
+  // generic_models is an array of family names e.g. ["Touring"]
+  const familyNames: string[] = style.generic_models;
+
+  const params: Array<string | number | string[]> = [familyNames];
   const conditions = [
     "cp.is_active = true",
-    "LOWER(cf.make) = LOWER('Harley-Davidson')",
-    "cf.model = ANY($1::text[])",
+    `EXISTS (
+      SELECT 1
+      FROM catalog_fitment_v2 cfv
+      JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id
+      JOIN harley_models hm      ON hm.id  = hmy.model_id
+      JOIN harley_families hf    ON hf.id  = hm.family_id
+      WHERE cfv.product_id = cp.id
+        AND hf.name = ANY($1::text[])
+    )`,
   ];
 
   if (category) {
@@ -27,7 +46,7 @@ export async function GET(request: NextRequest) {
   try {
     const { rows } = await db.query(
       `
-      SELECT DISTINCT
+      SELECT
         cp.id,
         cp.sku,
         cp.slug,
@@ -67,7 +86,6 @@ export async function GET(request: NextRequest) {
         cp.fitment_year_start,
         cp.fitment_year_end
       FROM public.catalog_products cp
-      JOIN public.catalog_fitment cf ON cf.product_id = cp.id
       WHERE ${conditions.join(" AND ")}
       ORDER BY cp.sort_priority DESC, cp.name ASC
       LIMIT 60

@@ -1,36 +1,8 @@
 // ============================================================
 // app/api/products/route.ts
 // ============================================================
-// Server-side product filter endpoint.
-// Called by ShopClient on every filter/sort/page change.
-//
-// GET /api/products
-//   ?category=ATV
-//   &brand=K%26L+SUPPLY
-//   &minPrice=10
-//   &maxPrice=500
-//   &inStock=true
-//   &sort=price_asc
-//   &page=0
-//   &pageSize=48
-//
-// Returns:
-//   {
-//     products:    NormalizedProduct[],
-//     total:       number,
-//     page:        number,
-//     pageSize:    number,
-//     facets: {
-//       categories: { name, count }[],
-//       brands:     { name, count }[],
-//       priceRange: { min, max },
-//     }
-//   }
-//
-// Facet counts are accurate across ALL matching products,
-// not just the current page.
-//
-// Phase B: swap this for Typesense — zero DB load, sub-10ms.
+// Phase 10 — catalog_fitment retired. Fitment filtering uses
+// catalog_fitment_v2 only.
 // ============================================================
 
 import { NextResponse } from "next/server";
@@ -121,7 +93,6 @@ export async function GET(req: Request) {
     : undefined;
   const inStock = url.searchParams.get("inStock") === "true" ? true : undefined;
   const search = url.searchParams.get("search")?.trim() || undefined;
-  const fitmentMake = url.searchParams.get("fitmentMake")?.trim() || undefined;
   const fitmentModel = url.searchParams.get("fitmentModel")?.trim() || undefined;
   const fitmentYear = url.searchParams.get("fitmentYear")
     ? parseInt(url.searchParams.get("fitmentYear")!, 10)
@@ -174,72 +145,43 @@ export async function GET(req: Request) {
     values.push(`%${search}%`);
     paramIdx++;
   }
-  if (fitmentMake && fitmentMake.toLowerCase() === 'harley-davidson') {
-    // Phase 7 — use canonical catalog_fitment_v2 (ID-based, no range ambiguity)
-    if (fitmentYear && fitmentModel) {
-      // Exact: specific model + year
-      conditions.push(`
-        EXISTS (
-          SELECT 1 FROM catalog_fitment_v2 cfv
-          JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id
-          JOIN harley_models hm ON hm.id = hmy.model_id
-          WHERE cfv.product_id = cp.id
-            AND hm.model_code = $${paramIdx++}
-            AND hmy.year = $${paramIdx++}
-        )
-      `);
-      values.push(fitmentModel, fitmentYear);
-    } else if (fitmentModel) {
-      // Model only
-      conditions.push(`
-        EXISTS (
-          SELECT 1 FROM catalog_fitment_v2 cfv
-          JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id
-          JOIN harley_models hm ON hm.id = hmy.model_id
-          WHERE cfv.product_id = cp.id
-            AND hm.model_code = $${paramIdx++}
-        )
-      `);
-      values.push(fitmentModel);
-    } else if (fitmentYear) {
-      // Year only
-      conditions.push(`
-        EXISTS (
-          SELECT 1 FROM catalog_fitment_v2 cfv
-          JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id
-          WHERE cfv.product_id = cp.id
-            AND hmy.year = $${paramIdx++}
-        )
-      `);
-      values.push(fitmentYear);
-    } else {
-      // Make only — any Harley fitment
-      conditions.push(`
-        EXISTS (
-          SELECT 1 FROM catalog_fitment_v2 cfv
-          WHERE cfv.product_id = cp.id
-        )
-      `);
-    }
-  } else if (fitmentMake) {
-    // Non-Harley makes — keep old catalog_fitment path
-    const makeIdx = paramIdx++;
-    values.push(fitmentMake);
-    let fitmentClauses = `AND LOWER(cf.make) = LOWER($${makeIdx})`;
-    if (fitmentModel) {
-      fitmentClauses += ` AND LOWER(cf.model) = LOWER($${paramIdx++})`;
-      values.push(fitmentModel);
-    }
-    if (fitmentYear) {
-      fitmentClauses += ` AND cf.year_start <= $${paramIdx} AND cf.year_end >= $${paramIdx}`;
-      paramIdx++;
-      values.push(fitmentYear);
-    }
-    conditions.push(
-      `EXISTS (SELECT 1 FROM public.catalog_fitment cf WHERE cf.product_id = cp.id ${fitmentClauses})`
-    );
+
+  // Fitment filtering — catalog_fitment_v2 only
+  if (fitmentModel && fitmentYear) {
+    conditions.push(`
+      EXISTS (
+        SELECT 1 FROM catalog_fitment_v2 cfv
+        JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id
+        JOIN harley_models hm ON hm.id = hmy.model_id
+        WHERE cfv.product_id = cp.id
+          AND hm.model_code = $${paramIdx++}
+          AND hmy.year = $${paramIdx++}
+      )
+    `);
+    values.push(fitmentModel, fitmentYear);
+  } else if (fitmentModel) {
+    conditions.push(`
+      EXISTS (
+        SELECT 1 FROM catalog_fitment_v2 cfv
+        JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id
+        JOIN harley_models hm ON hm.id = hmy.model_id
+        WHERE cfv.product_id = cp.id
+          AND hm.model_code = $${paramIdx++}
+      )
+    `);
+    values.push(fitmentModel);
+  } else if (fitmentYear) {
+    conditions.push(`
+      EXISTS (
+        SELECT 1 FROM catalog_fitment_v2 cfv
+        JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id
+        WHERE cfv.product_id = cp.id
+          AND hmy.year = $${paramIdx++}
+      )
+    `);
+    values.push(fitmentYear);
   }
-  
+
   const where = conditions.join(" AND ");
   const orderMap: Record<string, string> = {
     newest: "cp.created_at DESC",
