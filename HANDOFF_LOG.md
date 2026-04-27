@@ -1,6 +1,6 @@
 # Stinkin' Supplies — Session Handoff
-**Date:** April 26, 2026
-**Status:** ✅ Typesense reindexed | ✅ Admin product manager live | ✅ Schema cleaned up | ⏳ Phase 10 cutover pending
+**Date:** April 27, 2026
+**Status:** ✅ Typesense reindexed | ✅ Admin product manager live | ✅ Schema cleaned up | ✅ VTwin image + sort fixes | ⏳ Phase 10 cutover pending
 
 ---
 
@@ -18,7 +18,25 @@
 
 ---
 
-## 📦 WHAT WAS DONE THIS SESSION (April 26)
+## 📦 WHAT WAS DONE THIS SESSION (April 27)
+
+### 1. Shop Sort Default — VTwin Domination Fix
+- Default sort changed from `newest` (created_at DESC) to `name_asc` across all three entry points
+- Files: `app/api/products/route.ts`, `app/shop/ShopClient.jsx`, `app/shop/page.jsx`
+- Root cause: VTwin was the most recently ingested vendor so all 37k rows had the latest `created_at`, flooding the first pages
+
+### 2. VTwin Image Blurriness Fix
+- Root cause 1: `catalog_unified.image_url` was storing THUMB_PIC (`/tn/` path, `t`-suffix) instead of FULL_PIC1
+- Root cause 2: `vtwinmfg.com` blocks hotlinks — browser was receiving a rejected/placeholder response and scaling it up
+- **DB fix:** `UPDATE catalog_unified SET image_url = image_urls[1] WHERE source_vendor = 'VTWIN' AND image_url LIKE '%/tn/%'` — 30,856 rows updated, 0 thumbnail URLs remaining
+- **Proxy fix:** Added `vtwinmfg.com` to `/api/image-proxy` with spoofed `Referer: https://www.vtwinmfg.com/` header; `normalizeProductRow` now wraps vtwin image URLs through the proxy before returning them to the ProductCard
+- **Ingest fix:** `scripts/ingest/ingest_vtwin_unified.js` primaryImage now prefers `full_pic1` over `thumb_pic` (for future re-ingests)
+- **Enrich fix:** `scripts/ingest/enrich_vtwin_content.js` removed `!row.image_url` guard that was silently skipping image updates when a thumbnail was already stored
+- Files changed: `app/api/image-proxy/route.ts`, `app/api/products/route.ts`, `lib/getProductImage.ts`, `next.config.ts`, `scripts/ingest/ingest_vtwin_unified.js`, `scripts/ingest/enrich_vtwin_content.js`
+
+---
+
+## 📦 WHAT WAS DONE LAST SESSION (April 26)
 
 ### 1. Typesense Reindex
 - Ran `node scripts/ingest/index_unified.js --recreate`
@@ -92,10 +110,13 @@ PU covered:          7,250 products (30.2%)
 `catalog_fitment` still exists. Cutover to v2 pending.
 
 ### Issue 2: catalog_unified vs catalog_products sync
-Frontend reads from `catalog_unified`. Fitment filtering reads from `catalog_fitment_v2` which references `catalog_products.id`. Stay in sync via shared `sku` but are separate tables.
+Frontend shop grid reads from `catalog_products` (not `catalog_unified`). `source_vendor` is lowercase in `catalog_products` (`vtwin`, `wps`, `pu`) but uppercase in `catalog_unified` (`VTWIN`, `WPS`, `PU`). Keep this in mind for any vendor-specific queries.
 
 ### Issue 3: PU fitment gap (post-2012)
 `hd_parts_data_clean.csv` covers 1979–2012 only. PU items for 2013+ bikes need PU ACES XML files from PU rep.
+
+### Issue 4: enrich_vtwin_content.js DATABASE_URL mismatch
+The enrichment script reads `process.env.DATABASE_URL` but the live DB requires the hardcoded Hetzner connection. Either export `DATABASE_URL` before running or switch the script to use the hardcoded string (see `ingest_vtwin_unified.js` for the pattern). The April 27 DB fix was applied directly via psql instead.
 
 ---
 
