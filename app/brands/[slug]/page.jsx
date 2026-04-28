@@ -250,7 +250,7 @@ export default function BrandDetailPage({ params }) {
               return (
                 <Link
                   key={p.id}
-                  href={`/shop/${p.slug}`}
+                  href={`/browse/${p.slug}`}
                   className="pcard"
                   style={{ animationDelay: `${Math.min(i, 12) * 0.03}s`,
                            opacity: p.inStock ? 1 : 0.55 }}

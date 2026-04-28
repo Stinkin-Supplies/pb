@@ -201,7 +201,7 @@ const NAV = [
   {
     section: "STORE",
     links: [
-      { href: "/shop",   icon: "↗", label: "VIEW STORE"  },
+      { href: "/browse",   icon: "↗", label: "VIEW STORE"  },
       { href: "/garage", icon: "⌂", label: "MY GARAGE"   },
     ],
   },
@@ -263,7 +263,7 @@ export default async function AdminLayout({ children, params }) {
                 <span>STINKIN' SUPPLIES</span>
               </div>
               <div className="topbar-right">
-                <a href="/shop" className="topbar-store-link">↗ VIEW STORE</a>
+                <a href="/browse" className="topbar-store-link">↗ VIEW STORE</a>
               </div>
             </div>
 

@@ -222,7 +222,7 @@ export default async function OrdersPage() {
               YOUR ORDER HISTORY WILL APPEAR HERE
             </div>
             <a
-              href="/shop"
+              href="/browse"
               style={{
                 ...B({ fontSize: 16, letterSpacing: "0.1em" }),
                 display: "inline-block",

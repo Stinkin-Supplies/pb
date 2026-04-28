@@ -239,7 +239,7 @@ export default async function AdminProductsPage({ searchParams }) {
           ) : null}
         </form>
 
-        <Link className="btn" href="/shop">View Store</Link>
+        <Link className="btn" href="/browse">View Store</Link>
       </div>
 
       <div className="table-wrap">
@@ -261,7 +261,7 @@ export default async function AdminProductsPage({ searchParams }) {
                   <td>
                     <div>{p.slug?.match(/([A-Z]{3}-\d{6})$/i)?.[1] ?? p.sku ?? <span className="muted">—</span>}</div>
                     <div className="muted" style={{ fontSize: 10 }}>
-                      <Link href={`/shop/${p.slug}`} className="muted" style={{ textDecoration: "none" }}>
+                      <Link href={`/browse/${p.slug}`} className="muted" style={{ textDecoration: "none" }}>
                         /shop/{p.slug}
                       </Link>
                     </div>

@@ -28,7 +28,7 @@ export default function CheckoutSuccessPage() {
           YOUR ORDER HAS BEEN PLACED SUCCESSFULLY
         </div>
         <div style={{ display:"flex", gap:12, justifyContent:"center" }}>
-          <a href="/shop" style={{ background:"#e8621a", border:"none", color:"#0a0909",
+          <a href="/browse" style={{ background:"#e8621a", border:"none", color:"#0a0909",
             fontFamily:"var(--font-caesar),sans-serif", fontSize:18, letterSpacing:"0.1em",
             padding:"12px 28px", borderRadius:2, textDecoration:"none" }}>
             CONTINUE SHOPPING

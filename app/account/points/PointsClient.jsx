@@ -183,7 +183,7 @@ export default function PointsClient({ user, points, lifetimeSpend, orderCount, 
                 </div>
                 <span className="redeem-note">POINTS ARE APPLIED AT CHECKOUT · MAP PRICING IS ALWAYS ENFORCED</span>
               </div>
-              <button className="shop-btn" onClick={() => window.location.href = "/shop"}>
+              <button className="shop-btn" onClick={() => window.location.href = "/browse"}>
                 SHOP NOW →
               </button>
             </div>

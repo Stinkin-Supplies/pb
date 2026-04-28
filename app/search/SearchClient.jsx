@@ -324,7 +324,7 @@ function ResultCard({ p, i, query, onAdd }) {
     <div
       className="s-card"
       style={{ animationDelay:`${Math.min(i,12) * 0.03}s`, opacity: p.inStock ? 1 : 0.55 }}
-      onClick={() => window.location.href = `/shop/${p.slug}`}
+      onClick={() => window.location.href = `/browse/${p.slug}`}
     >
       <div className="s-card-img">
         {img
@@ -701,7 +701,7 @@ export default function SearchClient({ initialQuery = "" }) {
           <div className="cat-pills">
             {CATEGORIES.map(c => (
               <div key={c} className="cat-pill"
-                onClick={() => window.location.href = `/shop?category=${encodeURIComponent(c)}`}>
+                onClick={() => window.location.href = `/browse?category=${encodeURIComponent(c)}`}>
                 {c}
               </div>
             ))}

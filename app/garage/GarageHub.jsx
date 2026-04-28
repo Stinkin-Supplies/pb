@@ -567,7 +567,7 @@ export default function GarageHub({ user, initialAddresses, initialVehicles, led
                         <div className="bike-name">{v.make} {v.model}</div>
                         <div className="bike-meta">{v.year} · {v.type?.toUpperCase() ?? "MOTORCYCLE"}{v.nickname ? ` · "${v.nickname}"` : ""}</div>
                         <div className="bike-actions">
-                          <button className="btn-orange" style={{fontSize:13, padding:"5px 12px"}} onClick={() => window.location.href = `/shop`}>SHOP PARTS →</button>
+                          <button className="btn-orange" style={{fontSize:13, padding:"5px 12px"}} onClick={() => window.location.href = "/browse"}>SHOP PARTS →</button>
                           {!v.is_primary && <button className="btn-ghost" onClick={() => handleSetPrimary(v.id)}>SET PRIMARY</button>}
                           <button className="btn-danger" onClick={() => handleRemoveBike(v.id)}>REMOVE</button>
                         </div>
@@ -666,7 +666,7 @@ export default function GarageHub({ user, initialAddresses, initialVehicles, led
           <div className="gh-card">
             <div className="gh-card-head">
               <div className="gh-card-title">SAVED <span>PARTS</span></div>
-              <a href="/shop" style={{...M({fontSize:9, letterSpacing:"0.12em"}), color:"#8a8784", textDecoration:"none"}}>BROWSE MORE →</a>
+              <a href="/browse" style={{...M({fontSize:9, letterSpacing:"0.12em"}), color:"#8a8784", textDecoration:"none"}}>BROWSE MORE →</a>
             </div>
             <div className="gh-card-body">
               {wishlistItems.length === 0 ? (
@@ -674,18 +674,18 @@ export default function GarageHub({ user, initialAddresses, initialVehicles, led
                   <div style={{fontSize:36, marginBottom:12, opacity:0.2}}>♡</div>
                   <div className="gh-empty-title">WISHLIST IS EMPTY</div>
                   <div className="gh-empty-sub">SAVE PARTS FROM ANY PRODUCT PAGE</div>
-                  <button className="btn-orange" onClick={() => window.location.href = "/shop"}>BROWSE PARTS</button>
+                  <button className="btn-orange" onClick={() => window.location.href = "/browse"}>BROWSE PARTS</button>
                 </div>
               ) : (
                 <div className="wl-grid">
                   {wishlistItems.map((item, i) => (
                     <div key={item.wishlistId} className="wl-card" style={{animationDelay:`${i*0.04}s`}}>
-                      <div className="wl-img" onClick={() => window.location.href=`/shop/${item.slug}`}>
+                      <div className="wl-img" onClick={() => window.location.href=`/browse/${item.slug}`}>
                         <span style={M({fontSize:8, color:"#3a3838", letterSpacing:"0.1em", position:"relative", zIndex:1})}>NO IMAGE</span>
                       </div>
                       <div className="wl-body">
                         <div className="wl-brand">{item.brand}</div>
-                        <div className="wl-name" onClick={() => window.location.href=`/shop/${item.slug}`}>{item.name}</div>
+                        <div className="wl-name" onClick={() => window.location.href=`/browse/${item.slug}`}>{item.name}</div>
                         <div className="wl-price">${item.price.toFixed(2)}</div>
                         <div className={`wl-stock ${item.inStock?"wl-in":"wl-out"}`}>{item.inStock?"✓ IN STOCK":"✗ OUT OF STOCK"}</div>
                         <div className="wl-actions">
@@ -720,7 +720,7 @@ export default function GarageHub({ user, initialAddresses, initialVehicles, led
                 <div className="gh-empty">
                   <div className="gh-empty-title">NO ORDERS YET</div>
                   <div className="gh-empty-sub">YOUR ORDER HISTORY WILL APPEAR HERE AFTER YOUR FIRST PURCHASE</div>
-                  <button className="btn-orange" onClick={() => window.location.href = "/shop"}>SHOP NOW</button>
+                  <button className="btn-orange" onClick={() => window.location.href = "/browse"}>SHOP NOW</button>
                 </div>
               ) : (
                 orders.map(order => (
