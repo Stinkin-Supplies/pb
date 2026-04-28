@@ -1,14 +1,14 @@
 # Stinkin' Supplies — Chase List
 **Running log of loose ends to follow up on**
-Last Updated: April 27, 2026 — VTwin image + sort fixes
+Last Updated: April 27, 2026 — end of session
 
 ---
 
 ## 🚀 NEXT SESSION — START HERE
 
-1. **Phase 10 — Cutover** — archive `catalog_fitment`, all writes → `catalog_fitment_v2` only
-2. **PU ACES fitment files** — request from PU rep (biggest fitment unlock: 30% → 70%+)
-3. **Expand model_alias_map** — add FLTRX, FXDB, FLHTK, FLSTF, FLHRC, FXDWG
+1. **PU ACES fitment files** — request from PU rep (biggest fitment unlock: 30% → 70%+)
+2. **Expand model_alias_map** — add FLTRX, FXDB, FLHTK, FLSTF, FLHRC, FXDWG
+3. **Frontend redesign** — /browse overhaul (vision discussed, implementation TBD)
 
 ---
 
@@ -16,13 +16,12 @@ Last Updated: April 27, 2026 — VTwin image + sort fixes
 
 | Task | Result |
 |------|--------|
-| Shop default sort | Changed from `newest` → `name_asc` in route.ts, ShopClient.jsx, page.jsx |
-| VTwin thumbnail → full-size fix (DB) | 30,856 catalog_unified rows updated: image_url now FULL_PIC1, 0 thumbnails remaining |
-| VTwin hotlink proxy | vtwinmfg.com added to /api/image-proxy with spoofed Referer; normalizeProductRow wraps URLs |
-| next.config.ts | vtwinmfg.com added to remotePatterns |
-| lib/getProductImage.ts | proxyImageUrl() now routes vtwinmfg.com through /api/image-proxy |
-| ingest_vtwin_unified.js | primaryImage now prefers full_pic1 over thumb_pic |
-| enrich_vtwin_content.js | Removed !row.image_url guard that silently skipped image updates |
+| Phase 10 — Cutover | catalog_fitment → catalog_fitment_archived; all routes on catalog_fitment_v2 |
+| Retire legacy fitment ingest scripts | 6 scripts moved to scripts/ingest/_retired/ |
+| api/fitment/route.ts | Non-Harley paths removed, makes endpoint removed, HD-only |
+| api/products/route.ts | Non-Harley fitment block removed, fitmentMake param dropped |
+| api/harley2/style-products/route.ts | Rewritten to join catalog_fitment_v2 → harley_families by name |
+| app/browse/[slug]/page.jsx | Fitment query switched to catalog_fitment_readable view |
 
 ---
 
@@ -90,9 +89,6 @@ Last Updated: April 27, 2026 — VTwin image + sort fixes
 
 ## 🔴 HIGH PRIORITY
 
-### Phase 10 — Cutover
-Stop writing to `catalog_fitment`. Archive it. All new writes → `catalog_fitment_v2` only.
-
 ### PU ACES fitment files
 Biggest remaining fitment unlock. PU delivers per-brand ACES XML files separately from product content XMLs — contain vehicle application data (year/make/model) for every part number. Would push PU from 30.2% → 70%+. Request from PU rep.
 
@@ -109,6 +105,9 @@ VALUES ('fltrx', 'touring', 'FLTRX', 9), ('fxdb', 'dyna', 'FXDB', 9),
        ('flhrc', 'touring', 'FLHRC', 9), ('fxdwg', 'dyna', 'FXDWG', 9);
 ```
 
+### Frontend redesign — /browse
+Full overhaul of the browse/shop experience. Vision TBD — discuss with Laken before building.
+
 ### WPS FatBook PDF OEM extraction
 Would expand OEM number coverage significantly. WPS side of catalog_oem_crossref still sparse.
 
@@ -121,15 +120,9 @@ Remove dead `cuOEM` UPDATE block (step 4 tries to UPDATE cu.oem_part_number whic
 ### IMG_CACHE_DIR persistence
 Set `IMG_CACHE_DIR=/var/cache/stinkin-images` in `.env.local` on Hetzner.
 
-### enrich_vtwin_content.js DATABASE_URL
-Script uses `process.env.DATABASE_URL` but live DB uses Hetzner credentials. Export the var or switch to the hardcoded connection string before running. See `ingest_vtwin_unified.js` for the pattern.
-
-### source_vendor casing mismatch
-`catalog_products` stores lowercase (`vtwin`, `wps`, `pu`). `catalog_unified` stores uppercase (`VTWIN`, `WPS`, `PU`). Any new vendor-specific queries must use the correct casing per table.
-
 ---
 
-## 📊 CURRENT STATE (End of April 26)
+## 📊 CURRENT STATE (End of April 27)
 
 | Metric | Value |
 |--------|-------|
@@ -138,8 +131,8 @@ Script uses `process.env.DATABASE_URL` but live DB uses Hetzner credentials. Exp
 | — PU | 24,009 |
 | — VTwin | 37,749 |
 | Typesense indexed | 88,301 (fresh — April 26) |
-| catalog_fitment (legacy) | 26,008 rows |
-| catalog_fitment_v2 | ~3,048,000+ rows |
+| catalog_fitment (legacy) | ARCHIVED → catalog_fitment_archived |
+| catalog_fitment_v2 | ~3,048,000+ rows — SOLE CANONICAL TABLE |
 | — VTwin covered | 4,858 products (12.9%) |
 | — WPS covered | 2,328 products (8.7%) |
 | — PU covered | 7,250 products (30.2%) |
@@ -159,4 +152,4 @@ Script uses `process.env.DATABASE_URL` but live DB uses Hetzner credentials. Exp
 
 ---
 
-*Updated: April 27, 2026 — VTwin image hotlink proxy + sort default + DB thumbnail fix*
+*Updated: April 27, 2026 — Phase 10 cutover complete*
