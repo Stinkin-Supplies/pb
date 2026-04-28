@@ -850,9 +850,9 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
       <div className="pdp-breadcrumb">
         <Link href="/">HOME</Link>
         <span className="sep">→</span>
-        <Link href="/shop">SHOP</Link>
+        <Link href="/browse">SHOP</Link>
         <span className="sep">→</span>
-        <Link href={`/shop?category=${product.category}`}>{product.category?.toUpperCase()}</Link>
+        <Link href={`/browse?category=${product.category}`}>{product.category?.toUpperCase()}</Link>
         <span className="sep">→</span>
         <span className="current">{product.name?.toUpperCase()}</span>
       </div>
@@ -1283,7 +1283,7 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
             <div className="related-title">
               MORE FROM <span>{(activeBrand || "THIS CATEGORY").toUpperCase()}</span>
             </div>
-            <a href={`/shop?category=${product.category}`} className="related-link">
+            <a href={`/browse?category=${product.category}`} className="related-link">
               VIEW ALL IN CATEGORY →
             </a>
           </div>
@@ -1292,7 +1292,7 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
               <div
                 key={p.id}
                 className="related-card"
-                onClick={() => window.location.href = `/shop/${p.slug}`}
+                onClick={() => window.location.href = `/browse/${p.slug}`}
               >
                 <RelatedCardImage product={p} />
                 <div className="related-body">

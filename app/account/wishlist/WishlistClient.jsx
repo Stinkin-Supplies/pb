@@ -91,7 +91,7 @@ export default function WishlistClient({ userId, initialItems }) {
             </div>
             <div style={{fontSize:13, color:"#8a8784", marginTop:4}}>{items.length} {items.length === 1 ? "item" : "items"} saved</div>
           </div>
-          <a href="/shop" style={{...B({fontSize:15, letterSpacing:"0.1em"}), background:"#e8621a", color:"#0a0909", padding:"10px 20px", borderRadius:2, textDecoration:"none"}}>
+          <a href="/browse" style={{...B({fontSize:15, letterSpacing:"0.1em"}), background:"#e8621a", color:"#0a0909", padding:"10px 20px", borderRadius:2, textDecoration:"none"}}>
             BROWSE PARTS →
           </a>
         </div>
@@ -104,7 +104,7 @@ export default function WishlistClient({ userId, initialItems }) {
             <div style={{fontSize:40, marginBottom:16, opacity:0.2}}>♡</div>
             <div className="wl-empty-title">YOUR WISHLIST IS EMPTY</div>
             <div className="wl-empty-sub">SAVE PARTS YOU WANT TO BUY LATER</div>
-            <button className="wl-empty-btn" onClick={() => window.location.href = "/shop"}>
+            <button className="wl-empty-btn" onClick={() => window.location.href = "/browse"}>
               BROWSE PARTS
             </button>
           </div>
@@ -112,12 +112,12 @@ export default function WishlistClient({ userId, initialItems }) {
           <div className="wl-grid">
             {items.map((item, i) => (
               <div key={item.wishlistId} className="wl-card" style={{animationDelay:`${i*0.04}s`}}>
-                <div className="wl-card-img" onClick={() => window.location.href = `/shop/${item.slug}`} style={{cursor:"pointer"}}>
+                <div className="wl-card-img" onClick={() => window.location.href = `/browse/${item.slug}`} style={{cursor:"pointer"}}>
                   <span style={M({fontSize:8, color:"#3a3838", letterSpacing:"0.1em", position:"relative", zIndex:1})}>NO IMAGE</span>
                 </div>
                 <div className="wl-card-body">
                   <div className="wl-brand">{item.brand}</div>
-                  <div className="wl-name" onClick={() => window.location.href = `/shop/${item.slug}`} style={{cursor:"pointer"}}>{item.name}</div>
+                  <div className="wl-name" onClick={() => window.location.href = `/browse/${item.slug}`} style={{cursor:"pointer"}}>{item.name}</div>
                   <div className="wl-price">${item.price.toFixed(2)}</div>
                   <div className={`wl-stock ${item.inStock?"in":"out"}`}>
                     {item.inStock ? "✓ IN STOCK" : "✗ OUT OF STOCK"}

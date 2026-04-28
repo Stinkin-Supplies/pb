@@ -414,7 +414,7 @@ export default function AccountClient({ user, initialAddresses }) {
                   { href:"/account/orders",   icon:"📦",  title:"Order History",   sub:"Track & view past orders"  },
                   { href:"/account/points",   icon:"★",   title:"Points & Rewards",sub:`${user.points.toLocaleString()} pts available` },
                   { href:"/account/wishlist", icon:"♡",   title:"Wishlist",        sub:"Saved parts & alerts"      },
-                  { href:"/shop",             icon:"🔧",  title:"Shop Parts",      sub:"500K+ parts available"     },
+                  { href:"/browse",             icon:"🔧",  title:"Shop Parts",      sub:"500K+ parts available"     },
                   { href:"/search",           icon:"🔍",  title:"Search",          sub:"Find any part fast"        },
                 ].map(l => (
                   <a key={l.href} href={l.href} className="quick-link">

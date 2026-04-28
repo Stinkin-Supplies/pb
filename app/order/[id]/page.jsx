@@ -572,7 +572,7 @@ export default async function OrderPage({ params }) {
         {/* ── CTA ── */}
         <div className="cta-row">
           <a
-            href="/shop"
+            href="/browse"
             style={{
               ...B({ fontSize: 16, letterSpacing: "0.1em" }),
               display: "inline-block",

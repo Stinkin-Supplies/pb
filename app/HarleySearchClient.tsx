@@ -395,7 +395,7 @@ function ProductModal({ product, onClose }: { product: HarleyProduct | null; onC
                 )}
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 4 }}>
-                <Link href={`/shop/${product.slug}`} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, textDecoration: "none", background: "#e8621a", color: "#0a0908", border: "1px solid #e8621a", borderRadius: 2, fontFamily: "var(--font-stencil, monospace)", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", padding: "12px 18px", flex: isMobile ? "1 1 100%" : "0 0 auto" }}>Open Full Page</Link>
+                <Link href={`/browse/${product.slug}`} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, textDecoration: "none", background: "#e8621a", color: "#0a0908", border: "1px solid #e8621a", borderRadius: 2, fontFamily: "var(--font-stencil, monospace)", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", padding: "12px 18px", flex: isMobile ? "1 1 100%" : "0 0 auto" }}>Open Full Page</Link>
                 <button onClick={onClose} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", background: "transparent", color: "#a09b92", border: "1px solid rgba(52,50,48,0.8)", borderRadius: 2, fontFamily: "var(--font-stencil, monospace)", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", padding: "12px 18px", cursor: "pointer", flex: isMobile ? "1 1 100%" : "0 0 auto" }}>Keep Browsing</button>
               </div>
             </div>
