@@ -25,7 +25,7 @@ export default async function AdminProductsPage() {
 
   // Harley families for fitment modal
   const familiesRes = await db.query(
-    `SELECT id, name, slug FROM harley_families ORDER BY name`
+    `SELECT id, name FROM harley_families ORDER BY name`
   );
   const families = familiesRes.rows;
 
