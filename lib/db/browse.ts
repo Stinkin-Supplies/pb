@@ -1,7 +1,8 @@
 /**
- * lib/db/catalog.ts
+ * lib/db/browse.ts
  * All queries against catalog_unified — the single source of truth.
- * Never touches Typesense. Scalable: swap pool for any Postgres client.
+ * Phase 10 — fitment via catalog_fitment_v2 only.
+ * Supports multi-family filtering for era pages + universal/chopper.
  */
 
 import { Pool } from "pg";
@@ -72,10 +73,16 @@ export interface HarleyModel {
 }
 
 export interface BrowseFilters {
+  // Single family (legacy) or multiple families (era pages)
   family?: string;
+  families?: string[];
+  // Universal/chopper — no fitment required
+  universal?: boolean;
   modelCode?: string;
   year?: number;
+  // Single DB category string or multiple (mapped from category slug)
   category?: string;
+  dbCategories?: string[];
   brand?: string;
   inStock?: boolean;
   search?: string;
@@ -131,9 +138,7 @@ export async function getYears(modelId: number): Promise<number[]> {
 }
 
 // Count products per family (for era cards)
-export async function getFamilyProductCounts(): Promise<
-  Record<string, number>
-> {
+export async function getFamilyProductCounts(): Promise<Record<string, number>> {
   const { rows } = await pool.query(
     `SELECT hf.name AS family, COUNT(DISTINCT cfv.product_id) AS cnt
      FROM harley_families hf
@@ -149,14 +154,15 @@ export async function getFamilyProductCounts(): Promise<
 
 // ─── Browse / Search ──────────────────────────────────────────────────────────
 
-export async function browseProducts(
-  filters: BrowseFilters
-): Promise<BrowseResult> {
+export async function browseProducts(filters: BrowseFilters): Promise<BrowseResult> {
   const {
     family,
+    families,
+    universal,
     modelCode,
     year,
     category,
+    dbCategories,
     brand,
     inStock,
     search,
@@ -171,18 +177,32 @@ export async function browseProducts(
   const params: unknown[] = [];
   let p = 1;
 
-  // Fitment filter — join through v2 authority tables
+  // Resolve effective family list
+  const effectiveFamilies: string[] = families?.length
+    ? families
+    : family
+      ? [family]
+      : [];
+
+  // Fitment filter
   let fitmentJoin = "";
-  if (family || modelCode || year) {
+
+  if (universal) {
+    // Chopper/universal — products with no specific fitment requirement
+    conditions.push(`(cu.fits_all_models = true OR cu.is_universal = true)`);
+  } else if (effectiveFamilies.length > 0 || modelCode || year) {
     fitmentJoin = `
       JOIN catalog_fitment_v2 cfv ON cfv.product_id = cu.id
       JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id
       JOIN harley_models hm ON hm.id = hmy.model_id
       JOIN harley_families hf ON hf.id = hm.family_id
     `;
-    if (family) {
+    if (effectiveFamilies.length === 1) {
       conditions.push(`hf.name = $${p++}`);
-      params.push(family);
+      params.push(effectiveFamilies[0]);
+    } else if (effectiveFamilies.length > 1) {
+      conditions.push(`hf.name = ANY($${p++}::text[])`);
+      params.push(effectiveFamilies);
     }
     if (modelCode) {
       conditions.push(`hm.model_code = $${p++}`);
@@ -194,10 +214,20 @@ export async function browseProducts(
     }
   }
 
-  if (category) {
+  // Category filter — dbCategories takes priority over category string
+  if (dbCategories && dbCategories.length > 0) {
+    if (dbCategories.length === 1) {
+      conditions.push(`cu.category = $${p++}`);
+      params.push(dbCategories[0]);
+    } else {
+      conditions.push(`cu.category = ANY($${p++}::text[])`);
+      params.push(dbCategories);
+    }
+  } else if (category) {
     conditions.push(`cu.category = $${p++}`);
     params.push(category);
   }
+
   if (brand) {
     conditions.push(`cu.brand ILIKE $${p++}`);
     params.push(brand);
@@ -210,7 +240,7 @@ export async function browseProducts(
       `(cu.name ILIKE $${p++} OR cu.brand ILIKE $${p} OR cu.sku ILIKE $${p} OR $${p} = ANY(cu.oem_numbers))`
     );
     params.push(`%${search}%`);
-    p += 3; // brand, sku, oem reuse same param
+    p += 3;
   }
   if (minPrice != null) {
     conditions.push(`cu.computed_price >= $${p++}`);
@@ -221,19 +251,17 @@ export async function browseProducts(
     params.push(maxPrice);
   }
 
-  const where =
-    conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-    const sortMap: Record<string, string> = {
-      relevance:  "cu.in_stock DESC, cu.name ASC",
-      price_asc:  "cu.computed_price ASC NULLS LAST",
-      price_desc: "cu.computed_price DESC NULLS LAST",
-      name_asc:   "cu.name ASC",
-      newest:     "cu.id DESC",
-    };
-    
+  const sortMap: Record<string, string> = {
+    relevance:  "cu.in_stock DESC, cu.name ASC",
+    price_asc:  "cu.computed_price ASC NULLS LAST",
+    price_desc: "cu.computed_price DESC NULLS LAST",
+    name_asc:   "cu.name ASC",
+    newest:     "cu.id DESC",
+  };
+
   const orderBy = sortMap[sort] ?? "cu.id DESC";
-
   const offset = (page - 1) * perPage;
 
   const baseQuery = `
@@ -249,15 +277,11 @@ export async function browseProducts(
     ${where}
   `;
 
-  // Main query
   const dataQuery = sort === "relevance"
     ? `
-      WITH base AS (
-        ${baseQuery}
-      ),
+      WITH base AS (${baseQuery}),
       ranked AS (
-        SELECT
-          base.*,
+        SELECT base.*,
           ROW_NUMBER() OVER (
             PARTITION BY base.source_vendor
             ORDER BY base.id DESC
@@ -269,8 +293,7 @@ export async function browseProducts(
         ranked.category, ranked.subcategory, ranked.source_vendor,
         ranked.computed_price, ranked.msrp, ranked.map_price,
         ranked.image_url, ranked.image_urls, ranked.in_stock, ranked.stock_quantity,
-        ranked.is_harley_fitment,
-        ranked.features, ranked.oem_numbers
+        ranked.is_harley_fitment, ranked.features, ranked.oem_numbers
       FROM ranked
       ORDER BY ranked.in_stock DESC, ranked.name ASC
       LIMIT $${p++} OFFSET $${p++}
@@ -282,7 +305,6 @@ export async function browseProducts(
     `;
   params.push(perPage, offset);
 
-  // Count query
   const countQuery = `
     SELECT COUNT(DISTINCT cu.id) AS total
     FROM catalog_unified cu
@@ -290,40 +312,17 @@ export async function browseProducts(
     ${where}
   `;
 
-  // Facets
-  const filterParamCount = params.length - 2; // subtract the limit + offset we pushed
+  const filterParamCount = params.length - 2;
   const facetParams = params.slice(0, filterParamCount);
-  const categoryFacetQuery = `
-    SELECT cu.category AS name, COUNT(DISTINCT cu.id) AS count
-    FROM catalog_unified cu
-    ${fitmentJoin}
-    ${where}
-    GROUP BY cu.category
-    ORDER BY count DESC
-    LIMIT 20
-  `;
-  const brandFacetQuery = `
-    SELECT cu.brand AS name, COUNT(DISTINCT cu.id) AS count
-    FROM catalog_unified cu
-    ${fitmentJoin}
-    ${where}
-    GROUP BY cu.brand
-    ORDER BY count DESC
-    LIMIT 30
-  `;
-  const priceRangeQuery = `
-    SELECT MIN(cu.computed_price) AS min, MAX(cu.computed_price) AS max
-    FROM catalog_unified cu
-    ${fitmentJoin}
-    ${where}
-  `;
+
+  const facetBase = `FROM catalog_unified cu ${fitmentJoin} ${where}`;
 
   const [dataRes, countRes, catRes, brandRes, priceRes] = await Promise.all([
     pool.query(dataQuery, params),
     pool.query(countQuery, facetParams),
-    pool.query(categoryFacetQuery, facetParams),
-    pool.query(brandFacetQuery, facetParams),
-    pool.query(priceRangeQuery, facetParams),
+    pool.query(`SELECT cu.category AS name, COUNT(DISTINCT cu.id) AS count ${facetBase} GROUP BY cu.category ORDER BY count DESC LIMIT 20`, facetParams),
+    pool.query(`SELECT cu.brand AS name, COUNT(DISTINCT cu.id) AS count ${facetBase} GROUP BY cu.brand ORDER BY count DESC LIMIT 30`, facetParams),
+    pool.query(`SELECT MIN(cu.computed_price) AS min, MAX(cu.computed_price) AS max ${facetBase}`, facetParams),
   ]);
 
   return {
@@ -332,14 +331,8 @@ export async function browseProducts(
     page,
     perPage,
     facets: {
-      categories: catRes.rows.map((r) => ({
-        name: r.name,
-        count: parseInt(r.count),
-      })),
-      brands: brandRes.rows.map((r) => ({
-        name: r.name,
-        count: parseInt(r.count),
-      })),
+      categories: catRes.rows.map((r) => ({ name: r.name, count: parseInt(r.count) })),
+      brands: brandRes.rows.map((r) => ({ name: r.name, count: parseInt(r.count) })),
       priceRange: {
         min: parseFloat(priceRes.rows[0]?.min ?? "0"),
         max: parseFloat(priceRes.rows[0]?.max ?? "0"),
@@ -350,9 +343,7 @@ export async function browseProducts(
 
 // ─── Product Detail ───────────────────────────────────────────────────────────
 
-export async function getProductBySlug(
-  slug: string
-): Promise<ProductDetail | null> {
+export async function getProductBySlug(slug: string): Promise<ProductDetail | null> {
   const { rows } = await pool.query(
     `SELECT
        cu.*,
@@ -371,7 +362,6 @@ export async function getProductBySlug(
 
   const product = rows[0];
 
-  // Get fitment summary
   const { rows: fitRows } = await pool.query(
     `SELECT
        hf.name AS family,
@@ -394,9 +384,7 @@ export async function getProductBySlug(
 
 // ─── Category stats for landing ───────────────────────────────────────────────
 
-export async function getCategoryStats(): Promise<
-  { category: string; count: number }[]
-> {
+export async function getCategoryStats(): Promise<{ category: string; count: number }[]> {
   const { rows } = await pool.query(
     `SELECT category, COUNT(*) AS count
      FROM catalog_unified
@@ -410,10 +398,7 @@ export async function getCategoryStats(): Promise<
 
 // ─── Quick search (autocomplete) ─────────────────────────────────────────────
 
-export async function quickSearch(
-  q: string,
-  limit = 8
-): Promise<CatalogProduct[]> {
+export async function quickSearch(q: string, limit = 8): Promise<CatalogProduct[]> {
   const { rows } = await pool.query(
     `SELECT
        id, sku, slug, name, brand, category,
