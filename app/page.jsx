@@ -1,1231 +1,556 @@
 "use client";
-
-/**
- * app/page.jsx  (NEW — replaces current landing)
- *
- * Animations used:
- * - Framer Motion: spring step transitions in fitment selector,
- *   staggered hero reveal, magnetic button effect
- * - GSAP: velocity ticker (scroll-based-velocity style)
- * - CSS: grain overlay, card hover accents, layered era cards
- */
+// ============================================================
+// app/page.jsx — Stinkin' Supplies Homepage
+// ============================================================
+// Structure:
+//   1. Floating minimal header
+//   2. Era cards — scroll-driven stacked reveal
+//   3. Shop By Part — category grid with hover image reveal
+//   4. Corner nav — fixed bottom-right
+// ============================================================
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { motion, AnimatePresence, useScroll, useTransform, useSpring } from "framer-motion";
-import { gsap } from "gsap";
+import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
+import { ERAS } from "@/lib/eras/config";
+import { HARLEY_CATEGORIES } from "@/lib/harley/config";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const GOLD       = "#b8922a";
-const GOLD_DIM   = "#8a6a1a";
-const GOLD_LIGHT = "#d4aa44";
+const TEAL   = "#0d9488";
+const DARK   = "#080808";
+const LIGHT  = "#e8e2d8";
+const MUTED  = "#3a3a3a";
 
-const ENGINE_ERAS = [
-  { key: "Knucklehead", years: "1936–1947", color: "#1a1510" },
-  { key: "Panhead",     years: "1948–1965", color: "#151a10" },
-  { key: "Shovelhead",  years: "1966–1984", color: "#1a1510" },
-  { key: "Evolution",   years: "1984–1999", color: "#101518" },
-  { key: "Twin Cam",    years: "1999–2017", color: "#101418" },
-  { key: "FXR",         years: "1982–1994", color: "#151510" },
-  { key: "Sportster",   years: "1957–2022", color: "#181210" },
-  { key: "Dyna",        years: "1991–2017", color: "#121518" },
-  { key: "Touring",     years: "1969–2026", color: "#181210" },
-  { key: "Softail M8",  years: "2018–2026", color: "#101518" },
-  { key: "Revolution Max", years: "2021–2026", color: "#181010" },
-  { key: "Trike",       years: "2009–2026", color: "#121510" },
-];
+// Category icons — override the emoji with SVG-style labels
+const CAT_ICONS = {
+  "engine":         "⚙",
+  "controls":       "✦",
+  "seats":          "▬",
+  "exhaust":        "≋",
+  "wheels-tires":   "○",
+  "electrical":     "⚡",
+  "suspension":     "⟨⟩",
+  "brakes":         "◉",
+  "frame-body":     "▣",
+  "fuel-systems":   "◈",
+  "drivetrain":     "⬡",
+  "gaskets-seals":  "◎",
+  "luggage":        "▤",
+  "windshields":    "◻",
+  "oils-chemicals": "◬",
+};
 
-const CATEGORIES = [
-  { name: "Engine",           icon: "⚙",  slug: "Engine" },
-  { name: "Exhaust",          icon: "💨", slug: "Exhaust" },
-  { name: "Brakes",           icon: "🛑", slug: "Brakes" },
-  { name: "Wheels & Tires",   icon: "🛞", slug: "Tire & Wheel" },
-  { name: "Electrical",       icon: "⚡", slug: "Electrical" },
-  { name: "Suspension",       icon: "🔧", slug: "Suspension" },
-  { name: "Controls",         icon: "🎛", slug: "Hand Controls" },
-  { name: "Drivetrain",       icon: "⛓", slug: "Drive" },
-  { name: "Gaskets & Seals",  icon: "🔩", slug: "Gaskets/Seals" },
-  { name: "Fuel Systems",     icon: "⛽", slug: "Intake/Carb/Fuel System" },
-  { name: "Frame & Body",     icon: "🏗", slug: "Body" },
-  { name: "Oils & Chemicals", icon: "🛢", slug: "Oils & Chemicals" },
-  { name: "Seats",            icon: "💺", slug: "Seat" },
-  { name: "Luggage",          icon: "🎒", slug: "Luggage" },
-  { name: "Windshields",      icon: "🌬", slug: "Windshield/Windscreen" },
-];
+// ─── Noise texture overlay ────────────────────────────────────────────────────
 
-const TICKER_ITEMS = [
-  "88,301 Parts In Stock",
-  "Knucklehead to M8",
-  "Free Shipping Over $99",
-  "V-Twin · WPS · Parts Unlimited",
-  "Fitment Guaranteed",
-  "Same Day Processing",
-  "1936 to Present",
-  "Dealer Pricing",
-];
+const NOISE = `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`;
 
-// ─── Magnetic Button ──────────────────────────────────────────────────────────
+// ─── Floating Header ──────────────────────────────────────────────────────────
 
-function MagneticButton({ children, className, onClick, ...props }) {
-  const ref = useRef(null);
-  const [pos, setPos] = useState({ x: 0, y: 0 });
+function FloatingHeader() {
+  const [scrolled, setScrolled] = useState(false);
 
-  function handleMove(e) {
-    const rect = ref.current?.getBoundingClientRect();
-    if (!rect) return;
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
-    setPos({
-      x: (e.clientX - cx) * 0.25,
-      y: (e.clientY - cy) * 0.25,
-    });
-  }
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 40);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   return (
-    <motion.button
-      ref={ref}
-      className={className}
-      onMouseMove={handleMove}
-      onMouseLeave={() => setPos({ x: 0, y: 0 })}
-      animate={{ x: pos.x, y: pos.y }}
-      transition={{ type: "spring", stiffness: 300, damping: 20 }}
-      onClick={onClick}
-      {...props}
+    <motion.header
+      animate={{
+        background: scrolled ? "rgba(8,8,8,0.96)" : TEAL,
+        borderBottomColor: scrolled ? "#1a1a1a" : "transparent",
+      }}
+      transition={{ duration: 0.3 }}
+      style={{
+        position: "fixed", top: 0, left: 0, right: 0, zIndex: 90,
+        height: 52, display: "flex", alignItems: "center",
+        justifyContent: "space-between", padding: "0 20px",
+        borderBottom: "1px solid transparent",
+        backdropFilter: "blur(12px)",
+      }}
     >
-      {children}
-    </motion.button>
-  );
-}
-
-// ─── Velocity Ticker ──────────────────────────────────────────────────────────
-
-function VelocityTicker() {
-  const tickerRef = useRef(null);
-  const { scrollY } = useScroll();
-  const x = useTransform(scrollY, [0, 3000], [0, -800]);
-  const smoothX = useSpring(x, { stiffness: 80, damping: 20 });
-
-  const items = [...TICKER_ITEMS, ...TICKER_ITEMS, ...TICKER_ITEMS];
-
-  return (
-    <div style={{
-      background: GOLD,
-      padding: "10px 0",
-      overflow: "hidden",
-      whiteSpace: "nowrap",
-      borderTop: "1px solid #0a0a0a",
-    }}>
-      <motion.div style={{ x: smoothX, display: "inline-flex" }}>
-        {items.map((item, i) => (
-          <span key={i} style={{
+      {/* Logo */}
+      <Link href="/" style={{ textDecoration: "none" }}>
+        <motion.div
+          animate={{ color: scrolled ? LIGHT : DARK }}
+          style={{
             fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
-            fontSize: "12px",
-            letterSpacing: "3px",
-            color: "rgba(10,9,9,0.85)",
-            padding: "0 32px",
-          }}>
-            {item}
-            <span style={{ marginLeft: "32px", opacity: 0.4 }}>◆</span>
-          </span>
-        ))}
-      </motion.div>
-    </div>
-  );
-}
-
-// ─── Fitment Selector ─────────────────────────────────────────────────────────
-
-function FitmentSelector() {
-  const [step, setStep] = useState(0); // 0=era, 1=model, 2=year
-  const [families, setFamilies] = useState([]);
-  const [models, setModels]   = useState([]);
-  const [years, setYears]     = useState([]);
-  const [counts, setCounts]   = useState({});
-
-  const [selFamily, setSelFamily] = useState(null);
-  const [selModel, setSelModel]   = useState(null);
-  const [selYear, setSelYear]     = useState(null);
-
-  useEffect(() => {
-    fetch("/api/browse/fitment?type=families")
-      .then(r => r.json()).then(d => setFamilies(d.families ?? []));
-    fetch("/api/browse/fitment?type=counts")
-      .then(r => r.json()).then(d => setCounts(d.counts ?? {}));
-  }, []);
-
-  useEffect(() => {
-    if (!selFamily) return;
-    setModels([]); setSelModel(null); setSelYear(null);
-    fetch(`/api/browse/fitment?type=models&familyId=${selFamily.id}`)
-      .then(r => r.json()).then(d => setModels(d.models ?? []));
-  }, [selFamily]);
-
-  useEffect(() => {
-    if (!selModel) return;
-    setYears([]); setSelYear(null);
-    fetch(`/api/browse/fitment?type=years&modelId=${selModel.id}`)
-      .then(r => r.json()).then(d => setYears(d.years ?? []));
-  }, [selModel]);
-
-  function handleFind() {
-    if (!selFamily) return;
-    const params = new URLSearchParams();
-    params.set("family", selFamily.name);
-    if (selModel)  params.set("model",  selModel.model_code);
-    if (selYear)   params.set("year",   selYear);
-    window.location.href = `/browse?${params.toString()}`;
-  }
-
-  const stepLabels = ["Engine / Era", "Model", "Year"];
-  const stepValues = [
-    selFamily?.name ?? null,
-    selModel?.name  ?? null,
-    selYear         ?? null,
-  ];
-
-  return (
-    <div style={{
-      background: "#141414",
-      border: `1px solid #2a2828`,
-      borderLeft: `3px solid ${GOLD}`,
-      padding: "28px 32px",
-      maxWidth: 580,
-      position: "relative",
-    }}>
-      <div style={{
-        fontFamily: "var(--font-stencil, monospace)",
-        fontSize: "9px",
-        letterSpacing: "3px",
-        color: GOLD,
-        marginBottom: "20px",
-        textTransform: "uppercase",
-      }}>
-        Select Your Bike
-      </div>
-
-      {/* Step progress */}
-      <div style={{ display: "flex", gap: "8px", marginBottom: "20px" }}>
-        {stepLabels.map((label, i) => (
-          <button
-            key={i}
-            onClick={() => i < step + 1 && setStep(i)}
-            style={{
-              flex: 1,
-              background: step === i ? GOLD : i < step ? "#1e1e1e" : "#111",
-              border: `1px solid ${step === i ? GOLD : i < step ? "#2a2a2a" : "#1a1a1a"}`,
-              color: step === i ? "#0a0909" : i < step ? "#c4c0bc" : "#444",
-              fontFamily: "var(--font-stencil, monospace)",
-              fontSize: "9px",
-              letterSpacing: "2px",
-              padding: "6px 8px",
-              cursor: i < step + 1 ? "pointer" : "default",
-              textTransform: "uppercase",
-              transition: "all 0.2s",
-            }}
-          >
-            {stepValues[i] ?? label}
-          </button>
-        ))}
-      </div>
-
-      {/* Step content */}
-      <AnimatePresence mode="wait">
-        {step === 0 && (
-          <motion.div
-            key="step0"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ type: "spring", stiffness: 400, damping: 30 }}
-          >
-            <div style={{
-              fontSize: "11px",
-              color: "#666",
-              marginBottom: "12px",
-              fontFamily: "var(--font-stencil, monospace)",
-              letterSpacing: "1px",
-            }}>
-              Choose your engine family
-            </div>
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(3, 1fr)",
-              gap: "6px",
-              maxHeight: "220px",
-              overflowY: "auto",
-            }}>
-              {families.map(fam => (
-                <motion.button
-                  key={fam.id}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => { setSelFamily(fam); setStep(1); }}
-                  style={{
-                    background: "#0f0f0f",
-                    border: `1px solid #252525`,
-                    color: "#c4c0bc",
-                    fontFamily: "var(--font-stencil, monospace)",
-                    fontSize: "10px",
-                    letterSpacing: "1px",
-                    padding: "10px 8px",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    textTransform: "uppercase",
-                    transition: "border-color 0.15s",
-                    lineHeight: 1.3,
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.borderColor = GOLD}
-                  onMouseLeave={e => e.currentTarget.style.borderColor = "#252525"}
-                >
-                  <div style={{ color: "#e0d8cc", fontSize: "11px", marginBottom: "2px" }}>
-                    {fam.name}
-                  </div>
-                  <div style={{ color: "#6f6a62", fontSize: "9px", marginBottom: "2px" }}>
-                    {fam.start_year && fam.end_year
-                      ? `${fam.start_year}–${fam.end_year}`
-                      : "All years"}
-                  </div>
-                  {counts[fam.name] && (
-                    <div style={{ color: "#555", fontSize: "9px" }}>
-                      {counts[fam.name].toLocaleString()} parts
-                    </div>
-                  )}
-                </motion.button>
-              ))}
-            </div>
-          </motion.div>
-        )}
-
-        {step === 1 && (
-          <motion.div
-            key="step1"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ type: "spring", stiffness: 400, damping: 30 }}
-          >
-            <div style={{
-              fontSize: "11px",
-              color: "#666",
-              marginBottom: "12px",
-              fontFamily: "var(--font-stencil, monospace)",
-              letterSpacing: "1px",
-            }}>
-              {selFamily?.name} — Select model
-            </div>
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(2, 1fr)",
-              gap: "6px",
-              maxHeight: "220px",
-              overflowY: "auto",
-            }}>
-              {/* All models option */}
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => { setSelModel(null); setStep(2); }}
-                style={{
-                  gridColumn: "1 / -1",
-                  background: "#0f0f0f",
-                  border: `1px solid ${GOLD}`,
-                  color: GOLD_LIGHT,
-                  fontFamily: "var(--font-stencil, monospace)",
-                  fontSize: "10px",
-                  letterSpacing: "1px",
-                  padding: "10px 12px",
-                  cursor: "pointer",
-                  textAlign: "left",
-                  textTransform: "uppercase",
-                }}
-              >
-                All {selFamily?.name} Models →
-              </motion.button>
-              {models.map(mod => (
-                <motion.button
-                  key={mod.id}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => { setSelModel(mod); setStep(2); }}
-                  style={{
-                    background: "#0f0f0f",
-                    border: "1px solid #252525",
-                    color: "#c4c0bc",
-                    fontFamily: "var(--font-stencil, monospace)",
-                    fontSize: "10px",
-                    letterSpacing: "1px",
-                    padding: "10px 8px",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    textTransform: "uppercase",
-                    transition: "border-color 0.15s",
-                    lineHeight: 1.3,
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.borderColor = GOLD}
-                  onMouseLeave={e => e.currentTarget.style.borderColor = "#252525"}
-                >
-                  <div style={{ color: "#e0d8cc", fontSize: "10px", marginBottom: "2px" }}>
-                    {mod.name}
-                  </div>
-                  <div style={{ color: "#555", fontSize: "9px" }}>
-                    {mod.model_code}
-                  </div>
-                </motion.button>
-              ))}
-            </div>
-          </motion.div>
-        )}
-
-        {step === 2 && (
-          <motion.div
-            key="step2"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ type: "spring", stiffness: 400, damping: 30 }}
-          >
-            <div style={{
-              fontSize: "11px",
-              color: "#666",
-              marginBottom: "12px",
-              fontFamily: "var(--font-stencil, monospace)",
-              letterSpacing: "1px",
-            }}>
-              {selFamily?.name}{selModel ? ` / ${selModel.name}` : ""} — Select year
-            </div>
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(6, 1fr)",
-              gap: "4px",
-              maxHeight: "160px",
-              overflowY: "auto",
-              marginBottom: "16px",
-            }}>
-              <motion.button
-                whileHover={{ scale: 1.04 }}
-                whileTap={{ scale: 0.96 }}
-                onClick={() => setSelYear(null)}
-                style={{
-                  gridColumn: "1 / -1",
-                  background: !selYear ? GOLD : "#0f0f0f",
-                  border: `1px solid ${!selYear ? GOLD : "#252525"}`,
-                  color: !selYear ? "#0a0909" : GOLD,
-                  fontFamily: "var(--font-stencil, monospace)",
-                  fontSize: "9px",
-                  letterSpacing: "1px",
-                  padding: "8px",
-                  cursor: "pointer",
-                  textTransform: "uppercase",
-                }}
-              >
-                All Years
-              </motion.button>
-              {years.map(yr => (
-                <motion.button
-                  key={yr}
-                  whileHover={{ scale: 1.04 }}
-                  whileTap={{ scale: 0.96 }}
-                  onClick={() => setSelYear(yr)}
-                  style={{
-                    background: selYear === yr ? GOLD : "#0f0f0f",
-                    border: `1px solid ${selYear === yr ? GOLD : "#252525"}`,
-                    color: selYear === yr ? "#0a0909" : "#888",
-                    fontFamily: "var(--font-stencil, monospace)",
-                    fontSize: "10px",
-                    padding: "7px 4px",
-                    cursor: "pointer",
-                    transition: "all 0.12s",
-                  }}
-                >
-                  {yr}
-                </motion.button>
-              ))}
-            </div>
-            <MagneticButton
-              onClick={handleFind}
-              style={{
-                width: "100%",
-                background: GOLD,
-                border: "none",
-                color: "#0a0909",
-                fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
-                fontSize: "20px",
-                letterSpacing: "3px",
-                padding: "12px",
-                cursor: "pointer",
-              }}
-            >
-              Find My Parts →
-            </MagneticButton>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Divider + raw search */}
-      <div style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "12px",
-        margin: "20px 0 16px",
-      }}>
-        <div style={{ flex: 1, height: 1, background: "#252525" }} />
-        <span style={{
-          fontFamily: "var(--font-stencil, monospace)",
-          fontSize: "9px",
-          letterSpacing: "2px",
-          color: "#444",
-          textTransform: "uppercase",
-        }}>or search by part / OEM number</span>
-        <div style={{ flex: 1, height: 1, background: "#252525" }} />
-      </div>
-      <QuickSearchBar />
-    </div>
-  );
-}
-
-// ─── Quick Search Bar ─────────────────────────────────────────────────────────
-
-function QuickSearchBar() {
-  const [q, setQ] = useState("");
-  const [results, setResults] = useState([]);
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (q.length < 2) { setResults([]); return; }
-    const t = setTimeout(async () => {
-      setLoading(true);
-      try {
-        const r = await fetch(`/api/browse/products?q=${encodeURIComponent(q)}&per_page=6`);
-        const d = await r.json();
-        setResults(d.products ?? []);
-        setOpen(true);
-      } finally { setLoading(false); }
-    }, 300);
-    return () => clearTimeout(t);
-  }, [q]);
-
-  useEffect(() => {
-    function handle(e) {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    }
-    document.addEventListener("mousedown", handle);
-    return () => document.removeEventListener("mousedown", handle);
-  }, []);
-
-  return (
-    <div ref={ref} style={{ position: "relative" }}>
-      <div style={{ display: "flex" }}>
-        <input
-          value={q}
-          onChange={e => setQ(e.target.value)}
-          onFocus={() => results.length > 0 && setOpen(true)}
-          placeholder="e.g. rocker cover gasket, 17362-92, EBC FA84..."
-          style={{
-            flex: 1,
-            background: "#0f0f0f",
-            border: "1px solid #252525",
-            borderRight: "none",
-            color: "#e0d8cc",
-            fontFamily: "var(--font-stencil, sans-serif)",
-            fontSize: "12px",
-            padding: "10px 14px",
-            outline: "none",
-          }}
-          onKeyDown={e => {
-            if (e.key === "Enter" && q.length > 1) {
-              window.location.href = `/browse?q=${encodeURIComponent(q)}`;
-            }
-          }}
-        />
-        <button
-          onClick={() => q.length > 1 && (window.location.href = `/browse?q=${encodeURIComponent(q)}`)}
-          style={{
-            background: "#1a1a1a",
-            border: "1px solid #252525",
-            color: "#888",
-            padding: "10px 16px",
-            cursor: "pointer",
-            fontSize: "14px",
+            fontSize: 22, letterSpacing: "0.06em", lineHeight: 1,
           }}
         >
-          {loading ? "…" : "⌕"}
-        </button>
-      </div>
+          STINKIN'<span style={{ color: scrolled ? TEAL : "#00000055" }}>'</span> SUPPLIES
+        </motion.div>
+      </Link>
 
-      <AnimatePresence>
-        {open && results.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            style={{
-              position: "absolute",
-              top: "100%",
-              left: 0, right: 0,
-              background: "#141414",
-              border: "1px solid #252525",
-              zIndex: 50,
-              maxHeight: 300,
-              overflowY: "auto",
-            }}
-          >
-            {results.map(p => (
-              <Link
-                key={p.id}
-                href={`/browse/${p.slug}`}
-                onClick={() => setOpen(false)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "12px",
-                  padding: "10px 14px",
-                  borderBottom: "1px solid #1a1a1a",
-                  textDecoration: "none",
-                  transition: "background 0.12s",
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = "#1a1a1a"}
-                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-              >
-                {p.image_url ? (
-                  <img src={p.image_url} alt="" style={{ width: 36, height: 36, objectFit: "contain", background: "#111" }} />
-                ) : (
-                  <div style={{ width: 36, height: 36, background: "#111", flexShrink: 0 }} />
-                )}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{
-                    fontFamily: "var(--font-stencil, monospace)",
-                    fontSize: "11px",
-                    color: "#e0d8cc",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.5px",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}>
-                    {p.name}
-                  </div>
-                  <div style={{ fontSize: "10px", color: "#555", marginTop: "2px" }}>
-                    {p.brand} · {p.category}
-                  </div>
-                </div>
-                <div style={{
-                  fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
-                  fontSize: "16px",
-                  color: GOLD_LIGHT,
-                  flexShrink: 0,
-                }}>
-                  {p.computed_price ? `$${Number(p.computed_price).toFixed(2)}` : "—"}
-                </div>
-              </Link>
-            ))}
-            <Link
-              href={`/browse?q=${encodeURIComponent(q)}`}
-              style={{
-                display: "block",
-                padding: "10px 14px",
-                fontFamily: "var(--font-stencil, monospace)",
-                fontSize: "9px",
-                letterSpacing: "2px",
-                color: GOLD,
-                textTransform: "uppercase",
-                textDecoration: "none",
-                textAlign: "center",
-              }}
-            >
-              See all results for "{q}" →
-            </Link>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+      {/* Right — search + garage */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <Link href="/search" style={{
+          display: "flex", alignItems: "center", justifyContent: "center",
+          width: 36, height: 36, textDecoration: "none",
+          border: `1px solid ${scrolled ? "#222" : "#00000033"}`,
+          color: scrolled ? "#888" : DARK,
+          transition: "all 0.2s",
+        }}>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.5"/>
+            <path d="M9.5 9.5L13 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+        </Link>
+        <Link href="/garage" style={{
+          fontFamily: "var(--font-stencil, 'Share Tech Mono', monospace)",
+          fontSize: 8, letterSpacing: "0.2em", textTransform: "uppercase",
+          textDecoration: "none", padding: "8px 14px",
+          border: `1px solid ${scrolled ? "#222" : "#00000033"}`,
+          color: scrolled ? "#888" : DARK,
+          transition: "all 0.2s",
+        }}>My Garage</Link>
+      </div>
+    </motion.header>
   );
 }
 
-// ─── Era Card (layered stack on hover) ───────────────────────────────────────
+// ─── Era Card ─────────────────────────────────────────────────────────────────
 
-function EraCard({ era, count, index }) {
+function EraCard({ era, index }) {
+  const ref = useRef(null);
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ["start end", "end start"],
+  });
+
+  const imageX = useTransform(
+    scrollYProgress,
+    [0, 1],
+    index % 2 === 0 ? ["8%", "-8%"] : ["-8%", "8%"]
+  );
+  const textY = useTransform(scrollYProgress, [0, 1], ["12px", "-12px"]);
+
+  const imageRight = index % 2 === 0;
+
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y: 40 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-80px" }}
+      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+      style={{ position: "relative" }}
+    >
+      <Link href={`/era/${era.slug}`} style={{ textDecoration: "none", display: "block" }}>
+        <motion.div
+          whileHover="hover"
+          style={{
+            position: "relative",
+            background: "#0c0c0c",
+            border: "1px solid #181818",
+            overflow: "hidden",
+            cursor: "pointer",
+            minHeight: 220,
+            display: "flex",
+            alignItems: "stretch",
+          }}
+        >
+          {/* Accent bar */}
+          <div style={{
+            position: "absolute", top: 0, left: 0, bottom: 0,
+            width: 3, background: era.accent,
+            zIndex: 2,
+          }} />
+
+          {/* Noise overlay */}
+          <div style={{
+            position: "absolute", inset: 0,
+            backgroundImage: NOISE, backgroundSize: "128px 128px",
+            opacity: 0.025, pointerEvents: "none", zIndex: 1,
+          }} />
+
+          {/* Hover glow */}
+          <motion.div
+            variants={{ hover: { opacity: 1 }, initial: { opacity: 0 } }}
+            initial="initial"
+            style={{
+              position: "absolute", inset: 0,
+              background: `radial-gradient(ellipse at ${imageRight ? "80%" : "20%"} 50%, ${era.accent}0a 0%, transparent 70%)`,
+              pointerEvents: "none", zIndex: 1,
+              transition: "opacity 0.4s",
+            }}
+          />
+
+          {/* Content row */}
+          <div style={{
+            display: "flex",
+            flexDirection: imageRight ? "row" : "row-reverse",
+            width: "100%", zIndex: 2,
+          }}>
+            {/* Text side */}
+            <motion.div
+              style={{
+                flex: 1, padding: "36px 32px 36px 36px",
+                display: "flex", flexDirection: "column",
+                justifyContent: "center", y: textY,
+              }}
+            >
+              <div style={{
+                fontFamily: "var(--font-stencil, 'Share Tech Mono', monospace)",
+                fontSize: 9, letterSpacing: "0.22em",
+                color: era.accent, textTransform: "uppercase",
+                marginBottom: 10,
+              }}>{era.year_range}</div>
+
+              <div style={{
+                fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
+                fontSize: "clamp(38px, 6vw, 72px)",
+                letterSpacing: "0.03em", lineHeight: 0.9,
+                color: LIGHT, marginBottom: 14,
+              }}>{era.display_name}</div>
+
+              <div style={{
+                fontFamily: "var(--font-stencil, monospace)",
+                fontSize: 11, color: "#555", lineHeight: 1.6,
+                maxWidth: 340, marginBottom: 20,
+              }}>{era.description}</div>
+
+              <motion.div
+                variants={{
+                  hover: { x: 6, color: era.accent },
+                  initial: { x: 0, color: "#444" },
+                }}
+                style={{
+                  display: "flex", alignItems: "center", gap: 8,
+                  fontFamily: "var(--font-stencil, monospace)",
+                  fontSize: 9, letterSpacing: "0.2em", textTransform: "uppercase",
+                  transition: "color 0.2s",
+                }}
+              >
+                <span>Shop {era.display_name}</span>
+                <span style={{ fontSize: 12 }}>→</span>
+              </motion.div>
+            </motion.div>
+
+            {/* Image side */}
+            <div style={{
+              width: "38%", minWidth: 160,
+              position: "relative", overflow: "hidden",
+              background: "#060606",
+            }}>
+              <motion.div
+                style={{
+                  position: "absolute", inset: "-10%",
+                  backgroundImage: `linear-gradient(135deg, ${era.accent}15 0%, transparent 60%)`,
+                  x: imageX,
+                }}
+              />
+              {/* Era number watermark */}
+              <div style={{
+                position: "absolute", inset: 0,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
+                fontSize: "clamp(80px, 14vw, 160px)",
+                letterSpacing: "-0.04em", lineHeight: 1,
+                color: `${era.accent}12`,
+                userSelect: "none",
+              }}>{String(index + 1).padStart(2, "0")}</div>
+              {/* Image slot — swap src for real photography */}
+              <div style={{
+                position: "absolute", inset: 0,
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <div style={{
+                  fontFamily: "var(--font-stencil, monospace)",
+                  fontSize: 8, letterSpacing: "0.18em",
+                  color: "#1e1e1e", textTransform: "uppercase",
+                }}>[ Photo ]</div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      </Link>
+    </motion.div>
+  );
+}
+
+// ─── Category Card ────────────────────────────────────────────────────────────
+
+function CategoryCard({ cat, index }) {
   const [hovered, setHovered] = useState(false);
 
   return (
     <motion.div
-      onHoverStart={() => setHovered(true)}
-      onHoverEnd={() => setHovered(false)}
-      style={{ position: "relative", cursor: "pointer" }}
-      onClick={() => window.location.href = `/browse?family=${encodeURIComponent(era.key)}`}
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-40px" }}
+      transition={{ delay: index * 0.04, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
     >
-      {/* Shadow layers for depth */}
-      {[2, 1].map(i => (
-        <motion.div
-          key={i}
-          animate={{
-            x: hovered ? i * 5 : 0,
-            y: hovered ? i * 5 : 0,
-          }}
-          transition={{ type: "spring", stiffness: 300, damping: 20 }}
-          style={{
-            position: "absolute",
-            inset: 0,
-            background: era.color,
-            border: `1px solid #252525`,
-            opacity: 0.5 - i * 0.15,
-          }}
-        />
-      ))}
-
-      {/* Main card */}
-      <motion.div
-        animate={{
-          x: hovered ? -4 : 0,
-          y: hovered ? -4 : 0,
-        }}
-        transition={{ type: "spring", stiffness: 300, damping: 20 }}
-        style={{
-          position: "relative",
-          background: era.color,
-          border: `1px solid ${hovered ? GOLD : "#252525"}`,
-          padding: "24px 20px",
-          minHeight: 140,
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "flex-end",
-          transition: "border-color 0.2s",
-          zIndex: 1,
-        }}
+      <Link
+        href={`/browse?category=${encodeURIComponent(cat.dbCategories[0])}`}
+        style={{ textDecoration: "none", display: "block" }}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
       >
         <motion.div
-          animate={{ width: hovered ? "100%" : "0%" }}
-          style={{
-            position: "absolute",
-            bottom: 0, left: 0,
-            height: 2,
-            background: GOLD,
+          animate={{
+            borderColor: hovered ? TEAL : "#1a1a1a",
+            background: hovered ? "#0d0d0d" : "#0a0a0a",
           }}
-          transition={{ duration: 0.3 }}
-        />
-        <div style={{
-          fontFamily: "var(--font-stencil, monospace)",
-          fontSize: "9px",
-          letterSpacing: "2px",
-          color: "#555",
-          marginBottom: "4px",
-          textTransform: "uppercase",
-        }}>
-          {era.years}
-        </div>
-        <div style={{
-          fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
-          fontSize: "22px",
-          letterSpacing: "1px",
-          color: "#e0d8cc",
-          lineHeight: 1,
-        }}>
-          {era.key}
-        </div>
-        {count != null && (
-          <div style={{
-            fontSize: "10px",
-            color: "#444",
-            marginTop: "6px",
-            fontFamily: "var(--font-stencil, monospace)",
-          }}>
-            {count.toLocaleString()} parts
-          </div>
-        )}
-      </motion.div>
-    </motion.div>
-  );
-}
-
-// ─── Category Card (expandable) ───────────────────────────────────────────────
-
-function CategoryCard({ cat, count }) {
-  return (
-    <motion.div
-      whileHover={{ y: -3 }}
-      transition={{ type: "spring", stiffness: 400, damping: 25 }}
-      onClick={() => window.location.href = `/browse?category=${encodeURIComponent(cat.slug)}`}
-      style={{
-        background: "#111",
-        border: "1px solid #1e1e1e",
-        padding: "24px 20px",
-        cursor: "pointer",
-        display: "flex",
-        flexDirection: "column",
-        gap: "8px",
-        transition: "border-color 0.2s",
-        position: "relative",
-        overflow: "hidden",
-      }}
-      onMouseEnter={e => e.currentTarget.style.borderColor = "#2a2a2a"}
-      onMouseLeave={e => e.currentTarget.style.borderColor = "#1e1e1e"}
-    >
-      <div style={{ fontSize: "24px" }}>{cat.icon}</div>
-      <div style={{
-        fontFamily: "var(--font-stencil, monospace)",
-        fontSize: "11px",
-        fontWeight: 600,
-        letterSpacing: "1px",
-        color: "#e0d8cc",
-        textTransform: "uppercase",
-      }}>
-        {cat.name}
-      </div>
-      {count != null && (
-        <div style={{ fontSize: "11px", color: "#444", fontFamily: "var(--font-stencil, monospace)" }}>
-          {count.toLocaleString()} parts
-        </div>
-      )}
-      <motion.div
-        initial={{ x: "-100%" }}
-        whileHover={{ x: "0%" }}
-        style={{
-          position: "absolute",
-          bottom: 0, left: 0, right: 0,
-          height: 1,
-          background: GOLD,
-          transformOrigin: "left",
-        }}
-      />
-    </motion.div>
-  );
-}
-
-// ─── Nav ──────────────────────────────────────────────────────────────────────
-
-function FloatingNav() {
-  const [scrolled, setScrolled] = useState(false);
-
-  useEffect(() => {
-    const handle = () => setScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", handle);
-    return () => window.removeEventListener("scroll", handle);
-  }, []);
-
-  return (
-    <motion.nav
-      animate={{
-        background: scrolled ? "rgba(10,9,9,0.96)" : "rgba(10,9,9,0.7)",
-        borderBottomColor: scrolled ? "#1e1e1e" : "transparent",
-      }}
-      style={{
-        position: "fixed",
-        top: 0, left: 0, right: 0,
-        zIndex: 100,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "0 48px",
-        height: 56,
-        backdropFilter: "blur(12px)",
-        borderBottom: "1px solid transparent",
-      }}
-    >
-      <div style={{
-        fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
-        fontSize: "22px",
-        letterSpacing: "4px",
-        color: "#e0d8cc",
-      }}>
-        STINKIN'<span style={{ color: GOLD }}>'</span> SUPPLIES
-      </div>
-
-      <div style={{ display: "flex", gap: "32px", alignItems: "center" }}>
-        {["Browse", "Brands", "Deals"].map(label => (
-          <Link
-            key={label}
-            href={`/${label.toLowerCase()}`}
-            style={{
-              fontFamily: "var(--font-stencil, monospace)",
-              fontSize: "10px",
-              letterSpacing: "2px",
-              textTransform: "uppercase",
-              color: "#666",
-              textDecoration: "none",
-              transition: "color 0.2s",
-            }}
-            onMouseEnter={e => e.currentTarget.style.color = "#c4c0bc"}
-            onMouseLeave={e => e.currentTarget.style.color = "#666"}
-          >
-            {label}
-          </Link>
-        ))}
-        <Link
-          href="/garage"
+          transition={{ duration: 0.2 }}
           style={{
-            fontFamily: "var(--font-stencil, monospace)",
-            fontSize: "10px",
-            letterSpacing: "2px",
-            textTransform: "uppercase",
-            background: GOLD,
-            color: "#0a0909",
-            padding: "8px 18px",
-            textDecoration: "none",
-            transition: "background 0.2s",
+            border: "1px solid #1a1a1a",
+            padding: "20px 18px",
+            position: "relative",
+            overflow: "hidden",
+            cursor: "pointer",
           }}
-          onMouseEnter={e => e.currentTarget.style.background = GOLD_LIGHT}
-          onMouseLeave={e => e.currentTarget.style.background = GOLD}
         >
-          ⚙ My Garage
-        </Link>
-      </div>
-    </motion.nav>
-  );
-}
-
-// ─── Main Page ────────────────────────────────────────────────────────────────
-
-export default function HomePage() {
-  const [eraProducts, setEraProducts] = useState({});
-  const [catStats, setCatStats] = useState({});
-
-  useEffect(() => {
-    fetch("/api/browse/fitment?type=counts")
-      .then(r => r.json())
-      .then(d => setEraProducts(d.counts ?? {}));
-    fetch("/api/browse/products?per_page=0")
-      .then(r => r.json())
-      .then(d => {
-        const map = {};
-        (d.facets?.categories ?? []).forEach(c => { map[c.name] = c.count; });
-        setCatStats(map);
-      });
-  }, []);
-
-  const stagger = {
-    container: { animate: { transition: { staggerChildren: 0.08 } } },
-    item: {
-      initial: { opacity: 0, y: 20 },
-      animate: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } },
-    },
-  };
-
-  return (
-    <div style={{ background: "#0a0909", color: "#e0d8cc", minHeight: "100vh" }}>
-      <FloatingNav />
-      <VelocityTicker />
-
-      {/* ── HERO ── */}
-      <section style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        padding: "56px 80px 0",
-        position: "relative",
-        overflow: "hidden",
-      }}>
-        {/* Background grain (inherited from globals.css body::before) */}
-
-        <motion.div
-          variants={stagger.container}
-          initial="initial"
-          animate="animate"
-          style={{ maxWidth: 620, position: "relative", zIndex: 2 }}
-        >
+          {/* Hover fill */}
           <motion.div
-            variants={stagger.item}
+            animate={{ scaleX: hovered ? 1 : 0 }}
+            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
             style={{
-              fontFamily: "var(--font-stencil, monospace)",
-              fontSize: "10px",
-              letterSpacing: "4px",
-              color: GOLD,
-              marginBottom: "16px",
-              textTransform: "uppercase",
+              position: "absolute", bottom: 0, left: 0, right: 0,
+              height: 2, background: TEAL,
+              transformOrigin: "left",
             }}
-          >
-            Parts for Every Era of American Iron
-          </motion.div>
+          />
 
-          <motion.h1
-            variants={stagger.item}
-            style={{
-              fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
-              fontSize: "clamp(64px, 9vw, 120px)",
-              lineHeight: 0.9,
-              letterSpacing: "2px",
-              marginBottom: "20px",
-              color: "#e0d8cc",
-            }}
-          >
-            FIND YOUR<br />
-            <span style={{ color: GOLD }}>EXACT</span><br />
-            FIT.
-          </motion.h1>
-
-          <motion.p
-            variants={stagger.item}
-            style={{
-              fontSize: "15px",
-              fontWeight: 300,
-              color: "#666",
-              lineHeight: 1.6,
-              maxWidth: 400,
-              marginBottom: "40px",
-              fontFamily: "var(--font-stencil, monospace)",
-              textTransform: "none",
-              letterSpacing: "0.5px",
-            }}
-          >
-            From Knucklehead to M8 — every part matched to your specific year, model, and engine. No guessing.
-          </motion.p>
-
-          <motion.div variants={stagger.item}>
-            <FitmentSelector />
-          </motion.div>
-        </motion.div>
-
-        {/* Decorative right side — large era text */}
-        <div style={{
-          position: "absolute",
-          right: -20,
-          top: "50%",
-          transform: "translateY(-50%)",
-          fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
-          fontSize: "clamp(120px, 18vw, 240px)",
-          letterSpacing: "4px",
-          color: "rgba(184,146,42,0.04)",
-          userSelect: "none",
-          pointerEvents: "none",
-          lineHeight: 0.85,
-          textAlign: "right",
-        }}>
-          HARLEY<br />DAVIDSON
-        </div>
-      </section>
-
-      {/* ── STATS ── */}
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(4, 1fr)",
-        borderTop: "1px solid #1a1a1a",
-        borderBottom: "1px solid #1a1a1a",
-      }}>
-        {[
-          { num: "88k",        label: "Parts in Catalog" },
-          { num: "1936–2026",  label: "Model Years" },
-          { num: "3",          label: "Wholesale Sources" },
-          { num: "$99",        label: "Free Shipping" },
-        ].map((s, i) => (
-          <div key={i} style={{
-            padding: "32px 48px",
-            borderRight: i < 3 ? "1px solid #1a1a1a" : "none",
-          }}>
-            <div style={{
-              fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
-              fontSize: "48px",
-              letterSpacing: "1px",
-              color: "#e0d8cc",
-              lineHeight: 1,
-            }}>
-              {s.num}
-            </div>
-            <div style={{
-              fontFamily: "var(--font-stencil, monospace)",
-              fontSize: "9px",
-              letterSpacing: "2px",
-              textTransform: "uppercase",
-              color: "#444",
-              marginTop: "4px",
-            }}>
-              {s.label}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* ── ENGINE ERA GRID ── */}
-      <section style={{ padding: "80px", borderBottom: "1px solid #1a1a1a" }}>
-        <div style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "baseline",
-          marginBottom: "40px",
-        }}>
-          <div>
-            <div style={{
-              fontFamily: "var(--font-stencil, monospace)",
-              fontSize: "9px",
-              letterSpacing: "4px",
-              color: GOLD,
-              textTransform: "uppercase",
-              marginBottom: "8px",
-            }}>
-              Fitment by Engine
-            </div>
-            <div style={{
-              fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
-              fontSize: "48px",
-              letterSpacing: "2px",
-              lineHeight: 1,
-            }}>
-              SHOP BY <span style={{ color: GOLD }}>ERA</span>
-            </div>
-          </div>
-          <Link href="/browse" style={{
-            fontFamily: "var(--font-stencil, monospace)",
-            fontSize: "9px",
-            letterSpacing: "2px",
-            textTransform: "uppercase",
-            color: "#555",
-            textDecoration: "none",
-            borderBottom: "1px solid #2a2a2a",
-            paddingBottom: "2px",
-            transition: "color 0.2s",
-          }}>
-            View All →
-          </Link>
-        </div>
-
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(6, 1fr)",
-          gap: "3px",
-        }}>
-          {ENGINE_ERAS.map((era, i) => (
-            <EraCard
-              key={era.key}
-              era={era}
-              count={eraProducts[era.key]}
-              index={i}
-            />
-          ))}
-        </div>
-      </section>
-
-      {/* ── CATEGORIES ── */}
-      <section style={{
-        padding: "80px",
-        background: "#0e0e0e",
-        borderBottom: "1px solid #1a1a1a",
-      }}>
-        <div style={{
-          fontFamily: "var(--font-stencil, monospace)",
-          fontSize: "9px",
-          letterSpacing: "4px",
-          color: GOLD,
-          textTransform: "uppercase",
-          marginBottom: "8px",
-        }}>
-          Browse by Part Type
-        </div>
-        <div style={{
-          fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
-          fontSize: "48px",
-          letterSpacing: "2px",
-          lineHeight: 1,
-          marginBottom: "40px",
-        }}>
-          SHOP <span style={{ color: GOLD }}>CATEGORIES</span>
-        </div>
-
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(5, 1fr)",
-          gap: "12px",
-        }}>
-          {CATEGORIES.map(cat => (
-            <CategoryCard
-              key={cat.slug}
-              cat={cat}
-              count={catStats[cat.slug]}
-            />
-          ))}
-        </div>
-      </section>
-
-      {/* ── FOOTER ── */}
-      <footer style={{
-        padding: "60px 80px 40px",
-        borderTop: "1px solid #1a1a1a",
-        display: "grid",
-        gridTemplateColumns: "2fr 1fr 1fr 1fr",
-        gap: "60px",
-      }}>
-        <div>
+          {/* Icon */}
           <div style={{
             fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
-            fontSize: "26px",
-            letterSpacing: "4px",
-            marginBottom: "12px",
-          }}>
-            STINKIN'<span style={{ color: GOLD }}>'</span> SUPPLIES
-          </div>
-          <p style={{
-            fontSize: "12px",
-            color: "#444",
-            lineHeight: 1.6,
-            maxWidth: 260,
-            textTransform: "none",
+            fontSize: 28, lineHeight: 1, marginBottom: 10,
+            color: hovered ? TEAL : "#2a2a2a",
+            transition: "color 0.2s",
+          }}>{CAT_ICONS[cat.slug] ?? "◆"}</div>
+
+          {/* Label */}
+          <div style={{
+            fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
+            fontSize: 18, letterSpacing: "0.04em", lineHeight: 1,
+            color: hovered ? LIGHT : "#888",
+            transition: "color 0.2s", marginBottom: 6,
+          }}>{cat.label}</div>
+
+          {/* Description */}
+          <div style={{
             fontFamily: "var(--font-stencil, monospace)",
-          }}>
-            The parts catalog built for people who know what they're wrenching on.
-            Every part matched to your exact bike.
-          </p>
-        </div>
-        {[
-          { title: "Shop", links: [["By Engine Era", "/browse"], ["By Category", "/browse"], ["Deals", "/deals"]] },
-          { title: "Account", links: [["My Garage", "/garage"], ["Orders", "/account/orders"], ["Wishlist", "/account/wishlist"]] },
-          { title: "Info", links: [["Shipping", "/"], ["Returns", "/"], ["Contact", "/"]] },
-        ].map(col => (
-          <div key={col.title}>
-            <div style={{
+            fontSize: 9, letterSpacing: "0.08em",
+            color: hovered ? "#666" : "#2a2a2a",
+            lineHeight: 1.5, textTransform: "uppercase",
+            transition: "color 0.2s",
+          }}>{cat.description}</div>
+
+          {/* Arrow */}
+          <motion.div
+            animate={{ x: hovered ? 4 : 0, opacity: hovered ? 1 : 0 }}
+            style={{
+              position: "absolute", top: 18, right: 16,
               fontFamily: "var(--font-stencil, monospace)",
-              fontSize: "9px",
-              letterSpacing: "3px",
-              textTransform: "uppercase",
-              color: "#555",
-              marginBottom: "16px",
-            }}>
-              {col.title}
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              {col.links.map(([label, href]) => (
-                <Link key={label} href={href} style={{
-                  fontSize: "12px",
-                  color: "#444",
-                  textDecoration: "none",
-                  textTransform: "none",
-                  fontFamily: "var(--font-stencil, monospace)",
-                  transition: "color 0.2s",
-                }}
-                onMouseEnter={e => e.currentTarget.style.color = "#888"}
-                onMouseLeave={e => e.currentTarget.style.color = "#444"}
-                >
-                  {label}
-                </Link>
-              ))}
-            </div>
-          </div>
+              fontSize: 10, color: TEAL,
+            }}
+          >→</motion.div>
+        </motion.div>
+      </Link>
+    </motion.div>
+  );
+}
+
+// ─── Corner Nav ───────────────────────────────────────────────────────────────
+
+function CornerNav() {
+  const [open, setOpen] = useState(false);
+
+  const items = [
+    { label: "My Garage",   href: "/garage",  icon: "⬡" },
+    { label: "Browse All",  href: "/browse",  icon: "▤" },
+    { label: "Search",      href: "/search",  icon: "◎" },
+    { label: "All Eras",    href: "#eras",    icon: "◈" },
+  ];
+
+  return (
+    <div style={{
+      position: "fixed", bottom: 24, right: 20, zIndex: 80,
+      display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8,
+    }}>
+      <AnimatePresence>
+        {open && items.map((item, i) => (
+          <motion.div
+            key={item.href}
+            initial={{ opacity: 0, x: 20, scale: 0.9 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: 20, scale: 0.9 }}
+            transition={{ delay: i * 0.05, type: "spring", stiffness: 400, damping: 28 }}
+          >
+            <Link
+              href={item.href}
+              onClick={() => setOpen(false)}
+              style={{
+                display: "flex", alignItems: "center", gap: 10,
+                textDecoration: "none",
+                background: "rgba(8,8,8,0.95)",
+                border: "1px solid #222",
+                padding: "9px 14px",
+                backdropFilter: "blur(12px)",
+                transition: "border-color 0.15s",
+              }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = TEAL}
+              onMouseLeave={e => e.currentTarget.style.borderColor = "#222"}
+            >
+              <span style={{ fontSize: 12, color: TEAL }}>{item.icon}</span>
+              <span style={{
+                fontFamily: "var(--font-stencil, monospace)",
+                fontSize: 9, letterSpacing: "0.18em",
+                textTransform: "uppercase", color: "#888",
+                whiteSpace: "nowrap",
+              }}>{item.label}</span>
+            </Link>
+          </motion.div>
         ))}
-      </footer>
+      </AnimatePresence>
+
+      {/* Toggle button */}
+      <motion.button
+        onClick={() => setOpen(o => !o)}
+        animate={{ rotate: open ? 45 : 0, background: open ? TEAL : "#0e0e0e" }}
+        transition={{ type: "spring", stiffness: 400, damping: 28 }}
+        style={{
+          width: 44, height: 44,
+          border: `1px solid ${open ? TEAL : "#2a2a2a"}`,
+          cursor: "pointer", display: "flex",
+          alignItems: "center", justifyContent: "center",
+          backdropFilter: "blur(12px)",
+        }}
+      >
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M2 7h10M7 2v10" stroke={open ? DARK : "#888"} strokeWidth="1.5" strokeLinecap="round"/>
+        </svg>
+      </motion.button>
+    </div>
+  );
+}
+
+// ─── Homepage ─────────────────────────────────────────────────────────────────
+
+export default function HomePage() {
+  return (
+    <div style={{ background: DARK, color: LIGHT, minHeight: "100vh" }}>
+      <FloatingHeader />
+
+      {/* Hero — era cards */}
+      <section id="eras" style={{ paddingTop: 52 }}>
+        {/* Section label */}
+        <div style={{
+          padding: "40px 20px 24px",
+          display: "flex", alignItems: "center", gap: 16,
+        }}>
+          <div style={{
+            fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
+            fontSize: 11, letterSpacing: "0.3em",
+            color: "#333", textTransform: "uppercase",
+          }}>Shop by Era</div>
+          <div style={{ flex: 1, height: 1, background: "#161616" }} />
+        </div>
+
+        {/* Era cards stack */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "0 20px" }}>
+          {ERAS.map((era, i) => (
+            <EraCard key={era.slug} era={era} index={i} />
+          ))}
+        </div>
+      </section>
+
+      {/* Shop by Part */}
+      <section style={{ padding: "64px 20px 80px" }}>
+        {/* Section header */}
+        <div style={{
+          display: "flex", alignItems: "center", gap: 16, marginBottom: 32,
+        }}>
+          <div style={{ flex: 1, height: 1, background: "#161616" }} />
+          <div style={{
+            fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
+            fontSize: 11, letterSpacing: "0.3em",
+            color: "#333", textTransform: "uppercase",
+            whiteSpace: "nowrap",
+          }}>Shop by Part</div>
+          <div style={{ flex: 1, height: 1, background: "#161616" }} />
+        </div>
+
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          style={{
+            fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
+            fontSize: "clamp(36px, 8vw, 72px)",
+            letterSpacing: "0.03em", lineHeight: 0.9,
+            color: LIGHT, marginBottom: 12,
+            textAlign: "center",
+          }}
+        >All Makes.<br />All Eras.</motion.div>
+        <div style={{
+          fontFamily: "var(--font-stencil, monospace)",
+          fontSize: 11, color: "#444", textAlign: "center",
+          letterSpacing: "0.1em", textTransform: "uppercase",
+          marginBottom: 40,
+        }}>Every category. Filter by era from any page.</div>
+
+        {/* Category grid */}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+          gap: 2,
+        }}>
+          {HARLEY_CATEGORIES.map((cat, i) => (
+            <CategoryCard key={cat.slug} cat={cat} index={i} />
+          ))}
+        </div>
+
+        {/* Browse all CTA */}
+        <div style={{ textAlign: "center", marginTop: 40 }}>
+          <Link href="/browse" style={{ textDecoration: "none" }}>
+            <motion.div
+              whileHover={{ background: TEAL, color: DARK, borderColor: TEAL }}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 10,
+                border: "1px solid #2a2a2a", padding: "12px 32px",
+                fontFamily: "var(--font-stencil, monospace)",
+                fontSize: 9, letterSpacing: "0.22em", textTransform: "uppercase",
+                color: "#666", cursor: "pointer", transition: "all 0.2s",
+              }}
+            >
+              Browse All Parts
+              <span>→</span>
+            </motion.div>
+          </Link>
+        </div>
+      </section>
+
+      {/* Footer strip */}
       <div style={{
-        padding: "16px 80px",
-        borderTop: "1px solid #1a1a1a",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
+        borderTop: "1px solid #141414",
+        padding: "20px",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        flexWrap: "wrap", gap: 12,
       }}>
         <div style={{
-          fontFamily: "var(--font-stencil, monospace)",
-          fontSize: "9px",
-          letterSpacing: "1px",
-          color: "#333",
-          textTransform: "uppercase",
-        }}>
-          © 2026 Stinkin' Supplies. All rights reserved.
-        </div>
+          fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
+          fontSize: 14, letterSpacing: "0.06em", color: "#333",
+        }}>STINKIN' SUPPLIES</div>
         <div style={{
           fontFamily: "var(--font-stencil, monospace)",
-          fontSize: "9px",
-          letterSpacing: "1px",
-          color: "#333",
+          fontSize: 8, letterSpacing: "0.18em", color: "#2a2a2a",
           textTransform: "uppercase",
-        }}>
-          Palm Coast, FL
-        </div>
+        }}>88,000+ Parts · WPS · Parts Unlimited · VTwin</div>
       </div>
+
+      <CornerNav />
+
+      <style>{`
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; }
+        @media (max-width: 640px) {
+          .era-image-side { display: none !important; }
+        }
+      `}</style>
     </div>
   );
 }
