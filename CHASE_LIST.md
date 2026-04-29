@@ -1,14 +1,32 @@
 # Stinkin' Supplies — Chase List
 **Running log of loose ends to follow up on**
-Last Updated: April 27, 2026 — end of session
+Last Updated: April 29, 2026 — end of session
 
 ---
 
 ## 🚀 NEXT SESSION — START HERE
 
-1. **PU ACES fitment files** — request from PU rep (biggest fitment unlock: 30% → 70%+)
-2. **Expand model_alias_map** — add FLTRX, FXDB, FLHTK, FLSTF, FLHRC, FXDWG
-3. **Frontend redesign** — /browse overhaul (vision discussed, implementation TBD)
+1. **Complete catalog_unified population** — 44,343 PU + 37,538 VTwin + 378 WPS missing
+2. **Migrate catalog_fitment_v2 FK** — drop FK to catalog_products, add FK to catalog_unified
+3. **Run VTwin fitment migration** — script ready at scripts/ingest/migrate_vtwin_fitment_to_v2.js
+4. **PU ACES fitment files** — request from PU rep (30% → 70%+)
+5. **Expand model_alias_map** — add FLTRX, FXDB, FLHTK, FLSTF, FLHRC, FXDWG
+
+---
+
+## ✅ DONE APRIL 29
+
+| Task | Result |
+|------|--------|
+| Homepage redesign | Era cards + category grid + corner nav + floating header |
+| lib/eras/config.ts | 9 eras with year_min/year_max for Sportster split |
+| app/era/[slug]/page.jsx | Era landing page, side panel filters, product grid |
+| lib/db/browse.ts | Multi-family, universal, yearMin/yearMax, dbCategories |
+| api/browse/products/route.ts | Passes families[], year_min, year_max, dbCategory[] |
+| app/layout.tsx | Bebas Neue + Share Tech Mono via next/font/google |
+| /shop → /browse | All references updated, shop directory deleted |
+| migrate_vtwin_fitment_to_v2.js | Script written, blocked on FK migration |
+| knucklehead.webp | Live on homepage era card |
 
 ---
 
@@ -16,88 +34,70 @@ Last Updated: April 27, 2026 — end of session
 
 | Task | Result |
 |------|--------|
-| Phase 10 — Cutover | catalog_fitment → catalog_fitment_archived; all routes on catalog_fitment_v2 |
-| Retire legacy fitment ingest scripts | 6 scripts moved to scripts/ingest/_retired/ |
-| api/fitment/route.ts | Non-Harley paths removed, makes endpoint removed, HD-only |
-| api/products/route.ts | Non-Harley fitment block removed, fitmentMake param dropped |
-| api/harley2/style-products/route.ts | Rewritten to join catalog_fitment_v2 → harley_families by name |
-| app/browse/[slug]/page.jsx | Fitment query switched to catalog_fitment_readable view |
-
----
-
-## ✅ DONE APRIL 26
-
-| Task | Result |
-|------|--------|
-| Typesense reindex | 88,301 docs, 0 errors — picks up all April 25 enrichment |
-| Typesense schema cleanup | index_unified.js confirmed complete; index_assembly.js retired |
-| Phase 9 — Admin product manager | /admin/products live: search, filter, edit, bulk, fitment |
-| proxy.ts fix | /api/admin/ added to isPublic passthrough |
-| harley_families slug fix | No slug column — all queries switched to name |
-| catalog_fitment_v2 unique constraint | UNIQUE (product_id, model_year_id) added directly on DB |
-
----
-
-## ✅ DONE APRIL 25
-
-| Task | Result |
-|------|--------|
-| WPS content enrichment | 9,678 rows: description/features/dims/upc backfilled from harddrive CSV |
-| WPS image backfill | 1,607 images added to catalog_unified from wps-master-image-list.csv |
-| VTwin content enrichment | 21,797 rows: images (up to 4), OEM xrefs, pricing, manufacturer_brand |
-| Drag Specialties XML enrichment | 4,302 PU rows enriched from DS catalog XML (bullets→features, images) |
-| PU brand XML enrichment | 4,971 rows from 134 brand XMLs (both PIES + Catalog_Content_Export formats) |
-| build_fitment.js | OEM xref → catalog_unified fitment columns (year_start/end, families, ranges) |
-| build_fitment_v2.js | 265,716 VTwin + 65,081 WPS rows inserted into catalog_fitment_v2 |
-| extract_fitment_from_names.js | 6,185 rows: year+family regex extraction from product names |
-| extract_fitment_db_driven.js | 14 rows: DB alias table driven extraction |
-| model_alias_map table | Created + seeded (205 aliases from harley_models + manual entries) |
-| engine_platform_map table | Created + seeded (M8, Twin Cam, Evo, Shovelhead, TC) |
-| catalog_fitment_v2 columns | Added fitment_source, confidence_score, parsed_snapshot |
-
----
-
-## ✅ DONE APRIL 23
-
-| Task | Result |
-|------|--------|
-| VTwin ingested into catalog_unified | 37,749 products (source_vendor=VTWIN) |
-| Engine-era families seeded | Knucklehead, Panhead, Shovelhead, V-Rod, Twin Cam, Evolution, FXR added |
-| catalog_fitment_v2 migration complete | 2,717,429 rows, 10,580 products + 3,646 universal |
-| Disk incident resolved | catalog_media bloated 29GB index dropped, VACUUM FULL, rebuilt as md5 hash |
-| Typesense reindexed | 88,301 docs, 0 errors |
-| fits_all_models flag | 3,646 products flagged on catalog_products |
-
----
-
-## ✅ DONE APRIL 21
-
-| Task | Result |
-|------|--------|
-| Deployed enriched PU data | stinksupp.vercel.app live |
-| Backfilled catalog_unified.image_url | 14,907 PU rows, 18,415 now have images |
-| Phase 1+2 — harley authority tables | 8 families, 149 models, 1,248 year rows |
-| Phase 3 — catalog_fitment_v2 | Table + indexes live |
-| Phase 4 — fitment migration | 319,389 rows, 3,292 products |
-| Phase 5 — catalog_fitment_readable view | Live |
-| Phase 6 — fitment dropdowns | /api/fitment canonical |
-| Phase 7 — HD filtering → v2 | No more range logic |
-| WPS Harley OEM cross-ref loaded | 1,568 rows, 5,411 products with OEM# |
-| is_harley_fitment flag | 7,244 products flagged |
+| Phase 10 complete | catalog_fitment → catalog_fitment_archived, all routes on v2 |
+| 6 ingest scripts retired | Moved to scripts/ingest/_retired/ |
+| api/fitment/route.ts | HD-only, non-Harley paths removed |
+| api/products/route.ts | Non-Harley fitment block removed |
+| api/harley2/style-products/route.ts | Rewritten for catalog_fitment_v2 |
+| app/browse/[slug]/page.jsx | Fitment reads from catalog_fitment_readable |
 
 ---
 
 ## 🔴 HIGH PRIORITY
 
+### Complete catalog_unified
+Frontend reads ONLY from catalog_unified. Currently missing:
+- 44,343 PU products
+- 37,538 VTwin products
+- 378 WPS products
+
+Until complete, era pages show limited products and fitment FK cannot be migrated.
+
+### Migrate catalog_fitment_v2 FK
+Current: product_id → catalog_products.id
+Target:  product_id → catalog_unified.id
+
+Safe migration once unified is complete:
+```sql
+UPDATE catalog_fitment_v2 cfv
+SET product_id = cu.id
+FROM catalog_unified cu
+JOIN catalog_products cp ON cp.sku = cu.sku
+WHERE cfv.product_id = cp.id;
+
+ALTER TABLE catalog_fitment_v2 DROP CONSTRAINT catalog_fitment_v2_product_id_fkey;
+ALTER TABLE catalog_fitment_v2 ADD CONSTRAINT catalog_fitment_v2_product_id_fkey
+  FOREIGN KEY (product_id) REFERENCES catalog_unified(id) ON DELETE CASCADE;
+```
+
+### VTwin fitment migration
+Script: `scripts/ingest/migrate_vtwin_fitment_to_v2.js`
+Blocked until FK migration above is complete.
+Expected: ~521,000 new rows across Softail, Dyna, Touring, Sportster, FXR.
+
 ### PU ACES fitment files
-Biggest remaining fitment unlock. PU delivers per-brand ACES XML files separately from product content XMLs — contain vehicle application data (year/make/model) for every part number. Would push PU from 30.2% → 70%+. Request from PU rep.
+30% → 70%+ fitment coverage for PU. Request from PU rep.
 
 ---
 
 ## 🔵 LOW PRIORITY / FUTURE
 
+### Era images remaining (800×600px min, WebP, landscape)
+```
+public/images/eras/panhead.webp
+public/images/eras/ironhead-sportster.webp
+public/images/eras/shovelhead.webp
+public/images/eras/evolution.webp
+public/images/eras/evo-sportster.webp
+public/images/eras/twin-cam.webp
+public/images/eras/milwaukee-8.webp
+public/images/eras/chopper.webp
+```
+
+### My Garage audit
+Built against /shop — review now that /browse is canonical.
+
 ### Expand model_alias_map
-Missing codes that appeared in product names: `FLTRX`, `FXDB`, `FLHTK`, `FLSTF`, `FLHRC`, `FXDWG`. Add to DB, re-run `extract_fitment_db_driven.js`.
 ```sql
 INSERT INTO model_alias_map (alias_text, model_family, model_code, priority)
 VALUES ('fltrx', 'touring', 'FLTRX', 9), ('fxdb', 'dyna', 'FXDB', 9),
@@ -105,51 +105,47 @@ VALUES ('fltrx', 'touring', 'FLTRX', 9), ('fxdb', 'dyna', 'FXDB', 9),
        ('flhrc', 'touring', 'FLHRC', 9), ('fxdwg', 'dyna', 'FXDWG', 9);
 ```
 
-### Frontend redesign — /browse
-Full overhaul of the browse/shop experience. Vision TBD — discuss with Laken before building.
-
 ### WPS FatBook PDF OEM extraction
-Would expand OEM number coverage significantly. WPS side of catalog_oem_crossref still sparse.
-
-### Tire catalog images
-`tire_master_image.xlsx` not yet processed.
-
-### Fix import_pu_brand_xml.js
-Remove dead `cuOEM` UPDATE block (step 4 tries to UPDATE cu.oem_part_number which doesn't exist).
-
-### IMG_CACHE_DIR persistence
-Set `IMG_CACHE_DIR=/var/cache/stinkin-images` in `.env.local` on Hetzner.
+### Tire catalog images — tire_master_image.xlsx not processed
+### Fix import_pu_brand_xml.js — remove dead cuOEM UPDATE block
+### IMG_CACHE_DIR — set in .env.local on Hetzner
 
 ---
 
-## 📊 CURRENT STATE (End of April 27)
+## 📊 CURRENT STATE (End of April 29)
 
 | Metric | Value |
 |--------|-------|
-| catalog_unified | 88,512 rows |
+| catalog_unified | 88,512 rows (INCOMPLETE) |
 | — WPS | 26,754 |
 | — PU | 24,009 |
 | — VTwin | 37,749 |
-| Typesense indexed | 88,301 (fresh — April 26) |
-| catalog_fitment (legacy) | ARCHIVED → catalog_fitment_archived |
-| catalog_fitment_v2 | ~3,048,000+ rows — SOLE CANONICAL TABLE |
-| — VTwin covered | 4,858 products (12.9%) |
-| — WPS covered | 2,328 products (8.7%) |
-| — PU covered | 7,250 products (30.2%) |
-| catalog_unified fitment (PU) | 5,171 with year / 5,365 with families |
-| catalog_unified fitment (VTwin) | 5,399 with year / 5,370 with families |
-| catalog_unified fitment (WPS) | 2,266 with year / 2,362 with families |
+| catalog_products | ~95,484 rows |
+| Typesense indexed | 88,301 |
+| catalog_fitment_archived | 26,008 rows (legacy) |
+| catalog_fitment_v2 | 3,048,726 rows |
+| — FK points to | catalog_products.id (needs migration) |
 | harley_families | 15 |
 | harley_models | 158 |
 | harley_model_years | 1,415 rows |
-| catalog_oem_crossref | ~95,116 rows |
-| oem_numbers[] populated | 5,411 products |
-| model_alias_map | 205 aliases |
-| engine_platform_map | 6 entries |
-| VTwin with images | 30,857 |
-| PU with images | 18,415 |
-| WPS with images | ~25,000+ |
+| Era pages | 9 eras live at /era/[slug] |
+| Homepage | Live — era cards + category grid + corner nav |
+| Fonts | Bebas Neue + Share Tech Mono live |
 
 ---
 
-*Updated: April 27, 2026 — Phase 10 cutover complete*
+## 🏗️ ARCHITECTURE VISION
+
+Each vendor has their own catalog for daily price updates:
+- `catalog_wps` — WPS native format
+- `catalog_pu` — PU native format
+- `catalog_vtwin` — VTwin native format
+
+All flow into `catalog_unified` — the ONLY table the frontend reads.
+`catalog_fitment_v2.product_id` must reference `catalog_unified.id`.
+
+Current reality: catalog_unified is incomplete, FK still on catalog_products.
+
+---
+
+*Updated: April 29, 2026*

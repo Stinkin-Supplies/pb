@@ -262,11 +262,11 @@ async function processVtwin(client, hdIndex, modelYearMap, modelAliases, platfor
     if (oems.length > 0) vtOemMap.set(item, oems);
   }
 
-  // catalog_products.sku for vtwin IS the VTwin ITEM number directly
   const { rows: bridgeRows } = await client.query(`
-    SELECT sku, id AS product_id
-    FROM catalog_products
-    WHERE source_vendor = 'vtwin' AND is_active = true
+    SELECT DISTINCT cu.id AS product_id, cu.sku
+    FROM catalog_unified cu
+    WHERE cu.source_vendor ILIKE 'vtwin'
+      AND cu.is_active = true
   `);
   const vendorSkuToProductId = new Map(bridgeRows.map(r => [r.sku, r.product_id]));
   console.log(`   VTwin product SKUs loaded: ${vendorSkuToProductId.size.toLocaleString()}`);
@@ -317,8 +317,8 @@ async function processWps(client, hdIndex, modelYearMap, modelAliases, platformM
   }
 
   const { rows: catRows } = await client.query(`
-    SELECT id, sku FROM catalog_products
-    WHERE source_vendor = 'wps' AND is_active = true
+    SELECT id, sku FROM catalog_unified
+    WHERE source_vendor ILIKE 'wps' AND is_active = true
   `);
   console.log(`   Catalog WPS products: ${catRows.length.toLocaleString()}`);
 
@@ -351,16 +351,16 @@ async function processWps(client, hdIndex, modelYearMap, modelAliases, platformM
 async function coverageReport(client) {
   const { rows } = await client.query(`
     SELECT
-      cp.source_vendor,
-      COUNT(DISTINCT cp.id)            AS total,
+      cu.source_vendor,
+      COUNT(DISTINCT cu.id)            AS total,
       COUNT(DISTINCT fv2.product_id)   AS has_fitment,
       ROUND(COUNT(DISTINCT fv2.product_id)::numeric /
-            NULLIF(COUNT(DISTINCT cp.id), 0) * 100, 1) AS pct
-    FROM catalog_products cp
-    LEFT JOIN catalog_fitment_v2 fv2 ON fv2.product_id = cp.id
-    WHERE cp.is_active = true
-    GROUP BY cp.source_vendor
-    ORDER BY cp.source_vendor
+            NULLIF(COUNT(DISTINCT cu.id), 0) * 100, 1) AS pct
+    FROM catalog_unified cu
+    LEFT JOIN catalog_fitment_v2 fv2 ON fv2.product_id = cu.id
+    WHERE cu.is_active = true
+    GROUP BY cu.source_vendor
+    ORDER BY cu.source_vendor
   `);
 
   console.log('\n📊  catalog_fitment_v2 coverage after run:');
