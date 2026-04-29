@@ -6,7 +6,7 @@
  * (fitment_hd_families, fitment_year_start, fitment_year_end)
  * into catalog_fitment_v2 (product_id, model_year_id).
  *
- * product_id now references catalog_unified.id (FK migrated April 29).
+ * product_id references catalog_unified.id (FK migrated April 29).
  * Safe to re-run — uses ON CONFLICT DO NOTHING.
  *
  * Usage:
@@ -23,6 +23,18 @@ const pool = new Pool({
 
 const BATCH_SIZE = 500;
 
+// VTwin uses generic family names that map to one or more harley_families names.
+// "Softail" covers both Softail Evo and Softail M8 eras.
+const FAMILY_ALIASES = {
+  "Softail":   ["Softail Evo", "Softail M8"],
+  "Touring":   ["Touring"],
+  "Sportster": ["Sportster"],
+  "Dyna":      ["Dyna"],
+  "FXR":       ["FXR"],
+  "V-Rod":     ["V-Rod"],
+  "Softail M8":["Softail M8"],
+};
+
 async function main() {
   const client = await pool.connect();
 
@@ -30,7 +42,6 @@ async function main() {
     console.log("=== VTwin Fitment Migration → catalog_fitment_v2 ===\n");
 
     // 1. Fetch all VTwin products with unmigrated fitment data
-    // product_id now = catalog_unified.id (FK was migrated to catalog_unified)
     console.log("Fetching VTwin products with family+year data not yet in v2...");
     const { rows: products } = await client.query(`
       SELECT
@@ -56,7 +67,7 @@ async function main() {
       return;
     }
 
-    // 2. Build a lookup: family name + year → model_year_id
+    // 2. Build lookup: "FamilyName:year" → [model_year_id, ...]
     console.log("Building model_year lookup table...");
     const { rows: modelYears } = await client.query(`
       SELECT
@@ -68,7 +79,6 @@ async function main() {
       JOIN harley_families hf ON hf.id = hm.family_id
     `);
 
-    // Map: "FamilyName:year" → [model_year_id, ...]
     const yearLookup = new Map();
     for (const row of modelYears) {
       const key = `${row.family_name}:${row.year}`;
@@ -92,29 +102,35 @@ async function main() {
         continue;
       }
 
-      for (const family of product.fitment_hd_families) {
-        let matched = false;
-        for (let year = yearStart; year <= yearEnd; year++) {
-          const key = `${family}:${year}`;
-          const modelYearIds = yearLookup.get(key);
-          if (!modelYearIds) continue;
-          matched = true;
-          for (const modelYearId of modelYearIds) {
-            rows.push({ product_id: product.id, model_year_id: modelYearId });
+      for (const vtwinFamily of product.fitment_hd_families) {
+        // Resolve alias → one or more harley_families names
+        const resolvedFamilies = FAMILY_ALIASES[vtwinFamily];
+        if (!resolvedFamilies) {
+          unmatchedFamilies.add(vtwinFamily);
+          continue;
+        }
+
+        for (const family of resolvedFamilies) {
+          for (let year = yearStart; year <= yearEnd; year++) {
+            const key = `${family}:${year}`;
+            const modelYearIds = yearLookup.get(key);
+            if (!modelYearIds) continue;
+            for (const modelYearId of modelYearIds) {
+              rows.push({ product_id: product.id, model_year_id: modelYearId });
+            }
           }
         }
-        if (!matched) unmatchedFamilies.add(family);
       }
     }
 
     console.log(`Expanded to ${rows.length} fitment rows (${skipped} products skipped — bad year data)`);
     if (unmatchedFamilies.size > 0) {
-      console.log(`Unmatched family names (not in harley_families): ${[...unmatchedFamilies].join(', ')}`);
+      console.log(`Unmatched family names (add to FAMILY_ALIASES): ${[...unmatchedFamilies].join(', ')}`);
     }
     console.log();
 
     if (rows.length === 0) {
-      console.log("No rows to insert — family names may not match harley_families. Check mapping above.");
+      console.log("No rows to insert. Check FAMILY_ALIASES mapping.");
       return;
     }
 
