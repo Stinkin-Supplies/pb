@@ -117,6 +117,7 @@ function EraCard({ era, index }) {
   });
 
   const textY = useTransform(scrollYProgress, [0, 1], ["12px", "-12px"]);
+  const textOnRight = index % 2 === 1;
 
   return (
     <motion.div
@@ -152,7 +153,7 @@ function EraCard({ era, index }) {
             initial="initial"
             style={{
               position: "absolute", inset: 0,
-              background: `radial-gradient(ellipse at 30% 50%, ${era.accent}15 0%, transparent 70%)`,
+              background: `radial-gradient(ellipse at ${textOnRight ? "70%" : "30%"} 50%, ${era.accent}15 0%, transparent 70%)`,
               pointerEvents: "none", zIndex: 2,
             }}
           />
@@ -173,7 +174,9 @@ function EraCard({ era, index }) {
           {/* Gradient overlay — keeps text readable */}
           <div style={{
             position: "absolute", inset: 0,
-            background: `linear-gradient(90deg, rgba(8,8,8,0.9) 38%, rgba(8,8,8,0.16) 100%)`,
+            background: textOnRight
+              ? `linear-gradient(270deg, rgba(8,8,8,0.9) 38%, rgba(8,8,8,0.16) 100%)`
+              : `linear-gradient(90deg, rgba(8,8,8,0.9) 38%, rgba(8,8,8,0.16) 100%)`,
             zIndex: 1,
           }} />
 
@@ -181,9 +184,11 @@ function EraCard({ era, index }) {
           <motion.div
             style={{
               position: "relative", zIndex: 3,
-              padding: "36px 32px 36px 36px",
+              padding: "36px 36px 36px 36px",
               display: "flex", flexDirection: "column",
-              justifyContent: "center", y: textY,
+              justifyContent: "center", alignItems: textOnRight ? "flex-end" : "flex-start",
+              textAlign: textOnRight ? "right" : "left",
+              y: textY,
             }}
           >
             <div style={{
