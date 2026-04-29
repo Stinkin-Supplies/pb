@@ -615,6 +615,9 @@ export default function EraPage({ params }) {
         params.set("universal", "true");
       } else {
         era.families.forEach(fam => params.append("family", fam));
+        // Year range bounds — splits eras sharing a family (e.g. Ironhead vs Evo Sportster)
+        if (era.year_min) params.set("year_min", String(era.year_min));
+        if (era.year_max) params.set("year_max", String(era.year_max));
       }
 
       // Category — map slug to dbCategories
