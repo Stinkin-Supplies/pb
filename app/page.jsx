@@ -134,6 +134,9 @@ function EraCard({ era, index }) {
           style={{
             position: "relative",
             background: "#0c0c0c",
+            backgroundImage: `url(/images/eras/${era.slug}.webp)`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
             border: "1px solid #181818",
             overflow: "hidden",
             cursor: "pointer",
@@ -158,19 +161,6 @@ function EraCard({ era, index }) {
             }}
           />
 
-          {/* Background image */}
-          <img
-            src={`/images/eras/${era.slug}.webp`}
-            alt={era.display_name}
-            style={{
-              position: "absolute", inset: 0,
-              width: "100%", height: "100%",
-              objectFit: "cover",
-              mixBlendMode: "screen",
-              opacity: 0.42,
-            }}
-          />
-
           {/* Gradient overlay — keeps text readable */}
           <div style={{
             position: "absolute", inset: 0,
@@ -178,6 +168,15 @@ function EraCard({ era, index }) {
               ? `linear-gradient(270deg, rgba(8,8,8,0.9) 38%, rgba(8,8,8,0.16) 100%)`
               : `linear-gradient(90deg, rgba(8,8,8,0.9) 38%, rgba(8,8,8,0.16) 100%)`,
             zIndex: 1,
+          }} />
+
+          {/* Image wash */}
+          <div style={{
+            position: "absolute", inset: 0,
+            background: "rgba(255,255,255,0.08)",
+            mixBlendMode: "screen",
+            opacity: 0.55,
+            zIndex: 0,
           }} />
 
           {/* Text */}
