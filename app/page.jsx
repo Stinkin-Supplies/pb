@@ -118,6 +118,10 @@ function EraCard({ era, index }) {
 
   const textY = useTransform(scrollYProgress, [0, 1], ["12px", "-12px"]);
   const textOnRight = index % 2 === 1;
+  const isEvolution = era.slug === "evolution";
+  const gradientDark = isEvolution ? 0.58 : 0.9;
+  const gradientLight = isEvolution ? 0.08 : 0.16;
+  const washOpacity = isEvolution ? 0.18 : 0.32;
 
   return (
     <motion.div
@@ -165,8 +169,8 @@ function EraCard({ era, index }) {
           <div style={{
             position: "absolute", inset: 0,
             background: textOnRight
-              ? `linear-gradient(270deg, rgba(8,8,8,0.9) 38%, rgba(8,8,8,0.16) 100%)`
-              : `linear-gradient(90deg, rgba(8,8,8,0.9) 38%, rgba(8,8,8,0.16) 100%)`,
+              ? `linear-gradient(270deg, rgba(8,8,8,${gradientDark}) 38%, rgba(8,8,8,${gradientLight}) 100%)`
+              : `linear-gradient(90deg, rgba(8,8,8,${gradientDark}) 38%, rgba(8,8,8,${gradientLight}) 100%)`,
             zIndex: 1,
           }} />
 
@@ -175,7 +179,7 @@ function EraCard({ era, index }) {
             position: "absolute", inset: 0,
             background: "rgba(255,255,255,0.08)",
             mixBlendMode: "screen",
-            opacity: 0.55,
+            opacity: washOpacity,
             zIndex: 0,
           }} />
 
