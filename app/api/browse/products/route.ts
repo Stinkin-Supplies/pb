@@ -1,7 +1,6 @@
 /**
  * app/api/browse/products/route.ts
- * Product search/filter — reads directly from catalog_unified.
- * Supports multi-family (era pages) and dbCategory arrays (category slug mapping).
+ * Supports multi-family, year range bounds, dbCategory arrays.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -11,20 +10,18 @@ export async function GET(req: NextRequest) {
   const p = req.nextUrl.searchParams;
 
   try {
-    // families[] — repeatable param e.g. ?family=Touring&family=Dyna
-    const familiesRaw = p.getAll("family");
+    const familiesRaw    = p.getAll("family");
     const dbCategoriesRaw = p.getAll("dbCategory");
 
     const filters: BrowseFilters = {
-      // Multi-family support
       families:     familiesRaw.length > 0 ? familiesRaw : undefined,
-      // Single family fallback (legacy)
       family:       familiesRaw.length === 1 ? familiesRaw[0] : undefined,
-      // Universal/chopper
+      // Era year range — splits shared families (Ironhead vs Evo Sportster)
+      yearMin:      p.get("year_min") ? parseInt(p.get("year_min")!) : undefined,
+      yearMax:      p.get("year_max") ? parseInt(p.get("year_max")!) : undefined,
       universal:    p.get("universal") === "true",
       modelCode:    p.get("model")      || undefined,
       year:         p.get("year")       ? parseInt(p.get("year")!)       : undefined,
-      // DB category array (mapped from era page category slug)
       dbCategories: dbCategoriesRaw.length > 0 ? dbCategoriesRaw : undefined,
       category:     dbCategoriesRaw.length === 0 ? (p.get("category") || undefined) : undefined,
       brand:        p.get("brand")      || undefined,

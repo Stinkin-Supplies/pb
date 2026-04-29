@@ -201,16 +201,10 @@ function EraCard({ era, index }) {
 
               <div style={{
                 fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
-                fontSize: "clamp(38px, 6vw, 72px)",
+                fontSize: "clamp(48px, 10vw, 120px)",
                 letterSpacing: "0.03em", lineHeight: 0.9,
                 color: LIGHT, marginBottom: 14,
               }}>{era.display_name}</div>
-
-              <div style={{
-                fontFamily: "var(--font-stencil, monospace)",
-                fontSize: 11, color: "#555", lineHeight: 1.6,
-                maxWidth: 340, marginBottom: 20,
-              }}>{era.description}</div>
 
               <motion.div
                 variants={{
@@ -231,7 +225,7 @@ function EraCard({ era, index }) {
 
             {/* Image side */}
             <div style={{
-              width: "38%", minWidth: 160,
+              width: "45%", minWidth: 180,
               position: "relative", overflow: "hidden",
               background: "#060606",
             }}>
@@ -252,17 +246,18 @@ function EraCard({ era, index }) {
                 color: `${era.accent}12`,
                 userSelect: "none",
               }}>{String(index + 1).padStart(2, "0")}</div>
-              {/* Image slot — swap src for real photography */}
-              <div style={{
-                position: "absolute", inset: 0,
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                <div style={{
-                  fontFamily: "var(--font-stencil, monospace)",
-                  fontSize: 8, letterSpacing: "0.18em",
-                  color: "#1e1e1e", textTransform: "uppercase",
-                }}>[ Photo ]</div>
-              </div>
+              <img
+                src={`/images/eras/${era.slug}.webp`}
+                alt={era.display_name}
+                style={{
+                  position: "absolute", inset: 0,
+                  width: "100%", height: "100%",
+                  objectFit: "contain",
+                  mixBlendMode: "screen",
+                  opacity: 0.9,
+                  padding: "16px",
+                }}
+              />
             </div>
           </div>
         </motion.div>
