@@ -41,10 +41,6 @@ const CAT_ICONS = {
   "oils-chemicals": "◬",
 };
 
-// ─── Noise texture overlay ────────────────────────────────────────────────────
-
-const NOISE = `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`;
-
 // ─── Floating Header ──────────────────────────────────────────────────────────
 
 function FloatingHeader() {
@@ -120,14 +116,7 @@ function EraCard({ era, index }) {
     offset: ["start end", "end start"],
   });
 
-  const imageX = useTransform(
-    scrollYProgress,
-    [0, 1],
-    index % 2 === 0 ? ["8%", "-8%"] : ["-8%", "8%"]
-  );
   const textY = useTransform(scrollYProgress, [0, 1], ["12px", "-12px"]);
-
-  const imageRight = index % 2 === 0;
 
   return (
     <motion.div
@@ -148,22 +137,13 @@ function EraCard({ era, index }) {
             overflow: "hidden",
             cursor: "pointer",
             minHeight: 220,
-            display: "flex",
-            alignItems: "stretch",
           }}
         >
           {/* Accent bar */}
           <div style={{
             position: "absolute", top: 0, left: 0, bottom: 0,
             width: 3, background: era.accent,
-            zIndex: 2,
-          }} />
-
-          {/* Noise overlay */}
-          <div style={{
-            position: "absolute", inset: 0,
-            backgroundImage: NOISE, backgroundSize: "128px 128px",
-            opacity: 0.025, pointerEvents: "none", zIndex: 1,
+            zIndex: 3,
           }} />
 
           {/* Hover glow */}
@@ -172,94 +152,69 @@ function EraCard({ era, index }) {
             initial="initial"
             style={{
               position: "absolute", inset: 0,
-              background: `radial-gradient(ellipse at ${imageRight ? "80%" : "20%"} 50%, ${era.accent}0a 0%, transparent 70%)`,
-              pointerEvents: "none", zIndex: 1,
-              transition: "opacity 0.4s",
+              background: `radial-gradient(ellipse at 30% 50%, ${era.accent}15 0%, transparent 70%)`,
+              pointerEvents: "none", zIndex: 2,
             }}
           />
 
-          {/* Content row */}
+          {/* Background image */}
+          <img
+            src={`/images/eras/${era.slug}.webp`}
+            alt={era.display_name}
+            style={{
+              position: "absolute", inset: 0,
+              width: "100%", height: "100%",
+              objectFit: "cover",
+              mixBlendMode: "screen",
+              opacity: 0.42,
+            }}
+          />
+
+          {/* Gradient overlay — keeps text readable */}
           <div style={{
-            display: "flex",
-            flexDirection: imageRight ? "row" : "row-reverse",
-            width: "100%", zIndex: 2,
-          }}>
-            {/* Text side */}
+            position: "absolute", inset: 0,
+            background: `linear-gradient(90deg, rgba(8,8,8,0.9) 38%, rgba(8,8,8,0.16) 100%)`,
+            zIndex: 1,
+          }} />
+
+          {/* Text */}
+          <motion.div
+            style={{
+              position: "relative", zIndex: 3,
+              padding: "36px 32px 36px 36px",
+              display: "flex", flexDirection: "column",
+              justifyContent: "center", y: textY,
+            }}
+          >
+            <div style={{
+              fontFamily: "var(--font-stencil, 'Share Tech Mono', monospace)",
+              fontSize: 9, letterSpacing: "0.22em",
+              color: era.accent, textTransform: "uppercase", marginBottom: 10,
+            }}>{era.year_range}</div>
+
+            <div style={{
+              fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
+              fontSize: "clamp(48px, 10vw, 120px)",
+              letterSpacing: "0.03em", lineHeight: 0.9,
+              color: LIGHT, marginBottom: 20,
+            }}>{era.display_name}</div>
+
             <motion.div
+              variants={{
+                hover: { x: 6, color: era.accent },
+                initial: { x: 0, color: "#444" },
+              }}
               style={{
-                flex: 1, padding: "36px 32px 36px 36px",
-                display: "flex", flexDirection: "column",
-                justifyContent: "center", y: textY,
+                display: "flex", alignItems: "center", gap: 8,
+                fontFamily: "var(--font-stencil, monospace)",
+                fontSize: 9, letterSpacing: "0.2em", textTransform: "uppercase",
+                transition: "color 0.2s",
               }}
             >
-              <div style={{
-                fontFamily: "var(--font-stencil, 'Share Tech Mono', monospace)",
-                fontSize: 9, letterSpacing: "0.22em",
-                color: era.accent, textTransform: "uppercase",
-                marginBottom: 10,
-              }}>{era.year_range}</div>
-
-              <div style={{
-                fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
-                fontSize: "clamp(48px, 10vw, 120px)",
-                letterSpacing: "0.03em", lineHeight: 0.9,
-                color: LIGHT, marginBottom: 14,
-              }}>{era.display_name}</div>
-
-              <motion.div
-                variants={{
-                  hover: { x: 6, color: era.accent },
-                  initial: { x: 0, color: "#444" },
-                }}
-                style={{
-                  display: "flex", alignItems: "center", gap: 8,
-                  fontFamily: "var(--font-stencil, monospace)",
-                  fontSize: 9, letterSpacing: "0.2em", textTransform: "uppercase",
-                  transition: "color 0.2s",
-                }}
-              >
-                <span>Shop {era.display_name}</span>
-                <span style={{ fontSize: 12 }}>→</span>
-              </motion.div>
+              <span>Shop Now</span>
+              <span style={{ fontSize: 12 }}>→</span>
             </motion.div>
-
-            {/* Image side */}
-            <div style={{
-              width: "45%", minWidth: 180,
-              position: "relative", overflow: "hidden",
-              background: "#060606",
-            }}>
-              <motion.div
-                style={{
-                  position: "absolute", inset: "-10%",
-                  backgroundImage: `linear-gradient(135deg, ${era.accent}15 0%, transparent 60%)`,
-                  x: imageX,
-                }}
-              />
-              {/* Era number watermark */}
-              <div style={{
-                position: "absolute", inset: 0,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
-                fontSize: "clamp(80px, 14vw, 160px)",
-                letterSpacing: "-0.04em", lineHeight: 1,
-                color: `${era.accent}12`,
-                userSelect: "none",
-              }}>{String(index + 1).padStart(2, "0")}</div>
-              <img
-                src={`/images/eras/${era.slug}.webp`}
-                alt={era.display_name}
-                style={{
-                  position: "absolute", inset: 0,
-                  width: "100%", height: "100%",
-                  objectFit: "contain",
-                  mixBlendMode: "screen",
-                  opacity: 0.9,
-                  padding: "16px",
-                }}
-              />
-            </div>
-          </div>
+          </motion.div>
         </motion.div>
       </Link>
     </motion.div>
