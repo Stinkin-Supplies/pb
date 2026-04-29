@@ -5,7 +5,7 @@
 // Filters: category, brand, price, in stock — all in side panel
 // ============================================================
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { use, useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { getProductImage } from "@/lib/getProductImage";
@@ -585,7 +585,7 @@ function ActiveTag({ label, onRemove, accent }) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function EraPage({ params }) {
-  const { slug } = params;
+  const { slug } = use(params);
   const era = getEra(slug);
 
   const [products, setProducts]   = useState([]);

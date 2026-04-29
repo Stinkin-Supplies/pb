@@ -66,25 +66,23 @@ export async function GET(request: NextRequest) {
         cu.stock_quantity,
         cu.in_stock,
         cu.source_vendor,
-
-        -- Fitment comes from catalog_products (source of truth)
-        cp.fitment_hd_families,
-        cp.fitment_year_start,
-        cp.fitment_year_end,
-        cp.fitment,
-        (cp.fitment IS NOT NULL)                              AS is_harley_fitment
+        cu.is_harley_fitment
 
       FROM catalog_unified cu
-      -- JOIN catalog_products for fitment source-of-truth
-      JOIN catalog_products cp ON cp.sku = cu.sku
 
       WHERE cu.is_active = true
         AND cu.category IS NOT NULL
-        -- Family filter: exact match in the families array
-        AND $1 = ANY(cp.fitment_hd_families)
-        -- Year filter: NULL years are treated as "all years"
-        AND (cp.fitment_year_start IS NULL OR cp.fitment_year_start <= $2)
-        AND (cp.fitment_year_end   IS NULL OR cp.fitment_year_end   >= $3)
+        AND EXISTS (
+          SELECT 1
+          FROM catalog_fitment_v2 cfv
+          JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id
+          JOIN harley_models hm      ON hm.id  = hmy.model_id
+          JOIN harley_families hf    ON hf.id  = hm.family_id
+          WHERE cfv.product_id = cu.id
+            AND hf.name = $1
+            AND hmy.year >= $2
+            AND hmy.year <= $3
+        )
         ${where}
 
       ORDER BY

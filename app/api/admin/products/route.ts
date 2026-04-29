@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
   if (action === 'activate') {
     if (!ids?.length) return NextResponse.json({ error: 'No ids' }, { status: 400 });
     await db.query(
-      `UPDATE catalog_unified SET is_active = true WHERE id = ANY($1::uuid[])`,
+      `UPDATE catalog_unified SET is_active = true WHERE id = ANY($1::int[])`,
       [ids]
     );
     return NextResponse.json({ message: `${ids.length} product(s) activated` });
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
   if (action === 'deactivate') {
     if (!ids?.length) return NextResponse.json({ error: 'No ids' }, { status: 400 });
     await db.query(
-      `UPDATE catalog_unified SET is_active = false WHERE id = ANY($1::uuid[])`,
+      `UPDATE catalog_unified SET is_active = false WHERE id = ANY($1::int[])`,
       [ids]
     );
     return NextResponse.json({ message: `${ids.length} product(s) deactivated` });
@@ -125,8 +125,8 @@ export async function POST(request: NextRequest) {
   if (action === 'delete') {
     if (!ids?.length) return NextResponse.json({ error: 'No ids' }, { status: 400 });
     // Remove fitment first
-    await db.query(`DELETE FROM catalog_fitment_v2 WHERE product_id = ANY($1::uuid[])`, [ids]);
-    await db.query(`DELETE FROM catalog_unified WHERE id = ANY($1::uuid[])`, [ids]);
+    await db.query(`DELETE FROM catalog_fitment_v2 WHERE product_id = ANY($1::int[])`, [ids]);
+    await db.query(`DELETE FROM catalog_unified WHERE id = ANY($1::int[])`, [ids]);
     return NextResponse.json({ message: `${ids.length} product(s) deleted` });
   }
 

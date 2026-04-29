@@ -66,21 +66,6 @@ function normalizeProductRow(row: any) {
   };
 }
 
-function normalizeFacetResponse(data: any): FacetResponse {
-  const rawCategories = data?.categories ?? data?.category ?? [];
-  const rawBrands = data?.brands ?? [];
-  const priceRange = data?.priceRange ?? data?.price_range ?? { min: 0, max: 0 };
-
-  return {
-    categories: rawCategories,
-    brands: rawBrands,
-    priceRange: {
-      min: Number(priceRange.min ?? 0),
-      max: Number(priceRange.max ?? 0),
-    },
-  };
-}
-
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const category = url.searchParams.get("category") || undefined;
@@ -107,40 +92,40 @@ export async function GET(req: Request) {
   const from = page * pageSize;
   const db = getCatalogDb();
 
-  const conditions: string[] = ["cp.is_active = true"];
+  const conditions: string[] = ["cu.is_active = true"];
   const values: any[] = [];
   let paramIdx = 1;
 
   if (category) {
-    conditions.push(`cp.category = $${paramIdx++}`);
+    conditions.push(`cu.category = $${paramIdx++}`);
     values.push(category);
   }
   if (brand) {
-    conditions.push(`cp.brand = $${paramIdx++}`);
+    conditions.push(`cu.brand = $${paramIdx++}`);
     values.push(brand);
   }
   if (minPrice != null && !Number.isNaN(minPrice)) {
-    conditions.push(`COALESCE(cp.price, cp.msrp, cp.cost) >= $${paramIdx++}`);
+    conditions.push(`COALESCE(cu.computed_price, cu.msrp, cu.cost) >= $${paramIdx++}`);
     values.push(minPrice);
   }
   if (maxPrice != null && !Number.isNaN(maxPrice)) {
-    conditions.push(`COALESCE(cp.price, cp.msrp, cp.cost) <= $${paramIdx++}`);
+    conditions.push(`COALESCE(cu.computed_price, cu.msrp, cu.cost) <= $${paramIdx++}`);
     values.push(maxPrice);
   }
   if (inStock) {
     conditions.push(`EXISTS (
       SELECT 1
       FROM public.vendor_offers vo
-      WHERE vo.catalog_product_id = cp.id
+      WHERE vo.catalog_product_id = cu.id
         AND vo.is_active = true
     )`);
   }
   if (search) {
     conditions.push(`(
-      cp.name ILIKE $${paramIdx}
-      OR cp.sku ILIKE $${paramIdx}
-      OR cp.brand ILIKE $${paramIdx}
-      OR cp.category ILIKE $${paramIdx}
+      cu.name ILIKE $${paramIdx}
+      OR cu.sku ILIKE $${paramIdx}
+      OR cu.brand ILIKE $${paramIdx}
+      OR cu.category ILIKE $${paramIdx}
     )`);
     values.push(`%${search}%`);
     paramIdx++;
@@ -153,7 +138,7 @@ export async function GET(req: Request) {
         SELECT 1 FROM catalog_fitment_v2 cfv
         JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id
         JOIN harley_models hm ON hm.id = hmy.model_id
-        WHERE cfv.product_id = cp.id
+        WHERE cfv.product_id = cu.id
           AND hm.model_code = $${paramIdx++}
           AND hmy.year = $${paramIdx++}
       )
@@ -165,7 +150,7 @@ export async function GET(req: Request) {
         SELECT 1 FROM catalog_fitment_v2 cfv
         JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id
         JOIN harley_models hm ON hm.id = hmy.model_id
-        WHERE cfv.product_id = cp.id
+        WHERE cfv.product_id = cu.id
           AND hm.model_code = $${paramIdx++}
       )
     `);
@@ -175,7 +160,7 @@ export async function GET(req: Request) {
       EXISTS (
         SELECT 1 FROM catalog_fitment_v2 cfv
         JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id
-        WHERE cfv.product_id = cp.id
+        WHERE cfv.product_id = cu.id
           AND hmy.year = $${paramIdx++}
       )
     `);
@@ -184,68 +169,69 @@ export async function GET(req: Request) {
 
   const where = conditions.join(" AND ");
   const orderMap: Record<string, string> = {
-    newest: "cp.created_at DESC",
-    price_asc: "COALESCE(cp.price, cp.msrp, cp.cost) ASC",
-    price_desc: "COALESCE(cp.price, cp.msrp, cp.cost) DESC",
-    name_asc: "cp.name ASC",
+    newest: "cu.created_at DESC",
+    price_asc: "COALESCE(cu.computed_price, cu.msrp, cu.cost) ASC",
+    price_desc: "COALESCE(cu.computed_price, cu.msrp, cu.cost) DESC",
+    name_asc: "cu.name ASC",
   };
   const orderClause = orderMap[sort] ?? orderMap.newest;
 
   try {
-    const [{ rows }, countResult, facetsResult] = await Promise.all([
+    const [{ rows }, countResult, categoriesResult, brandsResult, priceRangeResult] = await Promise.all([
       db.query(
         `SELECT
-            cp.id,
-            cp.sku,
-            cp.slug,
-            cp.name,
-            cp.brand,
-            cp.category,
-            COALESCE(cp.price, cp.msrp, cp.cost, 0) AS price,
-            cp.msrp,
-            cp.map_price,
-            cp.weight,
-            cp.description,
-            cp.is_active,
-            cp.created_at,
+            cu.id,
+            cu.sku,
+            cu.slug,
+            cu.name,
+            cu.brand,
+            cu.category,
+            COALESCE(cu.computed_price, cu.msrp, cu.cost, 0) AS price,
+            cu.msrp,
+            cu.map_price,
+            cu.weight,
+            cu.description,
+            cu.is_active,
+            cu.created_at,
             COALESCE((
               SELECT cm.url
               FROM public.catalog_media cm
-              WHERE cm.product_id = cp.id
+              WHERE cm.product_id = cu.id
               ORDER BY cm.priority ASC
               LIMIT 1
-            ), NULL) AS image_url,
+            ), cu.image_url) AS image_url,
             COALESCE((
               SELECT ARRAY_AGG(cm.url ORDER BY cm.priority ASC)
               FROM public.catalog_media cm
-              WHERE cm.product_id = cp.id
-            ), '{}'::text[]) AS image_urls,
+              WHERE cm.product_id = cu.id
+            ), cu.image_urls, '{}'::text[]) AS image_urls,
             COALESCE((
               SELECT SUM(vo.total_qty)
               FROM public.vendor_offers vo
-              WHERE vo.catalog_product_id = cp.id
+              WHERE vo.catalog_product_id = cu.id
                 AND vo.is_active = true
-            ), 0) AS stock_quantity,
+            ), cu.stock_quantity, 0) AS stock_quantity,
             COALESCE((
               SELECT BOOL_OR(vo.is_active)
               FROM public.vendor_offers vo
-              WHERE vo.catalog_product_id = cp.id
-            ), false) AS in_stock,
-            cp.source_vendor,
-            cp.is_harley_fitment,
-            cp.fitment_hd_families,
-            cp.fitment_hd_codes,
-            cp.fitment_year_start,
-            cp.fitment_year_end,
-            cp.drag_part,
-            cp.in_oldbook,
-            cp.in_fatbook,
-            cp.features,
-            cp.warehouse_wi,
-            cp.warehouse_ny,
-            cp.warehouse_tx,
-            cp.oem_part_number
-         FROM public.catalog_products cp
+              WHERE vo.catalog_product_id = cu.id
+            ), cu.in_stock, false) AS in_stock,
+            cu.source_vendor,
+            cu.is_harley_fitment,
+            cu.fitment_hd_families,
+            cu.fitment_hd_codes,
+            cu.fitment_year_start,
+            cu.fitment_year_end,
+            cu.drag_part,
+            cu.in_oldbook,
+            cu.in_fatbook,
+            cu.features,
+            cu.warehouse_wi,
+            cu.warehouse_ny,
+            cu.warehouse_tx,
+            cu.oem_part_number
+         FROM public.catalog_unified cu
+         LEFT JOIN public.catalog_products cp ON cp.sku = cu.sku
          WHERE ${where}
          ORDER BY ${orderClause}
          LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
@@ -253,19 +239,48 @@ export async function GET(req: Request) {
       ),
       db.query(
         `SELECT COUNT(*)::int AS count
-         FROM public.catalog_products cp
+         FROM public.catalog_unified cu
          WHERE ${where}`,
         values
       ),
       db.query(
-        "SELECT get_product_facets($1, $2, $3, $4, $5) AS data",
-        [brand ?? null, category ?? null, minPrice ?? null, maxPrice ?? null, inStock ?? null]
+        `SELECT cu.category AS name, COUNT(DISTINCT cu.id)::int AS count
+         FROM public.catalog_unified cu
+         WHERE ${where}
+         GROUP BY cu.category
+         ORDER BY count DESC
+         LIMIT 20`,
+        values
+      ),
+      db.query(
+        `SELECT cu.brand AS name, COUNT(DISTINCT cu.id)::int AS count
+         FROM public.catalog_unified cu
+         WHERE ${where}
+         GROUP BY cu.brand
+         ORDER BY count DESC
+         LIMIT 30`,
+        values
+      ),
+      db.query(
+        `SELECT
+           MIN(COALESCE(cu.computed_price, cu.msrp, cu.cost)) AS min,
+           MAX(COALESCE(cu.computed_price, cu.msrp, cu.cost)) AS max
+         FROM public.catalog_unified cu
+         WHERE ${where}`,
+        values
       ),
     ]);
 
     const total = Number(countResult.rows[0]?.count ?? 0);
     const products = rows.map(normalizeProductRow);
-    const facets = normalizeFacetResponse(facetsResult.rows[0]?.data);
+    const facets = {
+      categories: categoriesResult.rows ?? [],
+      brands: brandsResult.rows ?? [],
+      priceRange: {
+        min: Number(priceRangeResult.rows[0]?.min ?? 0),
+        max: Number(priceRangeResult.rows[0]?.max ?? 0),
+      },
+    };
 
     return NextResponse.json({
       products,
