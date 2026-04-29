@@ -48,7 +48,7 @@ export const ERAS: Era[] = [
   },
   {
     slug:         "ironhead-sportster",
-    display_name: "Ironhead Sportster",
+    display_name: "Ironhead",
     subtitle:     "The original Sportster. 1957–1985.",
     year_range:   "1957–1985",
     description:  "Raw, light, and loud. The Ironhead Sportster was built for one thing — going fast and looking mean.",
