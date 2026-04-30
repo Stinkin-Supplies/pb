@@ -23,6 +23,18 @@ export type Era = {
 
 export const ERAS: Era[] = [
   {
+    slug:         "flathead",
+    display_name: "Flathead",
+    subtitle:     "Before the Knucklehead. 1930–1952.",
+    year_range:   "1930–1952",
+    description:  "The V-series and U-series side-valve flatheads that built Harley-Davidson before the overhead valve era. VL, UL, ULH, and the iconic Servi-Car.",
+    families:     ["Flathead"],
+    year_min:     1930,
+    year_max:     1952,
+    universal:    false,
+    accent:       "#6b7c5a",
+  },
+    {
     slug:         "knucklehead",
     display_name: "Knucklehead",
     subtitle:     "Where it began. 1936–1947.",

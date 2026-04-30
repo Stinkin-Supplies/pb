@@ -37,6 +37,7 @@ const replace = args.includes("--replace");
 // ─── Family definitions ───────────────────────────────────────────────────────
 // Maps harley_families.name → canonical year range in the DB
 const FAMILY_YEAR_RANGES = {
+  "Flathead":    { min: 1930, max: 1952 },
   "Knucklehead": { min: 1936, max: 1947 },
   "Panhead":     { min: 1948, max: 1965 },
   "Shovelhead":  { min: 1966, max: 1984 },
@@ -59,6 +60,12 @@ const FAMILY_YEAR_RANGES = {
 // Evaluated in order — first match wins for a given keyword tier
 const ERA_KEYWORDS = [
   // Old iron — unambiguous
+  { pattern: /flathead/i,               families: ["Flathead"],                 year_min: 1930, year_max: 1952, confidence: "high" },
+  { pattern: /side.?valve/i,            families: ["Flathead"],                 year_min: 1930, year_max: 1952, confidence: "high" },
+  { pattern: /servi.?car/i,             families: ["Flathead"],                 year_min: 1932, year_max: 1952, confidence: "high" },
+  { pattern: /\bulh\b/i,                families: ["Flathead"],                 year_min: 1937, year_max: 1941, confidence: "high" },
+  { pattern: /\bwla\b/i,                families: ["Flathead"],                 year_min: 1942, year_max: 1945, confidence: "high" },
+  { pattern: /hummer.*side.?valve|side.?valve.*hummer/i, families: ["Flathead"], year_min: 1948, year_max: 1956, confidence: "high" },
   { pattern: /knucklehead/i,            families: ["Knucklehead"],              year_min: 1936, year_max: 1947, confidence: "high" },
   { pattern: /panhead/i,                families: ["Panhead"],                  year_min: 1948, year_max: 1965, confidence: "high" },
   { pattern: /shovelhead/i,             families: ["Shovelhead", "FXR"],        year_min: 1966, year_max: 1984, confidence: "high" },

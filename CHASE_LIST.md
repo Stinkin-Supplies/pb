@@ -1,15 +1,32 @@
 # Stinkin' Supplies — Chase List
 **Running log of loose ends to follow up on**
-Last Updated: April 30, 2026 — end of session (second pass)
+Last Updated: April 30, 2026 — end of session (third pass)
 
 ---
 
 ## 🚀 NEXT SESSION — START HERE
 
-1. **PDP updates** — display `image_urls` (multi-image carousel), `special_instructions`, confirm bullets render
-2. **WPS fitment files** — pending from WPS rep (contacted April 30)
-3. **My Garage audit** — built against /shop, review for /browse
-4. **Low-confidence fitment staging** — 560 products in fitment_staging with confidence='low', not yet promoted
+1. **WPS fitment files** — pending from WPS rep (contacted April 30)
+2. **My Garage audit** — built against /shop, review for /browse
+3. **Low-confidence fitment staging** — ~500 products pending, review before promoting
+4. **Flathead era image** — need flathead.webp for homepage era card
+5. **PDP redesign** — noted, not started (fitment/filtering first)
+
+---
+
+## ✅ DONE APRIL 30 — THIRD PASS
+
+| Task | Result |
+|------|--------|
+| Flathead family added to DB | ✅ harley_families + 12 models + 86 model years (1930–1952) |
+| Flathead era added to config.ts | ✅ /era/flathead live, accent #6b7c5a |
+| Flathead keyword rules added | ✅ flathead, side valve, servi-car, ulh, wla in infer_fitment_staging.js |
+| Flathead fitment promoted | ✅ 3,803 products in catalog_fitment_v2 |
+| special_instructions column | ✅ Added to catalog_unified, 970 rows synced from pu_products |
+| PDP multi-image gallery | ✅ image_urls merged into gallery in page.jsx |
+| PDP special instructions block | ✅ Gold block renders in info col when not null |
+| hd_family_engine_map | ✅ Flathead entry added |
+| Typesense reindexed | ✅ 88,512 docs, 0 errors |
 
 ---
 
@@ -17,21 +34,20 @@ Last Updated: April 30, 2026 — end of session (second pass)
 
 | Task | Result |
 |------|--------|
-| Era page product counts verified | ✅ All 9 eras returning real counts |
+| Era page product counts verified | ✅ All 10 eras returning real counts |
 | Era config fixed | ✅ Family names now match DB (Softail Evo, Softail M8, etc.) |
-| Era images | ✅ All 9 WebP images live |
+| Era images | ✅ All 9 WebP images live (flathead.webp still needed) |
 | hf.slug bug | ✅ Fixed in api/admin/products/[id]/fitment/route.ts |
 | Fitment staging pipeline | ✅ Built infer_fitment_staging.js + promote_fitment_staging.js |
-| Fitment inference — all vendors | ✅ 88,512 products evaluated, 61,404 rows inserted to fitment_staging |
+| Fitment inference — all vendors | ✅ 88,512 products evaluated, 64,258 rows inserted to fitment_staging |
 | High-confidence fitment promoted | ✅ 43,552 rows → catalog_fitment_v2 |
 | Medium-confidence fitment promoted | ✅ 199,513 rows → catalog_fitment_v2 |
 | Universal products flagged | ✅ 311 products set is_universal = true |
 | Old iron era counts | ✅ Knucklehead 2,745 / Panhead 3,224 / Shovelhead 6,310 |
-| Typesense reindexed | ✅ 88,512 docs, 0 errors |
-| Browse search param bug | ✅ Fixed in lib/db/browse.ts (p index was advancing too far) |
-| VTwin PDP 404 | ✅ Fixed — removed flag gate from unified fallback in page.jsx |
-| generateMetadata | ✅ Fixed — now queries catalog_unified for VTwin-only products |
-| catalog.ts hardened | ✅ Throws on missing CATALOG_DATABASE_URL instead of silently hitting prod |
+| Browse search param bug | ✅ Fixed in lib/db/browse.ts |
+| VTwin PDP 404 | ✅ Fixed — removed flag gate from unified fallback |
+| generateMetadata | ✅ Fixed — queries catalog_unified for VTwin-only products |
+| catalog.ts hardened | ✅ Throws on missing CATALOG_DATABASE_URL |
 
 ---
 
@@ -69,7 +85,7 @@ Last Updated: April 30, 2026 — end of session (second pass)
 | Task | Result |
 |------|--------|
 | Homepage redesign | Era cards + category grid + corner nav + floating header |
-| lib/eras/config.ts | 9 eras with year_min/year_max for Sportster split |
+| lib/eras/config.ts | 10 eras with year_min/year_max |
 | app/era/[slug]/page.jsx | Era landing page, side panel filters, product grid |
 | lib/db/browse.ts | Multi-family, universal, yearMin/yearMax, dbCategories |
 | api/browse/products/route.ts | Passes families[], year_min, year_max, dbCategory[] |
@@ -97,20 +113,26 @@ Last Updated: April 30, 2026 — end of session (second pass)
 ### WPS Fitment Files
 Contacted WPS rep April 30. Once received, run fitment extraction and insert into catalog_fitment_v2.
 
-### PDP — Rich Content Display
-`image_urls`, `special_instructions`, and bullets are now in the DB but not displayed on the PDP.
-- Multi-image carousel/gallery using `catalog_unified.image_urls`
-- `special_instructions` block (where not null)
-- Bullets already in `features` array — confirm rendering
+### Flathead Era Image
+Need `public/images/eras/flathead.webp` — 800×600px min, landscape, WebP.
+Pre-war American iron — VL, UL, or Servi-Car aesthetic.
 
 ---
 
 ## 🔵 LOW PRIORITY / FUTURE
 
-### Low-confidence fitment staging — 560 products
-`fitment_staging` has 560 products with `confidence='low'` and `status='pending'`.
-These are displacement-inference rows (e.g. "80 inch" → Shovelhead/Evo range).
-Review before promoting: `SELECT * FROM fitment_staging WHERE confidence='low' LIMIT 30;`
+### PDP Redesign
+Noted — not started. Current PDP is functional. Do not touch until fitment/filtering perfected.
+
+### Low-confidence fitment staging — ~500 products
+`fitment_staging` has ~500 products with `confidence='low'` and `status='pending'`.
+Displacement-inference rows. Review before promoting:
+```sql
+SELECT cu.name, fs.family_name, fs.year_min, fs.year_max, fs.raw_signal
+FROM fitment_staging fs
+JOIN catalog_unified cu ON cu.id = fs.product_id
+WHERE fs.confidence = 'low' AND fs.status = 'pending' LIMIT 30;
+```
 
 ### My Garage audit
 Built against /shop — review now that /browse is canonical.
@@ -118,7 +140,6 @@ Built against /shop — review now that /browse is canonical.
 ### PU SKU mismatches — minor brands
 jagoilcoolers (55 parsed, 1 updated), dannygray (72 parsed, 6 updated),
 ohlins (102 parsed, 50 updated), avon-gripd (285 parsed, 40 updated).
-Investigate SKU format mismatch.
 
 ### WPS FatBook PDF OEM extraction
 ### Tire catalog images — tire_master_image.xlsx not processed
@@ -127,7 +148,7 @@ Investigate SKU format mismatch.
 
 ---
 
-## 📊 CURRENT STATE (End of April 30 — second pass)
+## 📊 CURRENT STATE (End of April 30 — third pass)
 
 | Metric | Value |
 |--------|-------|
@@ -139,26 +160,26 @@ Investigate SKU format mismatch.
 | pu_products | ~152,928 rows (includes non-Harley) |
 | Typesense indexed | 88,512 ✅ (reindexed April 30) |
 | catalog_fitment_archived | 26,008 rows (legacy, do not write) |
-| catalog_fitment_v2 | ~3,139,258 rows (after staging promotion) |
+| catalog_fitment_v2 | ~3,163,382 rows |
 | — FK points to | catalog_unified.id ✅ |
-| fitment_staging | 61,404 rows total — high+medium promoted, low pending |
+| fitment_staging | 64,258 rows — high+medium+Flathead promoted, low pending |
 | vendor_offers | 23,499 rows |
 | — FK points to | catalog_unified.id ✅ |
 | WPS pricing | 26,729 products synced |
 | PU pricing | 24,007 products synced |
 | MAP violations | 0 ✅ |
 | Cron | 0 3 * * * Hetzner |
-| harley_families | 15 |
-| harley_models | 158 |
-| harley_model_years | 1,415 rows |
-| model_alias_map | +6 new aliases (FLTRX, FXDB, FLHTK, FLSTF, FLHRC, FXDWG) |
-| Era pages | 9 eras live, all with real product counts |
-| Era fitment counts | Knucklehead 2,745 / Panhead 3,224 / Shovelhead 6,310 / Evolution 6,649 / Ironhead 1,962 / Evo Sportster 3,293 / Twin Cam 10,291 / Milwaukee-8 4,414 / Chopper 3,630 |
+| harley_families | 16 (added Flathead) |
+| harley_models | 170 (added 12 Flathead models) |
+| harley_model_years | 1,501 rows (added 86 Flathead years) |
+| model_alias_map | +6 aliases (FLTRX, FXDB, FLHTK, FLSTF, FLHRC, FXDWG) |
+| Era pages | 10 eras live at /era/[slug] |
+| Era fitment counts | Flathead 3,803 / Knucklehead 2,745 / Panhead 3,224 / Shovelhead 6,310 / Evolution 6,649 / Ironhead 1,962 / Evo Sportster 3,293 / Twin Cam 10,291 / Milwaukee-8 4,414 / Chopper 3,630 |
 | Homepage | Live — era cards + category grid + corner nav |
 | Fonts | Bebas Neue + Share Tech Mono live |
 | PU image_url coverage | 23,975 / 24,009 (99.9%) |
 | PU image_urls (2+) | 8,310 / 24,009 |
-| pu_products new columns | part_image, product_image, special_instructions, supplier_number ✅ |
+| special_instructions | 970 products synced to catalog_unified ✅ |
 | is_universal products | 311 flagged ✅ |
 
 ---
@@ -188,10 +209,11 @@ PU enrichment pipeline:
 Fitment staging pipeline:
 - `scripts/ingest/infer_fitment_staging.js [--vendor VTWIN|PU|WPS] [--replace]`
 - 4-pass inference: OEM year decode → era keyword → displacement → universal flag
+- Flathead keywords: flathead, side valve, servi-car, ulh, wla
 - Writes to `fitment_staging` table with confidence + status for review
 - `scripts/ingest/promote_fitment_staging.js [--confidence high|medium|low] [--dry-run]`
 - Promotes approved rows from fitment_staging → catalog_fitment_v2
 
 ---
 
-*Updated: April 30, 2026 — second pass*
+*Updated: April 30, 2026 — third pass*
