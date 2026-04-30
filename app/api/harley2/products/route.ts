@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
         cu.internal_sku,
         cu.slug,
         cu.name,
-        cu.display_brand                                      AS brand,
+        cu.brand,
         cu.category,
         COALESCE(cu.computed_price, cu.msrp, cu.cost, 0)     AS price,
         cu.msrp,

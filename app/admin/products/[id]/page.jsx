@@ -431,14 +431,10 @@ export default async function ProductDetailPage({ params }) {
                     <input type="text" name="name" defaultValue={p.name ?? ""} />
                   </div>
                 </div>
-                <div className="field-row">
+                <div className="field-row full">
                   <div className="field">
                     <label>Brand</label>
                     <input type="text" name="brand" defaultValue={p.brand ?? ""} />
-                  </div>
-                  <div className="field">
-                    <label>Display Brand</label>
-                    <input type="text" name="display_brand" defaultValue={p.display_brand ?? ""} />
                   </div>
                 </div>
                 <div className="field-row">
@@ -676,10 +672,7 @@ export default async function ProductDetailPage({ params }) {
                     ["has_map_policy",     "MAP Policy",       p.has_map_policy],
                     ["is_universal",       "Universal Fit",    p.is_universal],
                     ["is_harley_fitment",  "Harley Fitment",   p.is_harley_fitment],
-                    ["in_oldbook",         "In Old Book",      p.in_oldbook],
-                    ["in_fatbook",         "In Fat Book",      p.in_fatbook],
-                    ["in_harddrive",       "In Hard Drive",    p.in_harddrive],
-                    ["in_street",          "In Street",        p.in_street],
+
                     ["drag_part",          "Drag Part",        p.drag_part],
                     ["closeout",           "Closeout",         p.closeout],
                   ].map(([name, label, val]) => (
@@ -718,7 +711,7 @@ export default async function ProductDetailPage({ params }) {
                   </div>
                   <div className="info-item">
                     <div className="info-item-label">OEM Part #</div>
-                    <div className="info-item-val" style={{fontSize:11}}>{p.oem_part_number || <span className="muted">—</span>}</div>
+                    <div className="info-item-val" style={{fontSize:11}}>{p.oem_numbers?.[0] || <span className="muted">—</span>}</div>
                   </div>
                   <div className="info-item">
                     <div className="info-item-label">Dropship Fee</div>

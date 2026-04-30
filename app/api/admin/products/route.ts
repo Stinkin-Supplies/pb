@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
   let pi = 1;
 
   if (q) {
-    conditions.push(`(cu.name ILIKE $${pi} OR cu.sku ILIKE $${pi} OR cu.vendor_sku ILIKE $${pi})`);
+    conditions.push(`(cu.name ILIKE $${pi} OR cu.sku ILIKE $${pi})`);
     params.push(`%${q}%`);
     pi++;
   }
@@ -59,7 +59,6 @@ export async function GET(request: NextRequest) {
       SELECT
         cu.id,
         cu.sku,
-        cu.vendor_sku,
         cu.source_vendor,
         cu.name,
         cu.brand,
