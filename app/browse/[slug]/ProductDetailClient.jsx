@@ -357,6 +357,26 @@ const css = `
     letter-spacing: 0.08em;
   }
 
+  /* special instructions */
+  .special-instructions {
+    margin-bottom: 20px;
+    padding: 14px 16px;
+    background: rgba(201,168,76,0.06);
+    border: 1px solid rgba(201,168,76,0.2);
+    border-radius: 2px;
+  }
+  .special-instructions-label {
+    font-family: var(--font-stencil), monospace;
+    font-size: 8px; letter-spacing: 0.2em;
+    color: #c9a84c; margin-bottom: 8px;
+    text-transform: uppercase;
+  }
+  .special-instructions-text {
+    font-family: var(--font-stencil), monospace;
+    font-size: 11px; letter-spacing: 0.05em;
+    color: #e8d5a0; line-height: 1.7;
+  }
+
   /* divider */
   .pdp-divider {
     border: none; border-top: 1px solid #2a2828;
@@ -1156,6 +1176,14 @@ export default function ProductDetailClient({ product, variants = [], fitment = 
                 </>
               </dl>
             </section>
+          )}
+
+          {/* Special Instructions */}
+          {product.specialInstructions && (
+            <div className="special-instructions">
+              <div className="special-instructions-label">⚠ SPECIAL INSTRUCTIONS</div>
+              <div className="special-instructions-text">{product.specialInstructions}</div>
+            </div>
           )}
 
           {/* Tab shortcuts */}
