@@ -1,14 +1,14 @@
 # Stinkin' Supplies — Session Handoff
-**Date:** April 29, 2026
-**Status:** ✅ Homepage live | ✅ Era pages live | ✅ Fonts fixed | ✅ FKs migrated | ✅ Pricing live | ✅ VTwin fitment complete
+**Date:** April 30, 2026
+**Status:** ✅ Typesense reindexed | ✅ PU images fully ingested | ✅ WPS fitment rep contacted | ⏳ Era pages unverified | ⏳ PDP rich content not yet displayed
 
 ---
 
 ## ✅ WHAT'S WORKING NOW
 
 - **Shop** — 88,512 products in catalog_unified (WPS + PU + VTwin)
-- **Search** — Typesense live, 88,301 docs
-- **Fitment filtering** — catalog_fitment_v2 (~2,896,193 rows) — FK now points to catalog_unified
+- **Search** — Typesense live, 88,512 docs (reindexed April 30, pricing current)
+- **Fitment filtering** — catalog_fitment_v2 (~2,896,193 rows) — FK points to catalog_unified
 - **Fitment dropdowns** — /api/fitment HD-only, canonical tables
 - **Pricing** — Daily price sync live, MAP compliant, WPS + PU
 - **Homepage** — Era cards + Shop by Part categories + corner nav
@@ -17,85 +17,79 @@
 - **Browse** — /browse replaces /shop everywhere
 - **Admin** — /admin/products live
 - **Production** — https://stinksupp.vercel.app
+- **PU images** — 23,975 / 24,009 products have image_url (99.9%)
+- **PU dual images** — 8,310 products have image_urls array with 2 images
 
 ---
 
-## 📦 WHAT WAS DONE THIS SESSION (April 29 — DB session)
+## 📦 WHAT WAS DONE THIS SESSION (April 30)
 
-### FK Migration (both tables)
-- `catalog_fitment_v2.product_id` FK migrated from `catalog_products` → `catalog_unified`
-- `vendor_offers.catalog_product_id` FK migrated from `catalog_products` → `catalog_unified`
-- Orphaned rows deleted (non-Harley products not in catalog_unified)
-- Both tables were in mixed state (partial previous migration) — handled cleanly
-- Script: `scripts/ingest/03_migrate_fks_to_unified.sql`
+### Typesense Reindex
+- Ran `node scripts/ingest/index_unified.js --recreate`
+- 88,512 docs indexed, 0 errors
+- computed_price values now current
 
-**Final row counts after migration:**
-- catalog_fitment_v2: 2,327,058 (was 3,048,726 — orphans removed)
-- vendor_offers: 23,499 (was 67,342 — orphans removed)
+### WPS Fitment
+- Contacted WPS rep for fitment files
+- Awaiting ACES XML delivery
 
-### Daily Price Sync
-- Built `scripts/ingest/daily_price_sync.js` — bulk SQL, no row-by-row loops
-- WPS: reads from `catalog_pricing`, joins `catalog_unified` on SKU
-- PU: reads from `pu_pricing`, joins `catalog_unified` on part_number / punctuated_part_number
-- MAP formula: `GREATEST(LEAST(GREATEST(cost/0.75, map_price), NULLIF(msrp,0)), map_price)`
-  - Target 25% margin
-  - Floor at MAP (never below MAP)
-  - Cap at MSRP (never above MSRP)
-  - Final GREATEST(…, map_price) handles vendors where MSRP < MAP (bad vendor data)
-- Upserts into `vendor_offers`, then bulk syncs to `catalog_unified.computed_price`
-- MAP compliance report at end of each run
-- **Result: 0 MAP violations** after formula fix
-- Cron set on Hetzner: `0 3 * * *`
-
-**Pricing results:**
-- WPS: 26,729 products synced, 87 below min margin (priced at MAP — not violations)
-- PU: 24,007 products synced, 1,129 below min margin (MAP=MSRP vendor data issue — not violations)
-
-### VTwin Fitment Migration
-- Updated `scripts/ingest/migrate_vtwin_fitment_to_v2.js` to use `catalog_unified.id` (was using `catalog_products.id` via join)
-- Pass 1: 542,161 rows inserted for products with exact harley_families name matches
-- Added `FAMILY_ALIASES` map to handle VTwin generic names:
-  - `"Softail"` → `["Softail Evo", "Softail M8"]`
-  - `"Touring"` → `["Touring"]`
-  - `"Sportster"` → `["Sportster"]`
-  - `"Dyna"` → `["Dyna"]`
-  - `"FXR"` → `["FXR"]`
-  - `"V-Rod"` → `["V-Rod"]`
-- Pass 2: +26,974 rows for previously unmatched Softail products
-- **Total VTwin fitment inserted: ~569,135 rows**
-
-### model_alias_map Expansion
-Added 6 new aliases:
+### pu_products Schema Migration
+Added 4 new columns:
 ```sql
-('fltrx', 'touring', 'FLTRX', 9)
-('fxdb',  'dyna',   'FXDB',  9)
-('flhtk', 'touring', 'FLHTK', 9)
-('flstf', 'softail', 'FLSTF', 9)
-('flhrc', 'touring', 'FLHRC', 9)
-('fxdwg', 'dyna',   'FXDWG', 9)
+ALTER TABLE pu_products
+  ADD COLUMN part_image text,
+  ADD COLUMN product_image text,
+  ADD COLUMN special_instructions text,
+  ADD COLUMN supplier_number text;
 ```
+
+### PU Image + Content Ingestion
+Built `scripts/ingest/enrich_pu_products.cjs`:
+- Parses all PU XML files — Catalog Content (`<root>`) and PIES formats
+- **Format detection by root tag** (`xml.trimStart().startsWith('<root>')`) — not filename
+- Extracts: `part_image`, `product_image`, `special_instructions`, `supplier_number`
+- Bulk upserts into `pu_products` via temp table
+- Syncs `image_url` + `image_urls` to `catalog_unified`
+
+Ran against two directories:
+- `scripts/data/pu_pricefile/` — 134 files, 77,958 updated
+- `~/Desktop/Stinkin-Supplies/data/pu-files/` — 95 files, 6,434 updated
+
+**Final PU image coverage:**
+- image_url populated: 23,975 / 24,009 (99.9%)
+- image_urls (2+ images): 8,310 / 24,009
+- 34 products still missing — no image in any XML
+
+**Brands with minor SKU mismatch (low priority):**
+- jagoilcoolers — 55 parsed, 1 updated
+- dannygray — 72 parsed, 6 updated
+- ohlins — 102 parsed, 50 updated
+- avon-gripd — 285 parsed, 40 updated
 
 ---
 
 ## 🚨 CURRENT ISSUES
 
-### Issue 1 — Typesense not reindexed
-catalog_unified updated with new computed_price values. Typesense still has 88,301 docs from April 23. Needs reindex to reflect current pricing.
+### Issue 1 — Era pages unverified
+catalog_fitment_v2 FK migrated to catalog_unified on April 29. Era page product count queries have not been verified against the new FK target.
 
-### Issue 2 — PU ACES fitment files not yet received
-PU fitment coverage ~30%. Request ACES XML files from PU rep to push to 70%+.
+### Issue 2 — PDP not displaying rich content
+`image_urls`, `special_instructions`, and bullets (`features`) are now in `catalog_unified` but the PDP does not yet render them. Need:
+- Multi-image gallery using `image_urls` array
+- `special_instructions` block (conditional, where not null)
+- Bullets from `features` array (may already render — confirm)
 
-### Issue 3 — Era pages may show low product counts
-catalog_fitment_v2 now points to catalog_unified, but era page queries should be verified against new FK target.
+### Issue 3 — WPS fitment files pending
+Contacted rep April 30. Once received, run fitment extraction and insert into catalog_fitment_v2.
 
 ---
 
 ## 🗺️ NEXT SESSION PRIORITIES
 
-1. **Reindex Typesense** — pick up new computed_price values
-2. **Request PU ACES fitment files** from PU rep
-3. **Verify era page product counts** — confirm queries work against new FK
-4. **Era images** — 8 WebP images still missing (see list below)
+1. **Verify era page product counts** — confirm queries work against new FK
+2. **PDP rich content** — multi-image, special_instructions, bullets
+3. **WPS fitment files** — ingest once received from rep
+4. **Era images** — 8 WebP images still missing
 5. **My Garage audit** — was built against /shop, needs review for /browse
 
 ---
@@ -125,6 +119,8 @@ Cron:       0 3 * * * daily_price_sync.js (Hetzner)
 | MSRP < MAP | Handled by final GREATEST(…, map_price) in pricing formula |
 | Daily price sync | scripts/ingest/daily_price_sync.js — bulk SQL, ~seconds to run |
 | Price sync cron | 0 3 * * * on Hetzner, logs to /var/log/price_sync.log |
+| PU XML format detection | Detect by root tag: `<root>` = Catalog Content, else PIES — NOT by filename |
+| PU enrich script | scripts/ingest/enrich_pu_products.cjs <xml_dir> |
 | Era images | Drop WebP 800×600px+ in public/images/eras/{slug}.webp |
 | Era image blend | mixBlendMode: "screen", opacity: 0.9 for dark backgrounds |
 | Sportster split | yearMin/yearMax in era config splits Ironhead vs Evo via hmy.year filter |

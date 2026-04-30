@@ -1,19 +1,31 @@
 # Stinkin' Supplies — Chase List
 **Running log of loose ends to follow up on**
-Last Updated: April 29, 2026 — end of DB session
+Last Updated: April 30, 2026 — end of session
 
 ---
 
 ## 🚀 NEXT SESSION — START HERE
 
-1. **Reindex Typesense** — pricing updated, needs refresh
-   ```bash
-   node scripts/ingest/index_unified.js --recreate
-   ```
-2. **Request PU ACES fitment files** from PU rep (30% → 70%+ coverage)
-3. **Verify era page product counts** — confirm queries work with new FK target (catalog_unified)
-4. **Era images** — 8 WebP images still missing (see list in HANDOFF_LOG)
+1. **Verify era page product counts** — confirm queries work with new FK target (catalog_unified)
+2. **PDP updates** — display `image_urls` (multi-image), `special_instructions`, bullets on product detail page
+3. **WPS fitment files** — pending from WPS rep (contacted April 30)
+4. **Era images** — 8 WebP images still missing (see list below)
 5. **My Garage audit** — built against /shop, review for /browse
+
+---
+
+## ✅ DONE APRIL 30
+
+| Task | Result |
+|------|--------|
+| Reindex Typesense | ✅ 88,512 docs, 0 errors, pricing current |
+| WPS fitment files | ✅ Contacted WPS rep — awaiting files |
+| pu_products schema migration | ✅ Added part_image, product_image, special_instructions, supplier_number |
+| enrich_pu_products.cjs | ✅ Built — parses Catalog Content + PIES, upserts pu_products, syncs catalog_unified |
+| PU image ingestion — main zip | ✅ 134 files, 77,958 updated |
+| PU image ingestion — brand files | ✅ 95 files, 6,434 updated |
+| PU image coverage | ✅ 23,975 / 24,009 (99.9%) |
+| PU dual image_urls | ✅ 8,310 products with 2+ images |
 
 ---
 
@@ -61,15 +73,17 @@ Last Updated: April 29, 2026 — end of DB session
 
 ## 🔴 HIGH PRIORITY
 
-### Reindex Typesense
-Pricing was updated this session. Typesense still has stale computed_price values.
-```bash
-node scripts/ingest/index_unified.js --recreate
-```
+### WPS Fitment Files
+Contacted WPS rep April 30. Once received, run fitment extraction and insert into catalog_fitment_v2.
 
-### PU ACES Fitment Files
-30% → 70%+ fitment coverage for PU products. Request ACES XML from PU rep.
-Once received, run fitment extraction against pu_products and insert into catalog_fitment_v2.
+### Era Page Product Count Verification
+catalog_fitment_v2 FK now points to catalog_unified. Confirm era page queries return correct counts.
+
+### PDP — Rich Content Display
+`image_urls`, `special_instructions`, and bullets are now in the DB but not displayed on the PDP.
+- Multi-image carousel/gallery using `catalog_unified.image_urls`
+- `special_instructions` block (where not null)
+- Bullets already in `features` array — confirm rendering
 
 ---
 
@@ -90,6 +104,11 @@ public/images/eras/chopper.webp
 ### My Garage audit
 Built against /shop — review now that /browse is canonical.
 
+### PU SKU mismatches — minor brands
+jagoilcoolers (55 parsed, 1 updated), dannygray (72 parsed, 6 updated),
+ohlins (102 parsed, 50 updated), avon-gripd (285 parsed, 40 updated).
+Investigate SKU format mismatch.
+
 ### WPS FatBook PDF OEM extraction
 ### Tire catalog images — tire_master_image.xlsx not processed
 ### Fix import_pu_brand_xml.js — remove dead cuOEM UPDATE block
@@ -97,7 +116,7 @@ Built against /shop — review now that /browse is canonical.
 
 ---
 
-## 📊 CURRENT STATE (End of April 29)
+## 📊 CURRENT STATE (End of April 30)
 
 | Metric | Value |
 |--------|-------|
@@ -107,7 +126,7 @@ Built against /shop — review now that /browse is canonical.
 | — VTwin | 37,749 |
 | catalog_products | ~133,022 rows (includes non-Harley) |
 | pu_products | ~152,928 rows (includes non-Harley) |
-| Typesense indexed | 88,301 (⚠️ needs reindex) |
+| Typesense indexed | 88,512 ✅ (reindexed April 30) |
 | catalog_fitment_archived | 26,008 rows (legacy, do not write) |
 | catalog_fitment_v2 | ~2,896,193 rows |
 | — FK points to | catalog_unified.id ✅ |
@@ -124,6 +143,9 @@ Built against /shop — review now that /browse is canonical.
 | Era pages | 9 eras live at /era/[slug] |
 | Homepage | Live — era cards + category grid + corner nav |
 | Fonts | Bebas Neue + Share Tech Mono live |
+| PU image_url coverage | 23,975 / 24,009 (99.9%) |
+| PU image_urls (2+) | 8,310 / 24,009 |
+| pu_products new columns | part_image, product_image, special_instructions, supplier_number ✅ |
 
 ---
 
@@ -143,6 +165,12 @@ Daily pricing pipeline:
 2. `vendor_offers` → `catalog_unified.computed_price` (bulk sync)
 3. Cron runs at 3am Hetzner time
 
+PU enrichment pipeline:
+- `scripts/ingest/enrich_pu_products.cjs <xml_dir>` — parses Catalog Content + PIES XMLs
+- Detects format by root tag (`<root>` = Catalog Content, else PIES)
+- Upserts part_image, product_image, special_instructions, supplier_number into pu_products
+- Syncs image_url + image_urls to catalog_unified
+
 ---
 
-*Updated: April 29, 2026*
+*Updated: April 30, 2026*

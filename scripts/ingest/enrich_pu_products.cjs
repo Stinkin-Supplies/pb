@@ -212,7 +212,7 @@ async function main() {
     }
 
     let rows = [];
-    const isCatalogContent = /catalog.?content/i.test(file);
+    const isCatalogContent = /catalog.?content/i.test(file) || xml.trimStart().startsWith('<root>');
 
     try {
       rows = isCatalogContent ? parseCatalogContent(xml) : parsePIES(xml);
