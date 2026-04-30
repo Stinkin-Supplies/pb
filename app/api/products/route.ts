@@ -52,13 +52,11 @@ function normalizeProductRow(row: any) {
     fitmentHdCodes: row.fitment_hd_codes ?? [],
     fitmentYearStart: row.fitment_year_start ?? null,
     fitmentYearEnd: row.fitment_year_end ?? null,
-    inOldbook: row.in_oldbook ?? false,
-    inFatbook: row.in_fatbook ?? false,
     dragPart: row.drag_part ?? false,
     warehouseWi: row.warehouse_wi ?? 0,
     warehouseNy: row.warehouse_ny ?? 0,
     warehouseTx: row.warehouse_tx ?? 0,
-    oemPartNumber: row.oem_part_number ?? null,
+    oemPartNumber: row.oem_numbers?.[0] ?? null,
     priceMin: price,
     priceMax: price,
     brandCount: 1,
@@ -223,13 +221,10 @@ export async function GET(req: Request) {
             cu.fitment_year_start,
             cu.fitment_year_end,
             cu.drag_part,
-            cu.in_oldbook,
-            cu.in_fatbook,
             cu.features,
             cu.warehouse_wi,
             cu.warehouse_ny,
             cu.warehouse_tx,
-            cu.oem_part_number
          FROM public.catalog_unified cu
          LEFT JOIN public.catalog_products cp ON cp.sku = cu.sku
          WHERE ${where}

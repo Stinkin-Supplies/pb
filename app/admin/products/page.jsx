@@ -297,7 +297,6 @@ export default async function AdminProductsPage({ searchParams }) {
          cu.id,
          cu.internal_sku,
          cu.sku,
-         cu.vendor_sku,
          cu.slug,
          cu.name,
          cu.brand,
