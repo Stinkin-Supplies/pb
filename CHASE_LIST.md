@@ -1,20 +1,41 @@
 # Stinkin' Supplies — Chase List
 **Running log of loose ends to follow up on**
-Last Updated: April 30, 2026 — end of session
+Last Updated: April 30, 2026 — end of session (second pass)
 
 ---
 
 ## 🚀 NEXT SESSION — START HERE
 
-1. **Verify era page product counts** — confirm queries work with new FK target (catalog_unified)
-2. **PDP updates** — display `image_urls` (multi-image), `special_instructions`, bullets on product detail page
-3. **WPS fitment files** — pending from WPS rep (contacted April 30)
-4. **Era images** — 8 WebP images still missing (see list below)
-5. **My Garage audit** — built against /shop, review for /browse
+1. **PDP updates** — display `image_urls` (multi-image carousel), `special_instructions`, confirm bullets render
+2. **WPS fitment files** — pending from WPS rep (contacted April 30)
+3. **My Garage audit** — built against /shop, review for /browse
+4. **Low-confidence fitment staging** — 560 products in fitment_staging with confidence='low', not yet promoted
 
 ---
 
-## ✅ DONE APRIL 30
+## ✅ DONE APRIL 30 — SECOND PASS
+
+| Task | Result |
+|------|--------|
+| Era page product counts verified | ✅ All 9 eras returning real counts |
+| Era config fixed | ✅ Family names now match DB (Softail Evo, Softail M8, etc.) |
+| Era images | ✅ All 9 WebP images live |
+| hf.slug bug | ✅ Fixed in api/admin/products/[id]/fitment/route.ts |
+| Fitment staging pipeline | ✅ Built infer_fitment_staging.js + promote_fitment_staging.js |
+| Fitment inference — all vendors | ✅ 88,512 products evaluated, 61,404 rows inserted to fitment_staging |
+| High-confidence fitment promoted | ✅ 43,552 rows → catalog_fitment_v2 |
+| Medium-confidence fitment promoted | ✅ 199,513 rows → catalog_fitment_v2 |
+| Universal products flagged | ✅ 311 products set is_universal = true |
+| Old iron era counts | ✅ Knucklehead 2,745 / Panhead 3,224 / Shovelhead 6,310 |
+| Typesense reindexed | ✅ 88,512 docs, 0 errors |
+| Browse search param bug | ✅ Fixed in lib/db/browse.ts (p index was advancing too far) |
+| VTwin PDP 404 | ✅ Fixed — removed flag gate from unified fallback in page.jsx |
+| generateMetadata | ✅ Fixed — now queries catalog_unified for VTwin-only products |
+| catalog.ts hardened | ✅ Throws on missing CATALOG_DATABASE_URL instead of silently hitting prod |
+
+---
+
+## ✅ DONE APRIL 30 — FIRST PASS
 
 | Task | Result |
 |------|--------|
@@ -76,9 +97,6 @@ Last Updated: April 30, 2026 — end of session
 ### WPS Fitment Files
 Contacted WPS rep April 30. Once received, run fitment extraction and insert into catalog_fitment_v2.
 
-### Era Page Product Count Verification
-catalog_fitment_v2 FK now points to catalog_unified. Confirm era page queries return correct counts.
-
 ### PDP — Rich Content Display
 `image_urls`, `special_instructions`, and bullets are now in the DB but not displayed on the PDP.
 - Multi-image carousel/gallery using `catalog_unified.image_urls`
@@ -89,17 +107,10 @@ catalog_fitment_v2 FK now points to catalog_unified. Confirm era page queries re
 
 ## 🔵 LOW PRIORITY / FUTURE
 
-### Era images remaining (800×600px min, WebP, landscape)
-```
-public/images/eras/panhead.webp
-public/images/eras/ironhead-sportster.webp
-public/images/eras/shovelhead.webp
-public/images/eras/evolution.webp
-public/images/eras/evo-sportster.webp
-public/images/eras/twin-cam.webp
-public/images/eras/milwaukee-8.webp
-public/images/eras/chopper.webp
-```
+### Low-confidence fitment staging — 560 products
+`fitment_staging` has 560 products with `confidence='low'` and `status='pending'`.
+These are displacement-inference rows (e.g. "80 inch" → Shovelhead/Evo range).
+Review before promoting: `SELECT * FROM fitment_staging WHERE confidence='low' LIMIT 30;`
 
 ### My Garage audit
 Built against /shop — review now that /browse is canonical.
@@ -116,7 +127,7 @@ Investigate SKU format mismatch.
 
 ---
 
-## 📊 CURRENT STATE (End of April 30)
+## 📊 CURRENT STATE (End of April 30 — second pass)
 
 | Metric | Value |
 |--------|-------|
@@ -128,8 +139,9 @@ Investigate SKU format mismatch.
 | pu_products | ~152,928 rows (includes non-Harley) |
 | Typesense indexed | 88,512 ✅ (reindexed April 30) |
 | catalog_fitment_archived | 26,008 rows (legacy, do not write) |
-| catalog_fitment_v2 | ~2,896,193 rows |
+| catalog_fitment_v2 | ~3,139,258 rows (after staging promotion) |
 | — FK points to | catalog_unified.id ✅ |
+| fitment_staging | 61,404 rows total — high+medium promoted, low pending |
 | vendor_offers | 23,499 rows |
 | — FK points to | catalog_unified.id ✅ |
 | WPS pricing | 26,729 products synced |
@@ -140,12 +152,14 @@ Investigate SKU format mismatch.
 | harley_models | 158 |
 | harley_model_years | 1,415 rows |
 | model_alias_map | +6 new aliases (FLTRX, FXDB, FLHTK, FLSTF, FLHRC, FXDWG) |
-| Era pages | 9 eras live at /era/[slug] |
+| Era pages | 9 eras live, all with real product counts |
+| Era fitment counts | Knucklehead 2,745 / Panhead 3,224 / Shovelhead 6,310 / Evolution 6,649 / Ironhead 1,962 / Evo Sportster 3,293 / Twin Cam 10,291 / Milwaukee-8 4,414 / Chopper 3,630 |
 | Homepage | Live — era cards + category grid + corner nav |
 | Fonts | Bebas Neue + Share Tech Mono live |
 | PU image_url coverage | 23,975 / 24,009 (99.9%) |
 | PU image_urls (2+) | 8,310 / 24,009 |
 | pu_products new columns | part_image, product_image, special_instructions, supplier_number ✅ |
+| is_universal products | 311 flagged ✅ |
 
 ---
 
@@ -171,6 +185,13 @@ PU enrichment pipeline:
 - Upserts part_image, product_image, special_instructions, supplier_number into pu_products
 - Syncs image_url + image_urls to catalog_unified
 
+Fitment staging pipeline:
+- `scripts/ingest/infer_fitment_staging.js [--vendor VTWIN|PU|WPS] [--replace]`
+- 4-pass inference: OEM year decode → era keyword → displacement → universal flag
+- Writes to `fitment_staging` table with confidence + status for review
+- `scripts/ingest/promote_fitment_staging.js [--confidence high|medium|low] [--dry-run]`
+- Promotes approved rows from fitment_staging → catalog_fitment_v2
+
 ---
 
-*Updated: April 30, 2026*
+*Updated: April 30, 2026 — second pass*

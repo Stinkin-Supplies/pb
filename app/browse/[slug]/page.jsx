@@ -76,6 +76,8 @@ export default async function ProductDetailPage({ params }) {
         cu.fatbook_page,
         cu.oldbook_page,
         cu.oem_numbers,
+        cu.image_urls,
+        cu.special_instructions,
         cu.country_of_origin,
         cu.weight    AS unified_weight,
         cu.height_in,
@@ -145,6 +147,8 @@ export default async function ProductDetailPage({ params }) {
           cu.fatbook_page,
           cu.oldbook_page,
           cu.oem_numbers,
+          cu.image_urls,
+          cu.special_instructions,
           cu.country_of_origin,
           cu.weight    AS unified_weight,
           cu.height_in,
@@ -154,7 +158,6 @@ export default async function ProductDetailPage({ params }) {
         LEFT JOIN public.catalog_products cp ON cp.sku = cu.sku
         WHERE cu.slug = $1
           AND cu.is_active = true
-          AND (cu.drag_part = true OR cu.in_fatbook = true OR cu.in_oldbook = true OR cu.in_harddrive = true)
         LIMIT 1`,
         [slug]
       );
@@ -263,11 +266,20 @@ function normalizeProductRow(row) {
   const rawWas = row.msrp != null ? Number(row.msrp) : null;
   const was    = rawWas != null && rawWas > price ? rawWas : null;
 
-  const rawImages = Array.isArray(row.images) && row.images.length > 0
+  // Build gallery from catalog_media images, then supplement with image_urls from PU enrichment
+  const mediaImages = Array.isArray(row.images) && row.images.length > 0
     ? row.images.map(u => u?.replace('http://', 'https://')).filter(Boolean)
     : row.image ? [row.image.replace('http://', 'https://')] : [];
 
-  const gallery      = rawImages.map(u => proxyImageUrl(u) ?? u).filter(Boolean);
+  const enrichedImages = Array.isArray(row.image_urls)
+    ? row.image_urls.map(u => u?.replace('http://', 'https://')).filter(Boolean)
+    : [];
+
+  // Merge: media images first, then any additional from image_urls not already present
+  const mediaSet = new Set(mediaImages);
+  const allImages = [...mediaImages, ...enrichedImages.filter(u => !mediaSet.has(u))];
+
+  const gallery      = allImages.map(u => proxyImageUrl(u) ?? u).filter(Boolean);
   const primaryImage = gallery[0] ?? null;
 
   return {
@@ -297,6 +309,7 @@ function normalizeProductRow(row) {
     upc:             row.upc         ?? null,
     features:        Array.isArray(row.features) ? row.features.filter(Boolean) : [],
     oemNumbers:      Array.isArray(row.oem_numbers) ? row.oem_numbers : [],
+    specialInstructions: row.special_instructions ?? null,
     pageReference:   row.page_reference ?? null,
     fatbookPage:     row.fatbook_page   ?? null,
     oldbookPage:     row.oldbook_page   ?? null,
@@ -318,11 +331,11 @@ export async function generateMetadata({ params }) {
   const { slug } = await params;
   try {
     const { rows } = await getCatalogDb().query(
-      `SELECT cp.name, cp.brand
-       FROM catalog_products cp
-       INNER JOIN catalog_unified cu ON cu.sku = cp.sku
-       WHERE cp.slug = $1
-         AND cp.is_active = true
+      `SELECT COALESCE(cp.name, cu.name) AS name, COALESCE(cp.brand, cu.brand) AS brand
+       FROM catalog_unified cu
+       LEFT JOIN catalog_products cp ON cp.sku = cu.sku
+       WHERE cu.slug = $1
+         AND cu.is_active = true
        LIMIT 1`,
       [slug]
     );
