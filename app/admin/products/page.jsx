@@ -231,7 +231,9 @@ function toInt(v, fb) {
 
 function buildHref(base, params) {
   const p = new URLSearchParams();
-  Object.entries(params).forEach(([k, v]) => { if (v) p.set(k, String(v)); });
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== "" && v !== null && v !== undefined) p.set(k, String(v));
+  });
   const qs = p.toString();
   return qs ? `${base}?${qs}` : base;
 }
@@ -347,20 +349,20 @@ export default async function AdminProductsPage({ searchParams }) {
           placeholder="Search SKU, name, brand, UPC…"
         />
 
-        <select name="prefix" defaultValue={prefix}>
-          <option value="">All Prefixes</option>
-          {PREFIXES.map(p => <option key={p} value={p}>{p}</option>)}
+        <select name="prefix">
+          <option value="" selected={!prefix}>All Prefixes</option>
+          {PREFIXES.map(p => <option key={p} value={p} selected={prefix === p}>{p}</option>)}
         </select>
 
-        <select name="vendor" defaultValue={vendor}>
-          <option value="">All Vendors</option>
-          {VENDORS.map(v => <option key={v} value={v}>{v}</option>)}
+        <select name="vendor">
+          <option value="" selected={!vendor}>All Vendors</option>
+          {VENDORS.map(v => <option key={v} value={v} selected={vendor === v}>{v}</option>)}
         </select>
 
-        <select name="active" defaultValue={active}>
-          <option value="">Any Status</option>
-          <option value="1">Active</option>
-          <option value="0">Inactive</option>
+        <select name="active">
+          <option value="" selected={!active}>Any Status</option>
+          <option value="1" selected={active === "1"}>Active</option>
+          <option value="0" selected={active === "0"}>Inactive</option>
         </select>
 
         <button className="btn" type="submit">Filter</button>
