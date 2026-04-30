@@ -11,7 +11,7 @@ async function requireAdmin() {
 }
 
 const FITMENT_QUERY = `
-  SELECT cfv.id, hmy.year, hf.name AS family_name, hf.slug AS family_slug,
+  SELECT cfv.id, hmy.year, hf.name AS family_name,
          hm.name AS model_name, hm.model_code
   FROM catalog_fitment_v2 cfv
   JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id
