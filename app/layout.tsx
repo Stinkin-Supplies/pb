@@ -1,5 +1,5 @@
-import SpeedInsights from "@/lib/stubs/speed-insights-next";
 import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import CartRoot from "@/components/CartRoot";
 import Footer from "@/components/Footer";
 import { Bebas_Neue, Share_Tech_Mono } from "next/font/google";
