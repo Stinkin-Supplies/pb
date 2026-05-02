@@ -582,6 +582,70 @@ function ActiveTag({ label, onRemove, accent }) {
   );
 }
 
+// ─── Category Tab Bar ────────────────────────────────────────────────────────
+
+function CategoryTabBar({ categories, active, onChange, accent }) {
+  const ALL = { slug: null, label: "All Parts" };
+  const tabs = [ALL, ...categories];
+
+  return (
+    <div style={{
+      background: "#080808",
+      borderBottom: "1px solid #1c1c1c",
+      position: "sticky",
+      top: 52,
+      zIndex: 40,
+    }}>
+      <div style={{
+        maxWidth: 1400,
+        margin: "0 auto",
+        padding: "0 40px",
+        display: "flex",
+        alignItems: "stretch",
+        gap: 0,
+        overflowX: "auto",
+        scrollbarWidth: "none",
+        msOverflowStyle: "none",
+      }}>
+        {tabs.map((cat) => {
+          const isActive = active === cat.slug;
+          return (
+            <button
+              key={cat.slug ?? "__all__"}
+              onClick={() => onChange(cat.slug)}
+              style={{
+                background: "none",
+                border: "none",
+                borderBottom: isActive
+                  ? `2px solid ${accent}`
+                  : "2px solid transparent",
+                color: isActive ? accent : "#555",
+                fontFamily: "var(--font-stencil, 'Share Tech Mono', monospace)",
+                fontSize: 9,
+                letterSpacing: "0.18em",
+                textTransform: "uppercase",
+                padding: "16px 20px 14px",
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+                transition: "color 0.15s, border-color 0.15s",
+                flexShrink: 0,
+              }}
+              onMouseEnter={e => {
+                if (!isActive) e.currentTarget.style.color = "#999";
+              }}
+              onMouseLeave={e => {
+                if (!isActive) e.currentTarget.style.color = "#555";
+              }}
+            >
+              {cat.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function EraPage({ params }) {
@@ -724,6 +788,14 @@ export default function EraPage({ params }) {
         onFilterChange={handleFilterChange}
         sort={sort}
         onSortChange={s => { setSort(s); setPage(1); }}
+      />
+
+      {/* Category tabs */}
+      <CategoryTabBar
+        categories={ERA_CATEGORIES}
+        active={filters.category}
+        onChange={slug => handleFilterChange({ category: slug })}
+        accent={era.accent}
       />
 
       {/* Side panel */}
