@@ -6,19 +6,21 @@ Last Updated: May 2, 2026 — end of session (seventh pass)
 
 ## 🚀 NEXT SESSION — START HERE
 
-1. **Other H-D catalog families** — run same PDF extraction pipeline against
-   Touring, Softail, Dyna, FXR folders (same format as Sportster).
-   Update CATALOG_DIR + manifest in build_oem_fitment.mjs per family.
-   All data lands in same oem_fitment table (catalog_file column distinguishes).
-
-2. **WPS fitment files** — pending from rep (contacted April 30)
+1. **WPS fitment files** — pending from rep (contacted April 30)
    When received: parse directly → catalog_fitment_v2, no inference.
 
-3. **My Garage audit** — built against /shop, review for /browse
+2. **Touring PDFs — get non-scanned versions**
+   Current Touring catalog set has scanned PDFs that yielded 0 rows.
+   Get text-based PDFs, drop in same folder, re-run:
+   `node scripts/ingest/build_oem_fitment_touring.mjs`
 
-4. **Flathead era image** — need flathead.webp for homepage era card
+3. **FX PDFs — same issue**
+   Only 1984-86 catalog had extractable text (1,709 rows).
+   1971-1984 catalogs were scanned — get text versions.
 
-5. **raw_vendor_aces** — confirmed EMPTY (0 rows). Remove from chase list.
+4. **My Garage audit** — built against /shop, review for /browse
+
+5. **Flathead era image** — need flathead.webp for homepage era card
 
 ---
 
@@ -27,11 +29,16 @@ Last Updated: May 2, 2026 — end of session (seventh pass)
 | Task | Result |
 |------|--------|
 | JW Boon fitment import | ✅ 348,377 rows inserted into catalog_fitment_v2 |
-| 7,081 products backfilled | ✅ is_harley_fitment = true |
+| 7,081 products backfilled | ✅ is_harley_fitment = true (JW Boon) |
 | seed_vintage_model_years.sql | ✅ Knucklehead/Panhead/Shovelhead/Ironhead/Flathead year rows seeded |
 | harley_model_years | ✅ 1,602 rows (up from 1,501) |
 | harley_models ironhead | ✅ K, KK, KH, KHK, KR, XL, XLH, XLCH, XLS, XLCR, XLT, XR750 added |
-| raw_vendor_aces | ✅ Confirmed empty — no ACES data to parse |
+| raw_vendor_aces | ✅ Confirmed empty — crossed off permanently |
+| Softail OEM extraction | ✅ 26,330 rows, 9,556 matched |
+| Dyna OEM extraction | ✅ 9,360 rows, 3,777 matched |
+| Touring OEM extraction | ✅ 11,434 rows, 3,798 matched (scanned PDFs — partial) |
+| FX OEM extraction | ✅ 1,709 rows, 874 matched (mostly scanned — partial) |
+| is_harley_fitment backfill | ✅ 24,183 total products flagged (up from 7,081) |
 
 ---
 
@@ -41,9 +48,9 @@ Last Updated: May 2, 2026 — end of session (seventh pass)
 |------|--------|
 | Sportster OEM PDF extraction | ✅ 75,963 rows extracted from 30 catalogs (1986–2022) |
 | oem_fitment table created | ✅ Full schema + GIN indexes + v_oem_fitment view |
-| hd_sportster_models seeded | ✅ 26 canonical Sportster model codes (XL883N, XL1200X, etc.) |
-| OEM → catalog_unified match | ✅ 23,869 rows matched via oem_numbers[] array (31.4%) |
-| catalog_unified backfill | ✅ 681 SKUs updated with OEM-sourced fitment_hd_models + year ranges |
+| hd_sportster_models seeded | ✅ 26 canonical Sportster model codes |
+| OEM → catalog_unified match | ✅ 23,869 rows matched (31.4%) |
+| catalog_unified backfill | ✅ 681 SKUs updated with OEM-sourced fitment |
 | fitment_hd_models normalized | ✅ 107,022 clean codes, 0 verbose strings remaining |
 
 ---
@@ -54,12 +61,10 @@ Last Updated: May 2, 2026 — end of session (seventh pass)
 |------|--------|
 | catalog_fitment_v2 wiped | ✅ TRUNCATED — 4,086,728 bad rows gone |
 | fitment_staging wiped | ✅ TRUNCATED — 64,258 bad rows gone |
-| hd_models engine splits | ✅ All Big Twin platforms split at Evo→TC (2000) and TC→M8 (2017) |
-| hd_models NULL engine_keys | ✅ All 16 NULL engine_keys filled |
-| Vintage models added | ✅ Original Single, F-Head, Flathead D/V/R/U/W, Servi-Car, Hummer |
-| Knucklehead/Panhead/Shovelhead/FXR models | ✅ Full lineup |
+| hd_models fully corrected | ✅ Engine era splits, vintage history complete |
 | JW Boon fitment DB acquired | ✅ jwboon_parts_final.xlsx |
 | Fulfillment infrastructure | ✅ warehouse_locations, vendor_sku_crossref, pick_fulfillment() |
+| WPS vendor_offers | ✅ 25,763 rows populated |
 
 ---
 
@@ -70,20 +75,9 @@ Last Updated: May 2, 2026 — end of session (seventh pass)
 | Fulfillment infrastructure | ✅ |
 | WPS vendor_offers populated | ✅ 25,763 rows |
 | OEM crossref imported | ✅ |
-| brand_directory table | ✅ |
-| category_display_map table | ✅ |
+| brand_directory table | ✅ 7 tier-1 + 25 tier-2 brands |
+| category_display_map table | ✅ 30 raw categories → clean groups |
 | hd_engine_types | ✅ 15 engines |
-
----
-
-## ✅ DONE APRIL 30 — THIRD PASS
-
-| Task | Result |
-|------|--------|
-| Flathead family | ✅ |
-| special_instructions | ✅ 970 products synced |
-| PDP multi-image gallery | ✅ live |
-| Typesense reindexed | ✅ 88,512 docs |
 
 ---
 
@@ -95,21 +89,21 @@ Last Updated: May 2, 2026 — end of session (seventh pass)
 | Era pages (10) | ✅ live at /era/[slug] |
 | Daily price sync | ✅ MAP compliant, cron live |
 | /shop → /browse | ✅ |
+| PDP multi-image gallery | ✅ live |
 
 ---
 
 ## 🔴 HIGH PRIORITY
 
-### Other H-D Catalog Families
-PDFs exist for Touring, Softail, Dyna, FXR — same format as Sportster.
-Run build_oem_fitment.mjs against each folder.
-Script is at: `scripts/ingest/build_oem_fitment.mjs`
-Only change needed: CATALOG_DIR path + CATALOGS manifest per family.
-All data lands in same oem_fitment table (catalog_file column distinguishes).
-
 ### WPS Fitment Files
 Pending from rep. When received: parse directly → catalog_fitment_v2.
 NO inference. Explicit year/make/model/submodel only.
+
+### Better Touring + FX PDFs
+Touring: 1991-1992, 1995-1996, 1998 catalogs were scanned (0 rows extracted).
+FX: 1971-1980 and 1971-1984 catalogs were scanned.
+Get text-based versions → re-run the family scripts.
+Scripts handle re-run safely (append-only, no dedup yet — add manifest guard if needed).
 
 ### Flathead Era Image
 `public/images/eras/flathead.webp` — 800×600px, landscape WebP.
@@ -118,9 +112,15 @@ NO inference. Explicit year/make/model/submodel only.
 
 ## 🔵 LOW PRIORITY / FUTURE
 
+### Re-run dedup guard for oem_fitment
+Current scripts are append-only — re-running would duplicate already-extracted catalogs.
+Add: `WHERE catalog_file NOT IN (SELECT DISTINCT catalog_file FROM oem_fitment)`
+before inserting, so re-runs only process new files.
+
 ### OEM match rate improvement
-oem_fitment: 31.4% matched (23,869 / 75,963 rows).
-Unmatched = OEM parts H-D listed that WPS/PU don't carry.
+oem_fitment: 33.6% matched (41,874 / 124,796 rows).
+~83k rows = OEM parts H-D listed that WPS/PU don't carry.
+Worth reviewing by section to find high-value gaps.
 
 ### My Garage audit
 Built against /shop — review for /browse.
@@ -128,6 +128,7 @@ Built against /shop — review for /browse.
 ### Browse/brand tabs
 3-tab UI: Find by Bike / Browse All / Brands
 brand_directory + category_display_map tables ready.
+Unblocks ~50k products with no fitment.
 
 ### PDP redesign
 Not started. Do after fitment is solid.
@@ -144,78 +145,73 @@ jagoilcoolers, dannygray, ohlins, avon-gripd
 | Metric | Value |
 |--------|-------|
 | catalog_unified | 88,512 rows |
-| catalog_fitment_v2 | 348,377 rows (JW Boon) |
-| fitment_staging | 0 (wiped) |
-| oem_fitment | 75,963 rows (Sportster only, 1986–2022) |
+| catalog_fitment_v2 | 348,377 rows (JW Boon, confidence=1.0) |
+| fitment_staging | 0 (wiped, do not use) |
+| oem_fitment | 124,796 rows (all families) |
+| — Sportster | 75,963 |
+| — Softail | 26,330 |
+| — Dyna | 9,360 |
+| — Touring | 11,434 |
+| — FX | 1,709 |
+| oem_fitment matched | 41,874 (33.6%) |
 | hd_sportster_models | 26 model codes |
 | harley_model_years | 1,602 rows |
 | harley_models | ~192 rows (ironhead/K-series added) |
 | harley_families | 16 |
-| harley_models | ~192 |
-| harley_model_years | 1,602 |
 | vendor_offers | 99,007 rows |
 | hd_models | ~250 rows (fully corrected) |
 | catalog_oem_crossref | 1,587 clean HD OEM rows |
 | oem_numbers enriched | 36,692 products |
 | fitment_hd_models | 107,022 clean codes, 0 verbose |
-| catalog_unified w/ OEM fitment | 681 SKUs backfilled |
-| catalog_unified is_harley_fitment | 7,081 products (JW Boon) |
+| is_harley_fitment = true | 24,183 products |
 | Typesense | 88,512 docs ✅ |
 | MAP violations | 0 ✅ |
-| raw_vendor_aces | 0 (empty) |
+| raw_vendor_aces | 0 (empty, done) |
 
 ## 🗄️ KEY TABLES
 ```
-catalog_unified          — 88,512 products, source of truth for frontend
-catalog_fitment_v2       — 348,377 rows (JW Boon fitment, confidence=1.0)
-fitment_staging          — EMPTY, do not use for inference
-oem_fitment              — 75,963 rows, Sportster OEM catalog data
-hd_sportster_models      — 26 Sportster model codes + year ranges
-v_oem_fitment            — aggregated view: 1 row per OEM part #
-harley_families          — 16 families
-harley_models            — ~192 rows (now includes ironhead/K-series)
-harley_model_years       — 1,602 rows (includes vintage eras)
-hd_models                — ~250 rows, fully corrected reference table
-hd_engine_types          — 15 engine families
-vendor_offers            — 99,007 vendor pricing/stock rows
-vendor_sku_crossref      — 110,679 SKU links
-catalog_oem_crossref     — 1,587 HD OEM → aftermarket SKU mappings
-brand_directory          — 32 brands (UI reference)
-category_display_map     — 30 category mappings (UI reference)
-warehouse_locations      — 10 warehouses
+catalog_unified           — 88,512 products, source of truth
+catalog_fitment_v2        — 348,377 rows (JW Boon, confidence=1.0)
+fitment_staging           — EMPTY, do not use
+oem_fitment               — 124,796 rows (Sportster+Softail+Dyna+Touring+FX)
+v_oem_fitment             — aggregated view, 1 row per OEM part#
+hd_sportster_models       — 26 Sportster model codes
+harley_families           — 16 families
+harley_models             — ~192 rows (includes ironhead/K-series)
+harley_model_years        — 1,602 rows (includes vintage eras)
+hd_models                 — ~250 rows, reference table
+hd_engine_types           — 15 engine families
+vendor_offers             — 99,007 rows
+vendor_sku_crossref       — 110,679 entries
+catalog_oem_crossref      — 1,587 HD OEM → aftermarket mappings
+brand_directory           — 32 brands (UI reference)
+category_display_map      — 30 category mappings (UI reference)
+warehouse_locations       — 10 warehouses
 ```
 
-## 🖼️ ERA IMAGES STATUS
+## 🛠️ INGEST SCRIPTS
 ```
-public/images/eras/flathead.webp           ← STILL NEEDED
-public/images/eras/knucklehead.webp        ✅
-public/images/eras/panhead.webp            ✅
-public/images/eras/ironhead-sportster.webp ✅
-public/images/eras/shovelhead.webp         ✅
-public/images/eras/evolution.webp          ✅
-public/images/eras/evo-sportster.webp      ✅
-public/images/eras/twin-cam.webp           ✅
-public/images/eras/milwaukee-8.webp        ✅
-public/images/eras/chopper.webp            ✅
+scripts/ingest/build_oem_fitment.mjs              — Sportster (30 catalogs)
+scripts/ingest/build_oem_fitment_softail.mjs      — Softail (8 catalogs)
+scripts/ingest/build_oem_fitment_dyna.mjs         — Dyna (3 catalogs)
+scripts/ingest/build_oem_fitment_touring.mjs      — Touring (5 catalogs, partial)
+scripts/ingest/build_oem_fitment_fx.mjs           — FX (4 catalogs, partial)
+scripts/ingest/import_jwboon_fitment_v2.mjs       — JW Boon NOS fitment
+scripts/ingest/seed_vintage_model_years.sql       — Vintage model year seeding
+scripts/ingest/daily_price_sync.js                — Daily MAP-compliant price sync
 ```
 
 ## 💡 OPERATIONAL GOTCHAS
 
 | Issue | Solution |
 |-------|----------|
-| DB connection from Mac | CATALOG_DB_HOST=2a01:4ff:f0:fa6f::1 CATALOG_DB_PORT=5432 CATALOG_DB_USER=catalog_app CATALOG_DB_PASSWORD=smelly |
-| psql IPv6 URL | Quote it: psql 'postgresql://catalog_app:smelly@[2a01:4ff:f0:fa6f::1]:5432/stinkin_catalog' |
-| psql with !~ operator | Use -f with a .sql file — zsh chokes on ! in -c strings |
+| psql IPv6 | Quote URL: psql 'postgresql://catalog_app:smelly@[2a01:4ff:f0:fa6f::1]:5432/stinkin_catalog' |
 | catalog_unified.id | INTEGER not UUID — use ::int[] not ::uuid[] in ANY() casts |
-| catalog_fitment_v2 | 348,377 JW Boon rows — DO NOT TRUNCATE |
-| harley_models vs hd_models | harley_models = fitment table (has family_id FK), hd_models = reference table |
-| catalog_fitment_v2 columns | id, product_id, model_year_id, created_at, fitment_source, confidence_score, parsed_snapshot |
-| harley_model_years | Links harley_models to years — FK target in catalog_fitment_v2 |
-| JW Boon OEM format | Short vintage numbers (215, 1080) — don't match modern H-D OEM format in catalog |
-| import script | scripts/ingest/import_jwboon_fitment_v2.mjs |
-| seed script | scripts/ingest/seed_vintage_model_years.sql |
-| Daily price sync | scripts/ingest/daily_price_sync.js |
+| catalog_fitment_v2 | 348,377 rows — DO NOT TRUNCATE |
+| oem_fitment re-run | Append-only — add catalog_file dedup guard before re-running |
+| harley_models vs hd_models | harley_models = fitment FK target, hd_models = reference only |
+| JW Boon OEM format | Short vintage numbers — don't match modern H-D OEM format in catalog |
+| Touring/FX PDFs | Scanned — need text-based versions for better extraction |
 | Era images | Drop WebP 800×600px+ in public/images/eras/{slug}.webp |
 | fonts | Bebas Neue = --font-caesar, Share Tech Mono = --font-stencil |
 | /browse not /shop | app/browse/[slug]/page.jsx is the PDP |
-| OEM fitment script | scripts/ingest/build_oem_fitment.mjs — update CATALOG_DIR for other families |
