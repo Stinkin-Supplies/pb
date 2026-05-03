@@ -1,0 +1,84 @@
+BEGIN
+--- Step 1: Insert Softail Twin Cam family ---
+INSERT 0 1
+ id |       name       
+----+------------------
+  6 | Softail Evo
+ 25 | Softail Twin Cam
+(2 rows)
+
+
+--- Step 2: Cap Softail Evo family and models at 1999 ---
+UPDATE 1
+UPDATE 26
+DELETE 169
+Evo family capped, post-1999 year rows deleted.
+
+--- Step 3: Insert Softail Twin Cam models ---
+psql:hd_models_correction_v2.sql:89: ERROR:  duplicate key value violates unique constraint "harley_models_model_code_key"
+DETAIL:  Key (model_code)=(FXST) already exists.
+CONTEXT:  SQL statement "INSERT INTO harley_models (family_id, model_code, name, start_year, end_year) VALUES
+    (tc_fam, 'FXST',    'Softail Standard',           2000, 2015),
+    (tc_fam, 'FXSTC',   'Softail Custom',             2000, 2010),
+    (tc_fam, 'FLSTF',   'Fat Boy',                    2000, 2017),
+    (tc_fam, 'FLSTC',   'Heritage Classic',           2000, 2013),
+    (tc_fam, 'FLST',    'Heritage Softail',           2000, 2006),
+    (tc_fam, 'FXSTB',   'Night Train',                2000, 2009),
+    (tc_fam, 'FXSTD',   'Softail Deuce',              2000, 2007),
+    (tc_fam, 'FLSTN',   'Softail Deluxe',             2005, 2017),
+    (tc_fam, 'FXSTS',   'Softail Springer',           2000, 2006),
+    (tc_fam, 'FLSTS',   'Heritage Springer',          2000, 2003),
+    (tc_fam, 'FLSTSC',  'Softail Springer Classic',   2005, 2007),
+    (tc_fam, 'FXSTSSE', 'CVO Springer Softail',       2007, 2009),
+    (tc_fam, 'FLSTSB',  'Cross Bones Springer',       2008, 2011),
+    (tc_fam, 'FXCW',    'Rocker',                     2008, 2011),
+    (tc_fam, 'FXCWC',   'Rocker C',                   2008, 2011),
+    (tc_fam, 'FLSTFB',  'Fat Boy Lo',                 2010, 2016),
+    (tc_fam, 'FLSTSE',  'CVO Softail Convertible',    2010, 2012),
+    (tc_fam, 'FXS',     'Blackline',                  2011, 2013),
+    (tc_fam, 'FLS',     'Softail Slim',               2012, 2017),
+    (tc_fam, 'FLSS',    'Softail Slim S',             2016, 2017),
+    (tc_fam, 'FXSB',    'Softail Breakout',           2013, 2017),
+    (tc_fam, 'FXSBSE',  'CVO Breakout',               2013, 2014),
+    (tc_fam, 'FLSTNSE', 'CVO Softail Deluxe',         2014, 2017),
+    (tc_fam, 'FLSTFBS', 'Fat Boy S',                  2016, 2017),
+    (tc_fam, 'FXSE',    'CVO Pro Street Breakout',    2016, 2017),
+    (tc_fam, 'FXSTDSE', 'CVO Softail Deuce',          2003, 2004),
+    (tc_fam, 'FLSTFSE', 'CVO Fat Boy',                2005, 2006)"
+PL/pgSQL function inline_code_block line 7 at SQL statement
+Softail TC models inserted.
+psql:hd_models_correction_v2.sql:93: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+
+--- Step 4: Seed Softail Twin Cam model years ---
+psql:hd_models_correction_v2.sql:161: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+Softail TC model years seeded.
+psql:hd_models_correction_v2.sql:168: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+
+--- Step 5: Fix Dyna models ---
+psql:hd_models_correction_v2.sql:179: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:hd_models_correction_v2.sql:182: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:hd_models_correction_v2.sql:190: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:hd_models_correction_v2.sql:207: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+Dyna models fixed and inserted.
+
+--- Step 6: Seed Dyna model years ---
+psql:hd_models_correction_v2.sql:290: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+Dyna model years seeded.
+psql:hd_models_correction_v2.sql:297: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+
+--- Final verification: all families ---
+psql:hd_models_correction_v2.sql:315: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+
+--- Softail Evo models (should all end <= 1999) ---
+psql:hd_models_correction_v2.sql:321: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+
+--- Softail TC models ---
+psql:hd_models_correction_v2.sql:327: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+
+--- Dyna models with year row counts ---
+psql:hd_models_correction_v2.sql:337: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+ROLLBACK
+
+============================================================
+CORRECTION v2 COMPLETE
+============================================================

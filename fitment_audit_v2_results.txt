@@ -1,0 +1,709 @@
+
+============================================================
+SECTION 1 — ELC-104488 FORENSICS (OEM 74406-87)
+============================================================
+
+--- 1a. Product record ---
+ id | sku | name | brand | is_harley_fitment | fitment_year_start | fitment_year_end | fitment_hd_models | fitment_hd_families | oem_numbers | source_vendor 
+----+-----+------+-------+-------------------+--------------------+------------------+-------------------+---------------------+-------------+---------------
+(0 rows)
+
+
+--- 1b. Is OEM 74406-87 in oem_fitment? ---
+   id   | oem_part_no | catalog_year_start | catalog_year_end |              catalog_file              |            section             |          description           | model_codes |   match_method    | matched_product_id | matched_sku 
+--------+-------------+--------------------+------------------+----------------------------------------+--------------------------------+--------------------------------+-------------+-------------------+--------------------+-------------
+ 113483 | 74406-87    |               1995 |             1996 | 1995-1996 FLT Models Parts Catalog.pdf | FAIRING LOWERS - ULTRA         | CRANKCASE - GEAR SIDE (1 OF 3) | {}          | oem_numbers_array |             290572 | LIG-700243
+ 114325 | 74406-87    |               1995 |             1996 | 1995-1996 FLT Models Parts Catalog.pdf | 9990W CLUTCH CONTROL           | 1987                           | {}          | oem_numbers_array |             290572 | LIG-700243
+ 118398 | 74406-87    |               1998 |             1998 | 1998 FLT Models Parts Catalog.pdf      | WIRING HARNESS - ULTRA SIDECAR | CRANKCASE - GEAR SIDE          | {}          | oem_numbers_array |             290572 | LIG-700243
+ 119082 | 74406-87    |               1998 |             1998 | 1998 FLT Models Parts Catalog.pdf      | 9990W CLUTCH CONTROL           | 1987                           | {}          | oem_numbers_array |             290572 | LIG-700243
+ 136872 | 74406-87    |               1997 |             1997 | 1997-touring.pdf                       | FAIRING LOWERS - ULTRA         | CRANKCASE - GEAR SIDE (2 OF 2) | {}          | oem_numbers_array |             290572 | LIG-700243
+ 137577 | 74406-87    |               1997 |             1997 | 1997-touring.pdf                       | 9990W CLUTCH CONTROL           | 1987                           | {}          | oem_numbers_array |             290572 | LIG-700243
+ 129198 | 74406-87    |               1993 |             1994 | 1993-1994-touring.pdf                  | FAIRING LOWERS - ULTRA         | CRANKCASE - GEAR SIDE (2 OF 2) | {}          | oem_numbers_array |             290572 | LIG-700243
+ 129974 | 74406-87    |               1993 |             1994 | 1993-1994-touring.pdf                  | 9990W CLUTCH CONTROL           | 1987                           | {}          | oem_numbers_array |             290572 | LIG-700243
+ 132708 | 74406-87    |               1995 |             1996 | 1995-1996-touring.pdf                  | FAIRING LOWERS - ULTRA         | CRANKCASE - GEAR SIDE (1 OF 3) | {}          | oem_numbers_array |             290572 | LIG-700243
+ 133576 | 74406-87    |               1995 |             1996 | 1995-1996-touring.pdf                  | 9990W CLUTCH CONTROL           | 1987                           | {}          | oem_numbers_array |             290572 | LIG-700243
+ 140632 | 74406-87    |               1998 |             1998 | 1998-touring.pdf                       | WIRING HARNESS - ULTRA SIDECAR | CRANKCASE - GEAR SIDE          | {}          | oem_numbers_array |             290572 | LIG-700243
+ 141337 | 74406-87    |               1998 |             1998 | 1998-touring.pdf                       | 9990W CLUTCH CONTROL           | 1987                           | {}          | oem_numbers_array |             290572 | LIG-700243
+(12 rows)
+
+
+--- 1c. Is OEM 74406-87 in catalog_oem_crossref? ---
+ id | sku | oem_number | oem_manufacturer | page_reference | source_file | created_at | original_oem | oem_base | is_cross_source | duplicate_count 
+----+-----+------------+------------------+----------------+-------------+------------+--------------+----------+-----------------+-----------------
+(0 rows)
+
+
+--- 1d. catalog_fitment_v2 rows for this product ---
+ id | product_id | model_year_id | fitment_source | confidence_score | year | model_code | family 
+----+------------+---------------+----------------+------------------+------+------------+--------
+(0 rows)
+
+
+--- 1e. Any product with 74406-87 in oem_numbers array ---
+   id   |    sku     |                name                | oem_numbers | is_harley_fitment 
+--------+------------+------------------------------------+-------------+-------------------
+ 290572 | LIG-700243 | OE Chrome Oil Pressure Sender Unit | {74406-87}  | t
+(1 row)
+
+
+--- 1f. Touring OEM fitment coverage — what catalog years/files exist? ---
+ catalog_year_start | catalog_year_end |              catalog_file              | rows_extracted | rows_matched | match_pct 
+--------------------+------------------+----------------------------------------+----------------+--------------+-----------
+               1993 |             1994 | 1993-1994-touring.pdf                  |           3456 |         1139 |      33.0
+               1995 |             1996 | 1995-1996 FLT Models Parts Catalog.pdf |           3923 |         1186 |      30.2
+               1995 |             1996 | 1995-1996-touring.pdf                  |           3745 |         1121 |      29.9
+               1997 |             1997 | 1997-touring.pdf                       |           3780 |         1338 |      35.4
+               1998 |             1998 | 1998 FLT Models Parts Catalog.pdf      |           4658 |         1419 |      30.5
+               1998 |             1998 | 1998-touring.pdf                       |           3869 |         1238 |      32.0
+               2000 |             2000 | 2000-touring.pdf                       |           3774 |         1121 |      29.7
+               2002 |             2002 | 2002-touring.pdf                       |           3576 |         1082 |      30.3
+               2003 |             2003 | 2003-touring.pdf                       |           3439 |          992 |      28.8
+               2004 |             2004 | 2004-touring.pdf                       |           3697 |         1030 |      27.9
+               2005 |             2005 | 2005-touring.pdf                       |           3564 |         1015 |      28.5
+               2006 |             2006 | 2006-touring.pdf                       |           3550 |          972 |      27.4
+               2009 |             2009 | 2009-touring.pdf                       |           3741 |         1129 |      30.2
+               2011 |             2011 | 2011-touring.pdf                       |           2791 |          843 |      30.2
+               2012 |             2012 | 2012-touring.pdf                       |           3542 |         1137 |      32.1
+               2013 |             2013 | 2013-touring.pdf                       |           3306 |         1056 |      31.9
+               2016 |             2016 | 2016-touring.pdf                       |           2722 |          986 |      36.2
+               2017 |             2017 | 2017-touring.pdf                       |           2551 |          917 |      35.9
+               2018 |             2018 | 2018-touring.pdf                       |           2465 |          892 |      36.2
+               2019 |             2019 | 2019-touring.pdf                       |           2475 |          921 |      37.2
+               2020 |             2020 | 2020-touring.pdf                       |           2134 |          785 |      36.8
+               2021 |             2021 | 2021 Touring Models Parts Catalog.pdf  |           4388 |         1760 |      40.1
+               2021 |             2021 | 2021-touring.pdf                       |           2087 |          829 |      39.7
+               2022 |             2022 | 2022-touring.pdf                       |           2327 |          862 |      37.0
+               2023 |             2023 | 2023-touring.pdf                       |           2194 |          869 |      39.6
+               2023 |             2023 | Touring-FLHXSE-2023.pdf                |           1977 |          939 |      47.5
+(26 rows)
+
+
+--- 1g. What model_codes appear in oem_fitment for FLH/FLT? ---
+ model_code | rows 
+------------+------
+(0 rows)
+
+
+============================================================
+SECTION 2 — SCALE OF THE GAP (already ran, confirm)
+============================================================
+
+--- 2a. Overall fitment coverage ---
+ total_products | flagged_harley | not_flagged | has_fitment_rows | no_fitment_rows 
+----------------+----------------+-------------+------------------+-----------------
+          88512 |          24253 |       64259 |             7081 |           81431
+(1 row)
+
+
+--- 2b. Flagged Harley but zero fitment rows — by vendor ---
+ source_vendor | flagged_no_fitment 
+---------------+--------------------
+ PU            |              11355
+ VTWIN         |               3274
+ WPS           |               2543
+(3 rows)
+
+
+--- 2c. Products with fitment_hd_models populated but no fitment rows ---
+ source_vendor | has_models_no_rows 
+---------------+--------------------
+ VTWIN         |               3184
+ PU            |               1005
+ WPS           |                745
+(3 rows)
+
+
+--- 2d. Products with fitment_year_start populated but no fitment rows ---
+ source_vendor | has_years_no_rows 
+---------------+-------------------
+ PU            |              7488
+ VTWIN         |              3193
+ WPS           |              1859
+(3 rows)
+
+
+============================================================
+SECTION 3 — TOURING FAMILY DEEP DIVE
+============================================================
+
+--- 3a. harley_families list ---
+ id |      name      | start_year | end_year 
+----+----------------+------------+----------
+ 23 | Flathead       |       1930 |     1952
+ 17 | Knucklehead    |       1936 |     1947
+ 18 | Panhead        |       1948 |     1965
+ 19 | Shovelhead     |       1966 |     1984
+ 10 | FXR            |       1982 |     1994
+  6 | Softail Evo    |       1984 |     2017
+  7 | Touring        |       1984 |     2026
+ 22 | Evolution      |       1984 |     1999
+  3 | Sportster      |       1984 |     2022
+  4 | Dyna           |       1993 |     2017
+ 21 | Twin Cam       |       1999 |     2017
+ 20 | V-Rod          |       2002 |     2017
+  8 | Trike          |       2009 |     2026
+  2 | Street         |       2015 |     2021
+  5 | Softail M8     |       2018 |     2026
+  1 | Revolution Max |       2021 |     2026
+(16 rows)
+
+
+--- 3b. harley_models in Touring family ---
+ id  | model_code |            name             | start_year | end_year 
+-----+------------+-----------------------------+------------+----------
+ 108 | FLH        | ELECTRA GLIDE               |       1984 |     1985
+ 110 | FLHS       | ELECTRA GLIDE SPORT         |       1984 |     1993
+ 112 | FLHTC      | ELECTRA GLIDE CLASSIC       |       1984 |     2013
+ 128 | FLTC       | TOUR GLIDE CLASSIC          |       1984 |     1991
+ 111 | FLHT       | ELECTRA GLIDE STANDARD      |       1986 |     2022
+ 114 | FLHTCU     | ULTRA CLASSIC ELECTRA GLIDE |       1989 |     2019
+ 129 | FLTCU      | ULTRA CLASSIC TOUR GLIDE    |       1989 |     1996
+ 103 | FLHR       | ROAD KING                   |       1994 |     2022
+ 104 | FLHRC      | ROAD KING CLASSIC           |       1998 |     2019
+ 130 | FLTR       | ROAD GLIDE                  |       1998 |     2026
+ 132 | FLTRSE     | CVO ROAD GLIDE              |       2000 |     2026
+ 107 | FLHRSE     | CVO ROAD KING               |       2002 |     2014
+ 105 | FLHRS      | ROAD KING CUSTOM            |       2004 |     2007
+ 113 | FLHTCSE    | CVO ELECTRA GLIDE           |       2004 |     2005
+ 117 | FLHTCUSE   | CVO ULTRA CLASSIC           |       2006 |     2013
+ 109 | FLHX       | STREET GLIDE                |       2006 |     2026
+ 125 | FLHTK      | ULTRA LIMITED               |       2010 |     2024
+ 122 | FLHXSE     | CVO STREET GLIDE            |       2010 |     2026
+ 131 | FLTRX      | ROAD GLIDE CUSTOM           |       2010 |     2013
+ 134 | FLTRU      | ROAD GLIDE ULTRA            |       2011 |     2019
+ 135 | FLTRUSE    | CVO ROAD GLIDE ULTRA        |       2011 |     2016
+ 133 | FLTRXSE    | CVO ROAD GLIDE CUSTOM       |       2012 |     2018
+ 115 | FLHTCUTC   | ULTRA CLASSIC TWIN-COOLED   |       2014 |     2019
+ 127 | FLHTKSE    | CVO LIMITED                 |       2014 |     2021
+ 120 | FLHXS      | STREET GLIDE SPECIAL        |       2014 |     2023
+ 116 | FLHTCUL    | ULTRA CLASSIC LOW           |       2015 |     2016
+ 126 | FLHTKL     | ULTRA LIMITED LOW           |       2015 |     2019
+ 138 | FLTRXS     | ROAD GLIDE SPECIAL          |       2015 |     2023
+ 106 | FLHRXS     | ROAD KING SPECIAL           |       2017 |     2025
+ 141 | FLTRK      | ROAD GLIDE LIMITED          |       2020 |     2026
+ 121 | FLHXST     | STREET GLIDE ST             |       2022 |     2023
+ 136 | FLTRKSE    | CVO ROAD GLIDE LIMITED      |       2022 |     2023
+ 139 | FLTRXST    | ROAD GLIDE ST               |       2022 |     2023
+ 140 | FLTRXSTSE  | CVO ROAD GLIDE ST           |       2024 |     2026
+ 119 | FLHXL      | STREET GLIDE LIMITED        |       2026 |     2026
+ 123 | FLHXLSE    | CVO STREET GLIDE LIMITED    |       2026 |     2026
+ 124 | FLHXSTSE   | CVO STREET GLIDE ST         |       2026 |     2026
+(37 rows)
+
+
+--- 3c. harley_model_years for Touring 1991-1998 ---
+  id  | year | model_code |         model_name          
+------+------+------------+-----------------------------
+  889 | 1991 | FLHS       | ELECTRA GLIDE SPORT
+  897 | 1991 | FLHT       | ELECTRA GLIDE STANDARD
+  936 | 1991 | FLHTC      | ELECTRA GLIDE CLASSIC
+  963 | 1991 | FLHTCU     | ULTRA CLASSIC ELECTRA GLIDE
+ 1096 | 1991 | FLTC       | TOUR GLIDE CLASSIC
+ 1099 | 1991 | FLTCU      | ULTRA CLASSIC TOUR GLIDE
+  890 | 1992 | FLHS       | ELECTRA GLIDE SPORT
+  898 | 1992 | FLHT       | ELECTRA GLIDE STANDARD
+  937 | 1992 | FLHTC      | ELECTRA GLIDE CLASSIC
+  964 | 1992 | FLHTCU     | ULTRA CLASSIC ELECTRA GLIDE
+ 1100 | 1992 | FLTCU      | ULTRA CLASSIC TOUR GLIDE
+  891 | 1993 | FLHS       | ELECTRA GLIDE SPORT
+  899 | 1993 | FLHT       | ELECTRA GLIDE STANDARD
+  938 | 1993 | FLHTC      | ELECTRA GLIDE CLASSIC
+  965 | 1993 | FLHTCU     | ULTRA CLASSIC ELECTRA GLIDE
+ 1101 | 1993 | FLTCU      | ULTRA CLASSIC TOUR GLIDE
+  803 | 1994 | FLHR       | ROAD KING
+  900 | 1994 | FLHT       | ELECTRA GLIDE STANDARD
+  939 | 1994 | FLHTC      | ELECTRA GLIDE CLASSIC
+  966 | 1994 | FLHTCU     | ULTRA CLASSIC ELECTRA GLIDE
+ 1102 | 1994 | FLTCU      | ULTRA CLASSIC TOUR GLIDE
+  804 | 1995 | FLHR       | ROAD KING
+  901 | 1995 | FLHT       | ELECTRA GLIDE STANDARD
+  940 | 1995 | FLHTC      | ELECTRA GLIDE CLASSIC
+  967 | 1995 | FLHTCU     | ULTRA CLASSIC ELECTRA GLIDE
+ 1103 | 1995 | FLTCU      | ULTRA CLASSIC TOUR GLIDE
+  805 | 1996 | FLHR       | ROAD KING
+  902 | 1996 | FLHT       | ELECTRA GLIDE STANDARD
+  941 | 1996 | FLHTC      | ELECTRA GLIDE CLASSIC
+  968 | 1996 | FLHTCU     | ULTRA CLASSIC ELECTRA GLIDE
+ 1104 | 1996 | FLTCU      | ULTRA CLASSIC TOUR GLIDE
+  806 | 1997 | FLHR       | ROAD KING
+  903 | 1997 | FLHT       | ELECTRA GLIDE STANDARD
+  942 | 1997 | FLHTC      | ELECTRA GLIDE CLASSIC
+  969 | 1997 | FLHTCU     | ULTRA CLASSIC ELECTRA GLIDE
+  807 | 1998 | FLHR       | ROAD KING
+  832 | 1998 | FLHRC      | ROAD KING CLASSIC
+  904 | 1998 | FLHT       | ELECTRA GLIDE STANDARD
+  943 | 1998 | FLHTC      | ELECTRA GLIDE CLASSIC
+  970 | 1998 | FLHTCU     | ULTRA CLASSIC ELECTRA GLIDE
+ 1105 | 1998 | FLTR       | ROAD GLIDE
+(41 rows)
+
+
+--- 3d. Touring products breakdown — fitment coverage ---
+ source_vendor | total_touring_products | has_fitment_rows | has_year_range | has_model_codes 
+---------------+------------------------+------------------+----------------+-----------------
+ PU            |                   3902 |                6 |           3365 |             488
+ VTWIN         |                   2828 |             1157 |           2828 |            2828
+ WPS           |                   1379 |              351 |           1340 |             695
+(3 rows)
+
+
+--- 3e. oem_fitment for Touring — coverage by year range ---
+ catalog_year_start | catalog_year_end | rows | matched | match_pct 
+--------------------+------------------+------+---------+-----------
+(0 rows)
+
+
+============================================================
+SECTION 4 — OEM FITMENT HEALTH
+============================================================
+
+--- 4a. oem_fitment by family (inferred from catalog_file) ---
+  family   | total_rows | matched | match_pct | earliest_year | latest_year 
+-----------+------------+---------+-----------+---------------+-------------
+ Touring   |      83731 |   27578 |      32.9 |          1993 |        2023
+ Sportster |      75963 |   23869 |      31.4 |          1991 |        2022
+ Softail   |      26330 |    9556 |      36.3 |          1993 |        2003
+ Dyna      |       9360 |    3777 |      40.4 |          1991 |        2009
+ FX        |       1709 |     874 |      51.1 |          1984 |        1986
+(5 rows)
+
+
+--- 4b. oem_fitment distinct catalog_files (see what we actually have) ---
+               catalog_file               | catalog_year_start | catalog_year_end | rows | matched 
+------------------------------------------+--------------------+------------------+------+---------
+ 1984-86 FX-FXST Parts Catalog.pdf        |               1984 |             1986 | 1709 |     874
+ 1991-1992 XL.pdf                         |               1991 |             1992 | 2395 |     775
+ 1991-92 Dyna Models Parts Catalog.pdf    |               1991 |             1992 | 2821 |    1244
+ 1993-1994-touring.pdf                    |               1993 |             1994 | 3456 |    1139
+ 1993-1994-xl.pdf                         |               1993 |             1994 | 2243 |     801
+ 1993-94 Softail Models Parts Catalog.pdf |               1993 |             1994 | 2704 |    1188
+ 1995-1996 FLT Models Parts Catalog.pdf   |               1995 |             1996 | 3923 |    1186
+ 1995-1996-touring.pdf                    |               1995 |             1996 | 3745 |    1121
+ 1995-1996-xl.pdf                         |               1995 |             1996 | 2470 |     816
+ 1995-96 Softail Models Parts Catalog.pdf |               1995 |             1996 | 3541 |    1461
+ 1997 Softail Models Parts Catalog.pdf    |               1997 |             1997 | 3922 |    1555
+ 1997-touring.pdf                         |               1997 |             1997 | 3780 |    1338
+ 1997-xl.pdf                              |               1997 |             1997 | 2997 |    1052
+ 1998 Dyna Models Parts Catalog.pdf       |               1998 |             1998 | 3474 |    1479
+ 1998 FLT Models Parts Catalog.pdf        |               1998 |             1998 | 4658 |    1419
+ 1998-touring.pdf                         |               1998 |             1998 | 3869 |    1238
+ 1998-xl.pdf                              |               1998 |             1998 | 3368 |    1103
+ 1999 Softail Models Parts Catalog.pdf    |               1999 |             1999 | 3861 |    1499
+ 1999-xl.pdf                              |               1999 |             1999 | 3207 |    1061
+ 2000 Softail Models Parts Catalog.pdf    |               2000 |             2000 | 4492 |    1408
+ 2000-touring.pdf                         |               2000 |             2000 | 3774 |    1121
+ 2000-xl.pdf                              |               2000 |             2000 | 2718 |     908
+ 2001 Softail Models Parts Catalog.pdf    |               2001 |             2001 | 4202 |    1291
+ 2001-xl.pdf                              |               2001 |             2001 | 2684 |     909
+ 2002-touring.pdf                         |               2002 |             2002 | 3576 |    1082
+ 2002-xl.pdf                              |               2002 |             2002 | 2568 |     836
+ 2003 Softail Models Parts Catalog.pdf    |               2003 |             2003 | 3608 |    1154
+ 2003-touring.pdf                         |               2003 |             2003 | 3439 |     992
+ 2003-xl.pdf                              |               2003 |             2003 | 2511 |     846
+ 2004 Sportster Models Parts Catalog.pdf  |               2004 |             2004 | 3286 |    1045
+ 2004-touring.pdf                         |               2004 |             2004 | 3697 |    1030
+ 2005-touring.pdf                         |               2005 |             2005 | 3564 |    1015
+ 2005-xl.pdf                              |               2005 |             2005 | 2573 |     832
+ 2006-touring.pdf                         |               2006 |             2006 | 3550 |     972
+ 2006-xl.pdf                              |               2006 |             2006 | 2503 |     830
+ 2007-xl.pdf                              |               2007 |             2007 | 2543 |     756
+ 2008-xl.pdf                              |               2008 |             2008 | 3403 |     842
+ 2009-touring.pdf                         |               2009 |             2009 | 3741 |    1129
+ 2009-xl.pdf                              |               2009 |             2009 | 2910 |     698
+ Dyna-Models-2009.pdf                     |               2009 |             2009 | 3065 |    1054
+ 2010-xl.pdf                              |               2010 |             2010 | 3194 |     763
+ 2011-touring.pdf                         |               2011 |             2011 | 2791 |     843
+ 2011-xl.pdf                              |               2011 |             2011 | 2855 |     708
+ 2012-touring.pdf                         |               2012 |             2012 | 3542 |    1137
+ 2012-xl.pdf                              |               2012 |             2012 | 2973 |     772
+ 2013-touring.pdf                         |               2013 |             2013 | 3306 |    1056
+ 2013-xl.pdf                              |               2013 |             2013 | 2843 |     736
+ 2014-xl.pdf                              |               2014 |             2014 | 2232 |     715
+ 2015-xl.pdf                              |               2015 |             2015 | 2228 |     736
+ 2016 Sportster Models Part Catalog.pdf   |               2016 |             2016 | 2519 |     888
+ 2016-touring.pdf                         |               2016 |             2016 | 2722 |     986
+ 2017-touring.pdf                         |               2017 |             2017 | 2551 |     917
+ 2017-xl.pdf                              |               2017 |             2017 | 2329 |     792
+ 2018-touring.pdf                         |               2018 |             2018 | 2465 |     892
+ 2018-xl.pdf                              |               2018 |             2018 | 2213 |     717
+ 2019-touring.pdf                         |               2019 |             2019 | 2475 |     921
+ 2019-xl.pdf                              |               2019 |             2019 | 2311 |     804
+ 2020-touring.pdf                         |               2020 |             2020 | 2134 |     785
+ 2020-xl.pdf                              |               2020 |             2020 | 2326 |     805
+ 2021 Touring Models Parts Catalog.pdf    |               2021 |             2021 | 4388 |    1760
+ 2021-touring.pdf                         |               2021 |             2021 | 2087 |     829
+ 2021-xl.pdf                              |               2021 |             2021 | 1793 |     661
+ 2022-touring.pdf                         |               2022 |             2022 | 2327 |     862
+ 2022-xl.pdf                              |               2022 |             2022 | 1768 |     662
+ 2023-touring.pdf                         |               2023 |             2023 | 2194 |     869
+ Touring-FLHXSE-2023.pdf                  |               2023 |             2023 | 1977 |     939
+(66 rows)
+
+
+--- 4c. oem_fitment unmatched — top OEM part numbers (worth hunting) ---
+ oem_part_no |          description           | unmatched_rows |                                                                          all_model_codes                                                                           
+-------------+--------------------------------+----------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ 41123-79    | VALVE CAP                      |            178 | {ALL,XL1200,XL1200C,XL1200CA,XL1200CB,XL1200CP,XL1200CX,XL1200L,XL1200N,XL1200R,XL1200T,XL1200V,XL1200X,XL883,XL883C,XL883HUG,XL883L,XL883N,XL883R,XR1200,XR1200X}
+ 59723-04    | SEAT POST                      |             95 | {ALL,XL1200C,XL1200CA,XL1200CB,XL1200CP,XL1200CX,XL1200L,XL1200N,XL1200NS,XL1200T,XL1200V,XL1200X,XL1200XS,XL883L,XL883N,XL883R}
+ 56667-04    | HANDLEBAR GRIP                 |             91 | {XL1200C,XL1200CA,XL1200CB,XL1200CP,XL1200CX,XL1200L,XL1200N,XL1200NS,XL1200R,XL1200T,XL1200V,XL1200X,XL1200XS,XL883,XL883C,XL883L,XL883N,XL883R,XR1200,XR1200X}
+ 70631-08    | CONDUIT CLIP (ABS)             |             84 | {ALL,XL1200C,XL1200CA,XL1200CB,XL1200CP,XL1200CX,XL1200T,XL1200V,XL1200X,XL883L,XL883N,XL883R}
+ 45041-01A   | CLEVIS PIN                     |             82 | {XL1200C,XL1200CA,XL1200CB,XL1200CP,XL1200CX,XL1200L,XL1200R,XL1200T,XL1200V,XL1200X,XL1200XS,XL883,XL883C,XL883L,XL883N,XL883R,XR1200,XR1200X}
+ 44160-00    | BOLT                           |             82 | {ALL,XL1200C,XL1200CA,XL1200CB,XL1200CP,XL1200CX,XL1200NS,XL1200T,XL1200V,XL1200X,XL1200XS,XL883L,XL883N,XL883R,XR1200X}
+ 41756-08    | GASKET                         |             74 | {ALL,XL1200C,XL1200CA,XL1200CB,XL1200CP,XL1200CX,XL1200NS,XL1200T,XL1200V,XL1200X,XL1200XS,XL883L,XL883N}
+ 68329-03    | BULB                           |             73 | {XL1200C,XL1200CA,XL1200CB,XL1200CP,XL1200CX,XL1200N,XL1200NS,XL1200R,XL1200T,XL1200V,XL1200X,XL1200XS,XL883,XL883C,XL883L,XL883N,XL883R,XR1200X}
+ 67667-05    | MEDALLION                      |             67 | {XL1200C,XL1200CA,XL1200CB,XL1200CP,XL1200CX,XL1200N,XL1200NS,XL1200T,XL1200V,XL1200X,XL1200XS,XL883C,XL883L,XL883N,XL883R,XR1200X}
+ 68163-84    | BULB, single contact (HDI)     |             63 | {XL1200C,XL1200CA,XL1200CB,XL1200L,XL1200N,XL1200T,XL1200V,XL1200X,XL883L,XL883N,XL883R,XR1200X}
+ 70598-99    | BOOT, temperature sensor       |             62 | {ALL,XL1200C,XL1200CP,XL1200L,XL1200N,XL1200V,XL1200X,XL883C,XL883L,XL883N,XL883R,XR1200,XR1200X}
+ 54321-85    | NUT                            |             60 | {XL1200C,XL1200CB,XL1200CP,XL1200N,XL1200V,XL1200X,XL883N,XL883R,XR1200X}
+ 42569-03    | BUSHING                        |             60 | {ALL,XL1200C,XL1200L,XL1200N,XL1200R,XL50,XL883,XL883C,XL883L,XL883N,XL883R}
+ 70664-08    | BOOT, jiffy stand sensor       |             58 | {ALL,XL1200C,XL1200CP,XL1200L,XL1200N,XL1200V,XL1200X,XL883C,XL883L,XL883N,XL883R,XR1200,XR1200X}
+ 18011-86    | INSERT, exhaust valve seat     |             57 | {ALL,XL1200C,XL1200CA,XL1200CB,XL1200CP,XL1200CX,XL1200L,XL1200N,XL1200R,XL1200T,XL1200V,XL1200X,XR1200,XR1200X}
+ 72486-08    | WIRE SEAL, 20 AWG (green)      |             56 | {ALL}
+ 72484-08    | TERMINAL, socket, 20 AWG       |             56 | {ALL}
+ 48738-07    | WASHER                         |             54 | {XL1200C,XL1200CA,XL1200CB,XL1200CP,XL1200N,XL1200NS,XL1200T,XL1200V,XL883L,XL883N,XL883R}
+ 68380-05    | BOOT                           |             53 | {XL1200C,XL1200CA,XL1200CB,XL1200CP,XL1200CX,XL1200N,XL1200NS,XL1200T,XL1200V,XL1200X,XL1200XS,XL883L,XL883N,XL883R,XR1200X}
+ 18020-07    | INSERT, intake valve seat      |             53 | {XL1200C,XL1200CA,XL1200CB,XL1200CP,XL1200CX,XL1200N,XL1200NS,XL1200T,XL1200V,XL1200X,XL1200XS,XR1200,XR1200X}
+ 67104-95    | CUSHION, rear                  |             53 | {XL1200CB,XL1200CP,XL1200L,XL1200N,XL1200NS,XL1200T,XL1200V,XL883,XL883HUG,XL883L,XL883N,XL883R}
+ 62122-89A   | BUMPER                         |             52 | {ALL,XL1200C,XL1200CP,XL1200L,XL1200N,XL1200V,XL1200X,XL883C,XL883L,XL883N,XL883R,XR1200,XR1200X}
+ 56104-02    | SCREW                          |             50 | {ALL,XL1200C,XL1200CA,XL1200CB,XL1200CP,XL1200CX,XL1200N,XL1200V,XL1200X,XL883L,XL883N,XL883R}
+ 74120-08    | DC LEAD ASSEMBLY               |             50 | {ALL,XL1200C,XL1200CP,XL1200N,XL1200V,XL1200X,XL883L,XL883N,XL883R,XR1200,XR1200X}
+ 59502-04B   | REAR FENDER EXTENSION          |             49 | {ALL,XL1200CX,XL1200N,XL1200NS,XL1200T,XL1200V,XL1200X,XL1200XS,XL883L,XL883N}
+ 48791-09    | SPRING COLLAR                  |             48 | {XL1200C,XL1200CA,XL1200CB,XL1200CP,XL1200R,XL1200T,XL1200V,XL883,XL883C,XL883L,XL883R}
+ 59481-00    | REFLECTOR, amber - right       |             47 | {ALL,XL1200C,XL1200CA,XL1200CB,XL1200CP,XL1200L,XL1200N,XL1200R,XL1200T,XL1200V,XL1200X,XL883,XL883C,XL883L,XL883N,XL883R}
+ 59986-75    | SUPPORT, license plate bracket |             47 | {ALL,XL1200L,XL1200N,XL1200T,XL1200V,XL1200X,XL883L,XL883N,XL883R}
+ 40875-11    | RIM STRIP                      |             47 | {XL1200C,XL1200CB,XL1200CP,XL1200N,XL1200X}
+ 45460-90    | RING, damper tube              |             45 | {ALL,XL1200,XL1200C,XL1200L,XL1200R,XL883,XL883C,XL883HUG,XL883R}
+ 40572-11    | INNER TUBE                     |             44 | {XL1200C,XL1200CB,XL1200CP,XL1200N,XL1200X}
+ 72545-08    | RESISTOR ASSEMBLY, fuel sender |             44 | {ALL,XR1200,XR1200X}
+ 59847-10    | FENDER, rear (prime)           |             44 | {XL1200L,XL1200N,XL1200T,XL1200V,XL1200X,XL883L,XL883N,XL883R}
+ 70640-07    | CLIP, caddy                    |             44 | {ALL,XL1200C,XL1200CP,XL1200N,XL1200V,XL1200X,XL883L,XL883N,XL883R}
+ 72199-94    | CONNECTOR ANCHOR               |             44 | {ALL,XL1200,XL1200C,XL1200CP,XL1200N,XL1200V,XL1200X,XL883,XL883HUG,XL883L,XL883N,XL883R,XR1200,XR1200X}
+ 72216-94    | FUSE BLOCK                     |             43 | {XL1200,XL1200C,XL1200S,XL883,XL883C,XL883HUG,XL883R}
+ 72046-79    | SOCKET HOUSING, 5-way          |             43 | {XL1200,XL1200C,XL1200S,XL883,XL883C,XL883HUG,XL883R}
+ 68265-04    | BALL STUD                      |             42 | {ALL,XL1200C,XL1200CB,XL1200CX,XL1200L,XL1200N,XL1200NS,XL883C,XL883L,XL883N,XL883R,XR1200,XR1200X}
+ 72399-98    | CONNECTOR, 3-way               |             42 | {XL1200,XL1200C,XL1200S,XL883,XL883C,XL883HUG,XL883R}
+ 70504-81    | CLIP, throttle cables          |             41 | {ALL,XL1200,XL1200C,XL1200R,XL1200S,XL883,XL883C,XL883HUG,XL883L,XL883R}
+(40 rows)
+
+
+============================================================
+SECTION 5 — NAME-ENCODED FITMENT (products where name has the answer)
+============================================================
+
+--- 5a. Count: products with year+model in name, zero fitment rows ---
+ name_encoded_no_fitment 
+-------------------------
+                    3841
+(1 row)
+
+
+--- 5b. Sample 30: name-encoded, no fitment rows ---
+   id   |   sku    |           name            | source_vendor | is_harley_fitment | fitment_year_start | fitment_year_end | fitment_hd_models 
+--------+----------+---------------------------+---------------+-------------------+--------------------+------------------+-------------------
+ 180691 | DS242005 | 10.4PL WIRE 65-99 FX RD   | PU            | f                 |                    |                  | 
+ 172319 | DS242002 | 10.4PL WIRE80-98 FLT BLK  | PU            | t                 |               1984 |             2026 | 
+ 150028 | DS242011 | 10.4 PLWIRE80-98L/FLT RD  | PU            | t                 |               1984 |             2026 | 
+ 224820 | DS242004 | 10.4 PL WIRE 82-94FXR BLK | PU            | f                 |                    |                  | 
+ 231050 | 21040093 | 10.4PL WIRE 99-08FL FI BK | PU            | f                 |                    |                  | 
+ 192369 | 21040095 | 10.4PL WIRE 99-08FL FI BL | PU            | f                 |                    |                  | 
+ 144951 | 21040094 | 10.4PL WIRE 99-08FL FI RD | PU            | f                 |                    |                  | 
+ 155838 | DS242001 | 10.4 PRW 65-99 FX/FL BK   | PU            | t                 |               1984 |             2026 | 
+ 183856 | DS242118 | 10.4 PRW 65-99 FX/FL BL   | PU            | t                 |               1984 |             2026 | 
+ 154645 | DS242119 | 10.4 PRW 80-98 XL/FLT BL  | PU            | t                 |               1980 |             1998 | 
+ 149241 | DS280271 | 10SIGNAL BRKT 91-17 FL'S  | PU            | t                 |               1991 |             2017 | 
+ 208218 | MEP8020  | 12" HD SHLD FLHT 86-95,CL | PU            | t                 |               1986 |             1995 | 
+ 144228 | MEP8120  | 12 HD SHLD FLHT 96-13 CL  | PU            | t                 |               1996 |             2013 | 
+ 203623 | DS196178 | 1.2 KW STAR BLK 81-19 XL  | PU            | f                 |                    |                  | 
+ 145919 | DS190796 | 12PT HEAD BOLTS 48-84 FL  | PU            | t                 |               1984 |             2026 | 
+ 178884 | DS189942 | 12 PT HEAD BOLTS 57-85 XL | PU            | t                 |               1973 |             1985 | 
+ 154383 | DS242186 | 14.4 PL WIRE 00-17 FXST   | PU            | t                 |               2000 |             2017 | 
+ 197209 | DS196183 | 1.4 KW STAR BLK. 81-19 XL | PU            | f                 |                    |                  | 
+ 206824 | MEP8030  | 15" HD SHLD FLHT 86-95,CL | PU            | t                 |               1986 |             1995 | 
+ 201568 | MEP8130  | 15 HD SHLD FLHT 96-13 CL  | PU            | t                 |               1996 |             2013 | 
+ 161326 | MEP8139  | 15 HD SHLD FLHT 96-13 SR  | PU            | t                 |               1996 |             2013 | 
+ 143040 | DS191081 | 19T TRN SPKT 91-92 XL     | PU            | f                 |                    |                  | 
+ 197663 | DS240019 | 1"LOW KICKSTD 89-06 FXST  | PU            | t                 |               1989 |             2006 | 
+ 203689 | DS199435 | 1ST GEAR C/SHAFT 73-85 XL | PU            | f                 |                    |                  | 
+ 181598 | DS199434 | 1ST GEAR M/SHAFT 56-90 XL | PU            | f                 |                    |                  | 
+ 150742 | DS191089 | 20T TRN SPKT 91-92 XL     | PU            | f                 |                    |                  | 
+ 207056 | DS243864 | 2:1 73-84FX SPEEDO 150MPH | PU            | f                 |                    |                  | 
+ 183092 | DS191090 | 21T TRN SPKT 91-92 XL     | PU            | f                 |                    |                  | 
+ 215282 | DS191091 | 22T TRN SPKT 91-92 XL     | PU            | f                 |                    |                  | 
+ 197165 | DS191092 | 23T TRN SPKT 91-92 XL     | PU            | f                 |                    |                  | 
+(30 rows)
+
+
+--- 5c. Of those — how many already have fitment_year_start set? ---
+ has_year_start | missing_year_start | has_model_codes | missing_model_codes 
+----------------+--------------------+-----------------+---------------------
+           2422 |               1419 |              72 |                3769
+(1 row)
+
+
+============================================================
+SECTION 6 — WHAT harley_model_years ACTUALLY EXISTS
+           (can we even write fitment rows for 91-98 Touring?)
+============================================================
+
+--- 6a. All distinct model_codes in harley_models with their family ---
+     family     |    model_code     |         model_name          | start_year | end_year | year_rows 
+----------------+-------------------+-----------------------------+------------+----------+-----------
+ Dyna           | FXDL              | LOW RIDER                   |       1993 |     2017 |        25
+ Dyna           | FXDWG             | WIDE GLIDE                  |       1993 |     2017 |        25
+ Dyna           | FXDS              | DYNA CONVERTIBLE            |       1994 |     2000 |         7
+ Dyna           | FXD               | SUPER GLIDE                 |       1995 |     2010 |        16
+ Dyna           | FXDX              | SUPER GLIDE SPORT           |       1999 |     2005 |         7
+ Dyna           | FXDWG2            | CVO WIDE GLIDE              |       2001 |     2002 |         2
+ Dyna           | FXDWG3            | CVO WIDE GLIDE              |       2001 |     2002 |         2
+ Dyna           | FXDC              | SUPER GLIDE CUSTOM          |       2005 |     2014 |        10
+ Dyna           | FXDB              | STREET BOB                  |       2006 |     2017 |        12
+ Dyna           | FXDSE             | SCREAMIN EAGLE DYNA         |       2007 |     2008 |         2
+ Dyna           | FXDF              | FAT BOB                     |       2008 |     2017 |        10
+ Dyna           | FXDFSE            | CVO FAT BOB                 |       2009 |     2010 |         2
+ Dyna           | FLD               | SWITCHBACK                  |       2012 |     2016 |         5
+ Dyna           | FXDLS             | LOW RIDER S                 |       2016 |     2017 |         2
+ Evolution      | evolution_bigtwin | Evolution Big Twin          |       1984 |     1999 |        16
+ Flathead       | V                 | V 74ci Flathead             |       1930 |     1936 |         7
+ Flathead       | VC                | VC 74ci Flathead Sidecar    |       1930 |     1936 |         7
+ Flathead       | VL                | VL 74ci Flathead            |       1930 |     1936 |         7
+ Flathead       | G                 | Servi-Car G 45ci            |       1932 |     1952 |        21
+ Flathead       | VD                | VD 74ci Flathead            |       1934 |     1936 |         3
+ Flathead       | VLD               | VLD 74ci Flathead           |       1934 |     1936 |         3
+ Flathead       | VLH               | VLH 80ci Flathead           |       1936 |     1936 |         1
+ Flathead       | U                 | U 74ci Flathead             |       1937 |     1948 |        12
+ Flathead       | UH                | UH 74ci Flathead            |       1937 |     1941 |         5
+ Flathead       | UL                | UL 80ci Flathead            |       1937 |     1948 |        12
+ Flathead       | ULH               | ULH 80ci Flathead           |       1937 |     1941 |         5
+ Flathead       | WL                | WL 45ci Flathead            |       1942 |     1951 |        10
+ FXR            | FXEF              | Super Glide Fat Bob         |       1982 |     1985 |         4
+ FXR            | FXR               | Super Glide II              |       1982 |     1992 |        11
+ FXR            | FXRS              | Low Rider                   |       1982 |     1994 |        13
+ FXR            | FXRDG             | Disc Glide                  |       1983 |     1986 |         4
+ FXR            | FXRT              | Sport Glide                 |       1983 |     1992 |        10
+ FXR            | FXRP              | Police                      |       1984 |     1994 |        11
+ FXR            | FXRD              | Sport Glide DeLuxe          |       1986 |     1992 |         7
+ FXR            | FXRS-SP           | Low Rider Sport             |       1988 |     1993 |         6
+ FXR            | FXRS-CON          | Low Rider Convertible       |       1994 |     1994 |         1
+ FXR            | FXSB              | BREAKOUT                    |       2013 |     2017 |         5
+ FXR            | FXLR              | LOW RIDER                   |       2018 |     2020 |         3
+ Knucklehead    | knucklehead       | Knucklehead                 |       1936 |     1947 |        12
+ Panhead        | panhead           | Panhead                     |       1948 |     1965 |        18
+ Revolution Max | RA1250            | PAN AMERICA                 |       2021 |     2024 |         4
+ Revolution Max | RA1250S           | PAN AMERICA SPECIAL         |       2021 |     2026 |         6
+ Revolution Max | RH1250S           | SPORTSTER S                 |       2021 |     2026 |         6
+ Revolution Max | RH975             | NIGHTSTER                   |       2022 |     2026 |         5
+ Revolution Max | RH975S            | NIGHTSTER SPECIAL           |       2023 |     2026 |         4
+ Revolution Max | RA1250SE          | CVO PAN AMERICA             |       2024 |     2025 |         2
+ Revolution Max | RA1250ST          | PAN AMERICA 1250 ST         |       2025 |     2026 |         2
+ Revolution Max | RA1250L           | PAN AMERICA 1250 LIMITED    |       2026 |     2026 |         1
+ Shovelhead     | shovelhead        | Shovelhead                  |       1966 |     1984 |        19
+ Softail Evo    | FXST              | SOFTAIL STANDARD            |       1984 |     2015 |        32
+ Softail Evo    | FLST              | HERITAGE SOFTAIL            |       1986 |     2006 |        21
+ Softail Evo    | FXSTC             | SOFTAIL CUSTOM              |       1986 |     2010 |        25
+ Softail Evo    | FLSTC             | HERITAGE SOFTAIL CLASSIC    |       1988 |     2017 |        30
+ Softail Evo    | FXSTS             | SPRINGER SOFTAIL            |       1988 |     2006 |        19
+ Softail Evo    | FLSTF             | FAT BOY                     |       1990 |     2017 |        28
+ Softail Evo    | FXSTSB            | BAD BOY                     |       1995 |     1997 |         3
+ Softail Evo    | FLSTS             | HERITAGE SPRINGER           |       1997 |     2003 |         7
+ Softail Evo    | FXSTB             | NIGHT TRAIN                 |       1998 |     2009 |        12
+ Softail Evo    | FXSTD             | SOFTAIL DEUCE               |       2000 |     2007 |         8
+ Softail Evo    | FXSTDSE           | CVO DEUCE                   |       2003 |     2004 |         2
+ Softail Evo    | FLSTFSE           | CVO FAT BOY                 |       2005 |     2006 |         2
+ Softail Evo    | FLSTN             | SOFTAIL DELUXE              |       2005 |     2017 |        13
+ Softail Evo    | FLSTSC            | SOFTAIL SPRINGER CLASSIC    |       2005 |     2007 |         3
+ Softail Evo    | FXSTSSE           | CVO SPRINGER SOFTAIL        |       2007 |     2009 |         3
+ Softail Evo    | FLSTSB            | CROSS BONES                 |       2008 |     2011 |         4
+ Softail Evo    | FXCW              | ROCKER                      |       2008 |     2011 |         4
+ Softail Evo    | FXCWC             | ROCKER                      |       2008 |     2011 |         4
+ Softail Evo    | FLSTFB            | FAT BOY LO                  |       2010 |     2016 |         7
+ Softail Evo    | FLSTSE            | CVO SOFTAIL CONVERTIBLE     |       2010 |     2012 |         3
+ Softail Evo    | FXS               | BLACKLINE                   |       2011 |     2013 |         3
+ Softail Evo    | FLS               | SOFTAIL SLIM                |       2012 |     2017 |         6
+ Softail Evo    | FLSS              | SOFTAIL SLIM                |       2012 |     2017 |         6
+ Softail Evo    | FXSBSE            | CVO BREAKOUT                |       2013 |     2014 |         2
+ Softail Evo    | FLSTNSE           | CVO DELUXE                  |       2014 |     2017 |         4
+ Softail Evo    | FLSTFBS           | FAT BOY S                   |       2016 |     2017 |         2
+ Softail Evo    | FXSE              | CVO PRO STREET BREAKOUT     |       2016 |     2017 |         2
+ Softail M8     | FLDE              | SOFTAIL DELUXE              |       2018 |     2020 |         3
+ Softail M8     | FLFB              | FAT BOY                     |       2018 |     2026 |         9
+ Softail M8     | FLFBS             | FAT BOY                     |       2018 |     2026 |         9
+ Softail M8     | FLHC              | HERITAGE CLASSIC            |       2018 |     2026 |         9
+ Softail M8     | FLHCS             | HERITAGE CLASSIC            |       2018 |     2026 |         9
+ Softail M8     | FLSB              | SPORT GLIDE                 |       2018 |     2021 |         4
+ Softail M8     | FLSL              | SOFTAIL SLIM                |       2018 |     2021 |         4
+ Softail M8     | FXBB              | STREET BOB                  |       2018 |     2026 |         9
+ Softail M8     | FXBBS             | STREET BOB                  |       2018 |     2026 |         9
+ Softail M8     | FXFB              | FAT BOB 114                 |       2018 |     2024 |         7
+ Softail M8     | FXFBS             | FAT BOB 114                 |       2018 |     2024 |         7
+ Softail M8     | FXLRS             | LOW RIDER S                 |       2020 |     2026 |         7
+ Softail M8     | FXLRST            | LOW RIDER ST                |       2022 |     2026 |         5
+ Softail M8     | FXBR              | BREAKOUT                    |       2023 |     2026 |         4
+ Softail M8     | FXBRS             | BREAKOUT                    |       2023 |     2026 |         4
+ Sportster      | K                 | K Model                     |       1952 |     1953 |         2
+ Sportster      | KK                | K Model Competition         |       1952 |     1953 |         2
+ Sportster      | KR                | KR Racer                    |       1952 |     1969 |        18
+ Sportster      | KH                | KH Model                    |       1954 |     1956 |         3
+ Sportster      | KHK               | KHK Competition             |       1955 |     1956 |         2
+ Sportster      | XL                | Sportster                   |       1957 |     1985 |        29
+ Sportster      | XLCH              | Sportster CH                |       1958 |     1979 |        22
+ Sportster      | XR750             | XR750 Dirt Track            |       1970 |     1980 |        11
+ Sportster      | XLT               | Sportster Touring           |       1975 |     1976 |         2
+ Sportster      | XLCR              | Sportster Cafe Racer        |       1977 |     1979 |         3
+ Sportster      | XLH               | SPORTSTER 1000              |       1984 |     1985 |         2
+ Sportster      | XLS               | ROADSTER                    |       1984 |     1985 |         2
+ Sportster      | XLX               | XLX-61                      |       1984 |     1986 |         3
+ Sportster      | XR1000            | XR-1000                     |       1984 |     1985 |         2
+ Sportster      | XL883             | SPORTSTER 883               |       1986 |     2008 |        23
+ Sportster      | XLH1100           | SPORTSTER 1100              |       1986 |     1987 |         2
+ Sportster      | XLH883            | SPORTSTER 883               |       1986 |     2008 |        23
+ Sportster      | XLH1200           | SPORTSTER 1200              |       1988 |     2003 |        16
+ Sportster      | XLH883DLX         | SPORTSTER 883 DELUXE        |       1988 |     1995 |         8
+ Sportster      | XLH883HUG         | SPORTSTER 883 HUGGER        |       1988 |     2003 |        16
+ Sportster      | XL1200C           | SPORTSTER 1200 CUSTOM       |       1996 |     2020 |        25
+ Sportster      | XL1200S           | SPORTSTER 1200 SPORT        |       1996 |     2003 |         8
+ Sportster      | XLH1200C          | SPORTSTER 1200 CUSTOM       |       1996 |     2020 |        25
+ Sportster      | XL883C            | SPORTSTER 883 CUSTOM        |       1999 |     2009 |        11
+ Sportster      | XLH883C           | SPORTSTER 883 CUSTOM        |       1999 |     2009 |        11
+ Sportster      | XL883R            | SPORTSTER 883R              |       2002 |     2007 |         6
+ Sportster      | XL1200R           | SPORTSTER 1200 ROADSTER     |       2004 |     2008 |         5
+ Sportster      | XL1200L           | SPORTSTER 1200 LOW          |       2006 |     2011 |         6
+ Sportster      | XL1200N           | SPORTSTER 1200 NIGHTSTER    |       2007 |     2012 |         6
+ Sportster      | XL50              | 50TH ANNIVERSARY SPORTSTER  |       2007 |     2007 |         1
+ Sportster      | XR1200            | XR1200                      |       2008 |     2010 |         3
+ Sportster      | XL883N            | IRON 883                    |       2009 |     2022 |        14
+ Sportster      | XL1200X           | FORTY-EIGHT                 |       2010 |     2022 |        13
+ Sportster      | XL883L            | SUPERLOW 883                |       2011 |     2020 |        10
+ Sportster      | XR1200X           | XR1200X                     |       2011 |     2013 |         3
+ Sportster      | XL1200V           | SEVENTY-TWO                 |       2012 |     2016 |         5
+ Sportster      | XL1200T           | SUPERLOW 1200T              |       2014 |     2017 |         4
+ Sportster      | XL1200CX          | SPORTSTER ROADSTER          |       2016 |     2020 |         5
+ Sportster      | XL1200NS          | IRON 1200                   |       2018 |     2020 |         3
+ Sportster      | XL1200XS          | FORTY-EIGHT SPECIAL         |       2018 |     2020 |         3
+ Street         | XG500             | STREET 500                  |       2015 |     2021 |         7
+ Street         | XG750             | STREET 750                  |       2015 |     2021 |         7
+ Street         | XG750A            | STREET ROD                  |       2017 |     2021 |         5
+ Touring        | FLH               | ELECTRA GLIDE               |       1984 |     1985 |         2
+ Touring        | FLHS              | ELECTRA GLIDE SPORT         |       1984 |     1993 |        10
+ Touring        | FLHTC             | ELECTRA GLIDE CLASSIC       |       1984 |     2013 |        30
+ Touring        | FLTC              | TOUR GLIDE CLASSIC          |       1984 |     1991 |         8
+ Touring        | FLHT              | ELECTRA GLIDE STANDARD      |       1986 |     2022 |        37
+ Touring        | FLHTCU            | ULTRA CLASSIC ELECTRA GLIDE |       1989 |     2019 |        31
+ Touring        | FLTCU             | ULTRA CLASSIC TOUR GLIDE    |       1989 |     1996 |         8
+ Touring        | FLHR              | ROAD KING                   |       1994 |     2022 |        29
+ Touring        | FLHRC             | ROAD KING CLASSIC           |       1998 |     2019 |        22
+ Touring        | FLTR              | ROAD GLIDE                  |       1998 |     2026 |        29
+ Touring        | FLTRSE            | CVO ROAD GLIDE              |       2000 |     2026 |        27
+ Touring        | FLHRSE            | CVO ROAD KING               |       2002 |     2014 |        13
+ Touring        | FLHRS             | ROAD KING CUSTOM            |       2004 |     2007 |         4
+ Touring        | FLHTCSE           | CVO ELECTRA GLIDE           |       2004 |     2005 |         2
+ Touring        | FLHTCUSE          | CVO ULTRA CLASSIC           |       2006 |     2013 |         8
+ Touring        | FLHX              | STREET GLIDE                |       2006 |     2026 |        21
+ Touring        | FLHTK             | ULTRA LIMITED               |       2010 |     2024 |        15
+ Touring        | FLHXSE            | CVO STREET GLIDE            |       2010 |     2026 |        17
+ Touring        | FLTRX             | ROAD GLIDE CUSTOM           |       2010 |     2013 |         4
+ Touring        | FLTRU             | ROAD GLIDE ULTRA            |       2011 |     2019 |         9
+ Touring        | FLTRUSE           | CVO ROAD GLIDE ULTRA        |       2011 |     2016 |         6
+ Touring        | FLTRXSE           | CVO ROAD GLIDE CUSTOM       |       2012 |     2018 |         7
+ Touring        | FLHTCUTC          | ULTRA CLASSIC TWIN-COOLED   |       2014 |     2019 |         6
+ Touring        | FLHTKSE           | CVO LIMITED                 |       2014 |     2021 |         8
+ Touring        | FLHXS             | STREET GLIDE SPECIAL        |       2014 |     2023 |        10
+ Touring        | FLHTCUL           | ULTRA CLASSIC LOW           |       2015 |     2016 |         2
+ Touring        | FLHTKL            | ULTRA LIMITED LOW           |       2015 |     2019 |         5
+ Touring        | FLTRXS            | ROAD GLIDE SPECIAL          |       2015 |     2023 |         9
+ Touring        | FLHRXS            | ROAD KING SPECIAL           |       2017 |     2025 |         9
+ Touring        | FLTRK             | ROAD GLIDE LIMITED          |       2020 |     2026 |         7
+ Touring        | FLHXST            | STREET GLIDE ST             |       2022 |     2023 |         2
+ Touring        | FLTRKSE           | CVO ROAD GLIDE LIMITED      |       2022 |     2023 |         2
+ Touring        | FLTRXST           | ROAD GLIDE ST               |       2022 |     2023 |         2
+ Touring        | FLTRXSTSE         | CVO ROAD GLIDE ST           |       2024 |     2026 |         3
+ Touring        | FLHXL             | STREET GLIDE LIMITED        |       2026 |     2026 |         1
+ Touring        | FLHXLSE           | CVO STREET GLIDE LIMITED    |       2026 |     2026 |         1
+ Touring        | FLHXSTSE          | CVO STREET GLIDE ST         |       2026 |     2026 |         1
+ Trike          | FLHTCUTG          | TRI GLIDE ULTRA             |       2009 |     2025 |        17
+ Trike          | FLHXXX            | STREET GLIDE TRIKE          |       2010 |     2011 |         2
+ Trike          | FLRT              | FREEWHEELER                 |       2015 |     2025 |        11
+ Trike          | FLHTCUTGSE        | CVO TRI GLIDE               |       2020 |     2022 |         3
+ Trike          | FLTRT             | ROAD GLIDE 3                |       2023 |     2026 |         4
+ Trike          | FLHLT             | STREET GLIDE 3 LIMITED      |       2026 |     2026 |         1
+ Trike          | FLHLTSE           | CVO STREET GLIDE 3 LIMITED  |       2026 |     2026 |         1
+ Twin Cam       | twin_cam          | Twin Cam                    |       1999 |     2017 |        19
+ V-Rod          | revolution        | V-Rod                       |       2002 |     2017 |        16
+(180 rows)
+
+
+--- 6b. Specific check: do FLH/FLT model codes exist in harley_models? ---
+ id  | model_code |            name             | start_year | end_year |   family   
+-----+------------+-----------------------------+------------+----------+------------
+ 108 | FLH        | ELECTRA GLIDE               |       1984 |     1985 | Touring
+ 110 | FLHS       | ELECTRA GLIDE SPORT         |       1984 |     1993 | Touring
+ 112 | FLHTC      | ELECTRA GLIDE CLASSIC       |       1984 |     2013 | Touring
+ 128 | FLTC       | TOUR GLIDE CLASSIC          |       1984 |     1991 | Touring
+ 111 | FLHT       | ELECTRA GLIDE STANDARD      |       1986 |     2022 | Touring
+ 114 | FLHTCU     | ULTRA CLASSIC ELECTRA GLIDE |       1989 |     2019 | Touring
+ 129 | FLTCU      | ULTRA CLASSIC TOUR GLIDE    |       1989 |     1996 | Touring
+ 103 | FLHR       | ROAD KING                   |       1994 |     2022 | Touring
+ 104 | FLHRC      | ROAD KING CLASSIC           |       1998 |     2019 | Touring
+ 130 | FLTR       | ROAD GLIDE                  |       1998 |     2026 | Touring
+ 132 | FLTRSE     | CVO ROAD GLIDE              |       2000 |     2026 | Touring
+ 107 | FLHRSE     | CVO ROAD KING               |       2002 |     2014 | Touring
+ 105 | FLHRS      | ROAD KING CUSTOM            |       2004 |     2007 | Touring
+ 113 | FLHTCSE    | CVO ELECTRA GLIDE           |       2004 |     2005 | Touring
+ 117 | FLHTCUSE   | CVO ULTRA CLASSIC           |       2006 |     2013 | Touring
+ 109 | FLHX       | STREET GLIDE                |       2006 |     2026 | Touring
+ 143 | FLHTCUTG   | TRI GLIDE ULTRA             |       2009 |     2025 | Trike
+ 125 | FLHTK      | ULTRA LIMITED               |       2010 |     2024 | Touring
+ 122 | FLHXSE     | CVO STREET GLIDE            |       2010 |     2026 | Touring
+ 145 | FLHXXX     | STREET GLIDE TRIKE          |       2010 |     2011 | Trike
+ 131 | FLTRX      | ROAD GLIDE CUSTOM           |       2010 |     2013 | Touring
+ 134 | FLTRU      | ROAD GLIDE ULTRA            |       2011 |     2019 | Touring
+ 135 | FLTRUSE    | CVO ROAD GLIDE ULTRA        |       2011 |     2016 | Touring
+ 133 | FLTRXSE    | CVO ROAD GLIDE CUSTOM       |       2012 |     2018 | Touring
+ 115 | FLHTCUTC   | ULTRA CLASSIC TWIN-COOLED   |       2014 |     2019 | Touring
+ 127 | FLHTKSE    | CVO LIMITED                 |       2014 |     2021 | Touring
+ 120 | FLHXS      | STREET GLIDE SPECIAL        |       2014 |     2023 | Touring
+ 116 | FLHTCUL    | ULTRA CLASSIC LOW           |       2015 |     2016 | Touring
+ 126 | FLHTKL     | ULTRA LIMITED LOW           |       2015 |     2019 | Touring
+ 138 | FLTRXS     | ROAD GLIDE SPECIAL          |       2015 |     2023 | Touring
+ 106 | FLHRXS     | ROAD KING SPECIAL           |       2017 |     2025 | Touring
+  60 | FLHC       | HERITAGE CLASSIC            |       2018 |     2026 | Softail M8
+  61 | FLHCS      | HERITAGE CLASSIC            |       2018 |     2026 | Softail M8
+ 144 | FLHTCUTGSE | CVO TRI GLIDE               |       2020 |     2022 | Trike
+ 141 | FLTRK      | ROAD GLIDE LIMITED          |       2020 |     2026 | Touring
+ 121 | FLHXST     | STREET GLIDE ST             |       2022 |     2023 | Touring
+ 136 | FLTRKSE    | CVO ROAD GLIDE LIMITED      |       2022 |     2023 | Touring
+ 139 | FLTRXST    | ROAD GLIDE ST               |       2022 |     2023 | Touring
+ 147 | FLTRT      | ROAD GLIDE 3                |       2023 |     2026 | Trike
+ 140 | FLTRXSTSE  | CVO ROAD GLIDE ST           |       2024 |     2026 | Touring
+ 148 | FLHLT      | STREET GLIDE 3 LIMITED      |       2026 |     2026 | Trike
+ 149 | FLHLTSE    | CVO STREET GLIDE 3 LIMITED  |       2026 |     2026 | Trike
+ 119 | FLHXL      | STREET GLIDE LIMITED        |       2026 |     2026 | Touring
+ 123 | FLHXLSE    | CVO STREET GLIDE LIMITED    |       2026 |     2026 | Touring
+ 124 | FLHXSTSE   | CVO STREET GLIDE ST         |       2026 |     2026 | Touring
+(45 rows)
+
+
+--- 6c. harley_model_years count by family ---
+     family     | year_rows | min_year | max_year 
+----------------+-----------+----------+----------
+ Touring        |       407 |     1984 |     2026
+ Sportster      |       358 |     1952 |     2022
+ Softail Evo    |       255 |     1984 |     2017
+ Dyna           |       127 |     1993 |     2017
+ Softail M8     |        99 |     2018 |     2026
+ Flathead       |        93 |     1930 |     1952
+ FXR            |        75 |     1982 |     2020
+ Trike          |        39 |     2009 |     2026
+ Revolution Max |        30 |     2021 |     2026
+ Street         |        19 |     2015 |     2021
+ Shovelhead     |        19 |     1966 |     1984
+ Twin Cam       |        19 |     1999 |     2017
+ Panhead        |        18 |     1948 |     1965
+ Evolution      |        16 |     1984 |     1999
+ V-Rod          |        16 |     2002 |     2017
+ Knucklehead    |        12 |     1936 |     1947
+(16 rows)
+
+
+============================================================
+AUDIT v2 COMPLETE
+============================================================

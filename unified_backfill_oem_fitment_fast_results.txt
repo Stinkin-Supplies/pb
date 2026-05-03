@@ -1,0 +1,13 @@
+CREATE FUNCTION
+UPDATE 1516
+UPDATE 23939
+UPDATE 0
+UPDATE 2600
+UPDATE 10127
+UPDATE 2600
+UPDATE 88512
+ total | with_oem | with_harley_fitment | with_fitment_years | with_hd_codes | with_pdp_payload 
+-------+----------+---------------------+--------------------+---------------+------------------
+ 88512 |    56755 |               24253 |              16105 |         11062 |            88512
+(1 row)
+
