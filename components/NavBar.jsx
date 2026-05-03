@@ -1,30 +1,18 @@
 "use client";
 // ============================================================
 // components/NavBar.jsx  —  SHARED NAV
-// ============================================================
-// Usage:
-//   import NavBar from "@/components/NavBar";
-//   <NavBar activePage="shop" />
-//
-// activePage options: "home" | "shop" | "brands" | "garage" |
-//                     "search" | "account" | "deals"
-//
-// Auth state is read from CartContext (useCartSafe) which holds
-// the single onAuthStateChange subscription for the whole app.
-// NavBar has no Supabase imports or local subscriptions — this
-// prevents the stacked-subscription bug that caused every token
-// refresh to re-fetch the current server page.
+// Updated: GlobalSearch wired in (desktop + mobile)
 // ============================================================
 
 import { useState } from "react";
 import Link from "next/link";
 import { useCartSafe } from "@/components/CartContext";
+import GlobalSearch from "@/components/GlobalSearch";
 
 const NAV_LINKS = [
   { label: "Shop",   href: "/shop"            },
   { label: "Brands", href: "/brands"          },
   { label: "Deals",  href: "/shop?badge=sale"  },
-  { label: "Search", href: "/search"          },
 ];
 
 const css = `
@@ -34,33 +22,51 @@ const css = `
     border-bottom: 1px solid #2a2828;
     height: 54px;
     display: flex; align-items: center;
-    padding: 0 24px; gap: 14px;
+    padding: 0 20px; gap: 12px;
     backdrop-filter: blur(10px);
   }
+
+  /* Logo */
   .ss-nav-logo {
     color: #f0ebe3; text-decoration: none; flex: none;
-    white-space: nowrap; max-width: none;
+    white-space: nowrap;
     height: 23px;
     display: flex; align-items: center;
   }
   .ss-nav-logo span {
     color: #e8621a;
-    height: 100%;
-    font-size: 25px;
+    font-size: 22px;
   }
-  .ss-nav-links { display: flex; gap: 20px; margin-right: 8px; }
+
+  /* Desktop links — left of search */
+  .ss-nav-links {
+    display: flex; gap: 18px; flex: none;
+  }
   .ss-nav-link {
     color: #8a8784; text-decoration: none;
+    font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+    font-family: var(--font-stencil);
     transition: color 0.2s; white-space: nowrap;
   }
   .ss-nav-link:hover { color: #f0ebe3; }
   .ss-nav-link.active { color: #e8621a; }
-  .ss-nav-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+
+  /* Search — grows to fill middle */
+  .ss-nav-search {
+    flex: 1;
+    min-width: 0;
+    max-width: 480px;
+  }
+
+  /* Right actions */
+  .ss-nav-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
   .ss-nav-signin {
     background: transparent;
     border: 1px solid rgba(232,98,26,0.3);
     color: #f0ebe3;
-    padding: 5px 12px; border-radius: 2px;
+    font-family: var(--font-stencil);
+    font-size: 10px; letter-spacing: 0.12em;
+    padding: 5px 11px; border-radius: 2px;
     cursor: pointer; transition: all 0.2s;
     text-decoration: none; white-space: nowrap;
   }
@@ -68,9 +74,12 @@ const css = `
   .ss-nav-garage {
     background: #e8621a; border: none;
     color: #0a0909;
-    padding: 5px 14px; border-radius: 2px;
+    font-family: var(--font-caesar);
+    font-size: 14px; letter-spacing: 0.06em;
+    padding: 5px 13px; border-radius: 2px;
     cursor: pointer; transition: background 0.2s;
     text-decoration: none; white-space: nowrap;
+    display: inline-flex; align-items: center;
   }
   .ss-nav-garage:hover { background: #c94f0f; }
   .ss-nav-cart {
@@ -88,57 +97,66 @@ const css = `
     display: flex; align-items: center; justify-content: center;
     pointer-events: none;
   }
+
+  /* Mobile toggle */
   .ss-mobile-toggle {
     display: none;
     align-items: center; justify-content: center;
     width: 32px; height: 32px;
     background: #1a1919; border: 1px solid #2a2828;
     border-radius: 2px; color: #f0ebe3; cursor: pointer;
+    flex-shrink: 0;
   }
-  @media (max-width: 700px) {
-    .ss-nav-links { display: none; }
-    .ss-nav-actions { gap: 6px; }
+
+  /* Mobile: hide links + garage, show toggle */
+  @media (max-width: 768px) {
+    .ss-nav-links   { display: none; }
+    .ss-nav-search  { display: none; }
+    .ss-nav-garage  { display: none; }
+    .ss-nav-signin  { display: none; }
     .ss-mobile-toggle { display: flex; }
-    .ss-nav-garage { display: none; }
   }
+
+  /* Mobile menu overlay */
   .ss-mobile-menu {
     position: fixed; inset: 54px 0 0;
     background: #111010;
-    background-color: #111010;
-    opacity: 1;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    min-height: calc(100vh - 54px);
-    display: flex;
-    flex-direction: column;
-    padding: 20px 28px;
-    gap: 14px;
-    z-index: 101;
-    overflow-y: auto;
+    display: flex; flex-direction: column;
+    padding: 20px 24px; gap: 0;
+    z-index: 101; overflow-y: auto;
   }
-  .ss-mobile-menu a {
-    letter-spacing: 0.12em;
-    color: #f0ebe3;
-    text-transform: uppercase;
+  .ss-mobile-search {
+    margin-bottom: 20px;
   }
-  .ss-mobile-menu a.active { color: #e8621a; }
-  .ss-mobile-menu .ss-nav-garage {
-    display: inline-flex; align-items: center;
-    justify-content: center; width: max-content;
+  .ss-mobile-menu-link {
+    color: #8a8784; text-decoration: none;
+    font-family: var(--font-stencil);
+    font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase;
+    padding: 14px 0;
+    border-bottom: 1px solid #1a1919;
+    display: block;
+    transition: color 0.15s;
   }
+  .ss-mobile-menu-link:hover,
+  .ss-mobile-menu-link.active { color: #e8621a; }
   .ss-mobile-menu-close {
     align-self: flex-end; background: none;
     border: none; color: #8a8784;
     font-size: 20px; cursor: pointer;
+    margin-bottom: 12px; padding: 0;
+  }
+  .ss-mobile-garage {
+    margin-top: 20px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: #e8621a; border: none; color: #0a0909;
+    font-family: var(--font-caesar); font-size: 16px; letter-spacing: 0.06em;
+    padding: 10px 20px; border-radius: 2px; width: 100%;
+    text-decoration: none; cursor: pointer;
   }
 `;
 
 export default function NavBar({ activePage = "", cartCount, onCartClick }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  // ── Auth + cart state from CartContext ───────────────────
-  // CartContext owns the single Supabase auth subscription for
-  // the whole app. Reading userId here costs nothing extra.
   const { itemCount, setIsOpen, userId } = useCartSafe();
 
   const displayCount = cartCount ?? itemCount;
@@ -156,22 +174,18 @@ export default function NavBar({ activePage = "", cartCount, onCartClick }) {
 
         {/* Logo */}
         <Link href="/" className="ss-nav-logo">
-          <span
-            className="font-caesar tracking-wider text-orange-500 whitespace-nowrap max-w-none"
-            style={{ fontFamily: "var(--font-caesar)" }}
-          >
+          <span style={{ fontFamily: "var(--font-caesar)" }}>
             STINKIN&apos; SUPPLIES
           </span>
         </Link>
 
-        {/* Desktop links */}
+        {/* Desktop nav links */}
         <div className="ss-nav-links">
           {NAV_LINKS.map(({ label, href }) => (
             <Link
               key={label}
               href={href}
-              className={`ss-nav-link text-xs tracking-widest uppercase ${activePage === label.toLowerCase() ? "active" : ""}`}
-              style={{ fontFamily: "var(--font-stencil)" }}
+              className={`ss-nav-link ${activePage === label.toLowerCase() ? "active" : ""}`}
               onClick={() => setMobileMenuOpen(false)}
             >
               {label}
@@ -179,34 +193,26 @@ export default function NavBar({ activePage = "", cartCount, onCartClick }) {
           ))}
         </div>
 
+        {/* ── GLOBAL SEARCH (desktop) ── */}
+        <GlobalSearch className="ss-nav-search" />
+
+        {/* Mobile toggle */}
         <button
           className="ss-mobile-toggle"
           aria-label="Toggle navigation"
           onClick={() => setMobileMenuOpen(v => !v)}
         >
-          ☰
+          {mobileMenuOpen ? "✕" : "☰"}
         </button>
 
-        {/* Actions */}
+        {/* Right actions (desktop) */}
         <div className="ss-nav-actions">
           {isSignedIn ? (
-            <Link
-              href="/account"
-              className="text-xs tracking-widest uppercase ss-nav-signin"
-              style={{ fontFamily: "var(--font-stencil)" }}
-            >
-              Account
-            </Link>
+            <Link href="/account" className="ss-nav-signin">ACCOUNT</Link>
           ) : (
-            <Link href="/auth" className="ss-nav-signin">
-              SIGN IN
-            </Link>
+            <Link href="/auth" className="ss-nav-signin">SIGN IN</Link>
           )}
-          <Link
-            href="/garage"
-            className="ss-nav-garage text-lg bg-orange-500 text-white px-5 py-2 whitespace-nowrap"
-            style={{ fontFamily: "var(--font-caesar)" }}
-          >
+          <Link href="/garage" className="ss-nav-garage">
             My Garage
           </Link>
           <button className="ss-nav-cart" onClick={handleCartClick} aria-label="Cart">
@@ -217,37 +223,50 @@ export default function NavBar({ activePage = "", cartCount, onCartClick }) {
           </button>
         </div>
 
-        {/* Mobile menu */}
-        {mobileMenuOpen && (
-          <div className="ss-mobile-menu">
-            <button
-              className="ss-mobile-menu-close"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              ✕
-            </button>
-            {NAV_LINKS.map(({ label, href }) => (
-              <Link
-                key={label}
-                href={href}
-                className={`ss-nav-link text-xs tracking-widest uppercase ${activePage === label.toLowerCase() ? "active" : ""}`}
-                style={{ fontFamily: "var(--font-stencil)" }}
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                {label}
-              </Link>
-            ))}
-            <Link
-              href="/garage"
-              className="ss-nav-garage text-lg bg-orange-500 text-white px-5 py-2 whitespace-nowrap"
-              style={{ fontFamily: "var(--font-caesar)" }}
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              My Garage
-            </Link>
-          </div>
-        )}
       </nav>
+
+      {/* ── MOBILE MENU ── */}
+      {mobileMenuOpen && (
+        <div className="ss-mobile-menu">
+          <button
+            className="ss-mobile-menu-close"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            ✕
+          </button>
+
+          {/* Search in mobile menu */}
+          <div className="ss-mobile-search">
+            <GlobalSearch placeholder="Search parts..." />
+          </div>
+
+          {/* Nav links */}
+          {[...NAV_LINKS, { label: "Search", href: "/search" }].map(({ label, href }) => (
+            <Link
+              key={label}
+              href={href}
+              className={`ss-mobile-menu-link ${activePage === label.toLowerCase() ? "active" : ""}`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              {label}
+            </Link>
+          ))}
+
+          {isSignedIn ? (
+            <Link href="/account" className="ss-mobile-menu-link" onClick={() => setMobileMenuOpen(false)}>
+              Account
+            </Link>
+          ) : (
+            <Link href="/auth" className="ss-mobile-menu-link" onClick={() => setMobileMenuOpen(false)}>
+              Sign In
+            </Link>
+          )}
+
+          <Link href="/garage" className="ss-mobile-garage" onClick={() => setMobileMenuOpen(false)}>
+            My Garage
+          </Link>
+        </div>
+      )}
     </>
   );
 }

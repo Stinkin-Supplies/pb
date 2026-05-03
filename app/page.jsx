@@ -54,10 +54,10 @@ function FloatingHeader() {
 
   return (
     <motion.header
-      animate={{
-        background: scrolled ? "rgba(8,8,8,0.96)" : TEAL,
-        borderBottomColor: scrolled ? "#1a1a1a" : "transparent",
-      }}
+        animate={{
+          background: scrolled ? "rgba(8,8,8,0.96)" : TEAL,
+          borderBottomColor: scrolled ? "#1a1a1a" : "rgba(26,26,26,0)",
+        }}
       transition={{ duration: 0.3 }}
       style={{
         position: "fixed", top: 0, left: 0, right: 0, zIndex: 90,
