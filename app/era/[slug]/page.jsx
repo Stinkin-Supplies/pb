@@ -9,7 +9,7 @@ import { use, useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { getProductImage } from "@/lib/getProductImage";
-import { ERAS, getEra, ERA_CATEGORIES } from "@/lib/eras/config";
+import { ERAS, getEra } from "@/lib/eras/config";
 
 const PER_PAGE = 48;
 
@@ -48,8 +48,9 @@ function ProductCard({ product, index, accent }) {
           whileHover={{ y: -3 }}
           transition={{ type: "spring", stiffness: 400, damping: 28 }}
           style={{
-            background: "#0e0e0e",
-            border: "1px solid #1c1c1c",
+            background: "#ffffff",
+            border: "1.5px solid #2a2a2a",
+            boxShadow: "0 1px 0 rgba(0,0,0,0.06)",
             overflow: "hidden",
             position: "relative",
           }}
@@ -57,7 +58,7 @@ function ProductCard({ product, index, accent }) {
           {/* Image */}
           <div style={{
             aspectRatio: "1",
-            background: "#080808",
+            background: "#ffffff",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -74,38 +75,38 @@ function ProductCard({ product, index, accent }) {
             ) : (
               <div style={{
                 fontFamily: "var(--font-stencil, 'Share Tech Mono', monospace)",
-                fontSize: 9, letterSpacing: 2, color: "#1e1e1e", textTransform: "uppercase",
+                fontSize: 9, letterSpacing: 2, color: "#9a9a9a", textTransform: "uppercase",
               }}>No Image</div>
             )}
 
             {!product.in_stock && (
               <div style={{
                 position: "absolute", top: 8, right: 8,
-                background: "rgba(8,8,8,0.9)", border: "1px solid #222",
+                background: "rgba(255,255,255,0.94)", border: "1px solid #2a2a2a",
                 fontFamily: "var(--font-stencil, monospace)", fontSize: 8,
-                letterSpacing: 1, color: "#555", padding: "3px 7px", textTransform: "uppercase",
+                letterSpacing: 1, color: "#2a2a2a", padding: "3px 7px", textTransform: "uppercase",
               }}>Out of Stock</div>
             )}
             {product.is_harley_fitment && (
               <div style={{
                 position: "absolute", top: 8, left: 8,
-                background: `rgba(0,0,0,0.7)`,
-                border: `1px solid ${accent}44`,
+                background: "#ffffff",
+                border: `1px solid #2a2a2a`,
                 fontFamily: "var(--font-stencil, monospace)", fontSize: 8,
-                letterSpacing: 1, color: accent, padding: "3px 7px", textTransform: "uppercase",
+                letterSpacing: 1, color: "#2a2a2a", padding: "3px 7px", textTransform: "uppercase",
               }}>HD Fit</div>
             )}
           </div>
 
           {/* Info */}
-          <div style={{ padding: "12px 14px 16px", borderTop: "1px solid #161616" }}>
+          <div style={{ padding: "12px 14px 16px", borderTop: "1px solid #e1e1e1" }}>
             <div style={{
               fontFamily: "var(--font-stencil, monospace)", fontSize: 8,
-              letterSpacing: 2, color: "#444", textTransform: "uppercase", marginBottom: 4,
+              letterSpacing: 2, color: "#666", textTransform: "uppercase", marginBottom: 4,
             }}>{product.brand}</div>
             <div style={{
               fontFamily: "var(--font-stencil, monospace)", fontSize: 12,
-              color: "#b0aca8", lineHeight: 1.3, marginBottom: 10,
+              color: "#1f1f1f", lineHeight: 1.3, marginBottom: 10,
               textTransform: "uppercase", letterSpacing: "0.5px",
               display: "-webkit-box", WebkitLineClamp: 2,
               WebkitBoxOrient: "vertical", overflow: "hidden",
@@ -113,14 +114,14 @@ function ProductCard({ product, index, accent }) {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div style={{
                 fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
-                fontSize: 20, letterSpacing: 1, color: "#ddd8d0",
+                fontSize: 20, letterSpacing: 1, color: "#1d1d1d",
               }}>{fmt(product.computed_price ? Number(product.computed_price) : null)}</div>
               <motion.button
-                whileHover={{ scale: 1.08, background: accent, color: "#080808" }}
+                whileHover={{ scale: 1.08, background: "#2a2a2a", color: "#ffffff" }}
                 whileTap={{ scale: 0.93 }}
                 onClick={e => e.preventDefault()}
                 style={{
-                  background: "#181818", border: "none", color: "#555",
+                  background: "#ffffff", border: "1px solid #2a2a2a", color: "#2a2a2a",
                   width: 30, height: 30, fontSize: 18, cursor: "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center",
                 }}
@@ -250,12 +251,12 @@ function SidePanel({ open, onClose, filters, onChange, facets, accent }) {
                       style={{ overflow: "hidden" }}
                     >
                       <div style={{ paddingTop: 8, paddingBottom: 8 }}>
-                        {ERA_CATEGORIES.map(cat => {
-                          const active = filters.category === cat.slug;
+                        {(facets.categories ?? []).map(cat => {
+                          const active = filters.category === cat.name;
                           return (
                             <button
-                              key={cat.slug}
-                              onClick={() => onChange({ category: active ? null : cat.slug })}
+                              key={cat.name}
+                              onClick={() => onChange({ category: active ? null : cat.name })}
                               style={{
                                 display: "flex", alignItems: "center",
                                 width: "100%", background: "none", border: "none",
@@ -274,7 +275,7 @@ function SidePanel({ open, onClose, filters, onChange, facets, accent }) {
                                 color: active ? "#e0d8cc" : "#666",
                                 textTransform: "uppercase", textAlign: "left",
                                 transition: "color 0.15s",
-                              }}>{cat.label}</span>
+                              }}>{cat.name}</span>
                             </button>
                           );
                         })}
@@ -497,7 +498,7 @@ function ActiveTag({ label, onRemove, accent }) {
 
 function CategoryTabBar({ categories, active, onChange, accent }) {
   const ALL = { slug: null, label: "All Parts" };
-  const tabs = [ALL, ...categories];
+  const tabs = [ALL, ...(categories ?? [])];
 
   return (
     <div style={{
@@ -519,11 +520,13 @@ function CategoryTabBar({ categories, active, onChange, accent }) {
         msOverflowStyle: "none",
       }}>
         {tabs.map((cat) => {
-          const isActive = active === cat.slug;
+          const value = cat.slug ?? cat.name ?? null;
+          const label = cat.label ?? cat.name ?? "All Parts";
+          const isActive = active === value;
           return (
             <button
-              key={cat.slug ?? "__all__"}
-              onClick={() => onChange(cat.slug)}
+              key={value ?? "__all__"}
+              onClick={() => onChange(value)}
               style={{
                 background: "none",
                 border: "none",
@@ -548,7 +551,7 @@ function CategoryTabBar({ categories, active, onChange, accent }) {
                 if (!isActive) e.currentTarget.style.color = "#555";
               }}
             >
-              {cat.label}
+              {label}
             </button>
           );
         })}
@@ -595,12 +598,9 @@ export default function EraPage({ params }) {
         if (era.year_max) params.set("year_max", String(era.year_max));
       }
 
-      // Category — map slug to dbCategories
+      // Category filter from live catalog facets
       if (f.category) {
-        const catDef = ERA_CATEGORIES.find(c => c.slug === f.category);
-        if (catDef) {
-          catDef.dbCategories.forEach(db => params.append("dbCategory", db));
-        }
+        params.set("category", f.category);
       }
 
       if (f.brand)     params.set("brand",     f.brand);
@@ -700,9 +700,9 @@ export default function EraPage({ params }) {
 
       {/* Category tabs */}
       <CategoryTabBar
-        categories={ERA_CATEGORIES}
+        categories={facets.categories}
         active={filters.category}
-        onChange={slug => handleFilterChange({ category: slug })}
+        onChange={category => handleFilterChange({ category })}
         accent={era.accent}
       />
 
@@ -717,7 +717,12 @@ export default function EraPage({ params }) {
       />
 
       {/* Product grid */}
-      <div style={{ padding: "32px 40px", maxWidth: 1400, margin: "0 auto" }}>
+      <div style={{
+        padding: "32px 40px",
+        maxWidth: 1400,
+        margin: "0 auto",
+        background: "#fff",
+      }}>
         {loading ? (
           <div style={{
             display: "grid",
