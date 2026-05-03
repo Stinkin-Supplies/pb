@@ -1,29 +1,20 @@
 /**
  * app/api/products/group/route.ts
- *
- * GET /api/products/group?slug=...
- *
- * Tries product_groups first (future grouped architecture).
- * Falls back to catalog_unified directly — primary path while
- * product_groups table is empty.
+ * Falls back to catalog_unified when product_groups is empty.
+ * Fixed: removed vendor_sku (not in catalog_unified schema)
  */
-
 export const runtime = "nodejs";
-
 import { NextResponse } from "next/server";
 import { getCatalogDb } from "@/lib/db/catalog";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const slug    = (searchParams.get("slug")     ?? "").trim();
+  const slug    = (searchParams.get("slug") ?? "").trim();
   const groupId =  searchParams.get("group_id");
-
   if (!slug && !groupId) {
     return NextResponse.json({ error: "slug or group_id required" }, { status: 400 });
   }
-
   const db = getCatalogDb();
-
   try {
     // ── 1. Try product_groups ─────────────────────────────────────
     const groupQuery = groupId
@@ -43,10 +34,8 @@ export async function GET(req: Request) {
          JOIN catalog_unified cu ON cu.id = pgm.unified_id
          WHERE cu.slug = $1
          LIMIT 1`;
-
     const { rows: groupRows } = await db.query(groupQuery, [groupId ?? slug]);
     const group = groupRows[0] ?? null;
-
     if (group) {
       const { rows: members } = await db.query(`
         SELECT pgm.vendor_sku, pgm.vendor, pgm.brand, pgm.display_brand,
@@ -62,7 +51,6 @@ export async function GET(req: Request) {
         ORDER BY pgm.is_canonical DESC, cu.in_stock DESC,
                  cu.stock_quantity DESC, pgm.display_brand ASC
       `, [group.id]);
-
       const { rows: crossrefs } = await db.query(`
         SELECT DISTINCT c.oem_number, c.page_reference
         FROM product_group_members pgm
@@ -70,7 +58,6 @@ export async function GET(req: Request) {
         WHERE pgm.group_id = $1
           AND (c.oem_number IS NOT NULL OR c.page_reference IS NOT NULL)
       `, [group.id]);
-
       return NextResponse.json({
         group: {
           id: group.id, oem_number: group.oem_number,
@@ -93,7 +80,7 @@ export async function GET(req: Request) {
         cu.category, cu.subcategory, cu.description, cu.features, cu.weight,
         cu.msrp, cu.map_price, cu.has_map_policy, cu.cost,
         cu.in_stock, cu.stock_quantity,
-        cu.image_url, cu.image_urls, cu.upc, cu.vendor_sku,
+        cu.image_url, cu.image_urls, cu.upc,
         cu.oem_part_number, cu.source_vendor,
         cu.is_harley_fitment, cu.is_universal,
         cu.fitment_hd_families, cu.fitment_hd_codes, cu.fitment_hd_models,
@@ -105,12 +92,10 @@ export async function GET(req: Request) {
       WHERE cu.slug = $1
       LIMIT 1
     `, [slug]);
-
     const cu = rows[0] ?? null;
     if (!cu) {
       return NextResponse.json({ error: "Product not found", slug }, { status: 404 });
     }
-
     return NextResponse.json({
       group: {
         id:             cu.id,
@@ -125,7 +110,7 @@ export async function GET(req: Request) {
         price_max:      cu.msrp,
       },
       options: [{
-        vendor_sku:     cu.vendor_sku   ?? cu.sku,
+        vendor_sku:     cu.sku,           // cu.sku = the SKU field that exists
         vendor:         cu.source_vendor,
         brand:          cu.brand,
         display_brand:  cu.brand,
@@ -163,7 +148,6 @@ export async function GET(req: Request) {
       page_references: [],
       source: "catalog_unified",
     });
-
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[products/group GET]", msg);

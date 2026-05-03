@@ -63,7 +63,7 @@ function FloatingHeader() {
         position: "fixed", top: 0, left: 0, right: 0, zIndex: 90,
         height: 52, display: "flex", alignItems: "center",
         justifyContent: "space-between", padding: "0 20px",
-        borderBottom: "1px solid transparent",
+        borderBottom: "1px solid rgba(0,0,0,0)",
         backdropFilter: "blur(12px)",
       }}
     >
