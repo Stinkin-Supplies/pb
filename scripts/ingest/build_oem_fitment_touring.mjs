@@ -37,31 +37,30 @@ const CATALOG_DIR = '/Users/home/Desktop/Stanky/parts-catalogs/Touring';
 
 // ── Catalog manifest ──────────────────────────────────────────────────────────
 const CATALOGS = [
-  {
-    "ys": 1991,
-    "ye": 1992,
-    "file": "Touring-1991-1992.pdf"
-  },
-  {
-    "ys": 1995,
-    "ye": 1996,
-    "file": "1995-1996 FLT Models Parts Catalog.pdf"
-  },
-  {
-    "ys": 1998,
-    "ye": 1998,
-    "file": "1998 FLT Models Parts Catalog.pdf"
-  },
-  {
-    "ys": 2021,
-    "ye": 2021,
-    "file": "2021 Touring Models Parts Catalog.pdf"
-  },
-  {
-    "ys": 2023,
-    "ye": 2023,
-    "file": "Touring-FLHXSE-2023.pdf"
-  }
+  { ys: 1991, ye: 1992, file: '1991-1992-touring.pdf' },
+  { ys: 1993, ye: 1994, file: '1993-1994-touring.pdf' },
+  { ys: 1995, ye: 1996, file: '1995-1996-touring.pdf' },
+  { ys: 1997, ye: 1997, file: '1997-touring.pdf' },
+  { ys: 1998, ye: 1998, file: '1998-touring.pdf' },
+  { ys: 2000, ye: 2000, file: '2000-touring.pdf' },
+  { ys: 2002, ye: 2002, file: '2002-touring.pdf' },
+  { ys: 2003, ye: 2003, file: '2003-touring.pdf' },
+  { ys: 2004, ye: 2004, file: '2004-touring.pdf' },
+  { ys: 2005, ye: 2005, file: '2005-touring.pdf' },
+  { ys: 2006, ye: 2006, file: '2006-touring.pdf' },
+  { ys: 2009, ye: 2009, file: '2009-touring.pdf' },
+  { ys: 2011, ye: 2011, file: '2011-touring.pdf' },
+  { ys: 2012, ye: 2012, file: '2012-touring.pdf' },
+  { ys: 2013, ye: 2013, file: '2013-touring.pdf' },
+  { ys: 2016, ye: 2016, file: '2016-touring.pdf' },
+  { ys: 2017, ye: 2017, file: '2017-touring.pdf' },
+  { ys: 2018, ye: 2018, file: '2018-touring.pdf' },
+  { ys: 2019, ye: 2019, file: '2019-touring.pdf' },
+  { ys: 2020, ye: 2020, file: '2020-touring.pdf' },
+  { ys: 2021, ye: 2021, file: '2021-touring.pdf' },
+  { ys: 2022, ye: 2022, file: '2022-touring.pdf' },
+  { ys: 2023, ye: 2023, file: '2023-touring.pdf' },
+  { ys: 2023, ye: 2023, file: 'Touring-FLHXSE-2023.pdf' },
 ];
 
 // ── Master Sportster model reference ─────────────────────────────────────────
