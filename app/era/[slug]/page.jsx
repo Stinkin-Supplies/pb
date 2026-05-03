@@ -402,16 +402,12 @@ function SidePanel({ open, onClose, filters, onChange, facets, accent }) {
 
 // ─── Era Hero ─────────────────────────────────────────────────────────────────
 
-function EraHero({ era, total, onOpenFilters, filters, onFilterChange, sort, onSortChange }) {
-  const activeFilterCount = [
-    filters.category, filters.brand, filters.min_price, filters.max_price, filters.in_stock,
-  ].filter(Boolean).length;
-
+function EraHero({ era, total, filters, onFilterChange }) {
   return (
     <div style={{
       position: "relative",
-      background: "#080808",
-      borderBottom: "1px solid #1c1c1c",
+      background: "#f0ede8",
+      borderBottom: "1px solid #ddd8d0",
       overflow: "hidden",
     }}>
       {/* Accent stripe */}
@@ -422,7 +418,7 @@ function EraHero({ era, total, onOpenFilters, filters, onFilterChange, sort, onS
 
       {/* Noise texture overlay */}
       <div style={{
-        position: "absolute", inset: 0, opacity: 0.03,
+        position: "absolute", inset: 0, opacity: 0.015,
         backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
         backgroundSize: "128px 128px",
         pointerEvents: "none",
@@ -440,15 +436,15 @@ function EraHero({ era, total, onOpenFilters, filters, onFilterChange, sort, onS
             letterSpacing: "0.18em", color: "#444", textDecoration: "none",
             textTransform: "uppercase", transition: "color 0.15s",
           }}
-            onMouseEnter={e => e.currentTarget.style.color = "#888"}
-            onMouseLeave={e => e.currentTarget.style.color = "#444"}
+            onMouseEnter={e => e.currentTarget.style.color = "#555"}
+            onMouseLeave={e => e.currentTarget.style.color = "#888"}
           >Home</Link>
-          <span style={{ color: "#2a2a2a", fontSize: 10 }}>›</span>
+          <span style={{ color: "#bbb", fontSize: 10 }}>›</span>
           <span style={{
             fontFamily: "var(--font-stencil, monospace)", fontSize: 9,
-            letterSpacing: "0.18em", color: "#444", textTransform: "uppercase",
+            letterSpacing: "0.18em", color: "#888", textTransform: "uppercase",
           }}>Eras</span>
-          <span style={{ color: "#2a2a2a", fontSize: 10 }}>›</span>
+          <span style={{ color: "#bbb", fontSize: 10 }}>›</span>
           <span style={{
             fontFamily: "var(--font-stencil, monospace)", fontSize: 9,
             letterSpacing: "0.18em", color: era.accent, textTransform: "uppercase",
@@ -465,99 +461,14 @@ function EraHero({ era, total, onOpenFilters, filters, onFilterChange, sort, onS
             fontSize: "clamp(52px, 8vw, 96px)",
             letterSpacing: "0.04em",
             lineHeight: 0.92,
-            color: "#e8e2d8",
+            color: "#111",
             margin: "0 0 12px",
           }}
         >{era.display_name}</motion.h1>
 
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.15, duration: 0.5 }}
-          style={{ display: "flex", flexDirection: "column", gap: 6 }}
-        >
-          <div style={{
-            fontFamily: "var(--font-stencil, monospace)", fontSize: 10,
-            letterSpacing: "0.2em", color: era.accent, textTransform: "uppercase",
-          }}>{era.year_range}</div>
-          <div style={{
-            fontFamily: "var(--font-stencil, monospace)", fontSize: 12,
-            color: "#555", maxWidth: 520, lineHeight: 1.6,
-          }}>{era.description}</div>
-        </motion.div>
 
-        {/* Toolbar */}
-        <div style={{
-          marginTop: 32, display: "flex", alignItems: "center",
-          gap: 12, flexWrap: "wrap",
-        }}>
-          {/* Filter button */}
-          <motion.button
-            whileHover={{ borderColor: era.accent, color: era.accent }}
-            whileTap={{ scale: 0.97 }}
-            onClick={onOpenFilters}
-            style={{
-              display: "flex", alignItems: "center", gap: 8,
-              background: "none", border: "1px solid #2a2a2a",
-              color: "#777", cursor: "pointer", padding: "9px 18px",
-              fontFamily: "var(--font-stencil, monospace)", fontSize: 9,
-              letterSpacing: "0.18em", textTransform: "uppercase",
-              transition: "border-color 0.15s, color 0.15s",
-            }}
-          >
-            <svg width="12" height="10" viewBox="0 0 12 10" fill="none">
-              <path d="M0 1h12M2 5h8M4 9h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-            Filters
-            {activeFilterCount > 0 && (
-              <span style={{
-                background: era.accent, color: "#080808",
-                borderRadius: "50%", width: 16, height: 16,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 8, fontWeight: 700,
-              }}>{activeFilterCount}</span>
-            )}
-          </motion.button>
 
-          {/* Sort */}
-          <select
-            value={sort}
-            onChange={e => onSortChange(e.target.value)}
-            style={{
-              background: "#0e0e0e", border: "1px solid #2a2a2a",
-              color: "#666", fontFamily: "var(--font-stencil, monospace)",
-              fontSize: 9, letterSpacing: "0.12em", padding: "9px 14px",
-              outline: "none", textTransform: "uppercase", cursor: "pointer",
-            }}
-          >
-            {SORT_OPTIONS.map(o => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
 
-          {/* Active filter tags */}
-          {filters.category && (
-            <ActiveTag
-              label={ERA_CATEGORIES.find(c => c.slug === filters.category)?.label ?? filters.category}
-              onRemove={() => onFilterChange({ category: null })}
-              accent={era.accent}
-            />
-          )}
-          {filters.brand && (
-            <ActiveTag label={filters.brand} onRemove={() => onFilterChange({ brand: null })} accent={era.accent} />
-          )}
-          {filters.in_stock && (
-            <ActiveTag label="In Stock" onRemove={() => onFilterChange({ in_stock: false })} accent={era.accent} />
-          )}
-
-          {/* Count */}
-          <div style={{ marginLeft: "auto",
-            fontFamily: "var(--font-stencil, monospace)", fontSize: 9,
-            letterSpacing: "0.18em", color: "#333", textTransform: "uppercase",
-          }}>
-            {total.toLocaleString()} parts
-          </div>
-        </div>
       </div>
     </div>
   );
@@ -783,11 +694,8 @@ export default function EraPage({ params }) {
       <EraHero
         era={era}
         total={total}
-        onOpenFilters={() => setPanelOpen(true)}
         filters={filters}
         onFilterChange={handleFilterChange}
-        sort={sort}
-        onSortChange={s => { setSort(s); setPage(1); }}
       />
 
       {/* Category tabs */}
