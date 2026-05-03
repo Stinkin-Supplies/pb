@@ -424,7 +424,7 @@ const css = `
     font-size: 10px; letter-spacing: 0.18em;
     color: #8a8784; cursor: pointer;
     border: none; background: none;
-    border-bottom: 2px solid transparent;
+    border-bottom: 2px solid rgba(0,0,0,0);
     transition: all 0.2s; margin-bottom: -1px;
   }
   .pdp-tab:hover  { color: #f0ebe3; }
