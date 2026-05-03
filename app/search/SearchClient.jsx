@@ -382,9 +382,9 @@ export default function SearchClient({ initialQuery = "" }) {
 
   // Load sale products for landing page
   useEffect(() => {
-    fetch("/api/search?sort=price_desc&pageSize=8")
+    fetch("/api/search?q=*&per_page=8&sort=relevance&closeout=true")
       .then(r => r.json())
-      .then(d => setSaleProducts((d.products ?? []).filter(p => p.was)))
+      .then(d => setSaleProducts(d.products ?? []))
       .catch(() => {});
   }, []);
 
