@@ -1,0 +1,59 @@
+BEGIN
+
+--- Step 1: Insert Softail Twin Cam family ---
+INSERT 0 1
+psql:hd_models_correction.sql:31: NOTICE:  Softail Twin Cam family id: 24
+psql:hd_models_correction.sql:31: NOTICE:  Softail Evo family id: 6
+DO
+
+--- Step 2: Cap Softail Evo family at 1999 ---
+UPDATE 1
+UPDATE 23
+UPDATE 0
+DELETE 169
+--- Evo model_years after 1999 deleted ---
+
+--- Step 3: Insert Softail Twin Cam models ---
+INSERT 0 0
+UPDATE 0
+--- Softail Twin Cam models inserted ---
+
+--- Step 4: Seed Softail Twin Cam model years ---
+psql:hd_models_correction.sql:223: ERROR:  syntax error at or near "hm"
+LINE 86: ) y ON hm.model_code = y.model_code
+                ^
+--- Softail TC model years seeded ---
+
+--- Step 5: Fix Dyna models ---
+psql:hd_models_correction.sql:238: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:hd_models_correction.sql:246: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:hd_models_correction.sql:265: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+--- Dyna models inserted ---
+
+--- Step 6: Seed Dyna model years ---
+psql:hd_models_correction.sql:330: ERROR:  syntax error at or near "hm"
+LINE 52: ) y ON hm.model_code = y.model_code
+                ^
+--- Dyna model years seeded ---
+
+--- Step 7: Move FXDS from FXR to Dyna ---
+psql:hd_models_correction.sql:347: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:hd_models_correction.sql:355: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+--- FXDS moved to Dyna ---
+
+--- Verification: family counts ---
+psql:hd_models_correction.sql:375: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+
+--- Verification: Softail Evo capped at 1999? ---
+psql:hd_models_correction.sql:382: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+
+--- Verification: Softail TC models ---
+psql:hd_models_correction.sql:389: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+
+--- Verification: Dyna models with year coverage ---
+psql:hd_models_correction.sql:399: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+ROLLBACK
+
+============================================================
+CORRECTION COMPLETE
+============================================================

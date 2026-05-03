@@ -1,0 +1,193 @@
+BEGIN
+--- Step 0: Drop unique constraint on harley_models.model_code ---
+ALTER TABLE
+ constraint_name 
+-----------------
+(0 rows)
+
+Constraint dropped.
+
+--- Step 1: Clean up any partial state from prior runs ---
+DELETE 0
+ id |    name     | start_year | end_year 
+----+-------------+------------+----------
+  5 | Softail M8  |       2018 |     2026
+  6 | Softail Evo |       1984 |     2017
+(2 rows)
+
+
+--- Step 2: Insert Softail Twin Cam family ---
+INSERT 0 1
+ id |       name       | start_year | end_year 
+----+------------------+------------+----------
+  5 | Softail M8       |       2018 |     2026
+  6 | Softail Evo      |       1984 |     2017
+ 26 | Softail Twin Cam |       2000 |     2017
+(3 rows)
+
+
+--- Step 3: Cap Softail Evo at 1999 ---
+UPDATE 1
+UPDATE 26
+DELETE 169
+ evo_year_rows_remaining 
+-------------------------
+                      86
+(1 row)
+
+
+--- Step 4: Insert Softail Twin Cam models ---
+DO
+ tc_models 
+-----------
+        27
+(1 row)
+
+
+--- Step 5: Seed Softail Twin Cam model years ---
+INSERT 0 166
+ tc_year_rows 
+--------------
+          166
+(1 row)
+
+
+--- Step 6: Fix Dyna models ---
+UPDATE 1
+UPDATE 1
+UPDATE 0
+DO
+ dyna_models 
+-------------
+          21
+(1 row)
+
+
+--- Step 7: Seed Dyna model years ---
+INSERT 0 34
+ dyna_year_rows 
+----------------
+            161
+(1 row)
+
+
+--- Final verification: all families ---
+      family      | models | year_rows | min_year | max_year 
+------------------+--------+-----------+----------+----------
+ Flathead         |     12 |        93 |     1930 |     1952
+ Knucklehead      |      1 |        12 |     1936 |     1947
+ Panhead          |      1 |        18 |     1948 |     1965
+ Sportster        |     40 |       358 |     1952 |     2022
+ Shovelhead       |      1 |        19 |     1966 |     1984
+ FXR              |     11 |        75 |     1982 |     2020
+ Evolution        |      1 |        16 |     1984 |     1999
+ Softail Evo      |     27 |        86 |     1984 |     1999
+ Touring          |     37 |       407 |     1984 |     2026
+ Dyna             |     21 |       161 |     1991 |     2017
+ Twin Cam         |      1 |        19 |     1999 |     2017
+ Softail Twin Cam |     27 |       166 |     2000 |     2017
+ V-Rod            |      1 |        16 |     2002 |     2017
+ Trike            |      7 |        39 |     2009 |     2026
+ Street           |      3 |        19 |     2015 |     2021
+ Softail M8       |     15 |        99 |     2018 |     2026
+ Revolution Max   |      8 |        30 |     2021 |     2026
+(17 rows)
+
+
+--- Softail Evo: all models should end <= 1999 ---
+ model_code |           name           | start_year | end_year 
+------------+--------------------------+------------+----------
+ FXST       | SOFTAIL STANDARD         |       1984 |     1999
+ FLST       | HERITAGE SOFTAIL         |       1986 |     1999
+ FXSTC      | SOFTAIL CUSTOM           |       1986 |     1999
+ FLSTC      | HERITAGE SOFTAIL CLASSIC |       1988 |     1999
+ FXSTS      | SPRINGER SOFTAIL         |       1988 |     1999
+ FLSTF      | FAT BOY                  |       1990 |     1999
+ FXSTSB     | BAD BOY                  |       1995 |     1997
+ FLSTS      | HERITAGE SPRINGER        |       1997 |     1999
+ FXSTB      | NIGHT TRAIN              |       1998 |     1999
+ FXSTD      | SOFTAIL DEUCE            |       2000 |     1999
+ FXSTDSE    | CVO DEUCE                |       2003 |     1999
+ FLSTFSE    | CVO FAT BOY              |       2005 |     1999
+ FLSTN      | SOFTAIL DELUXE           |       2005 |     1999
+ FLSTSC     | SOFTAIL SPRINGER CLASSIC |       2005 |     1999
+ FXSTSSE    | CVO SPRINGER SOFTAIL     |       2007 |     1999
+ FLSTSB     | CROSS BONES              |       2008 |     1999
+ FXCW       | ROCKER                   |       2008 |     1999
+ FXCWC      | ROCKER                   |       2008 |     1999
+ FLSTFB     | FAT BOY LO               |       2010 |     1999
+ FLSTSE     | CVO SOFTAIL CONVERTIBLE  |       2010 |     1999
+ FXS        | BLACKLINE                |       2011 |     1999
+ FLS        | SOFTAIL SLIM             |       2012 |     1999
+ FLSS       | SOFTAIL SLIM             |       2012 |     1999
+ FXSBSE     | CVO BREAKOUT             |       2013 |     1999
+ FLSTNSE    | CVO DELUXE               |       2014 |     1999
+ FLSTFBS    | FAT BOY S                |       2016 |     1999
+ FXSE       | CVO PRO STREET BREAKOUT  |       2016 |     1999
+(27 rows)
+
+
+--- Softail TC models ---
+ model_code |           name           | start_year | end_year 
+------------+--------------------------+------------+----------
+ FLST       | Heritage Softail         |       2000 |     2006
+ FLSTC      | Heritage Classic         |       2000 |     2013
+ FLSTF      | Fat Boy                  |       2000 |     2017
+ FLSTS      | Heritage Springer        |       2000 |     2003
+ FXST       | Softail Standard         |       2000 |     2015
+ FXSTB      | Night Train              |       2000 |     2009
+ FXSTC      | Softail Custom           |       2000 |     2010
+ FXSTD      | Softail Deuce            |       2000 |     2007
+ FXSTS      | Softail Springer         |       2000 |     2006
+ FXSTDSE    | CVO Softail Deuce        |       2003 |     2004
+ FLSTFSE    | CVO Fat Boy              |       2005 |     2006
+ FLSTN      | Softail Deluxe           |       2005 |     2017
+ FLSTSC     | Softail Springer Classic |       2005 |     2007
+ FXSTSSE    | CVO Springer Softail     |       2007 |     2009
+ FLSTSB     | Cross Bones Springer     |       2008 |     2011
+ FXCW       | Rocker                   |       2008 |     2011
+ FXCWC      | Rocker C                 |       2008 |     2011
+ FLSTFB     | Fat Boy Lo               |       2010 |     2016
+ FLSTSE     | CVO Softail Convertible  |       2010 |     2012
+ FXS        | Blackline                |       2011 |     2013
+ FLS        | Softail Slim             |       2012 |     2017
+ FXSB       | Softail Breakout         |       2013 |     2017
+ FXSBSE     | CVO Breakout             |       2013 |     2014
+ FLSTNSE    | CVO Softail Deluxe       |       2014 |     2017
+ FLSS       | Softail Slim S           |       2016 |     2017
+ FLSTFBS    | Fat Boy S                |       2016 |     2017
+ FXSE       | CVO Pro Street Breakout  |       2016 |     2017
+(27 rows)
+
+
+--- Dyna: models and year row counts ---
+ model_code |            name             | start_year | end_year | year_rows 
+------------+-----------------------------+------------+----------+-----------
+ FXD        | SUPER GLIDE                 |       1991 |     2010 |        20
+ FXDB-S     | Dyna Glide Sturgis          |       1991 |     1991 |         1
+ FXDB-D     | Dyna Glide Daytona          |       1992 |     1992 |         1
+ FXDC       | SUPER GLIDE CUSTOM          |       1992 |     2014 |        23
+ FXDL       | LOW RIDER                   |       1993 |     2017 |        25
+ FXDWG      | WIDE GLIDE                  |       1993 |     2017 |        25
+ FXDS       | DYNA CONVERTIBLE            |       1994 |     2000 |         8
+ FXDX       | Dyna Super Glide Sport      |       1999 |     2005 |         7
+ FXDX       | SUPER GLIDE SPORT           |       1999 |     2005 |         7
+ FXDWG2     | CVO WIDE GLIDE              |       2001 |     2002 |         2
+ FXDWG3     | CVO WIDE GLIDE              |       2001 |     2002 |         2
+ FXDXT      | Dyna Super Glide Sport Tour |       2001 |     2003 |         3
+ FXDB       | STREET BOB                  |       2006 |     2017 |        12
+ FXDSE      | CVO Dyna Super Glide        |       2007 |     2007 |         1
+ FXDSE      | SCREAMIN EAGLE DYNA         |       2007 |     2008 |         2
+ FXDF       | FAT BOB                     |       2008 |     2017 |        10
+ FXDSE2     | CVO Dyna Super Glide        |       2008 |     2008 |         1
+ FXDFSE     | CVO Dyna Fat Bob            |       2009 |     2010 |         2
+ FXDFSE     | CVO FAT BOB                 |       2009 |     2010 |         2
+ FLD        | SWITCHBACK                  |       2012 |     2016 |         5
+ FXDLS      | LOW RIDER S                 |       2016 |     2017 |         2
+(21 rows)
+
+COMMIT
+
+============================================================
+CORRECTION v4 COMPLETE
+============================================================

@@ -1,0 +1,150 @@
+--- catalog_unified columns ---
+     column_name      |        data_type         
+----------------------+--------------------------
+ id                   | integer
+ sku                  | character varying
+ source_vendor        | character varying
+ product_code         | character varying
+ name                 | text
+ description          | text
+ features             | ARRAY
+ brand                | character varying
+ category             | character varying
+ subcategory          | character varying
+ msrp                 | numeric
+ retail_price         | numeric
+ cost                 | numeric
+ map_price            | numeric
+ has_map_policy       | boolean
+ dropship_fee         | numeric
+ stock_quantity       | integer
+ warehouse_wi         | integer
+ warehouse_ny         | integer
+ warehouse_tx         | integer
+ warehouse_nv         | integer
+ warehouse_nc         | integer
+ in_stock             | boolean
+ weight               | numeric
+ height_in            | numeric
+ length_in            | numeric
+ width_in             | numeric
+ uom                  | character varying
+ upc                  | character varying
+ country_of_origin    | character varying
+ hazardous_code       | character varying
+ truck_only           | boolean
+ no_ship_ca           | boolean
+ image_url            | text
+ image_urls           | ARRAY
+ fitment_year_start   | smallint
+ fitment_year_end     | smallint
+ fitment_year_ranges  | jsonb
+ fitment_hd_families  | ARRAY
+ fitment_hd_models    | ARRAY
+ fitment_hd_codes     | ARRAY
+ fitment_other_makes  | ARRAY
+ is_harley_fitment    | boolean
+ is_universal         | boolean
+ drag_part            | boolean
+ closeout             | boolean
+ is_active            | boolean
+ is_discontinued      | boolean
+ brand_part_number    | character varying
+ part_add_date        | date
+ slug                 | text
+ created_at           | timestamp with time zone
+ updated_at           | timestamp with time zone
+ internal_sku         | character varying
+ oem_numbers          | ARRAY
+ computed_price       | numeric
+ special_instructions | text
+(57 rows)
+
+
+--- oem_fitment columns ---
+    column_name     |        data_type         
+--------------------+--------------------------
+ id                 | bigint
+ catalog_year_start | smallint
+ catalog_year_end   | smallint
+ catalog_file       | text
+ page_number        | smallint
+ section            | text
+ oem_part_no        | character varying
+ description        | text
+ qty_note           | text
+ models_raw         | text
+ model_codes        | ARRAY
+ fits_all_models    | boolean
+ matched_product_id | bigint
+ matched_sku        | text
+ match_method       | character varying
+ match_confidence   | numeric
+ extracted_at       | timestamp with time zone
+ matched_at         | timestamp with time zone
+(18 rows)
+
+
+--- catalog_oem_crossref columns ---
+   column_name    |        data_type         
+------------------+--------------------------
+ id               | integer
+ sku              | text
+ oem_number       | text
+ oem_manufacturer | text
+ page_reference   | text
+ source_file      | text
+ created_at       | timestamp with time zone
+ original_oem     | text
+ oem_base         | text
+ is_cross_source  | boolean
+ duplicate_count  | integer
+(11 rows)
+
+
+--- harley_models columns ---
+ column_name |          data_type          
+-------------+-----------------------------
+ id          | integer
+ family_id   | integer
+ model_code  | text
+ name        | text
+ start_year  | integer
+ end_year    | integer
+ created_at  | timestamp without time zone
+(7 rows)
+
+
+--- harley_families columns ---
+ column_name |          data_type          
+-------------+-----------------------------
+ id          | integer
+ name        | text
+ start_year  | integer
+ end_year    | integer
+ created_at  | timestamp without time zone
+(5 rows)
+
+
+--- harley_model_years columns ---
+ column_name |          data_type          
+-------------+-----------------------------
+ id          | integer
+ model_id    | integer
+ year        | integer
+ created_at  | timestamp without time zone
+(4 rows)
+
+
+--- catalog_fitment_v2 columns ---
+   column_name    |          data_type          
+------------------+-----------------------------
+ id               | integer
+ product_id       | integer
+ model_year_id    | integer
+ created_at       | timestamp without time zone
+ fitment_source   | text
+ confidence_score | numeric
+ parsed_snapshot  | text
+(7 rows)
+

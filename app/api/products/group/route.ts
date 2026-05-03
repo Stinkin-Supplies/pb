@@ -7,6 +7,15 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { getCatalogDb } from "@/lib/db/catalog";
 
+type CrossrefRow = { oem_number: string | null; page_reference: string | null; source_file?: string | null };
+type OemFitmentSummaryRow = {
+  year_start: number | null;
+  year_end: number | null;
+  catalog_files: string[] | null;
+  sections: string[] | null;
+  oem_parts: string[] | null;
+};
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const slug    = (searchParams.get("slug") ?? "").trim();
@@ -67,8 +76,8 @@ export async function GET(req: Request) {
           price_min: group.price_min, price_max: group.price_max,
         },
         options: members,
-        oem_numbers:     [...new Set(crossrefs.map((r: any) => r.oem_number).filter(Boolean))],
-        page_references: [...new Set(crossrefs.map((r: any) => r.page_reference).filter(Boolean))],
+        oem_numbers:     [...new Set((crossrefs as CrossrefRow[]).map((r) => r.oem_number).filter(Boolean))],
+        page_references: [...new Set((crossrefs as CrossrefRow[]).map((r) => r.page_reference).filter(Boolean))],
         source: "product_groups",
       });
     }
@@ -81,11 +90,11 @@ export async function GET(req: Request) {
         cu.msrp, cu.map_price, cu.has_map_policy, cu.cost,
         cu.in_stock, cu.stock_quantity,
         cu.image_url, cu.image_urls, cu.upc,
-        cu.oem_part_number, cu.source_vendor,
+        cu.oem_numbers, cu.source_vendor, cu.pdp_payload,
         cu.is_harley_fitment, cu.is_universal,
         cu.fitment_hd_families, cu.fitment_hd_codes, cu.fitment_hd_models,
         cu.fitment_year_start, cu.fitment_year_end,
-        cu.closeout, cu.drag_part, cu.in_oldbook, cu.in_fatbook,
+        cu.closeout, cu.drag_part,
         cu.warehouse_wi, cu.warehouse_ny, cu.warehouse_tx,
         cu.warehouse_nv, cu.warehouse_nc
       FROM catalog_unified cu
@@ -96,10 +105,65 @@ export async function GET(req: Request) {
     if (!cu) {
       return NextResponse.json({ error: "Product not found", slug }, { status: 404 });
     }
+
+    // Pull cross-reference and fitment provenance directly from source fitment tables
+    const { rows: crossrefs } = await db.query(`
+      SELECT DISTINCT c.oem_number, c.page_reference, c.source_file
+      FROM catalog_oem_crossref c
+      WHERE c.sku = $1 OR c.sku = $2
+    `, [cu.sku, cu.internal_sku ?? cu.sku]);
+
+    const { rows: oemFitmentRows } = await db.query(`
+      SELECT
+        MIN(catalog_year_start) AS year_start,
+        MAX(catalog_year_end) AS year_end,
+        array_remove(array_agg(DISTINCT catalog_file), NULL) AS catalog_files,
+        array_remove(array_agg(DISTINCT section), NULL) AS sections,
+        array_remove(array_agg(DISTINCT oem_part_no), NULL) AS oem_parts
+      FROM oem_fitment
+      WHERE matched_sku = $1 OR matched_sku = $2
+    `, [cu.sku, cu.internal_sku ?? cu.sku]);
+
+    const { rows: puFitmentRows } = await db.query(`
+      SELECT
+        year_start, year_end, hd_families, hd_models, hd_codes, is_harley, is_universal, parsed_from
+      FROM pu_fitment
+      WHERE regexp_replace(upper(sku), '[^A-Z0-9]+', '', 'g')
+            = regexp_replace(upper($1), '[^A-Z0-9]+', '', 'g')
+      LIMIT 1
+    `, [cu.sku]);
+
+    const { rows: catalogFitmentRows } = await db.query(`
+      SELECT
+        cp.id AS catalog_product_id,
+        (SELECT COUNT(*) FROM catalog_fitment_v2 cf WHERE cf.product_id = cp.id) AS fitment_v2_rows,
+        (SELECT COUNT(*) FROM catalog_fitment_archived ca WHERE ca.product_id = cp.id) AS fitment_archived_rows,
+        (SELECT MIN(year_start) FROM catalog_fitment_archived ca WHERE ca.product_id = cp.id) AS archived_year_start,
+        (SELECT MAX(year_end) FROM catalog_fitment_archived ca WHERE ca.product_id = cp.id) AS archived_year_end
+      FROM catalog_products cp
+      WHERE cp.sku = $1
+      LIMIT 1
+    `, [cu.sku]);
+
+    const oemFitment = (oemFitmentRows[0] as OemFitmentSummaryRow | undefined) ?? null;
+    const puFitment = puFitmentRows[0] ?? null;
+    const catalogFitment = catalogFitmentRows[0] ?? null;
+
+    const payloadFitment = cu.pdp_payload?.fitment ?? null;
+    const payloadOemNumbers = Array.isArray(cu.pdp_payload?.oem_numbers) ? cu.pdp_payload.oem_numbers : [];
+    const mergedOem = [
+      ...new Set([
+        ...(Array.isArray(cu.oem_numbers) ? cu.oem_numbers : []),
+        ...payloadOemNumbers,
+        ...(crossrefs as CrossrefRow[]).map((r) => r.oem_number).filter(Boolean),
+        ...(Array.isArray(oemFitment?.oem_parts) ? oemFitment.oem_parts : []),
+      ].filter(Boolean))
+    ];
+
     return NextResponse.json({
       group: {
         id:             cu.id,
-        oem_number:     cu.oem_part_number ?? null,
+        oem_number:     mergedOem[0] ?? null,
         group_signal:   "singleton",
         member_count:   1,
         vendor_count:   1,
@@ -134,18 +198,27 @@ export async function GET(req: Request) {
         features:       cu.features,
         weight:         cu.weight,
         upc:            cu.upc,
+        pdp_payload:    cu.pdp_payload ?? null,
       }],
       fitment: {
-        isHarleyFitment:   cu.is_harley_fitment,
-        isUniversal:       cu.is_universal,
-        fitmentHdFamilies: cu.fitment_hd_families ?? [],
-        fitmentHdCodes:    cu.fitment_hd_codes    ?? [],
-        fitmentHdModels:   cu.fitment_hd_models   ?? [],
-        fitmentYearStart:  cu.fitment_year_start,
-        fitmentYearEnd:    cu.fitment_year_end,
+        isHarleyFitment:   payloadFitment?.is_harley_fitment ?? puFitment?.is_harley ?? cu.is_harley_fitment,
+        isUniversal:       payloadFitment?.is_universal ?? puFitment?.is_universal ?? cu.is_universal,
+        fitmentHdFamilies: payloadFitment?.fitment_hd_families ?? puFitment?.hd_families ?? cu.fitment_hd_families ?? [],
+        fitmentHdCodes:    payloadFitment?.fitment_hd_codes ?? puFitment?.hd_codes ?? cu.fitment_hd_codes ?? [],
+        fitmentHdModels:   payloadFitment?.fitment_hd_models ?? puFitment?.hd_models ?? cu.fitment_hd_models ?? [],
+        fitmentYearStart:  payloadFitment?.fitment_year_start ?? oemFitment?.year_start ?? puFitment?.year_start ?? catalogFitment?.archived_year_start ?? cu.fitment_year_start,
+        fitmentYearEnd:    payloadFitment?.fitment_year_end ?? oemFitment?.year_end ?? puFitment?.year_end ?? catalogFitment?.archived_year_end ?? cu.fitment_year_end,
       },
-      oem_numbers:     cu.oem_part_number ? [cu.oem_part_number] : [],
-      page_references: [],
+      fitment_sources: {
+        catalog_fitment_v2_rows: catalogFitment?.fitment_v2_rows ?? 0,
+        catalog_fitment_archived_rows: catalogFitment?.fitment_archived_rows ?? 0,
+        pu_fitment_parsed_from: puFitment?.parsed_from ?? null,
+        oem_fitment_catalog_files: oemFitment?.catalog_files ?? [],
+        oem_fitment_sections: oemFitment?.sections ?? [],
+      },
+      oem_numbers:     mergedOem,
+      page_references: [...new Set((crossrefs as CrossrefRow[]).map((r) => r.page_reference).filter(Boolean))],
+      oem_sources: [...new Set((crossrefs as CrossrefRow[]).map((r) => r.source_file).filter(Boolean))],
       source: "catalog_unified",
     });
   } catch (err: unknown) {

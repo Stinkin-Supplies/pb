@@ -1,0 +1,220 @@
+CREATE FUNCTION
+psql:scripts/sql/unified_catalog_audit_and_normalize.sql:12: NOTICE:  column "pdp_payload" of relation "catalog_unified" already exists, skipping
+ALTER TABLE
+UPDATE 88512
+
+===== Unified Catalog Audit: Source -> Unified Coverage =====
+ source_vendor | unified_rows | unified_with_description | unified_with_features | unified_with_oem | unified_with_pdp_payload | wps_source_has_description | wps_source_has_features | wps_source_has_oem | pu_source_has_features_or_text | pu_source_has_oem | vtwin_source_has_description | vtwin_source_has_oem 
+---------------+--------------+--------------------------+-----------------------+------------------+--------------------------+----------------------------+-------------------------+--------------------+--------------------------------+-------------------+------------------------------+----------------------
+ PU            |        24009 |                    24008 |                 21294 |             3876 |                    24009 |                      24008 |                    3495 |               3508 |                          24009 |             23939 |                            2 |                    0
+ VTWIN         |        37749 |                        0 |                     0 |            25849 |                    37749 |                          0 |                       0 |                  0 |                              0 |                 0 |                            0 |                    0
+ WPS           |        26754 |                    13791 |                  7955 |             6967 |                    26754 |                      13613 |                    6428 |                  0 |                             26 |                26 |                          209 |                  129
+(3 rows)
+
+
+===== Gap Sample (source has data, unified missing) =====
+ source_vendor |          gap_reason          |    sku     |            name             
+---------------+------------------------------+------------+-----------------------------
+ PU            | missing_description_from_wps | DS194469   | +.030" BREATHER GEAR 48-E77
+ PU            | missing_features_from_source | FA2092HH   | EBC DOUBLE H PAD SET
+ PU            | missing_features_from_source | FA2163     | BRAKE PAD ORGANIC FA216/3
+ PU            | missing_features_from_source | FA242      | PAD BRAKE KIT FA242
+ PU            | missing_features_from_source | HS42001K   | MIK AIR BOX ADAPTER KIT
+ PU            | missing_features_from_source | HS42012300 | MIK FILTER ELEMENT 3 INCH
+ PU            | missing_features_from_source | HS4201842  | MIK 42MM FLANGE ADPT BLK
+ PU            | missing_features_from_source | HS4201845  | MIK 45MM FLANGE ADPT BLK
+ PU            | missing_features_from_source | HS4206248  | MIK 48MM FLANGE ADPT BLK
+ PU            | missing_features_from_source | R12N55A3B  | BATTERY  #12N5.5A-3B
+ PU            | missing_features_from_source | Y12N55A3B  | BATTERY-YUASA
+ PU            | missing_oem_from_source      | 10010018   | CARB KIT "E" 04-06 XL
+ PU            | missing_oem_from_source      | 10010031   | SUPPORT CRB SPR E 66-82BT
+ PU            | missing_oem_from_source      | 10010043   | CARBURETOR S&S E BLK
+ PU            | missing_oem_from_source      | 10010044   | CARBURETOR S&S G BLK
+ PU            | missing_oem_from_source      | 10010045   | CARBURETOR S&S E 36-84
+ PU            | missing_oem_from_source      | 10010046   | CARBURETOR G F/T143
+ PU            | missing_oem_from_source      | 10010047   | SUPPORT CARB 66-84BT
+
+ PU            | missing_oem_from_source      | 10010085   | CARB E A/C KT CH BT 84-99
+ PU            | missing_oem_from_source      | 10010086   | CARB E A/C KT BK BT 84-99
+ PU            | missing_oem_from_source      | 10010087   | CARB G A/C KT CH BT 84-99
+ PU            | missing_oem_from_source      | 10010088   | CARB G A/C KT BK BT 84-99
+ PU            | missing_oem_from_source      | 10010089   | CARB E A/C KT CH BT 99-05
+ PU            | missing_oem_from_source      | 10010090   | CARB G A/C KT CH BT 99-05
+ PU            | missing_oem_from_source      | 10010091   | CARB E A/C KT CHR BT 2006
+ PU            | missing_oem_from_source      | 10010092   | CARB G A/C KT CHR BT 2006
+ PU            | missing_oem_from_source      | 10020002   | S&S E CARB. NO MANIFOLD
+ PU            | missing_oem_from_source      | 10020025   | CARBURETOR,SUPER E
+ PU            | missing_oem_from_source      | 10020026   | CARBURETOR,SUPER G
+ PU            | missing_oem_from_source      | 10020030   | CARB KIT 45MM 90-06 BT
+ PU            | missing_oem_from_source      | 10020059   | CARBURETOR STD E BLK
+ PU            | missing_oem_from_source      | 10020060   | CARBURETOR STD G BLK
+ PU            | missing_oem_from_source      | 10030015   | DLR JET KIT S&S CARBS
+ PU            | missing_oem_from_source      | 10030022   | CRUSE CNTL KIT E/G 98-06
+ PU            | missing_oem_from_source      | 10030040   | SPRING IDLE MIX SCREW
+ PU            | missing_oem_from_source      | 10030041   | PLUG FLOAT BOWL S&S
+ PU            | missing_oem_from_source      | 10030042   | NEEDLE S&S E & G CARB.
+ PU            | missing_oem_from_source      | 10030043   | BELLOWS SEAL ACC PUMP S&S
+ PU            | missing_oem_from_source      | 10030044   | SPRING,ACCEL PUMP DIAPHRM
+ PU            | missing_oem_from_source      | 10030045   | ACCEL PUMP DIAPHRM S&S
+ PU            | missing_oem_from_source      | 10030047   | PLUNGER ENRICHNER
+ PU            | missing_oem_from_source      | 10030050   | CHECK BALL SPRING S&S
+ PU            | missing_oem_from_source      | 10030052   | FUEL INLET S&S E G CARB
+ PU            | missing_oem_from_source      | 10030056   | BREATHER CONV KIT E,G CRB
+ PU            | missing_oem_from_source      | 10030060   | O-RING,INTAKE S&S MNFOLD
+ PU            | missing_oem_from_source      | 10030085   | IDLE MIX SCREW S&S E&G
+ PU            | missing_oem_from_source      | 10030166   | REBUILD KIT BENDIX CARB
+ PU            | missing_oem_from_source      | 10030188   | HOSE BOWL OVERFLOW E/G
+ PU            | missing_oem_from_source      | 10030192   | O-RING ACCL PUMP TUBE E/G
+ PU            | missing_oem_from_source      | 10030193   | O-RING ACCL PUMP CAP E/G
+ PU            | missing_oem_from_source      | 10030194   | BALL CHECK ACCEL PUMP E/G
+ PU            | missing_oem_from_source      | 10030195   | GUIDE CABLE S&S E/G CV
+ PU            | missing_oem_from_source      | 10030196   | GUIDE CABLE E/G S&S CBL
+ PU            | missing_oem_from_source      | 10030237   | INLET CARB FUEL SWIVEL
+ PU            | missing_oem_from_source      | 10030257   | INLET GAS 76-06KEIHN CARB
+ PU            | missing_oem_from_source      | 10030291   | REBUILD KT CARB 76-89KEHN
+ PU            | missing_oem_from_source      | 10030292   | REBUILD KT CARB 88-06CV
+ PU            | missing_oem_from_source      | 10030293   | REBUILD KT CARB 42 MIK
+ PU            | missing_oem_from_source      | 10030294   | REBUILD KT CARB LINKRT
+ PU            | missing_oem_from_source      | 10030312   | REBUILD KIT E/G BASIC
+ PU            | missing_oem_from_source      | 10030313   | O-RING INT.STK. HDS.10PK
+ PU            | missing_oem_from_source      | 10030353   | FLOAT S&S E/G CARB
+ PU            | missing_oem_from_source      | 10030452   | BOWL CARB S&S E/G
+ PU            | missing_oem_from_source      | 10030453   | REBUILD KIT MSTR S&S A/B
+ PU            | missing_oem_from_source      | 10030454   | NOZZLE E/G ACL.PMP.
+ PU            | missing_oem_from_source      | 10030455   | BELLOWS SEAL ACL.PMP.
+ PU            | missing_oem_from_source      | 10030456   | O-RING INTAKE S&S MNFLD
+ PU            | missing_oem_from_source      | 10030457   | O-RING INTAKE STK MNFLD
+ PU            | missing_oem_from_source      | 10030458   | SEAL INTAKE BAND 79-84
+ PU            | missing_oem_from_source      | 10030459   | LEVER ENRICH E/G
+ PU            | missing_oem_from_source      | 10030460   | SCREW S&S BOWL 10PK
+ PU            | missing_oem_from_source      | 10030966   | SCREW E/G BOWL LONG
+ PU            | missing_oem_from_source      | 10031271   | CARB KIT HARLEY 883
+ PU            | missing_oem_from_source      | 10031272   | CARB KIT HARLEY 1200
+ PU            | missing_oem_from_source      | 10031273   | CARB KIT HARLEY 82CI
+ PU            | missing_oem_from_source      | 10031274   | CARB KIT HARLEY
+ PU            | missing_oem_from_source      | 10031275   | CARB KIT HARLEY 88CI
+ PU            | missing_oem_from_source      | 10031945   | MIK/42 CARB JET KIT
+ PU            | missing_oem_from_source      | 10031946   | MIK/45 CARB JET KIT
+ PU            | missing_oem_from_source      | 10031948   | MIK/42 CARB GSKT KIT
+ PU            | missing_oem_from_source      | 10031949   | MIK/48 CARB GSKT KIT
+ PU            | missing_oem_from_source      | 10032029   | DIAPHRAGM REBUILD KIT
+ PU            | missing_oem_from_source      | 10032033   | FLOAT CARB HSR42,45,48
+ PU            | missing_oem_from_source      | 10040010   | JET NEEDLE HSR 45/48
+ PU            | missing_oem_from_source      | 10040011   | JET NEEDLE HSR 45/48
+ PU            | missing_oem_from_source      | 10050008   | JET,INTERMEDIATE S&S.036
+ PU            | missing_oem_from_source      | 10050009   | JET,INTERMEDIATE S&S.040
+ PU            | missing_oem_from_source      | 10050010   | PILOT JET 4PK
+ PU            | missing_oem_from_source      | 10050011   | PILOT JET 4PK
+ PU            | missing_oem_from_source      | 10050012   | PILOT JET HSR48 4PK
+ PU            | missing_oem_from_source      | 10050047   | PILOTJET VM28/486-10
+ PU            | missing_oem_from_source      | 10050048   | PILOTJET VM28/486-12.5
+ PU            | missing_oem_from_source      | 10050049   | PILOTJET VM28/486-15
+ PU            | missing_oem_from_source      | 10050050   | PILOTJET VM28/486-17.5
+ PU            | missing_oem_from_source      | 10050051   | PILOTJET VM28/486-20
+ PU            | missing_oem_from_source      | 10050052   | PILOTJET VM28/486-22.5
+ PU            | missing_oem_from_source      | 10050053   | PILOTJET VM28/486-25
+ PU            | missing_oem_from_source      | 10050054   | PILOTJET VM28/486-27.5
+ PU            | missing_oem_from_source      | 10050055   | PILOTJET VM28/486-30
+ PU            | missing_oem_from_source      | 10050056   | PILOTJET VM28/486-32.5
+ PU            | missing_oem_from_source      | 10050057   | PILOTJET VM28/486-35
+ PU            | missing_oem_from_source      | 10050058   | PILOTJET VM28/486-37.5
+ PU            | missing_oem_from_source      | 10050059   | PILOTJET VM28/486-40
+ PU            | missing_oem_from_source      | 10050060   | PILOTJET VM28/486-42.5
+ PU            | missing_oem_from_source      | 10050061   | PILOTJET VM28/486-45
+ PU            | missing_oem_from_source      | 10050063   | PILOTJET VM28/486-50
+ PU            | missing_oem_from_source      | 10050065   | PILOTJET VM28/486-55
+ PU            | missing_oem_from_source      | 10050066   | PILOTJET VM28/486-57.5
+ PU            | missing_oem_from_source      | 10050067   | PILOTJET VM28/486-60
+ PU            | missing_oem_from_source      | 10050068   | PILOTJET VM28/486-62.5
+ PU            | missing_oem_from_source      | 10050069   | PILOTJET VM28/486-65
+ PU            | missing_oem_from_source      | 10050070   | PILOTJET VM28/486-67.5
+ PU            | missing_oem_from_source      | 10050071   | PILOTJET VM28/486-70
+ PU            | missing_oem_from_source      | 10050142   | PILOTJET N424/25-35
+ PU            | missing_oem_from_source      | 10050143   | PILOTJET N424/25-38
+ PU            | missing_oem_from_source      | 10050144   | PILOTJET N424/25-40
+ PU            | missing_oem_from_source      | 10050145   | PILOTJET N424/25-42
+ PU            | missing_oem_from_source      | 10050146   | PILOTJET N424/25-45
+ PU            | missing_oem_from_source      | 10050147   | PILOTJET N424/25-48
+ PU            | missing_oem_from_source      | 10050148   | PILOTJET N424/25-50
+ PU            | missing_oem_from_source      | 10050149   | PILOTJET N424/25-52
+ PU            | missing_oem_from_source      | 10050150   | PILOTJET N424/25-55
+ PU            | missing_oem_from_source      | 10050151   | PILOTJET N424/25-58
+ PU            | missing_oem_from_source      | 10050153   | PILOTJET N424/25-62
+ PU            | missing_oem_from_source      | 10050154   | PILOTJET N424/25-65
+ PU            | missing_oem_from_source      | 10050157   | KEHIN PILOT ASST KPJK-02
+ PU            | missing_oem_from_source      | 10060012   | CARB JETS MIKUNI SLOT KIT
+ PU            | missing_oem_from_source      | 10060013   | CARB JET MIKUNI HEX KIT
+ PU            | missing_oem_from_source      | 10060014   | CARB JET MIKUNI HEX KIT
+ PU            | missing_oem_from_source      | 10060015   | CARB JETS KEHIN SLOT KIT
+ PU            | missing_oem_from_source      | 10060016   | CARB JET KEHIN HEX KIT
+ PU            | missing_oem_from_source      | 10060017   | CARB JET KEHIN HEX KIT
+ PU            | missing_oem_from_source      | 10060025   | CARB JET 4-PK MIK SJ90
+ PU            | missing_oem_from_source      | 10060027   | CARB JET 4-PK MIK SJ95
+ PU            | missing_oem_from_source      | 10060028   | CARB JET 4-PK MIK SJ97.5
+ PU            | missing_oem_from_source      | 10060029   | CARB JET 4-PK MIK SJ100
+ PU            | missing_oem_from_source      | 10060030   | CARB JET 4-PK MIK SJ102.5
+ PU            | missing_oem_from_source      | 10060031   | CARB JET 4-PK MIK SJ105
+ PU            | missing_oem_from_source      | 10060032   | CARB JET 4-PK MIK SJ107.5
+ PU            | missing_oem_from_source      | 10060033   | CARB JET 4-PK MIK SJ110
+ PU            | missing_oem_from_source      | 10060034   | CARB JET 4-PK MIK SJ112.5
+ PU            | missing_oem_from_source      | 10060035   | CARB JET 4-PK MIK SJ115
+ PU            | missing_oem_from_source      | 10060036   | CARB JET 4-PK MIK SJ117.5
+ PU            | missing_oem_from_source      | 10060037   | CARB JET 4-PK MIK SJ120
+ PU            | missing_oem_from_source      | 10060038   | CARB JET 4-PK MIK SJ122.5
+ PU            | missing_oem_from_source      | 10060039   | CARB JET 4-PK MIK SJ125
+ PU            | missing_oem_from_source      | 10060040   | CARB JET 4-PK MIK SJ127.5
+ PU            | missing_oem_from_source      | 10060041   | CARB JET 4-PK MIK SJ130
+ PU            | missing_oem_from_source      | 10060042   | CARB JET 4-PK MIK SJ132.5
+ PU            | missing_oem_from_source      | 10060043   | CARB JET 4-PK MIK SJ135
+ PU            | missing_oem_from_source      | 10060044   | CARB JET 4-PK MIK SJ137.5
+ PU            | missing_oem_from_source      | 10060045   | CARB JET 4-PK MIK SJ140
+ PU            | missing_oem_from_source      | 10060046   | CARB JET 4-PK MIK SJ142.5
+ PU            | missing_oem_from_source      | 10060047   | CARB JET 4-PK MIK SJ145
+ PU            | missing_oem_from_source      | 10060048   | CARB JET 4-PK MIK SJ147.5
+ PU            | missing_oem_from_source      | 10060049   | CARB JET 4-PK MIK SJ150
+ PU            | missing_oem_from_source      | 10060050   | CARB JET 4-PK MIK SJ152.5
+ PU            | missing_oem_from_source      | 10060051   | CARB JET 4-PK MIK SJ155
+ PU            | missing_oem_from_source      | 10060052   | CARB JET 4-PK MIK SJ157.5
+ PU            | missing_oem_from_source      | 10060053   | CARB JET 4-PK MIK SJ160
+ PU            | missing_oem_from_source      | 10060055   | CARB JET 4-PK MIK HJ70
+ PU            | missing_oem_from_source      | 10060056   | CARB JET 4-PK MIK HJ80
+ PU            | missing_oem_from_source      | 10060057   | CARB JET 4-PK MIK HJ90
+ PU            | missing_oem_from_source      | 10060058   | CARB JET 4-PK MIK HJ100
+ PU            | missing_oem_from_source      | 10060061   | CARB JET 4-PK MIK HJ115
+ PU            | missing_oem_from_source      | 10060062   | CARB JET 4-PK MIK HJ120
+ PU            | missing_oem_from_source      | 10060063   | CARB JET 4-PK MIK HJ125
+ PU            | missing_oem_from_source      | 10060064   | CARB JET 4-PK MIK HJ130
+ PU            | missing_oem_from_source      | 10060065   | CARB JET 4-PK MIK HJ135
+ PU            | missing_oem_from_source      | 10060066   | CARB JET 4-PK MIK HJ140
+ PU            | missing_oem_from_source      | 10060067   | CARB JET 4-PK MIK HJ145
+ PU            | missing_oem_from_source      | 10060068   | CARB JET 4-PK MIK HJ150
+ PU            | missing_oem_from_source      | 10060069   | CARB JET 4-PK MIK HJ155
+ PU            | missing_oem_from_source      | 10060070   | CARB JET 4-PK MIK HJ160
+ PU            | missing_oem_from_source      | 10060071   | CARB JET 4-PK MIK HJ165
+ PU            | missing_oem_from_source      | 10060072   | CARB JET 4-PK MIK HJ170
+ PU            | missing_oem_from_source      | 10060073   | CARB JET 4-PK MIK HJ175
+ PU            | missing_oem_from_source      | 10060074   | CARB JET 4-PK MIK HJ180
+ PU            | missing_oem_from_source      | 10060075   | CARB JET 4-PK MIK HJ185
+ PU            | missing_oem_from_source      | 10060076   | CARB JET 4-PK MIK HJ190
+ PU            | missing_oem_from_source      | 10060077   | CARB JET 4-PK MIK HJ195
+ PU            | missing_oem_from_source      | 10060078   | CARB JET 4-PK MIK HJ200
+ PU            | missing_oem_from_source      | 10060079   | CARB JET 4-PK MIK HJ210
+ PU            | missing_oem_from_source      | 10060080   | CARB JET 4-PK MIK HJ220
+ PU            | missing_oem_from_source      | 10060081   | CARB JET 4-PK MIK HJ230
+ PU            | missing_oem_from_source      | 10060082   | CARB JET 4-PK MIK HJ240
+ PU            | missing_oem_from_source      | 10060083   | CARB JET 4-PK MIK HJ250
+ PU            | missing_oem_from_source      | 10060084   | CARB JET 4-PK MIK HJ260
+ PU            | missing_oem_from_source      | 10060085   | CARB JET 4-PK MIK HJ270
+ PU            | missing_oem_from_source      | 10060086   | CARB JET 4-PK MIK HJ280
+ PU            | missing_oem_from_source      | 10060087   | CARB JET 4-PK MIK HJ290
+ PU            | missing_oem_from_source      | 10060088   | CARB JET 4-PK MIK HJ300
+ PU            | missing_oem_from_source      | 10060089   | CARB JET 4-PK MIK HJ310
+ PU            | missing_oem_from_source      | 10060090   | CARB JET 4-PK MIK HJ320
+ PU            | missing_oem_from_source      | 10060091   | CARB JET 4-PK MIK HJ330
+ PU            | missing_oem_from_source      | 10060092   | CARB JET 4-PK MIK HJ340
+ PU            | missing_oem_from_source      | 10060093   | CARB JET 4-PK MIK HJ350
+ PU            | missing_oem_from_source      | 10060094   | CARB JET 4-PK MIK HJ360
+ PU            | missing_oem_from_source      | 10060095   | CARB JET 4-PK MIK HJ370
+ PU            | missing_oem_from_source      | 10060096   | CARB JET 4-PK MIK HJ380
+(200 rows)
+
