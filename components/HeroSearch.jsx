@@ -232,8 +232,8 @@ export default function HeroSearch() {
       style={{
         position: "relative",
         background: DARK,
-        paddingTop: "clamp(80px, 12vw, 120px)",
-        paddingBottom: "clamp(48px, 7vw, 80px)",
+        paddingTop: "clamp(72px, 10vw, 96px)",
+        paddingBottom: "clamp(32px, 4vw, 48px)",
         paddingLeft: "clamp(20px, 5vw, 60px)",
         paddingRight: "clamp(20px, 5vw, 60px)",
         overflow: "hidden",
@@ -259,65 +259,19 @@ export default function HeroSearch() {
       <div style={{ position: "absolute", left: 0, right: 0, top: "68%", height: 1, background: "#0d0d0d", zIndex: 0 }} />
 
       {/* ── Content ─────────────────────────────────────────────── */}
-      <div style={{ position: "relative", zIndex: 1, maxWidth: 820, margin: "0 auto" }}>
-
-        {/* Eyebrow */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          style={{
-            fontFamily: "var(--font-stencil, 'Share Tech Mono', monospace)",
-            fontSize: "clamp(7px, 0.75vw, 9px)",
-            letterSpacing: "0.3em", color: GOLD,
-            textTransform: "uppercase", marginBottom: 20,
-          }}
-        >
-          ◈ &nbsp;88,000+ PARTS · WPS · PARTS UNLIMITED · VTWIN
-        </motion.div>
-
-        {/* Headline */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55, delay: 0.06 }}
-          style={{
-            fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
-            fontSize: "clamp(52px, 9vw, 108px)",
-            letterSpacing: "0.02em", lineHeight: 0.88,
-            color: LIGHT, marginBottom: 12,
-          }}
-        >
-          Find Your<br />
-          <span style={{ color: GOLD }}>Parts.</span>
-        </motion.div>
-
-        {/* Subline */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.4, delay: 0.18 }}
-          style={{
-            fontFamily: "var(--font-stencil, monospace)",
-            fontSize: "clamp(9px, 0.9vw, 11px)",
-            letterSpacing: "0.16em", color: "#3a3a3a",
-            textTransform: "uppercase", marginBottom: 36,
-          }}
-        >
-          Search OEM numbers, model names, brands, or part types
-        </motion.div>
+      <div style={{ position: "relative", zIndex: 1, maxWidth: 720, margin: "0 auto", display: "flex", flexDirection: "column", alignItems: "center" }}>
 
         {/* ── Search bar ────────────────────────────────────────── */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, delay: 0.22 }}
-          style={{ position: "relative" }}
+          style={{ position: "relative", width: "100%" }}
         >
           <form onSubmit={onSubmit}>
             <div style={{
               display: "flex",
-              border: `1.5px solid ${focused ? GOLD : "#1e1e1e"}`,
+              border: `1.5px solid ${GOLD}`,
               transition: "border-color 0.2s",
               background: "#050505",
             }}>
@@ -467,7 +421,7 @@ export default function HeroSearch() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.4 }}
-          style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 16 }}
+          style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 16, justifyContent: "center" }}
         >
           {["Knucklehead", "Panhead", "Shovelhead", "Sportster", "Twin Cam", "Milwaukee Eight"].map(term => (
             <button
