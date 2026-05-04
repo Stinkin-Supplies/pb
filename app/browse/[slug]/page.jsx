@@ -7,6 +7,7 @@
 // shape the UI expects.
 // ============================================================
 
+import SideNav from "components/SideNav";
 import { notFound } from "next/navigation";
 import getCatalogDb from "@/lib/db/catalog";
 import ProductDetailClient from "./ProductDetailClient";
