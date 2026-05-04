@@ -107,6 +107,47 @@ function FloatingHeader() {
   );
 }
 
+// ─── Split Text ───────────────────────────────────────────────────────────────
+
+function SplitText({ text, style }) {
+  const container = {
+    hidden: {},
+    visible: {
+      transition: { staggerChildren: 0.035, delayChildren: 0.1 },
+    },
+  };
+
+  const letter = {
+    hidden: { opacity: 0, y: 40, rotateX: 90 },
+    visible: {
+      opacity: 1, y: 0, rotateX: 0,
+      transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] },
+    },
+  };
+
+  return (
+    <motion.div
+      variants={container}
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: true, margin: "-60px" }}
+      style={{ display: "flex", flexWrap: "wrap", perspective: 600, ...style }}
+      aria-label={text}
+    >
+      {text.split("").map((char, i) => (
+        <motion.span
+          key={i}
+          variants={letter}
+          aria-hidden="true"
+          style={{ display: "inline-block", whiteSpace: char === " " ? "pre" : "normal" }}
+        >
+          {char}
+        </motion.span>
+      ))}
+    </motion.div>
+  );
+}
+
 // ─── Era Card ─────────────────────────────────────────────────────────────────
 
 function EraCard({ era, index }) {
@@ -200,12 +241,15 @@ function EraCard({ era, index }) {
               color: era.accent, textTransform: "uppercase", marginBottom: 10,
             }}>{era.year_range}</div>
 
-            <div style={{
-              fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
-              fontSize: "clamp(48px, 10vw, 120px)",
-              letterSpacing: "0.03em", lineHeight: 0.9,
-              color: LIGHT, marginBottom: 20,
-            }}>{era.display_name}</div>
+            <SplitText
+              text={era.display_name}
+              style={{
+                fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
+                fontSize: "clamp(48px, 10vw, 120px)",
+                letterSpacing: "0.03em", lineHeight: 0.9,
+                color: LIGHT, marginBottom: 20,
+              }}
+            />
 
             <motion.div
               variants={{
