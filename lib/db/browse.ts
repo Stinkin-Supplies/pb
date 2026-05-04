@@ -207,9 +207,10 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
   if (brand) { conditions.push(`cu.brand ILIKE $${p++}`); params.push(brand); }
   if (inStock) { conditions.push(`cu.in_stock = true`); }
   if (search) {
-    conditions.push(`(cu.name ILIKE $${p++} OR cu.brand ILIKE $${p} OR cu.sku ILIKE $${p} OR $${p} = ANY(cu.oem_numbers))`);
-    params.push(`%${search}%`);
-    p += 3;
+    const likeParam = p++;
+    const exactParam = p++;
+    conditions.push(`(cu.name ILIKE $${likeParam} OR cu.brand ILIKE $${likeParam} OR cu.sku ILIKE $${likeParam} OR $${exactParam}::text = ANY(cu.oem_numbers))`);
+    params.push(`%${search}%`, search);
   }
   if (minPrice != null) { conditions.push(`cu.computed_price >= $${p++}`); params.push(minPrice); }
   if (maxPrice != null) { conditions.push(`cu.computed_price <= $${p++}`); params.push(maxPrice); }
@@ -318,7 +319,7 @@ export async function quickSearch(q: string, limit = 8): Promise<CatalogProduct[
   const { rows } = await pool.query(
     `SELECT id, sku, slug, name, brand, category, computed_price, image_url, in_stock
      FROM catalog_unified
-     WHERE name ILIKE $1 OR sku ILIKE $2 OR brand ILIKE $1 OR $3 = ANY(oem_numbers)
+     WHERE name ILIKE $1 OR sku ILIKE $2 OR brand ILIKE $1 OR $3::text = ANY(oem_numbers)
      ORDER BY CASE WHEN sku ILIKE $2 THEN 0 ELSE 1 END, in_stock DESC, name
      LIMIT $4`,
     [`%${q}%`, `${q}%`, q, limit]

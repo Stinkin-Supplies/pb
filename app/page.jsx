@@ -12,6 +12,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
+import HeroSearch from "@/components/HeroSearch";
 import { ERAS } from "@/lib/eras/config";
 import { HARLEY_CATEGORIES } from "@/lib/harley/config";
 
@@ -76,7 +77,7 @@ function FloatingHeader() {
             fontSize: 22, letterSpacing: "0.06em", lineHeight: 1,
           }}
         >
-          STINKIN'<span style={{ color: scrolled ? TEAL : "#00000055" }}>'</span> SUPPLIES
+          STINKIN'<span style={{ color: scrolled ? TEAL : "#00000055" }}></span> SUPPLIES
         </motion.div>
       </Link>
 
@@ -432,9 +433,10 @@ export default function HomePage() {
   return (
     <div style={{ background: DARK, color: LIGHT, minHeight: "100vh" }}>
       <FloatingHeader />
+      <HeroSearch />  
 
       {/* Hero — era cards */}
-      <section id="eras" style={{ paddingTop: 52 }}>
+      <section id="eras" style={{ paddingTop: 0 }}>
         {/* Section label */}
         <div style={{
           padding: "40px 20px 24px",

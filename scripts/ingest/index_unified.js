@@ -58,6 +58,7 @@ const SCHEMA = {
     { name: 'category',          type: 'string',   facet: true, optional: true },
     { name: 'subcategory',       type: 'string',   facet: true, optional: true },
     { name: 'oem_part_number',   type: 'string',   optional: true },
+    { name: 'oem_numbers',       type: 'string[]', optional: true },
     { name: 'upc',               type: 'string',   optional: true },
     { name: 'uom',               type: 'string',   optional: true },
 
@@ -148,6 +149,7 @@ function transform(row) {
     category:         row.category || undefined,
     subcategory:      row.subcategory || undefined,
     oem_part_number:  row.oem_part_number || undefined,
+    oem_numbers:      Array.isArray(row.oem_numbers) && row.oem_numbers.length ? row.oem_numbers : undefined,
     upc:              row.upc || undefined,
     uom:              row.uom || undefined,
 
