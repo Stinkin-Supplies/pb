@@ -6,6 +6,7 @@
  * Scalable: all queries go through /api/browse/products.
  */
 
+import SideNav from "@/components/SideNav";
 import { useState, useEffect, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
