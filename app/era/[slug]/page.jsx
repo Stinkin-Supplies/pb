@@ -45,11 +45,11 @@ function ProductCard({ product, index, accent }) {
     >
       <Link href={`/browse/${product.slug}`} style={{ textDecoration: "none", display: "block" }}>
         <motion.div
-          whileHover={{ y: -3 }}
+          whileHover={{ y: -3, boxShadow: "0 4px 16px rgba(201,168,76,0.18)" }}          
           transition={{ type: "spring", stiffness: 400, damping: 28 }}
           style={{
             background: "#ffffff",
-            border: "1.5px solid #2a2a2a",
+            border: "1.5px solid #b8952e",
             boxShadow: "0 1px 0 rgba(0,0,0,0.06)",
             overflow: "hidden",
             position: "relative",

@@ -182,18 +182,14 @@ function EraCard({ era, index }) {
             backgroundImage: `url(/images/eras/${era.slug}.webp)`,
             backgroundSize: "cover",
             backgroundPosition: "center",
-            border: "1px solid #181818",
+            border: "1.5px solid #b8952e",
+            outline: "1px solid #b8952e",
+            outlineOffset: "-1px",
             overflow: "hidden",
             cursor: "pointer",
             minHeight: 220,
           }}
         >
-          {/* Accent bar */}
-          <div style={{
-            position: "absolute", top: 0, left: 0, bottom: 0,
-            width: 3, background: era.accent,
-            zIndex: 3,
-          }} />
 
           {/* Hover glow */}
           <motion.div
