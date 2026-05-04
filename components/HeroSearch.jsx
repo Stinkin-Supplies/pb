@@ -75,7 +75,7 @@ function CyclingPlaceholder({ hidden }) {
 // ─── Search result row ─────────────────────────────────────────────────────────
 
 function ResultRow({ hit, index }) {
-  const doc = hit.document;
+  const doc = hit.document ?? hit;
   const oemList = Array.isArray(doc.oem_numbers) ? doc.oem_numbers.slice(0, 3) : [];
 
   return (
