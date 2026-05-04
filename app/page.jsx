@@ -12,6 +12,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
+import SideNav from "@/components/SideNav";
 import HeroSearch from "@/components/HeroSearch";
 import { ERAS } from "@/lib/eras/config";
 import { HARLEY_CATEGORIES } from "@/lib/harley/config";
@@ -49,61 +50,26 @@ function FloatingHeader() {
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
   return (
     <motion.header
-        animate={{
-          background: scrolled ? "rgba(8,8,8,0.96)" : TEAL,
-          borderBottomColor: scrolled ? "#1a1a1a" : "rgba(26,26,26,0)",
-        }}
+      animate={{
+        background: 'rgba(8,8,8,0.96)',
+        borderBottomColor: scrolled ? '#1a1a1a' : 'rgba(26,26,26,0)',
+      }}
       transition={{ duration: 0.3 }}
       style={{
-        position: "fixed", top: 0, left: 0, right: 0, zIndex: 90,
-        height: 52, display: "flex", alignItems: "center",
-        justifyContent: "space-between", padding: "0 20px",
-        borderBottom: "1px solid rgba(0,0,0,0)",
-        backdropFilter: "blur(12px)",
+        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 90,
+        height: 120, display: 'flex', alignItems: 'center',
+        justifyContent: 'flex-end', padding: '0 20px',
+        borderBottom: '1px solid rgba(0,0,0,0)',
+        backdropFilter: 'blur(12px)',
       }}
     >
-      {/* Logo */}
-      <Link href="/" style={{ textDecoration: "none" }}>
-        <motion.div
-          animate={{ color: scrolled ? LIGHT : DARK }}
-          style={{
-            fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
-            fontSize: 22, letterSpacing: "0.06em", lineHeight: 1,
-          }}
-        >
-          STINKIN'<span style={{ color: scrolled ? TEAL : "#00000055" }}></span> SUPPLIES
-        </motion.div>
-      </Link>
-
-      {/* Right — search + garage */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <Link href="/search" style={{
-          display: "flex", alignItems: "center", justifyContent: "center",
-          width: 36, height: 36, textDecoration: "none",
-          border: `1px solid ${scrolled ? "#222" : "#00000033"}`,
-          color: scrolled ? "#888" : DARK,
-          transition: "all 0.2s",
-        }}>
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.5"/>
-            <path d="M9.5 9.5L13 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-          </svg>
-        </Link>
-        <Link href="/garage" style={{
-          fontFamily: "var(--font-stencil, 'Share Tech Mono', monospace)",
-          fontSize: 8, letterSpacing: "0.2em", textTransform: "uppercase",
-          textDecoration: "none", padding: "8px 14px",
-          border: `1px solid ${scrolled ? "#222" : "#00000033"}`,
-          color: scrolled ? "#888" : DARK,
-          transition: "all 0.2s",
-        }}>My Garage</Link>
-      </div>
+      <SideNav />
     </motion.header>
   );
 }
@@ -433,7 +399,7 @@ export default function HomePage() {
   return (
     <div style={{ background: DARK, color: LIGHT, minHeight: "100vh" }}>
       <FloatingHeader />
-      <HeroSearch />  
+        
 
       {/* Hero — era cards */}
       <section id="eras" style={{ paddingTop: 0 }}>
