@@ -15,15 +15,93 @@ const NAV_ITEMS = [
   { label: "Shop All Parts", sub: "88,000+ products",           href: "/browse",               icon: "◈" },
   { label: "Era",            sub: "Shop by engine generation",  href: "/#eras",               icon: "◆" },
   { label: "Model",          sub: "Filter by HD model code",    href: "/browse?filter=model", icon: "◇" },
-  { label: "OEM",            sub: "Search by OEM part number",  href: "/browse?filter=oem",   icon: "○" },
+  { label: "Category",       sub: "Search by category",         href: "/browse?filter=oem",   icon: "○" },
   { label: "My Garage",      sub: "Your saved bikes & parts",   href: "/garage",              icon: "◉", gold: true },
 ];
 
 export default function SideNav() {
   const [open, setOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState('');
 
   return (
-    <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+    <>
+    {/* Search dropdown — slides down below header */}
+    <AnimatePresence>
+      {searchOpen && (
+        <motion.div
+          key="searchbar"
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.2 }}
+          style={{
+            position: 'fixed',
+            top: 120,
+            left: 0, right: 0,
+            zIndex: 89,
+            display: 'flex',
+            justifyContent: 'center',
+            padding: '12px 20px',
+            background: 'rgba(8,8,8,0.97)',
+            borderBottom: `1px solid ${GOLD}33`,
+            backdropFilter: 'blur(12px)',
+          }}
+        >
+          <form
+            onSubmit={e => { e.preventDefault(); if(query.trim()) { window.location.href = '/browse?q=' + encodeURIComponent(query.trim()); }}}
+            style={{ display: 'flex', width: '100%', maxWidth: 640, gap: 0 }}
+          >
+            <input
+              autoFocus
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              onKeyDown={e => e.key === 'Escape' && setSearchOpen(false)}
+              placeholder="OEM · MODEL · PART"
+              autoComplete="off"
+              style={{
+                flex: 1,
+                height: 42,
+                background: '#0e0e0e',
+                border: `1.5px solid ${GOLD}`,
+                borderRight: 'none',
+                color: '#e8e2d8',
+                fontFamily: "var(--font-stencil, 'Share Tech Mono', monospace)",
+                fontSize: 13, letterSpacing: '0.1em',
+                padding: '0 16px',
+                outline: 'none',
+                textTransform: 'uppercase',
+                caretColor: GOLD,
+              }}
+            />
+            <button
+              type="submit"
+              style={{
+                height: 42, padding: '0 20px',
+                background: GOLD, border: 'none',
+                fontFamily: "var(--font-stencil, monospace)",
+                fontSize: 9, letterSpacing: '0.2em',
+                textTransform: 'uppercase',
+                color: '#080808', cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >Search</button>
+            <button
+              type="button"
+              onClick={() => setSearchOpen(false)}
+              style={{
+                height: 42, width: 42,
+                background: '#111', border: `1.5px solid ${GOLD}44`,
+                borderLeft: 'none',
+                color: GOLD, cursor: 'pointer', fontSize: 16,
+              }}
+            >✕</button>
+          </form>
+        </motion.div>
+      )}
+    </AnimatePresence>
+
+    <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 16 }}>
 
       {/* ── Expanded panel — animates from logo position ── */}
       <AnimatePresence>
@@ -195,6 +273,29 @@ export default function SideNav() {
         )}
       </AnimatePresence>
 
+      {/* ── Search icon trigger ── */}
+      <motion.button
+        onClick={() => { setSearchOpen(v => !v); setOpen(false); }}
+        aria-label="Search"
+        whileHover={{ scale: 1.08 }}
+        whileTap={{ scale: 0.92 }}
+        style={{
+          background: 'none', border: 'none',
+          cursor: 'pointer', padding: 0,
+          display: 'flex', alignItems: 'center',
+        }}
+      >
+        <img
+          src="/images/searchicon.png"
+          alt="Search"
+          style={{
+            height:40, width: 'auto', display: 'block',
+            filter: searchOpen ? `drop-shadow(0 0 8px ${GOLD}bb)` : 'brightness(0.7)',
+            transition: 'filter 0.2s',
+          }}
+        />
+      </motion.button>
+
       {/* ── Logo trigger ── */}
       <motion.button
         onClick={() => setOpen(v => !v)}
@@ -219,5 +320,6 @@ export default function SideNav() {
         />
       </motion.button>
     </div>
+  </>
   );
 }
