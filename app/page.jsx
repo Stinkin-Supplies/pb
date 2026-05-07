@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
 
 // ─── Era Data ────────────────────────────────────────────────────────────────
 const ERAS = [
@@ -19,103 +19,136 @@ const ERAS = [
   { name: 'Other',              slug: 'other',                years: '' },
 ];
 
-// ─── Combobox ─────────────────────────────────────────────────────────────────
-function ModelCombobox() {
-  const router = useRouter();
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState([]);
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [highlighted, setHighlighted] = useState(-1);
-  const inputRef = useRef(null);
-  const listRef = useRef(null);
-  const debounceRef = useRef(null);
+// Generate years 1930 → current year
+const YEARS = Array.from(
+  { length: new Date().getFullYear() - 1930 + 1 },
+  (_, i) => new Date().getFullYear() - i
+);
 
-  const search = useCallback(async (q) => {
-    if (!q || q.length < 2) { setResults([]); setOpen(false); return; }
+// ─── Model Search — Year dropdown + Modal ────────────────────────────────────
+function ModelSearch() {
+  const router = useRouter();
+  const [selectedYear, setSelectedYear] = useState('');
+  const [models, setModels] = useState([]);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const openModal = async (year) => {
+    if (!year) return;
     setLoading(true);
+    setModalOpen(true);
     try {
-      const res = await fetch(`/api/models/search?q=${encodeURIComponent(q)}`);
+      const res = await fetch(`/api/models/search?q=${year}`);
       const data = await res.json();
-      setResults(data.results || []);
-      setOpen(true);
-      setHighlighted(-1);
+      const sorted = (data.results || []).sort((a, b) =>
+        a.model_name.localeCompare(b.model_name)
+      );
+      setModels(sorted);
     } catch {
-      setResults([]);
+      setModels([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
-  useEffect(() => {
-    clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => search(query), 220);
-    return () => clearTimeout(debounceRef.current);
-  }, [query, search]);
-
-  const select = (item) => {
-    setQuery(`${item.year} ${item.model_name}`);
-    setOpen(false);
+  const selectModel = (item) => {
+    setModalOpen(false);
     router.push(`/browse?year=${item.year}&model=${encodeURIComponent(item.model_code)}&family=${encodeURIComponent(item.family)}`);
   };
 
-  const onKeyDown = (e) => {
-    if (!open || !results.length) return;
-    if (e.key === 'ArrowDown') { e.preventDefault(); setHighlighted(h => Math.min(h + 1, results.length - 1)); }
-    if (e.key === 'ArrowUp')   { e.preventDefault(); setHighlighted(h => Math.max(h - 1, 0)); }
-    if (e.key === 'Enter' && highlighted >= 0) { e.preventDefault(); select(results[highlighted]); }
-    if (e.key === 'Escape') setOpen(false);
+  const handleYearChange = (e) => {
+    const year = e.target.value;
+    setSelectedYear(year);
+    if (year) openModal(year);
   };
 
-  // scroll highlighted into view
+  // Close modal on Escape
   useEffect(() => {
-    if (highlighted >= 0 && listRef.current) {
-      const el = listRef.current.children[highlighted];
-      el?.scrollIntoView({ block: 'nearest' });
-    }
-  }, [highlighted]);
+    const fn = (e) => { if (e.key === 'Escape') setModalOpen(false); };
+    window.addEventListener('keydown', fn);
+    return () => window.removeEventListener('keydown', fn);
+  }, []);
 
   return (
-    <div className="combobox-wrap">
-      <div className="combobox-input-row">
-        <svg className="search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-        </svg>
-        <input
-          ref={inputRef}
-          className="combobox-input"
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          onKeyDown={onKeyDown}
-          onFocus={() => results.length && setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 150)}
-          placeholder="Type a year, model, or era…"
-          autoComplete="off"
-          spellCheck="false"
-        />
-        {loading && <span className="spinner" />}
+    <>
+      <div className="model-search-wrap">
+        <div className="year-select-row">
+          <svg className="select-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+          </svg>
+          <select
+            className="year-select"
+            value={selectedYear}
+            onChange={handleYearChange}
+          >
+            <option value="">Select a year…</option>
+            {YEARS.map(y => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+          <svg className="chevron-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="m6 9 6 6 6-6"/>
+          </svg>
+        </div>
+        {selectedYear && (
+          <button className="change-year-btn" onClick={() => { setSelectedYear(''); setModels([]); }}>
+            Clear
+          </button>
+        )}
       </div>
 
-      {open && results.length > 0 && (
-        <ul ref={listRef} className="combobox-list" role="listbox">
-          {results.map((item, i) => (
-            <li
-              key={`${item.year}-${item.model_code}`}
-              className={`combobox-item ${i === highlighted ? 'highlighted' : ''}`}
-              onMouseDown={() => select(item)}
-              onMouseEnter={() => setHighlighted(i)}
-              role="option"
-            >
-              <span className="item-year">{item.year}</span>
-              <span className="item-name">{item.model_name}</span>
-              <span className="item-family">{item.family}</span>
-            </li>
-          ))}
-        </ul>
+      {/* ── Modal — portaled to body to escape tile stacking context */}
+      {modalOpen && typeof document !== 'undefined' && createPortal(
+        <div className="model-modal-overlay" onClick={() => setModalOpen(false)}>
+          <div className="model-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <span className="modal-eyebrow">Select your model</span>
+                <h3 className="modal-title">{selectedYear} Models</h3>
+              </div>
+              <button className="modal-close" onClick={() => setModalOpen(false)}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
+                  <path d="M18 6 6 18M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+
+            <div className="modal-body">
+              {loading ? (
+                <div className="modal-loading">
+                  <span className="spinner" />
+                  <span>Loading models…</span>
+                </div>
+              ) : models.length === 0 ? (
+                <p className="modal-empty">No models found for {selectedYear}.</p>
+              ) : (
+                <ul className="model-list">
+                  {models.map(item => (
+                    <li key={`${item.year}-${item.model_code}`}>
+                      <button className="model-list-item" onClick={() => selectModel(item)}>
+                        <span className="mli-name">{item.model_name}</span>
+                        <span className="mli-meta">
+                          <span className="mli-code">{item.model_code}</span>
+                          <span className="mli-family">{item.family}</span>
+                        </span>
+                        <svg className="mli-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                          <path d="m9 18 6-6-6-6"/>
+                        </svg>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   );
 }
+
+
 
 // ─── Era Slider ───────────────────────────────────────────────────────────────
 function EraSlider() {
@@ -175,7 +208,7 @@ function FloatingNav() {
   return (
     <nav className={`float-nav ${scrolled ? 'scrolled' : ''}`}>
       <Link href="/" className="nav-logo">
-        <Image src="/logo.png" alt="Stinkin' Supplies" width={120} height={40} style={{ objectFit: 'contain' }} />
+        <img src="/logo.svg" alt="Stinkin' Supplies" style={{ height: '100px', width: 'auto', objectFit: 'contain' }} />
       </Link>
       <div className="nav-links">
         <Link href="/browse">Browse</Link>
@@ -201,7 +234,7 @@ export default function HomePage() {
           <div className="tile-inner">
             <p className="tile-eyebrow">Find parts for your bike</p>
             <h2 className="tile-heading">What are you riding?</h2>
-            <ModelCombobox />
+            <ModelSearch />
           </div>
         </section>
 
@@ -289,7 +322,7 @@ export default function HomePage() {
           background-image:
             radial-gradient(ellipse 80% 50% at 20% 10%, rgba(201,168,76,0.06) 0%, transparent 60%),
             radial-gradient(ellipse 60% 40% at 80% 80%, rgba(201,168,76,0.04) 0%, transparent 50%);
-          padding: 100px var(--gap) var(--gap);
+          padding: 160px var(--gap) var(--gap);
           display: grid;
           grid-template-columns: 1fr 1fr 1fr;
           grid-template-rows: auto auto auto auto;
@@ -308,7 +341,7 @@ export default function HomePage() {
           background: var(--surface);
           border: 1px solid var(--border-dim);
           border-radius: var(--radius);
-          overflow: hidden;
+          overflow: visible;
           position: relative;
           opacity: 0;
           transform: translateY(20px);
@@ -447,32 +480,33 @@ export default function HomePage() {
           background: linear-gradient(90deg, transparent, var(--gold), transparent);
         }
 
-        /* ── Combobox */
-        .combobox-wrap {
-          position: relative;
-          width: 100%;
-          max-width: 540px;
-          margin-top: 8px;
+        /* ── Year Select + Modal */
+        .model-search-wrap {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin-top: 12px;
+          max-width: 400px;
         }
-        .combobox-input-row {
+        .year-select-row {
+          flex: 1;
           display: flex;
           align-items: center;
           gap: 10px;
           background: var(--surface-2);
           border: 1px solid var(--border-dim);
           border-radius: var(--radius-sm);
-          padding: 0 16px;
+          padding: 0 14px;
           transition: border-color 0.2s;
+          cursor: pointer;
         }
-        .combobox-input-row:focus-within {
-          border-color: var(--gold-dim);
-        }
-        .search-ico {
-          width: 16px; height: 16px;
-          color: var(--text-dim);
+        .year-select-row:focus-within { border-color: var(--gold-dim); }
+        .select-ico {
+          width: 15px; height: 15px;
+          color: var(--gold-dim);
           flex-shrink: 0;
         }
-        .combobox-input {
+        .year-select {
           flex: 1;
           background: transparent;
           border: none;
@@ -480,14 +514,38 @@ export default function HomePage() {
           padding: 14px 0;
           font-family: var(--font-display);
           font-size: 16px;
-          letter-spacing: 0.03em;
+          letter-spacing: 0.04em;
           color: var(--white);
-          caret-color: var(--gold);
+          cursor: pointer;
+          appearance: none;
+          -webkit-appearance: none;
         }
-        .combobox-input::placeholder { color: var(--text-dim); }
+        .year-select option { background: var(--surface-2); color: var(--white); }
+        .chevron-ico {
+          width: 16px; height: 16px;
+          color: var(--text-dim);
+          flex-shrink: 0;
+          pointer-events: none;
+        }
+        .change-year-btn {
+          background: transparent;
+          border: 1px solid var(--border-dim);
+          border-radius: var(--radius-sm);
+          padding: 8px 14px;
+          font-family: var(--font-mono);
+          font-size: 11px;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          color: var(--text-dim);
+          cursor: pointer;
+          transition: color 0.2s, border-color 0.2s;
+          white-space: nowrap;
+        }
+        .change-year-btn:hover { color: var(--white); border-color: rgba(255,255,255,0.2); }
 
+        /* ── Spinner */
         .spinner {
-          width: 14px; height: 14px;
+          width: 18px; height: 18px;
           border: 2px solid var(--border-dim);
           border-top-color: var(--gold);
           border-radius: 50%;
@@ -496,52 +554,148 @@ export default function HomePage() {
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        .combobox-list {
-          position: absolute;
-          top: calc(100% + 6px);
-          left: 0; right: 0;
-          background: var(--surface-2);
+        /* ── Modal overlay */
+        .model-modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0,0,0,0.75);
+          backdrop-filter: blur(6px);
+          -webkit-backdrop-filter: blur(6px);
+          z-index: 1000;
+          display: flex;
+          align-items: flex-end;
+          justify-content: center;
+          animation: overlayIn 0.2s ease forwards;
+        }
+        @keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .model-modal {
+          background: var(--surface);
+          border: 1px solid var(--border);
+          border-bottom: none;
+          border-radius: var(--radius) var(--radius) 0 0;
+          width: min(560px, 100vw);
+          max-height: 75vh;
+          display: flex;
+          flex-direction: column;
+          animation: modalUp 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        @keyframes modalUp {
+          from { transform: translateY(40px); opacity: 0; }
+          to   { transform: translateY(0);    opacity: 1; }
+        }
+
+        .modal-header {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          padding: 24px 24px 16px;
+          border-bottom: 1px solid var(--border-dim);
+          flex-shrink: 0;
+        }
+        .modal-eyebrow {
+          display: block;
+          font-family: var(--font-mono);
+          font-size: 10px;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          color: var(--gold);
+          margin-bottom: 4px;
+        }
+        .modal-title {
+          font-family: var(--font-display);
+          font-size: 26px;
+          font-weight: 700;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          color: var(--white);
+        }
+        .modal-close {
+          background: transparent;
           border: 1px solid var(--border-dim);
-          border-radius: var(--radius-sm);
-          list-style: none;
-          max-height: 320px;
+          border-radius: 50%;
+          width: 36px; height: 36px;
+          display: flex; align-items: center; justify-content: center;
+          color: var(--text-dim);
+          cursor: pointer;
+          transition: color 0.2s, border-color 0.2s;
+          flex-shrink: 0;
+        }
+        .modal-close:hover { color: var(--white); border-color: rgba(255,255,255,0.3); }
+
+        .modal-body {
           overflow-y: auto;
-          z-index: 100;
-          box-shadow: 0 16px 48px rgba(0,0,0,0.6);
+          flex: 1;
           scrollbar-width: thin;
           scrollbar-color: var(--gold-dim) transparent;
         }
-        .combobox-item {
-          display: grid;
-          grid-template-columns: 52px 1fr auto;
-          align-items: center;
-          gap: 12px;
-          padding: 11px 16px;
-          cursor: pointer;
-          border-bottom: 1px solid var(--border-dim);
-          transition: background 0.12s;
-        }
-        .combobox-item:last-child { border-bottom: none; }
-        .combobox-item.highlighted,
-        .combobox-item:hover { background: rgba(201,168,76,0.08); }
 
-        .item-year {
+        .modal-loading {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 12px;
+          padding: 48px;
+          font-family: var(--font-mono);
+          font-size: 12px;
+          color: var(--text-dim);
+          letter-spacing: 0.08em;
+        }
+        .modal-empty {
+          text-align: center;
+          padding: 48px;
           font-family: var(--font-mono);
           font-size: 13px;
-          color: var(--gold);
-          letter-spacing: 0.05em;
+          color: var(--text-dim);
         }
-        .item-name {
-          font-size: 14px;
+
+        .model-list {
+          list-style: none;
+          padding: 8px 0;
+        }
+        .model-list-item {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 14px 24px;
+          background: transparent;
+          border: none;
+          border-bottom: 1px solid var(--border-dim);
+          cursor: pointer;
+          text-align: left;
+          transition: background 0.15s;
+        }
+        .model-list li:last-child .model-list-item { border-bottom: none; }
+        .model-list-item:hover { background: rgba(201,168,76,0.07); }
+
+        .mli-name {
+          font-family: var(--font-display);
+          font-size: 17px;
+          font-weight: 600;
+          letter-spacing: 0.03em;
           color: var(--white);
-          letter-spacing: 0.02em;
+          flex: 1;
         }
-        .item-family {
+        .mli-meta {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          gap: 2px;
+        }
+        .mli-code {
           font-family: var(--font-mono);
           font-size: 11px;
-          color: var(--text-dim);
-          text-align: right;
+          color: var(--gold);
+          letter-spacing: 0.08em;
         }
+        .mli-family {
+          font-family: var(--font-mono);
+          font-size: 10px;
+          color: var(--text-dim);
+          letter-spacing: 0.06em;
+        }
+        .mli-arrow { color: var(--text-dim); flex-shrink: 0; }
 
         /* ── Era slider */
         .era-slider-outer {
@@ -653,7 +807,7 @@ export default function HomePage() {
           align-items: center;
           justify-content: space-between;
           gap: 32px;
-          padding: 10px 20px 10px 16px;
+          padding: 14px 20px 14px 16px;
           background: rgba(10,10,10,0.6);
           backdrop-filter: blur(20px) saturate(180%);
           -webkit-backdrop-filter: blur(20px) saturate(180%);
@@ -695,7 +849,7 @@ export default function HomePage() {
               "eras    eras"
               "cat     model"
               "deals   deals";
-            padding-top: 88px;
+            padding-top: 148px;
           }
           .tile-inner { padding: 24px 22px; }
           .tile-inner--eras { padding: 20px 0 20px 22px; }
