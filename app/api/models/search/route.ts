@@ -2,11 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
 
 const pool = new Pool({
-  host: '2a01:4ff:f0:fa6f::1',
-  port: 5432,
-  database: 'stinkin_catalog',
-  user: 'catalog_app',
-  password: 'smelly',
+  connectionString: process.env.CATALOG_DATABASE_URL,
+  ssl: false,
 });
 
 export async function GET(req: NextRequest) {
