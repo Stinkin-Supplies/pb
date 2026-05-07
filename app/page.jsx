@@ -723,62 +723,128 @@ export default function HomePage() {
           .era-card-face  { border-radius: 16px; }
         }
 
-        /* ── Floating nav */
-        .float-nav {
+        /* ══════════════════════════════════════════════════════
+           FLOATING NAV — dark glass pill sitting on a gold cloud
+           ══════════════════════════════════════════════════════ */
+
+        /* Wrapper positions both the glow layer and the pill */
+        .nav-cloud-wrap {
           position: fixed;
-          top: 16px;
+          top: 12px;
           left: 50%;
           transform: translateX(-50%);
           z-index: 300;
+          width: min(860px, calc(100vw - 32px));
+          transition: opacity 0.35s ease, transform 0.35s cubic-bezier(0.22,1,0.36,1);
+        }
+
+        /* The golden cloud — blurred blob sitting behind the pill */
+        .nav-cloud-wrap::before {
+          content: '';
+          position: absolute;
+          inset: 8px 20px -4px;
+          border-radius: 999px;
+          background: radial-gradient(
+            ellipse 80% 60% at 50% 100%,
+            rgba(201,168,76,0.55) 0%,
+            rgba(180,140,20,0.28) 45%,
+            transparent 75%
+          );
+          filter: blur(14px);
+          z-index: 0;
+          transition: opacity 0.3s;
+          pointer-events: none;
+        }
+
+        /* Brighter cloud on scroll — nav is more prominent */
+        .nav-cloud-wrap.scrolled::before {
+          background: radial-gradient(
+            ellipse 80% 60% at 50% 100%,
+            rgba(212,175,55,0.7) 0%,
+            rgba(180,140,20,0.38) 45%,
+            transparent 75%
+          );
+          filter: blur(18px);
+        }
+
+        /* The dark glass pill itself */
+        .float-nav {
+          position: relative;
+          z-index: 1;
           display: flex;
           align-items: center;
           justify-content: space-between;
           gap: 32px;
-          padding: 14px 20px 14px 16px;
-          background: rgba(10,10,10,0.6);
-          backdrop-filter: blur(20px) saturate(180%);
-          -webkit-backdrop-filter: blur(20px) saturate(180%);
-          border: 1px solid var(--border-dim);
+          padding: 10px 20px 10px 14px;
+          background: rgba(8, 8, 8, 0.78);
+          backdrop-filter: blur(22px) saturate(160%);
+          -webkit-backdrop-filter: blur(22px) saturate(160%);
+          border: 1px solid rgba(201,168,76,0.22);
           border-radius: 999px;
-          width: min(860px, calc(100vw - 32px));
-          transition: background 0.3s, border-color 0.3s,
-                      opacity 0.35s ease, transform 0.35s cubic-bezier(0.22,1,0.36,1);
+          /* Subtle gold rim glow on the bottom edge */
+          box-shadow:
+            0 1px 0 rgba(201,168,76,0.18) inset,
+            0 -1px 0 rgba(201,168,76,0.08) inset,
+            0 2px 12px rgba(0,0,0,0.6);
+          transition: background 0.3s, border-color 0.3s;
         }
-        .float-nav.scrolled {
-          background: rgba(10,10,10,0.85);
-          border-color: var(--border);
-        }
-        /* Animate out when minimized */
-        .float-nav.nav-hidden {
-          opacity: 0;
-          pointer-events: none;
-          transform: translateX(-50%) translateY(-12px) scale(0.96);
-        }
-        .float-nav.nav-visible {
-          opacity: 1;
-          pointer-events: auto;
-          transform: translateX(-50%) translateY(0) scale(1);
+        .nav-cloud-wrap.scrolled .float-nav {
+          background: rgba(6, 6, 6, 0.9);
+          border-color: rgba(201,168,76,0.35);
+          box-shadow:
+            0 1px 0 rgba(201,168,76,0.25) inset,
+            0 -1px 0 rgba(201,168,76,0.1) inset,
+            0 4px 20px rgba(0,0,0,0.7);
         }
 
-        /* Mini floating icon — shown when nav is collapsed */
+        /* ── HD Bar & Shield mini button ──────────────────── */
         .nav-mini {
           position: fixed;
-          top: 16px;
+          top: 10px;
           left: 16px;
           z-index: 300;
-          width: 56px;
-          height: 56px;
-          border-radius: 50%;
-          background: rgba(10,10,10,0.85);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
-          border: 1px solid var(--border);
+          width: 62px;
+          height: 46px;
+          background: rgba(8,8,8,0.88);
+          border: none;
+          cursor: pointer;
+          padding: 0;
           display: flex;
           align-items: center;
           justify-content: center;
-          cursor: pointer;
-          padding: 0;
-          transition: border-color 0.2s, transform 0.2s, background 0.2s;
+          /* Clip to HD bar & shield silhouette */
+          clip-path: polygon(
+            49.41% 0%,
+            32.99% 10.38%,
+            16.27% 14.57%,
+            16.12% 22.16%,
+            19.82% 28.94%,
+            19.23% 31.94%,
+            0.44%  32.34%,
+            0.59%  65.07%,
+            18.64% 65.87%,
+            19.38% 67.66%,
+            16.12% 72.65%,
+            16.57% 74.85%,
+            37.28% 92.22%,
+            48.37% 99.20%,
+            52.81% 99.80%,
+            61.39% 95.21%,
+            83.14% 75.05%,
+            84.76% 70.46%,
+            82.10% 65.07%,
+            99.85% 64.67%,
+            99.26% 36.73%,
+            98.22% 32.34%,
+            96.45% 31.14%,
+            78.70% 30.94%,
+            83.43% 20.36%,
+            81.66% 14.77%,
+            60.65% 7.58%
+          );
+          /* Gold cloud glow underneath */
+          filter: drop-shadow(0 6px 12px rgba(201,168,76,0.5)) drop-shadow(0 2px 4px rgba(0,0,0,0.8));
+          transition: filter 0.2s, transform 0.2s, opacity 0.25s;
           animation: miniIn 0.3s cubic-bezier(0.22,1,0.36,1) forwards;
         }
         @keyframes miniIn {
@@ -786,15 +852,15 @@ export default function HomePage() {
           to   { opacity: 1; transform: scale(1); }
         }
         .nav-mini:hover {
-          border-color: var(--gold);
+          filter: drop-shadow(0 8px 18px rgba(212,175,55,0.75)) drop-shadow(0 2px 6px rgba(0,0,0,0.9));
           transform: scale(1.08);
-          background: rgba(20,20,20,0.95);
         }
         .nav-mini-logo {
           width: 38px;
           height: 38px;
           object-fit: contain;
-          border-radius: 50%;
+          display: block;
+          /* No border-radius — the clip-path handles the shape */
         }
 
         /* Close button inside nav when manually opened */
