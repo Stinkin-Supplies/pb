@@ -1,481 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { createPortal } from 'react-dom';
-import { useRouter } from 'next/navigation';
+import FloatingNav    from '@/components/home/FloatingNav';
+import SmokeBackground from '@/components/home/SmokeBackground';
+import ModelSearch    from '@/components/home/ModelSearch';
+import EraCarousel   from '@/components/home/EraCarousel';
 import Link from 'next/link';
 
-// ─── Era Data ────────────────────────────────────────────────────────────────
-const ERAS = [
-  { name: 'Flathead',        slug: 'flathead',          img: 'flathead.webp',           years: '1930–1952' },
-  { name: 'Knucklehead',     slug: 'knucklehead',       img: 'knucklehead.webp',        years: '1936–1947' },
-  { name: 'Panhead',         slug: 'panhead',           img: 'panhead.webp',            years: '1948–1965' },
-  { name: 'Shovelhead',      slug: 'shovelhead',        img: 'shovelhead.webp',         years: '1966–1984' },
-  { name: 'Ironhead',        slug: 'ironhead-sportster',img: 'ironhead-sportster.webp', years: '1957–1985' },
-  { name: 'Evolution',       slug: 'evolution',         img: 'evolution.webp',          years: '1984–1999' },
-  { name: 'Evo Sportster',   slug: 'evo-sportster',     img: 'evo-sportster.webp',      years: '1986–2021' },
-  { name: 'Twin Cam',        slug: 'twin-cam',          img: 'twin-cam.webp',           years: '1999–2017' },
-  { name: 'Milwaukee Eight', slug: 'milwaukee-8',       img: 'milwaukee-8.webp',        years: '2017–present' },
-  { name: 'Chopper',         slug: 'chopper',           img: null,                      years: 'Universal' },
-];
-
-// Generate years 1930 → current year
-const YEARS = Array.from(
-  { length: new Date().getFullYear() - 1930 + 1 },
-  (_, i) => new Date().getFullYear() - i
-);
-
-// ─── Model Search — Year dropdown + Modal ────────────────────────────────────
-function ModelSearch() {
-  const router = useRouter();
-  const [selectedYear, setSelectedYear] = useState('');
-  const [models, setModels] = useState([]);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-
-  const openModal = async (year) => {
-    if (!year) return;
-    setLoading(true);
-    setModalOpen(true);
-    try {
-      const res = await fetch(`/api/models/search?q=${year}`);
-      const data = await res.json();
-      const sorted = (data.results || []).sort((a, b) =>
-        a.model_name.localeCompare(b.model_name)
-      );
-      setModels(sorted);
-    } catch {
-      setModels([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const selectModel = (item) => {
-    setModalOpen(false);
-    router.push(`/browse?year=${item.year}&model=${encodeURIComponent(item.model_code)}&family=${encodeURIComponent(item.family)}`);
-  };
-
-  const handleYearChange = (e) => {
-    const year = e.target.value;
-    setSelectedYear(year);
-    if (year) openModal(year);
-  };
-
-  // Close modal on Escape
-  useEffect(() => {
-    const fn = (e) => { if (e.key === 'Escape') setModalOpen(false); };
-    window.addEventListener('keydown', fn);
-    return () => window.removeEventListener('keydown', fn);
-  }, []);
-
-  return (
-    <>
-      <div className="model-search-wrap">
-        <div className="year-select-row">
-          <svg className="select-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
-          </svg>
-          <select
-            className="year-select"
-            value={selectedYear}
-            onChange={handleYearChange}
-          >
-            <option value="">Select a year…</option>
-            {YEARS.map(y => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
-          <svg className="chevron-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="m6 9 6 6 6-6"/>
-          </svg>
-        </div>
-        {selectedYear && (
-          <button className="change-year-btn" onClick={() => { setSelectedYear(''); setModels([]); }}>
-            Clear
-          </button>
-        )}
-      </div>
-
-      {/* ── Modal — portaled to body to escape tile stacking context */}
-      {modalOpen && typeof document !== 'undefined' && createPortal(
-        <div className="model-modal-overlay" onClick={() => setModalOpen(false)}>
-          <div className="model-modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <div>
-                <span className="modal-eyebrow">Select your model</span>
-                <h3 className="modal-title">{selectedYear} Models</h3>
-              </div>
-              <button className="modal-close" onClick={() => setModalOpen(false)}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
-                  <path d="M18 6 6 18M6 6l12 12"/>
-                </svg>
-              </button>
-            </div>
-
-            <div className="modal-body">
-              {loading ? (
-                <div className="modal-loading">
-                  <span className="spinner" />
-                  <span>Loading models…</span>
-                </div>
-              ) : models.length === 0 ? (
-                <p className="modal-empty">No models found for {selectedYear}.</p>
-              ) : (
-                <ul className="model-list">
-                  {models.map(item => (
-                    <li key={`${item.year}-${item.model_code}`}>
-                      <button className="model-list-item" onClick={() => selectModel(item)}>
-                        <span className="mli-name">{item.model_name}</span>
-                        <span className="mli-meta">
-                          <span className="mli-code">{item.model_code}</span>
-                          <span className="mli-family">{item.family}</span>
-                        </span>
-                        <svg className="mli-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
-                          <path d="m9 18 6-6-6-6"/>
-                        </svg>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-    </>
-  );
-}
-
-
-
-// ─── Smoke Background ─────────────────────────────────────────────────────────
-function SmokeBackground() {
-  const canvasRef = useRef(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    let animId;
-
-    const resize = () => {
-      canvas.width  = window.innerWidth;
-      canvas.height = window.innerHeight;
-    };
-    resize();
-    window.addEventListener('resize', resize);
-
-    // Each particle is a soft radial smoke puff
-    const particles = [];
-    const MAX = 28;
-
-    const spawn = (atBottom = true) => ({
-      x:       Math.random() * canvas.width,
-      y:       atBottom ? canvas.height + 80 : Math.random() * canvas.height,
-      vx:      (Math.random() - 0.5) * 0.35,
-      vy:      -(Math.random() * 0.45 + 0.15),
-      r:       Math.random() * 140 + 80,
-      alpha:   atBottom ? 0 : Math.random() * 0.09 + 0.02,
-      maxAlpha:Math.random() * 0.10 + 0.03,
-      grow:    Math.random() * 0.25 + 0.08,
-      fade:    Math.random() * 0.00035 + 0.00015,
-      phase:   atBottom ? 'in' : 'float',
-    });
-
-    for (let i = 0; i < MAX; i++) particles.push(spawn(false));
-
-    const draw = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      for (const p of particles) {
-        // Lifecycle
-        if (p.phase === 'in') {
-          p.alpha += 0.0008;
-          if (p.alpha >= p.maxAlpha) p.phase = 'float';
-        } else {
-          p.alpha -= p.fade;
-        }
-        p.r  += p.grow;
-        p.x  += p.vx;
-        p.y  += p.vy;
-
-        // Respawn when fully faded or off top
-        if (p.alpha <= 0 || p.y < -p.r * 2) {
-          Object.assign(p, spawn(true));
-          continue;
-        }
-
-        // Draw radial gradient puff — warm grey/gold tinted smoke
-        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
-        g.addColorStop(0,   `rgba(180,160,120,${p.alpha})`);
-        g.addColorStop(0.4, `rgba(140,130,110,${p.alpha * 0.6})`);
-        g.addColorStop(1,   `rgba(80,75,65,0)`);
-
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fillStyle = g;
-        ctx.fill();
-      }
-
-      // Spawn new ones to keep count up
-      while (particles.length < MAX) particles.push(spawn(true));
-
-      animId = requestAnimationFrame(draw);
-    };
-    draw();
-
-    return () => {
-      cancelAnimationFrame(animId);
-      window.removeEventListener('resize', resize);
-    };
-  }, []);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        width: '100%',
-        height: '100%',
-        zIndex: 0,
-        pointerEvents: 'none',
-        opacity: 1,
-      }}
-    />
-  );
-}
-
-// ─── Era 3D Fan Carousel ─────────────────────────────────────────────────────
-function EraCarousel() {
-  const router = useRouter();
-  const total = ERAS.length;
-  const [mounted, setMounted] = useState(false);
-  const [active, setActive] = useState(0);
-  const [scrollProgress, setScrollProgress] = useState(0);
-  const wrapRef = useRef(null);
-  const autoRef = useRef(null);
-  const touchStartX = useRef(null);
-  const isDragging = useRef(false);
-  const dragStartX = useRef(0);
-  const dragDelta = useRef(0);
-  const lastScrollIdx = useRef(0);
-
-  // ── Auto-rotate
-  const resetAuto = useCallback(() => {
-    clearInterval(autoRef.current);
-    autoRef.current = setInterval(() => {
-      setActive(a => (a + 1) % total);
-    }, 3600);
-  }, [total]);
-
-  useEffect(() => { setMounted(true); }, []);
-
-  useEffect(() => {
-    resetAuto();
-    return () => clearInterval(autoRef.current);
-  }, [resetAuto]);
-
-  const goTo = (idx) => {
-    setActive((idx + total) % total);
-    resetAuto();
-  };
-
-  // ── Scroll-driven advance
-  // When the tile is in view, scroll within it advances the active card
-  useEffect(() => {
-    const el = wrapRef.current;
-    if (!el) return;
-
-    const onWheel = (e) => {
-      // Only intercept if tile is roughly centered in viewport
-      const rect = el.getBoundingClientRect();
-      const inView = rect.top < window.innerHeight * 0.6 && rect.bottom > window.innerHeight * 0.4;
-      if (!inView) return;
-
-      e.preventDefault();
-      const delta = e.deltaY;
-
-      // Accumulate scroll, advance card every ~120px of scroll
-      lastScrollIdx.current += delta;
-      if (lastScrollIdx.current > 120) {
-        lastScrollIdx.current = 0;
-        goTo(active + 1);
-      } else if (lastScrollIdx.current < -120) {
-        lastScrollIdx.current = 0;
-        goTo(active - 1);
-      }
-
-      // Also drive a smooth progress value for parallax feel
-      setScrollProgress(p => Math.max(0, Math.min(1,
-        p + delta / (window.innerHeight * 2)
-      )));
-    };
-
-    el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
-  }, [active, goTo]);
-
-  // ── Drag
-  const onMouseDown = (e) => {
-    isDragging.current = true;
-    dragStartX.current = e.clientX;
-    dragDelta.current = 0;
-  };
-  const onMouseMove = (e) => {
-    if (!isDragging.current) return;
-    dragDelta.current = e.clientX - dragStartX.current;
-  };
-  const onMouseUp = () => {
-    if (!isDragging.current) return;
-    isDragging.current = false;
-    if (Math.abs(dragDelta.current) > 40) {
-      goTo(dragDelta.current < 0 ? active + 1 : active - 1);
-    }
-  };
-
-  // ── Touch swipe
-  const onTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
-  const onTouchEnd = (e) => {
-    if (touchStartX.current === null) return;
-    const dx = e.changedTouches[0].clientX - touchStartX.current;
-    if (Math.abs(dx) > 40) goTo(dx < 0 ? active + 1 : active - 1);
-    touchStartX.current = null;
-  };
-
-  // ── Card transform — fan bottom-right to top-left
-  const getCardStyle = (i) => {
-    const diff = ((i - active + total) % total);
-    const pos  = diff > total / 2 ? diff - total : diff;
-    const absP = Math.abs(pos);
-
-    if (absP > 4) return { display: 'none' };
-
-    // Subtle extra rotation driven by scroll progress
-    const scrollBias = scrollProgress * 4;
-
-    // Fixed offsets — no window access (avoids SSR hydration mismatch)
-    const unit  = 140; // px per step — tighter spread keeps cards in tile
-    const rotZ  = pos * -15 - (pos !== 0 ? scrollBias * Math.sign(pos) : 0);
-    const rotX  = 10 + absP * 5;
-    const tx    = pos * unit;
-    const ty    = pos * unit * 0.72;
-    const tz    = -absP * 60;
-    const scale = absP === 0 ? 1 : absP === 1 ? 0.88 : absP === 2 ? 0.76 : absP === 3 ? 0.64 : 0.54;
-    const op    = absP === 0 ? 1 : absP === 1 ? 0.92 : absP === 2 ? 0.72 : absP === 3 ? 0.48 : 0.26;
-
-    return {
-      transform: `translateX(${tx}px) translateY(${ty}px) translateZ(${tz}px) rotateX(${rotX}deg) rotateZ(${rotZ}deg) scale(${scale})`,
-      opacity: op,
-      zIndex: 20 - absP * 2,
-      pointerEvents: absP <= 3 ? 'auto' : 'none',
-      cursor: 'pointer',
-    };
-  };
-
-  if (!mounted) return (
-    <div className="carousel-wrap carousel-placeholder" />
-  );
-
-  return (
-    <div ref={wrapRef} className="carousel-wrap">
-      <div
-        className="carousel-stage"
-        onMouseDown={onMouseDown}
-        onMouseMove={onMouseMove}
-        onMouseUp={onMouseUp}
-        onMouseLeave={onMouseUp}
-        onTouchStart={onTouchStart}
-        onTouchEnd={onTouchEnd}
-      >
-        <div className="carousel-scene">
-          {ERAS.map((era, i) => {
-            const diff = ((i - active + total) % total);
-            const pos  = diff > total / 2 ? diff - total : diff;
-            const isActive = pos === 0;
-            return (
-              <div
-                key={era.slug}
-                className={`era-card ${isActive ? 'era-card--active' : ''}`}
-                style={getCardStyle(i)}
-                onClick={() => isActive ? router.push(`/era/${era.slug}`) : goTo(i)}
-              >
-                <div className="era-card-face">
-                  <div className="era-card-art"
-                    style={{ backgroundImage: era.img ? `url('/images/eras/${era.img}')` : 'none' }}
-                  />
-
-                  <div className="era-card-content">
-                    <span className="era-card-years">{era.years}</span>
-                    <h3 className="era-card-name">{era.name}</h3>
-                    {isActive && (
-                      <span className="era-card-cta">
-                        Shop Parts
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="13" height="13">
-                          <path d="m9 18 6-6-6-6"/>
-                        </svg>
-                      </span>
-                    )}
-                  </div>
-                  <div className="era-card-corner" />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="carousel-footer">
-        <button className="carousel-arrow-sm" onClick={() => goTo(active - 1)} aria-label="Previous">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="16" height="16"><path d="m15 18-6-6 6-6"/></svg>
-        </button>
-        <div className="carousel-dots">
-          {ERAS.map((era, i) => (
-            <button key={era.slug} className={`carousel-dot ${i === active ? 'carousel-dot--active' : ''}`} onClick={() => goTo(i)} aria-label={era.name} />
-          ))}
-        </div>
-        <button className="carousel-arrow-sm" onClick={() => goTo(active + 1)} aria-label="Next">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="16" height="16"><path d="m9 18 6-6-6-6"/></svg>
-        </button>
-      </div>
-
-      {/* Scroll hint — fades out after first interaction */}
-      <div className="scroll-hint">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="16" height="16">
-          <path d="M12 5v14M5 12l7 7 7-7"/>
-        </svg>
-        <span>Scroll to browse eras</span>
-      </div>
-    </div>
-  );
-}
-// ─── Floating Nav ─────────────────────────────────────────────────────────────
-function FloatingNav() {
-  const [scrolled, setScrolled] = useState(false);
-  useEffect(() => {
-    const fn = () => setScrolled(window.scrollY > 40);
-    window.addEventListener('scroll', fn);
-    return () => window.removeEventListener('scroll', fn);
-  }, []);
-
-  return (
-    <nav className={`float-nav ${scrolled ? 'scrolled' : ''}`}>
-      <Link href="/" className="nav-logo">
-        <img src="/logo.svg" alt="Stinkin' Supplies" style={{ height: '100px', width: 'auto', objectFit: 'contain' }} />
-      </Link>
-      <div className="nav-links">
-        <Link href="/browse">Browse</Link>
-        <Link href="/eras">Eras</Link>
-        <Link href="/browse?category=all">Categories</Link>
-        <Link href="/browse?deals=true">Deals</Link>
-        <Link href="/admin/products">Admin</Link>
-      </div>
-    </nav>
-  );
-}
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function HomePage() {
@@ -550,7 +80,7 @@ export default function HomePage() {
       <style>{`
         /* ── Reset & base */
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #0a0a0a; }
+        body { background: #080808; }
 
         /* ── Tokens */
         :root {
@@ -575,8 +105,8 @@ export default function HomePage() {
         /* ── Page shell */
         .bento-page {
           min-height: 100vh;
-          background: #0a0a0a;
-          padding: 160px var(--gap) var(--gap);
+          background: transparent;
+          padding: 160px 48px var(--gap);
           display: grid;
           grid-template-columns: 1fr 1fr 1fr;
           grid-template-rows: auto auto auto auto;
@@ -589,14 +119,14 @@ export default function HomePage() {
           margin: 0 auto;
           font-family: var(--font-display);
           position: relative;
-          z-index: 1;
+          z-index: 2;
         }
 
         /* ── Tile base */
         .tile {
-          background: rgba(17,17,17,0.75);
-          backdrop-filter: blur(2px);
-          -webkit-backdrop-filter: blur(2px);
+          background: rgba(14,14,14,0.82);
+          backdrop-filter: blur(4px);
+          -webkit-backdrop-filter: blur(4px);
           border: 1px solid var(--border-dim);
           border-radius: var(--radius);
           overflow: visible;
@@ -959,22 +489,22 @@ export default function HomePage() {
         /* ── Era Fan Carousel */
         .tile-eras {
           grid-area: eras;
-          min-height: 700px !important;
+          min-height: 500px !important;
           overflow: hidden !important;
           position: relative;
-          background: rgba(10,10,10,0.55) !important;
+          background: rgba(8,8,8,0.35) !important;
           border-color: rgba(201,168,76,0.15);
         }
         .carousel-placeholder {
           width: 100%;
-          min-height: 700px;
+          min-height: 500px;
           background: var(--surface);
         }
         .carousel-wrap {
           position: relative;
           width: 100%;
           height: 100%;
-          min-height: 700px;
+          min-height: 500px;
           display: flex;
           flex-direction: column;
           user-select: none;
@@ -983,8 +513,10 @@ export default function HomePage() {
         }
         .carousel-stage {
           position: absolute;
-          inset: 0;
+          top: 0;
           bottom: 52px;
+          left: 220px;
+          right: 220px;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -998,11 +530,11 @@ export default function HomePage() {
         /* Scene — constrained with gutters so side cards peek but stay in tile */
         .carousel-scene {
           position: relative;
-          width: 58%;
-          max-width: 720px;
+          width: 90%;
+          max-width: 880px;
           aspect-ratio: 16/10;
           transform-style: preserve-3d;
-          margin-left: 3%;
+          margin-left: 2%;
           margin-top: 3%;
         }
 
@@ -1180,12 +712,14 @@ export default function HomePage() {
         @media (max-width: 768px) {
           .tile-eras      { min-height: 520px !important; }
           .carousel-wrap  { min-height: 520px; }
-          .carousel-scene { width: 88%; margin-left: 3%; }
+          .carousel-stage { left: 60px !important; right: 60px !important; }
+          .carousel-scene { width: 88%; margin-left: 0; }
         }
         @media (max-width: 480px) {
           .tile-eras      { min-height: 420px !important; }
           .carousel-wrap  { min-height: 420px; }
-          .carousel-scene { width: 92%; margin-left: 2%; }
+          .carousel-stage { left: 40px !important; right: 40px !important; }
+          .carousel-scene { width: 92%; margin-left: 0; }
           .era-card-face  { border-radius: 16px; }
         }
 
@@ -1195,7 +729,7 @@ export default function HomePage() {
           top: 16px;
           left: 50%;
           transform: translateX(-50%);
-          z-index: 200;
+          z-index: 300;
           display: flex;
           align-items: center;
           justify-content: space-between;
@@ -1207,12 +741,77 @@ export default function HomePage() {
           border: 1px solid var(--border-dim);
           border-radius: 999px;
           width: min(860px, calc(100vw - 32px));
-          transition: background 0.3s, border-color 0.3s;
+          transition: background 0.3s, border-color 0.3s,
+                      opacity 0.35s ease, transform 0.35s cubic-bezier(0.22,1,0.36,1);
         }
         .float-nav.scrolled {
           background: rgba(10,10,10,0.85);
           border-color: var(--border);
         }
+        /* Animate out when minimized */
+        .float-nav.nav-hidden {
+          opacity: 0;
+          pointer-events: none;
+          transform: translateX(-50%) translateY(-12px) scale(0.96);
+        }
+        .float-nav.nav-visible {
+          opacity: 1;
+          pointer-events: auto;
+          transform: translateX(-50%) translateY(0) scale(1);
+        }
+
+        /* Mini floating icon — shown when nav is collapsed */
+        .nav-mini {
+          position: fixed;
+          top: 16px;
+          left: 16px;
+          z-index: 300;
+          width: 56px;
+          height: 56px;
+          border-radius: 50%;
+          background: rgba(10,10,10,0.85);
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          border: 1px solid var(--border);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          padding: 0;
+          transition: border-color 0.2s, transform 0.2s, background 0.2s;
+          animation: miniIn 0.3s cubic-bezier(0.22,1,0.36,1) forwards;
+        }
+        @keyframes miniIn {
+          from { opacity: 0; transform: scale(0.7); }
+          to   { opacity: 1; transform: scale(1); }
+        }
+        .nav-mini:hover {
+          border-color: var(--gold);
+          transform: scale(1.08);
+          background: rgba(20,20,20,0.95);
+        }
+        .nav-mini-logo {
+          width: 38px;
+          height: 38px;
+          object-fit: contain;
+          border-radius: 50%;
+        }
+
+        /* Close button inside nav when manually opened */
+        .nav-close {
+          background: rgba(255,255,255,0.06);
+          border: 1px solid var(--border-dim);
+          border-radius: 50%;
+          width: 30px; height: 30px;
+          display: flex; align-items: center; justify-content: center;
+          color: var(--text-dim);
+          cursor: pointer;
+          transition: color 0.2s, background 0.2s;
+          margin-left: 4px;
+          flex-shrink: 0;
+        }
+        .nav-close:hover { color: var(--white); background: rgba(255,255,255,0.12); }
+
         .nav-logo img { display: block; }
         .nav-links {
           display: flex;
@@ -1243,6 +842,8 @@ export default function HomePage() {
               "cat     model"
               "deals   deals";
             padding-top: 148px;
+          padding-left: 16px;
+          padding-right: 16px;
           }
           .tile-inner { padding: 24px 22px; }
           .tile-inner--eras { padding: 20px 0 20px 22px; }
