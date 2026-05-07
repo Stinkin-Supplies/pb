@@ -7,16 +7,16 @@ import Link from 'next/link';
 
 // ─── Era Data ────────────────────────────────────────────────────────────────
 const ERAS = [
-  { name: 'Flathead',           slug: 'flathead',             years: '1930–1947' },
-  { name: 'Knucklehead',        slug: 'knucklehead',          years: '1936–1947' },
-  { name: 'Panhead',            slug: 'panhead',              years: '1948–1965' },
-  { name: 'Shovelhead',         slug: 'shovelhead',           years: '1966–1984' },
-  { name: 'Ironhead Sportster', slug: 'ironhead-sportster',   years: '1957–1985' },
-  { name: 'Evolution Big Twin', slug: 'evolution-big-twin',   years: '1984–1999' },
-  { name: 'Evolution Sportster',slug: 'evolution-sportster',  years: '1986–2003' },
-  { name: 'Twin Cam',           slug: 'twin-cam',             years: '1999–2017' },
-  { name: 'Milwaukee 8',        slug: 'milwaukee-8',          years: '2017–present' },
-  { name: 'Other',              slug: 'other',                years: '' },
+  { name: 'Flathead',           slug: 'flathead',           img: 'flathead.webp',           years: '1930–1947' },
+  { name: 'Knucklehead',        slug: 'knucklehead',        img: 'knucklehead.webp',        years: '1936–1947' },
+  { name: 'Panhead',            slug: 'panhead',            img: 'panhead.webp',            years: '1948–1965' },
+  { name: 'Shovelhead',         slug: 'shovelhead',         img: 'shovelhead.webp',         years: '1966–1984' },
+  { name: 'Ironhead Sportster', slug: 'ironhead-sportster', img: 'ironhead-sportster.webp', years: '1957–1985' },
+  { name: 'Evolution Big Twin', slug: 'evolution-big-twin', img: 'evolution.webp',          years: '1984–1999' },
+  { name: 'Evolution Sportster',slug: 'evolution-sportster',img: 'evo-sportster.webp',      years: '1986–2003' },
+  { name: 'Twin Cam',           slug: 'twin-cam',           img: 'twin-cam.webp',           years: '1999–2017' },
+  { name: 'Milwaukee 8',        slug: 'milwaukee-8',        img: 'milwaukee-8.webp',        years: '2017–present' },
+  { name: 'Chopper',            slug: 'chopper',            img: 'chopper.webp',            years: '' },
 ];
 
 // Generate years 1930 → current year
@@ -150,52 +150,210 @@ function ModelSearch() {
 
 
 
-// ─── Era Slider ───────────────────────────────────────────────────────────────
-function EraSlider() {
-  const trackRef = useRef(null);
-  const [dragging, setDragging] = useState(false);
-  const [startX, setStartX] = useState(0);
-  const [scrollLeft, setScrollLeft] = useState(0);
+// ─── Era 3D Fan Carousel ─────────────────────────────────────────────────────
+function EraCarousel() {
+  const router = useRouter();
+  const total = ERAS.length;
+  const [mounted, setMounted] = useState(false);
+  const [active, setActive] = useState(0);
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const wrapRef = useRef(null);
+  const autoRef = useRef(null);
+  const touchStartX = useRef(null);
+  const isDragging = useRef(false);
+  const dragStartX = useRef(0);
+  const dragDelta = useRef(0);
+  const lastScrollIdx = useRef(0);
 
+  // ── Auto-rotate
+  const resetAuto = useCallback(() => {
+    clearInterval(autoRef.current);
+    autoRef.current = setInterval(() => {
+      setActive(a => (a + 1) % total);
+    }, 3600);
+  }, [total]);
+
+  useEffect(() => { setMounted(true); }, []);
+
+  useEffect(() => {
+    resetAuto();
+    return () => clearInterval(autoRef.current);
+  }, [resetAuto]);
+
+  const goTo = (idx) => {
+    setActive((idx + total) % total);
+    resetAuto();
+  };
+
+  // ── Scroll-driven advance
+  // When the tile is in view, scroll within it advances the active card
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+
+    const onWheel = (e) => {
+      // Only intercept if tile is roughly centered in viewport
+      const rect = el.getBoundingClientRect();
+      const inView = rect.top < window.innerHeight * 0.6 && rect.bottom > window.innerHeight * 0.4;
+      if (!inView) return;
+
+      e.preventDefault();
+      const delta = e.deltaY;
+
+      // Accumulate scroll, advance card every ~120px of scroll
+      lastScrollIdx.current += delta;
+      if (lastScrollIdx.current > 120) {
+        lastScrollIdx.current = 0;
+        goTo(active + 1);
+      } else if (lastScrollIdx.current < -120) {
+        lastScrollIdx.current = 0;
+        goTo(active - 1);
+      }
+
+      // Also drive a smooth progress value for parallax feel
+      setScrollProgress(p => Math.max(0, Math.min(1,
+        p + delta / (window.innerHeight * 2)
+      )));
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [active, goTo]);
+
+  // ── Drag
   const onMouseDown = (e) => {
-    setDragging(true);
-    setStartX(e.pageX - trackRef.current.offsetLeft);
-    setScrollLeft(trackRef.current.scrollLeft);
+    isDragging.current = true;
+    dragStartX.current = e.clientX;
+    dragDelta.current = 0;
   };
   const onMouseMove = (e) => {
-    if (!dragging) return;
-    e.preventDefault();
-    const x = e.pageX - trackRef.current.offsetLeft;
-    trackRef.current.scrollLeft = scrollLeft - (x - startX);
+    if (!isDragging.current) return;
+    dragDelta.current = e.clientX - dragStartX.current;
   };
-  const onMouseUp = () => setDragging(false);
+  const onMouseUp = () => {
+    if (!isDragging.current) return;
+    isDragging.current = false;
+    if (Math.abs(dragDelta.current) > 40) {
+      goTo(dragDelta.current < 0 ? active + 1 : active - 1);
+    }
+  };
+
+  // ── Touch swipe
+  const onTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
+  const onTouchEnd = (e) => {
+    if (touchStartX.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    if (Math.abs(dx) > 40) goTo(dx < 0 ? active + 1 : active - 1);
+    touchStartX.current = null;
+  };
+
+  // ── Card transform — fan bottom-right to top-left
+  const getCardStyle = (i) => {
+    const diff = ((i - active + total) % total);
+    const pos  = diff > total / 2 ? diff - total : diff;
+    const absP = Math.abs(pos);
+
+    if (absP > 4) return { display: 'none' };
+
+    // Subtle extra rotation driven by scroll progress
+    const scrollBias = scrollProgress * 4;
+
+    // Fixed offsets — no window access (avoids SSR hydration mismatch)
+    const unit  = 192; // px per step, consistent server+client
+    const rotZ  = pos * -15 - (pos !== 0 ? scrollBias * Math.sign(pos) : 0);
+    const rotX  = 10 + absP * 5;
+    const tx    = pos * unit;
+    const ty    = pos * unit * 0.72;
+    const tz    = -absP * 60;
+    const scale = absP === 0 ? 1 : absP === 1 ? 0.88 : absP === 2 ? 0.76 : absP === 3 ? 0.64 : 0.54;
+    const op    = absP === 0 ? 1 : absP === 1 ? 0.92 : absP === 2 ? 0.72 : absP === 3 ? 0.48 : 0.26;
+
+    return {
+      transform: `translateX(${tx}px) translateY(${ty}px) translateZ(${tz}px) rotateX(${rotX}deg) rotateZ(${rotZ}deg) scale(${scale})`,
+      opacity: op,
+      zIndex: 20 - absP * 2,
+      pointerEvents: absP <= 3 ? 'auto' : 'none',
+      cursor: 'pointer',
+    };
+  };
+
+  if (!mounted) return (
+    <div className="carousel-wrap carousel-placeholder" />
+  );
 
   return (
-    <div className="era-slider-outer">
+    <div ref={wrapRef} className="carousel-wrap">
       <div
-        ref={trackRef}
-        className={`era-track ${dragging ? 'grabbing' : ''}`}
+        className="carousel-stage"
         onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
         onMouseLeave={onMouseUp}
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
       >
-        {ERAS.map((era) => (
-          <Link key={era.slug} href={`/era/${era.slug}`} className="era-node" draggable={false}>
-            <div className="era-dot">
-              <span className="era-dot-inner" />
-            </div>
-            <span className="era-label">{era.name}</span>
-            {era.years && <span className="era-years">{era.years}</span>}
-          </Link>
-        ))}
+        <div className="carousel-scene">
+          {ERAS.map((era, i) => {
+            const diff = ((i - active + total) % total);
+            const pos  = diff > total / 2 ? diff - total : diff;
+            const isActive = pos === 0;
+            return (
+              <div
+                key={era.slug}
+                className={`era-card ${isActive ? 'era-card--active' : ''}`}
+                style={getCardStyle(i)}
+                onClick={() => isActive ? router.push(`/era/${era.slug}`) : goTo(i)}
+              >
+                <div className="era-card-face">
+                  <div className="era-card-art"
+                    style={{ backgroundImage: era.img ? `url('/images/eras/${era.img}')` : 'none' }}
+                  />
+                  <span className="era-card-num">{String(i + 1).padStart(2, '0')}</span>
+                  <div className="era-card-content">
+                    <span className="era-card-years">{era.years}</span>
+                    <h3 className="era-card-name">{era.name}</h3>
+                    {isActive && (
+                      <span className="era-card-cta">
+                        Shop Parts
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="13" height="13">
+                          <path d="m9 18 6-6-6-6"/>
+                        </svg>
+                      </span>
+                    )}
+                  </div>
+                  <div className="era-card-corner" />
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
-      <div className="era-fade-left" />
-      <div className="era-fade-right" />
+
+      {/* Footer */}
+      <div className="carousel-footer">
+        <button className="carousel-arrow-sm" onClick={() => goTo(active - 1)} aria-label="Previous">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="16" height="16"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <div className="carousel-dots">
+          {ERAS.map((era, i) => (
+            <button key={era.slug} className={`carousel-dot ${i === active ? 'carousel-dot--active' : ''}`} onClick={() => goTo(i)} aria-label={era.name} />
+          ))}
+        </div>
+        <button className="carousel-arrow-sm" onClick={() => goTo(active + 1)} aria-label="Next">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="16" height="16"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+      </div>
+
+      {/* Scroll hint — fades out after first interaction */}
+      <div className="scroll-hint">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="16" height="16">
+          <path d="M12 5v14M5 12l7 7 7-7"/>
+        </svg>
+        <span>Scroll to browse eras</span>
+      </div>
     </div>
   );
 }
-
 // ─── Floating Nav ─────────────────────────────────────────────────────────────
 function FloatingNav() {
   const [scrolled, setScrolled] = useState(false);
@@ -226,6 +384,14 @@ export default function HomePage() {
   return (
     <>
       <FloatingNav />
+      <div className="smoke-bg" aria-hidden="true">
+        <span className="smoke smoke-1" />
+        <span className="smoke smoke-2" />
+        <span className="smoke smoke-3" />
+        <span className="smoke smoke-4" />
+        <span className="smoke smoke-5" />
+        <span className="smoke smoke-6" />
+      </div>
 
       <main className="bento-page">
 
@@ -250,13 +416,9 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ── Era slider — full width */}
+        {/* ── Era 3D Carousel — full width */}
         <section className="tile tile-eras" style={{ '--delay': '160ms' }}>
-          <div className="tile-inner tile-inner--eras">
-            <p className="tile-eyebrow">Shop by era</p>
-            <h2 className="tile-heading tile-heading--sm">Every generation. Every part.</h2>
-            <EraSlider />
-          </div>
+          <EraCarousel />
         </section>
 
         {/* ── Category tile */}
@@ -310,19 +472,21 @@ export default function HomePage() {
           --text-dim:   rgba(245,240,232,0.5);
           --radius:     16px;
           --radius-sm:  10px;
-          --gap:        14px;
+          --gap:        24px;
           --font-display: 'Barlow Condensed', sans-serif;
           --font-mono:    'Share Tech Mono', monospace;
         }
 
         /* ── Page shell */
         .bento-page {
+          position: relative;
+          z-index: 1;
           min-height: 100vh;
           background: var(--black);
           background-image:
             radial-gradient(ellipse 80% 50% at 20% 10%, rgba(201,168,76,0.06) 0%, transparent 60%),
             radial-gradient(ellipse 60% 40% at 80% 80%, rgba(201,168,76,0.04) 0%, transparent 50%);
-          padding: 160px var(--gap) var(--gap);
+          padding: 188px calc(var(--gap) + 6px) calc(var(--gap) + 6px);
           display: grid;
           grid-template-columns: 1fr 1fr 1fr;
           grid-template-rows: auto auto auto auto;
@@ -334,6 +498,44 @@ export default function HomePage() {
           max-width: 1400px;
           margin: 0 auto;
           font-family: var(--font-display);
+        }
+
+        /* ── Smoke background */
+        .smoke-bg {
+          position: fixed;
+          inset: 0;
+          z-index: 0;
+          pointer-events: none;
+          overflow: hidden;
+          background:
+            radial-gradient(circle at 20% 15%, rgba(201,168,76,0.13), transparent 45%),
+            radial-gradient(circle at 80% 85%, rgba(201,168,76,0.12), transparent 50%),
+            radial-gradient(circle at 50% 50%, rgba(201,168,76,0.08), transparent 60%),
+            #080808;
+        }
+        .smoke {
+          position: absolute;
+          width: 72vw;
+          height: 72vw;
+          min-width: 560px;
+          min-height: 560px;
+          border-radius: 50%;
+          filter: blur(72px);
+          opacity: 0.46;
+          background: radial-gradient(circle at 40% 40%, rgba(244, 224, 170, 0.82), rgba(120, 96, 40, 0.38) 48%, transparent 74%);
+          animation: smokeDrift 18s ease-in-out infinite alternate;
+        }
+        .smoke-1 { top: -12%; left: -8%; animation-duration: 22s; }
+        .smoke-2 { top: 8%; right: -12%; animation-duration: 26s; animation-delay: -4s; }
+        .smoke-3 { bottom: -16%; left: 16%; animation-duration: 24s; animation-delay: -8s; }
+        .smoke-4 { bottom: -8%; right: 8%; animation-duration: 20s; animation-delay: -2s; }
+        .smoke-5 { top: 38%; left: 34%; animation-duration: 28s; animation-delay: -10s; opacity: 0.28; }
+        .smoke-6 { top: 22%; left: 62%; animation-duration: 30s; animation-delay: -6s; opacity: 0.36; }
+
+        @keyframes smokeDrift {
+          0%   { transform: translate3d(0, 0, 0) scale(1); }
+          50%  { transform: translate3d(18px, -24px, 0) scale(1.08); }
+          100% { transform: translate3d(-16px, 14px, 0) scale(0.95); }
         }
 
         /* ── Tile base */
@@ -360,7 +562,7 @@ export default function HomePage() {
         /* ── Grid placement */
         .tile-search   { grid-area: search;  min-height: 220px; }
         .tile-video    { grid-area: video;   min-height: 220px; }
-        .tile-eras     { grid-area: eras;    min-height: 180px; }
+        .tile-eras     { grid-area: eras;    min-height: 580px; overflow: hidden; }
         .tile-category { grid-area: cat;     min-height: 200px; }
         .tile-model    { grid-area: model;   min-height: 200px; }
         .tile-deals    { grid-area: deals;   min-height: 200px; background: var(--surface-2); }
@@ -697,104 +899,249 @@ export default function HomePage() {
         }
         .mli-arrow { color: var(--text-dim); flex-shrink: 0; }
 
-        /* ── Era slider */
-        .era-slider-outer {
+        /* ── Era Fan Carousel */
+        .tile-eras {
+          grid-area: eras;
+          min-height: 700px !important;
+          overflow: visible !important;
           position: relative;
-          width: 100%;
-        }
-        .era-track {
+          background: rgba(17,17,17,0.38);
+          border-color: rgba(201,168,76,0.16);
           display: flex;
-          gap: 0;
-          overflow-x: auto;
-          scroll-behavior: smooth;
-          scrollbar-width: none;
-          cursor: grab;
-          padding: 12px 0 16px 0;
-          /* Horizontal connecting line */
+          justify-content: center;
+        }
+        .carousel-placeholder {
+          width: 100%;
+          min-height: 700px;
+          background: var(--surface);
+        }
+        .carousel-wrap {
           position: relative;
-        }
-        .era-track::-webkit-scrollbar { display: none; }
-        .era-track.grabbing { cursor: grabbing; }
-
-        /* The line connecting dots */
-        .era-track::before {
-          content: '';
-          position: absolute;
-          top: 28px;
-          left: 0; right: 0;
-          height: 1px;
-          background: linear-gradient(90deg, transparent 0%, var(--gold-dim) 5%, var(--gold-dim) 95%, transparent 100%);
-          pointer-events: none;
-        }
-
-        .era-node {
+          width: min(1040px, calc(100% - 140px));
+          height: 100%;
+          min-height: 700px;
           display: flex;
           flex-direction: column;
+          user-select: none;
+          margin: 0 auto;
+        }
+        .carousel-stage {
+          position: absolute;
+          inset: 0;
+          bottom: 52px;
+          display: flex;
           align-items: center;
-          gap: 10px;
-          padding: 0 28px;
-          text-decoration: none;
-          flex-shrink: 0;
-          position: relative;
-          transition: transform 0.2s;
+          justify-content: center;
+          perspective: 2000px;
+          perspective-origin: 55% 50%;
+          cursor: grab;
+          overflow: visible;
         }
-        .era-node:hover { transform: translateY(-3px); }
+        .carousel-stage:active { cursor: grabbing; }
 
-        .era-dot {
-          width: 28px; height: 28px;
-          border-radius: 50%;
-          border: 2px solid var(--gold-dim);
-          display: flex; align-items: center; justify-content: center;
-          background: var(--surface);
+        /* Scene — centered, slight bottom-right offset */
+        .carousel-scene {
           position: relative;
-          z-index: 1;
-          transition: border-color 0.2s, background 0.2s;
+          width: 84%;
+          max-width: 900px;
+          aspect-ratio: 16/10;
+          transform-style: preserve-3d;
+          margin: 4% auto 0;
         }
-        .era-node:hover .era-dot {
+
+        /* Cards — same size as scene, bleed past edges */
+        .era-card {
+          position: absolute;
+          top: 0; left: 0;
+          width: 100%;
+          height: 100%;
+          transition: transform 0.65s cubic-bezier(0.22, 1, 0.36, 1),
+                      opacity  0.55s ease;
+          transform-origin: center center;
+          will-change: transform, opacity;
+        }
+        .era-card-face {
+          width: 100%; height: 100%;
+          border-radius: 24px;
+          border: 1px solid rgba(255,255,255,0.07);
+          background: linear-gradient(145deg, rgba(30,30,30,0.72) 0%, rgba(18,18,18,0.62) 100%);
+          overflow: hidden;
+          position: relative;
+          box-shadow:
+            0 20px 70px rgba(0,0,0,0.65),
+            inset 0 1px 0 rgba(255,255,255,0.04);
+          transition: border-color 0.35s, box-shadow 0.35s;
+        }
+        .era-card--active .era-card-face {
+          border-color: rgba(201,168,76,0.6);
+          box-shadow:
+            0 0 0 1px rgba(201,168,76,0.22),
+            0 32px 100px rgba(0,0,0,0.8),
+            0 0 140px rgba(201,168,76,0.1);
+        }
+        .era-card-art {
+          position: absolute;
+          inset: 0;
+          background-size: cover;
+          background-position: center;
+          opacity: 0.25;
+          transition: opacity 0.4s;
+        }
+        .era-card--active .era-card-art { opacity: 0.48; }
+
+        .era-card-num {
+          position: absolute;
+          top: 4%; right: 4%;
+          font-family: var(--font-display);
+          font-size: clamp(80px, 14vw, 160px);
+          font-weight: 900;
+          line-height: 1;
+          color: rgba(255,255,255,0.04);
+          letter-spacing: -0.03em;
+          pointer-events: none;
+        }
+        .era-card--active .era-card-num { color: rgba(201,168,76,0.07); }
+
+        .era-card-content {
+          position: absolute;
+          bottom: 0; left: 0; right: 0;
+          padding: clamp(18px, 4%, 40px);
+          background: linear-gradient(to top,
+            rgba(0,0,0,0.94) 0%,
+            rgba(0,0,0,0.5) 50%,
+            transparent 100%);
+        }
+        .era-card-years {
+          display: block;
+          font-family: var(--font-mono);
+          font-size: clamp(10px, 1.2vw, 13px);
+          color: var(--gold);
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+          margin-bottom: 6px;
+        }
+        .era-card-name {
+          font-family: var(--font-display);
+          font-size: clamp(24px, 4.5vw, 52px);
+          font-weight: 700;
+          letter-spacing: 0.03em;
+          text-transform: uppercase;
+          color: var(--white);
+          line-height: 1.0;
+          margin: 0;
+        }
+        .era-card-cta {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          margin-top: clamp(8px, 1.5%, 16px);
+          font-family: var(--font-mono);
+          font-size: clamp(9px, 1vw, 12px);
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: var(--gold);
+          border: 1px solid var(--gold-dim);
+          border-radius: 999px;
+          padding: 6px 18px;
+          background: rgba(0,0,0,0.5);
+          transition: background 0.2s, border-color 0.2s;
+          width: fit-content;
+        }
+        .era-card--active:hover .era-card-cta {
+          background: rgba(201,168,76,0.18);
           border-color: var(--gold);
-          background: rgba(201,168,76,0.12);
         }
-        .era-dot-inner {
-          width: 8px; height: 8px;
+        .era-card-corner {
+          position: absolute;
+          top: 18px; right: 18px;
+          width: 22px; height: 22px;
+          border-top: 2px solid var(--gold);
+          border-right: 2px solid var(--gold);
+          border-radius: 0 6px 0 0;
+          opacity: 0;
+          transition: opacity 0.3s;
+        }
+        .era-card--active .era-card-corner { opacity: 1; }
+
+        /* Footer */
+        .carousel-footer {
+          position: absolute;
+          bottom: 0; left: 0; right: 0;
+          height: 52px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 14px;
+          z-index: 30;
+          background: linear-gradient(to top, rgba(10,10,10,0.7) 0%, transparent 100%);
+        }
+        .carousel-dots {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+        }
+        .carousel-dot {
+          width: 5px; height: 5px;
           border-radius: 50%;
-          background: var(--gold-dim);
+          background: rgba(255,255,255,0.18);
+          border: none;
+          cursor: pointer;
+          padding: 0;
           transition: background 0.2s, transform 0.2s;
         }
-        .era-node:hover .era-dot-inner {
+        .carousel-dot--active {
           background: var(--gold);
-          transform: scale(1.3);
+          transform: scale(1.6);
         }
-
-        .era-label {
-          font-family: var(--font-display);
-          font-size: 11px;
-          font-weight: 600;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
+        .carousel-arrow-sm {
+          background: rgba(10,10,10,0.5);
+          border: 1px solid var(--border-dim);
+          border-radius: 50%;
+          width: 32px; height: 32px;
+          display: flex; align-items: center; justify-content: center;
           color: var(--text-dim);
-          white-space: nowrap;
-          transition: color 0.2s;
+          cursor: pointer;
+          transition: color 0.2s, border-color 0.2s, background 0.2s;
+          backdrop-filter: blur(8px);
         }
-        .era-node:hover .era-label { color: var(--white); }
-
-        .era-years {
+        .carousel-arrow-sm:hover {
+          color: var(--gold);
+          border-color: var(--gold-dim);
+          background: rgba(201,168,76,0.1);
+        }
+        .scroll-hint {
+          position: absolute;
+          bottom: 58px;
+          right: 20px;
+          display: flex;
+          align-items: center;
+          gap: 6px;
           font-family: var(--font-mono);
           font-size: 10px;
-          color: var(--gold-dim);
-          white-space: nowrap;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          color: var(--text-dim);
+          animation: hintPulse 2.5s ease-in-out infinite;
+          pointer-events: none;
+          z-index: 10;
+        }
+        @keyframes hintPulse {
+          0%, 100% { opacity: 0.35; transform: translateY(0); }
+          50%       { opacity: 0.75; transform: translateY(3px); }
         }
 
-        /* Fade edges */
-        .era-fade-left,
-        .era-fade-right {
-          position: absolute;
-          top: 0; bottom: 0;
-          width: 60px;
-          pointer-events: none;
-          z-index: 2;
+        /* Mobile */
+        @media (max-width: 768px) {
+          .tile-eras      { min-height: 520px !important; }
+          .carousel-wrap  { min-height: 520px; width: calc(100% - 36px); }
+          .carousel-scene { width: 88%; margin: 0 auto; }
         }
-        .era-fade-left  { left: 0;  background: linear-gradient(90deg,  var(--surface), transparent); }
-        .era-fade-right { right: 0; background: linear-gradient(270deg, var(--surface), transparent); }
+        @media (max-width: 480px) {
+          .tile-eras      { min-height: 420px !important; }
+          .carousel-wrap  { min-height: 420px; width: calc(100% - 20px); }
+          .carousel-scene { width: 92%; margin: 0 auto; }
+          .era-card-face  { border-radius: 16px; }
+        }
 
         /* ── Floating nav */
         .float-nav {
@@ -849,7 +1196,7 @@ export default function HomePage() {
               "eras    eras"
               "cat     model"
               "deals   deals";
-            padding-top: 148px;
+            padding: 160px 18px 18px;
           }
           .tile-inner { padding: 24px 22px; }
           .tile-inner--eras { padding: 20px 0 20px 22px; }
@@ -868,6 +1215,7 @@ export default function HomePage() {
               "cat"
               "model"
               "deals";
+            padding: 146px 14px 14px;
           }
           .nav-links a:not(:first-child):not(:last-child) { display: none; }
         }
