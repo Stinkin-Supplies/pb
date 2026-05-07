@@ -7,16 +7,16 @@ import Link from 'next/link';
 
 // ─── Era Data ────────────────────────────────────────────────────────────────
 const ERAS = [
-  { name: 'Flathead',           slug: 'flathead',           img: 'flathead.webp',           years: '1930–1947' },
-  { name: 'Knucklehead',        slug: 'knucklehead',        img: 'knucklehead.webp',        years: '1936–1947' },
-  { name: 'Panhead',            slug: 'panhead',            img: 'panhead.webp',            years: '1948–1965' },
-  { name: 'Shovelhead',         slug: 'shovelhead',         img: 'shovelhead.webp',         years: '1966–1984' },
-  { name: 'Ironhead Sportster', slug: 'ironhead-sportster', img: 'ironhead-sportster.webp', years: '1957–1985' },
-  { name: 'Evolution Big Twin', slug: 'evolution-big-twin', img: 'evolution.webp',          years: '1984–1999' },
-  { name: 'Evolution Sportster',slug: 'evolution-sportster',img: 'evo-sportster.webp',      years: '1986–2003' },
-  { name: 'Twin Cam',           slug: 'twin-cam',           img: 'twin-cam.webp',           years: '1999–2017' },
-  { name: 'Milwaukee 8',        slug: 'milwaukee-8',        img: 'milwaukee-8.webp',        years: '2017–present' },
-  { name: 'Chopper',            slug: 'chopper',            img: 'chopper.webp',            years: '' },
+  { name: 'Flathead',        slug: 'flathead',          img: 'flathead.webp',           years: '1930–1952' },
+  { name: 'Knucklehead',     slug: 'knucklehead',       img: 'knucklehead.webp',        years: '1936–1947' },
+  { name: 'Panhead',         slug: 'panhead',           img: 'panhead.webp',            years: '1948–1965' },
+  { name: 'Shovelhead',      slug: 'shovelhead',        img: 'shovelhead.webp',         years: '1966–1984' },
+  { name: 'Ironhead',        slug: 'ironhead-sportster',img: 'ironhead-sportster.webp', years: '1957–1985' },
+  { name: 'Evolution',       slug: 'evolution',         img: 'evolution.webp',          years: '1984–1999' },
+  { name: 'Evo Sportster',   slug: 'evo-sportster',     img: 'evo-sportster.webp',      years: '1986–2021' },
+  { name: 'Twin Cam',        slug: 'twin-cam',          img: 'twin-cam.webp',           years: '1999–2017' },
+  { name: 'Milwaukee Eight', slug: 'milwaukee-8',       img: 'milwaukee-8.webp',        years: '2017–present' },
+  { name: 'Chopper',         slug: 'chopper',           img: null,                      years: 'Universal' },
 ];
 
 // Generate years 1930 → current year
@@ -150,6 +150,104 @@ function ModelSearch() {
 
 
 
+// ─── Smoke Background ─────────────────────────────────────────────────────────
+function SmokeBackground() {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let animId;
+
+    const resize = () => {
+      canvas.width  = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+    resize();
+    window.addEventListener('resize', resize);
+
+    // Each particle is a soft radial smoke puff
+    const particles = [];
+    const MAX = 28;
+
+    const spawn = (atBottom = true) => ({
+      x:       Math.random() * canvas.width,
+      y:       atBottom ? canvas.height + 80 : Math.random() * canvas.height,
+      vx:      (Math.random() - 0.5) * 0.35,
+      vy:      -(Math.random() * 0.45 + 0.15),
+      r:       Math.random() * 140 + 80,
+      alpha:   atBottom ? 0 : Math.random() * 0.09 + 0.02,
+      maxAlpha:Math.random() * 0.10 + 0.03,
+      grow:    Math.random() * 0.25 + 0.08,
+      fade:    Math.random() * 0.00035 + 0.00015,
+      phase:   atBottom ? 'in' : 'float',
+    });
+
+    for (let i = 0; i < MAX; i++) particles.push(spawn(false));
+
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (const p of particles) {
+        // Lifecycle
+        if (p.phase === 'in') {
+          p.alpha += 0.0008;
+          if (p.alpha >= p.maxAlpha) p.phase = 'float';
+        } else {
+          p.alpha -= p.fade;
+        }
+        p.r  += p.grow;
+        p.x  += p.vx;
+        p.y  += p.vy;
+
+        // Respawn when fully faded or off top
+        if (p.alpha <= 0 || p.y < -p.r * 2) {
+          Object.assign(p, spawn(true));
+          continue;
+        }
+
+        // Draw radial gradient puff — warm grey/gold tinted smoke
+        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
+        g.addColorStop(0,   `rgba(180,160,120,${p.alpha})`);
+        g.addColorStop(0.4, `rgba(140,130,110,${p.alpha * 0.6})`);
+        g.addColorStop(1,   `rgba(80,75,65,0)`);
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = g;
+        ctx.fill();
+      }
+
+      // Spawn new ones to keep count up
+      while (particles.length < MAX) particles.push(spawn(true));
+
+      animId = requestAnimationFrame(draw);
+    };
+    draw();
+
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener('resize', resize);
+    };
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        width: '100%',
+        height: '100%',
+        zIndex: 0,
+        pointerEvents: 'none',
+        opacity: 1,
+      }}
+    />
+  );
+}
+
 // ─── Era 3D Fan Carousel ─────────────────────────────────────────────────────
 function EraCarousel() {
   const router = useRouter();
@@ -259,7 +357,7 @@ function EraCarousel() {
     const scrollBias = scrollProgress * 4;
 
     // Fixed offsets — no window access (avoids SSR hydration mismatch)
-    const unit  = 192; // px per step, consistent server+client
+    const unit  = 140; // px per step — tighter spread keeps cards in tile
     const rotZ  = pos * -15 - (pos !== 0 ? scrollBias * Math.sign(pos) : 0);
     const rotX  = 10 + absP * 5;
     const tx    = pos * unit;
@@ -308,7 +406,7 @@ function EraCarousel() {
                   <div className="era-card-art"
                     style={{ backgroundImage: era.img ? `url('/images/eras/${era.img}')` : 'none' }}
                   />
-                  <span className="era-card-num">{String(i + 1).padStart(2, '0')}</span>
+
                   <div className="era-card-content">
                     <span className="era-card-years">{era.years}</span>
                     <h3 className="era-card-name">{era.name}</h3>
@@ -383,15 +481,8 @@ function FloatingNav() {
 export default function HomePage() {
   return (
     <>
+      <SmokeBackground />
       <FloatingNav />
-      <div className="smoke-bg" aria-hidden="true">
-        <span className="smoke smoke-1" />
-        <span className="smoke smoke-2" />
-        <span className="smoke smoke-3" />
-        <span className="smoke smoke-4" />
-        <span className="smoke smoke-5" />
-        <span className="smoke smoke-6" />
-      </div>
 
       <main className="bento-page">
 
@@ -417,7 +508,10 @@ export default function HomePage() {
         </section>
 
         {/* ── Era 3D Carousel — full width */}
-        <section className="tile tile-eras" style={{ '--delay': '160ms' }}>
+        <section
+          className="tile tile-eras"
+          style={{ '--delay': '160ms' }}
+        >
           <EraCarousel />
         </section>
 
@@ -456,6 +550,7 @@ export default function HomePage() {
       <style>{`
         /* ── Reset & base */
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #0a0a0a; }
 
         /* ── Tokens */
         :root {
@@ -472,21 +567,16 @@ export default function HomePage() {
           --text-dim:   rgba(245,240,232,0.5);
           --radius:     16px;
           --radius-sm:  10px;
-          --gap:        24px;
+          --gap:        14px;
           --font-display: 'Barlow Condensed', sans-serif;
           --font-mono:    'Share Tech Mono', monospace;
         }
 
         /* ── Page shell */
         .bento-page {
-          position: relative;
-          z-index: 1;
           min-height: 100vh;
-          background: var(--black);
-          background-image:
-            radial-gradient(ellipse 80% 50% at 20% 10%, rgba(201,168,76,0.06) 0%, transparent 60%),
-            radial-gradient(ellipse 60% 40% at 80% 80%, rgba(201,168,76,0.04) 0%, transparent 50%);
-          padding: 188px calc(var(--gap) + 6px) calc(var(--gap) + 6px);
+          background: #0a0a0a;
+          padding: 160px var(--gap) var(--gap);
           display: grid;
           grid-template-columns: 1fr 1fr 1fr;
           grid-template-rows: auto auto auto auto;
@@ -498,53 +588,20 @@ export default function HomePage() {
           max-width: 1400px;
           margin: 0 auto;
           font-family: var(--font-display);
-        }
-
-        /* ── Smoke background */
-        .smoke-bg {
-          position: fixed;
-          inset: 0;
-          z-index: 0;
-          pointer-events: none;
-          overflow: hidden;
-          background:
-            radial-gradient(circle at 20% 15%, rgba(201,168,76,0.13), transparent 45%),
-            radial-gradient(circle at 80% 85%, rgba(201,168,76,0.12), transparent 50%),
-            radial-gradient(circle at 50% 50%, rgba(201,168,76,0.08), transparent 60%),
-            #080808;
-        }
-        .smoke {
-          position: absolute;
-          width: 72vw;
-          height: 72vw;
-          min-width: 560px;
-          min-height: 560px;
-          border-radius: 50%;
-          filter: blur(72px);
-          opacity: 0.46;
-          background: radial-gradient(circle at 40% 40%, rgba(244, 224, 170, 0.82), rgba(120, 96, 40, 0.38) 48%, transparent 74%);
-          animation: smokeDrift 18s ease-in-out infinite alternate;
-        }
-        .smoke-1 { top: -12%; left: -8%; animation-duration: 22s; }
-        .smoke-2 { top: 8%; right: -12%; animation-duration: 26s; animation-delay: -4s; }
-        .smoke-3 { bottom: -16%; left: 16%; animation-duration: 24s; animation-delay: -8s; }
-        .smoke-4 { bottom: -8%; right: 8%; animation-duration: 20s; animation-delay: -2s; }
-        .smoke-5 { top: 38%; left: 34%; animation-duration: 28s; animation-delay: -10s; opacity: 0.28; }
-        .smoke-6 { top: 22%; left: 62%; animation-duration: 30s; animation-delay: -6s; opacity: 0.36; }
-
-        @keyframes smokeDrift {
-          0%   { transform: translate3d(0, 0, 0) scale(1); }
-          50%  { transform: translate3d(18px, -24px, 0) scale(1.08); }
-          100% { transform: translate3d(-16px, 14px, 0) scale(0.95); }
+          position: relative;
+          z-index: 1;
         }
 
         /* ── Tile base */
         .tile {
-          background: var(--surface);
+          background: rgba(17,17,17,0.75);
+          backdrop-filter: blur(2px);
+          -webkit-backdrop-filter: blur(2px);
           border: 1px solid var(--border-dim);
           border-radius: var(--radius);
           overflow: visible;
           position: relative;
+          isolation: isolate;
           opacity: 0;
           transform: translateY(20px);
           animation: tileIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) var(--delay, 0ms) forwards;
@@ -903,12 +960,10 @@ export default function HomePage() {
         .tile-eras {
           grid-area: eras;
           min-height: 700px !important;
-          overflow: visible !important;
+          overflow: hidden !important;
           position: relative;
-          background: rgba(17,17,17,0.38);
-          border-color: rgba(201,168,76,0.16);
-          display: flex;
-          justify-content: center;
+          background: rgba(10,10,10,0.55) !important;
+          border-color: rgba(201,168,76,0.15);
         }
         .carousel-placeholder {
           width: 100%;
@@ -917,13 +972,14 @@ export default function HomePage() {
         }
         .carousel-wrap {
           position: relative;
-          width: min(1040px, calc(100% - 140px));
+          width: 100%;
           height: 100%;
           min-height: 700px;
           display: flex;
           flex-direction: column;
           user-select: none;
-          margin: 0 auto;
+          background: transparent;
+          isolation: isolate;
         }
         .carousel-stage {
           position: absolute;
@@ -939,14 +995,15 @@ export default function HomePage() {
         }
         .carousel-stage:active { cursor: grabbing; }
 
-        /* Scene — centered, slight bottom-right offset */
+        /* Scene — constrained with gutters so side cards peek but stay in tile */
         .carousel-scene {
           position: relative;
-          width: 84%;
-          max-width: 900px;
+          width: 58%;
+          max-width: 720px;
           aspect-ratio: 16/10;
           transform-style: preserve-3d;
-          margin: 4% auto 0;
+          margin-left: 3%;
+          margin-top: 3%;
         }
 
         /* Cards — same size as scene, bleed past edges */
@@ -964,7 +1021,7 @@ export default function HomePage() {
           width: 100%; height: 100%;
           border-radius: 24px;
           border: 1px solid rgba(255,255,255,0.07);
-          background: linear-gradient(145deg, rgba(30,30,30,0.72) 0%, rgba(18,18,18,0.62) 100%);
+          background: linear-gradient(145deg, #1e1e1e 0%, #121212 100%);
           overflow: hidden;
           position: relative;
           box-shadow:
@@ -989,18 +1046,7 @@ export default function HomePage() {
         }
         .era-card--active .era-card-art { opacity: 0.48; }
 
-        .era-card-num {
-          position: absolute;
-          top: 4%; right: 4%;
-          font-family: var(--font-display);
-          font-size: clamp(80px, 14vw, 160px);
-          font-weight: 900;
-          line-height: 1;
-          color: rgba(255,255,255,0.04);
-          letter-spacing: -0.03em;
-          pointer-events: none;
-        }
-        .era-card--active .era-card-num { color: rgba(201,168,76,0.07); }
+
 
         .era-card-content {
           position: absolute;
@@ -1133,13 +1179,13 @@ export default function HomePage() {
         /* Mobile */
         @media (max-width: 768px) {
           .tile-eras      { min-height: 520px !important; }
-          .carousel-wrap  { min-height: 520px; width: calc(100% - 36px); }
-          .carousel-scene { width: 88%; margin: 0 auto; }
+          .carousel-wrap  { min-height: 520px; }
+          .carousel-scene { width: 88%; margin-left: 3%; }
         }
         @media (max-width: 480px) {
           .tile-eras      { min-height: 420px !important; }
-          .carousel-wrap  { min-height: 420px; width: calc(100% - 20px); }
-          .carousel-scene { width: 92%; margin: 0 auto; }
+          .carousel-wrap  { min-height: 420px; }
+          .carousel-scene { width: 92%; margin-left: 2%; }
           .era-card-face  { border-radius: 16px; }
         }
 
@@ -1196,7 +1242,7 @@ export default function HomePage() {
               "eras    eras"
               "cat     model"
               "deals   deals";
-            padding: 160px 18px 18px;
+            padding-top: 148px;
           }
           .tile-inner { padding: 24px 22px; }
           .tile-inner--eras { padding: 20px 0 20px 22px; }
@@ -1215,7 +1261,6 @@ export default function HomePage() {
               "cat"
               "model"
               "deals";
-            padding: 146px 14px 14px;
           }
           .nav-links a:not(:first-child):not(:last-child) { display: none; }
         }
