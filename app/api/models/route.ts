@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL ||
-    `postgresql://catalog_app:smelly@[2a01:4ff:f0:fa6f::1]:5432/stinkin_catalog`,
+  connectionString: process.env.CATALOG_DATABASE_URL,
+  ssl: false,
 });
 
 export async function GET(req: NextRequest) {
