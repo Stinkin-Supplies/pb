@@ -4,6 +4,7 @@ import FloatingNav    from '@/components/home/FloatingNav';
 import SmokeBackground from '@/components/home/SmokeBackground';
 import ModelSearch    from '@/components/home/ModelSearch';
 import EraCarousel   from '@/components/home/EraCarousel';
+import ScrollVelocity from '@/components/home/ScrollVelocity';
 import Link from 'next/link';
 
 
@@ -13,6 +14,8 @@ export default function HomePage() {
     <>
       <SmokeBackground />
       <FloatingNav />
+
+      <ScrollVelocity />
 
       <main className="bento-page">
 
@@ -106,7 +109,8 @@ export default function HomePage() {
         .bento-page {
           min-height: 100vh;
           background: transparent;
-          padding: 160px 48px var(--gap);
+          /* Top padding handled by ScrollVelocity band sitting above */
+          padding: 0 48px var(--gap);
           display: grid;
           grid-template-columns: 1fr 1fr 1fr;
           grid-template-rows: auto auto auto auto;
@@ -907,7 +911,7 @@ export default function HomePage() {
               "eras    eras"
               "cat     model"
               "deals   deals";
-            padding-top: 148px;
+            padding-top: 0;
           padding-left: 16px;
           padding-right: 16px;
           }

@@ -285,7 +285,7 @@ function FloatingNav() {
       >
         <nav className="float-nav">
           <Link href="/" className="nav-logo">
-            <img src="/logo.svg" alt="Stinkin' Supplies" style={{ height: '88px', width: 'auto', objectFit: 'contain' }} />
+            <img src="/LOGO.svg" alt="Stinkin' Supplies" style={{ height: '88px', width: 'auto', objectFit: 'contain' }} />
           </Link>
           <div className="nav-links">
             <Link href="/browse">Browse</Link>

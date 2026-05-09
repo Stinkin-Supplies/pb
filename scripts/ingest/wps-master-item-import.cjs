@@ -220,10 +220,5 @@ async function flushBatch(client, batch) {
   return { u, f };
 }
 
-function isValid(val) {
-  if (!val) return false;
-  const s = val.toString().trim();
-  return s.length > 2 && s !== 'null' && s !== 'undefined' && s !== 'N/A';
-}
 
 run();

@@ -9,11 +9,14 @@
 
 import pg from 'pg';
 import { BatchProgressBar } from './progress_bar.js';
+import dotenv from 'dotenv';
+
+dotenv.config({ path: '.env.local' });
 
 const { Pool } = pg;
 
 const db = new Pool({
-  connectionString: 'postgresql://catalog_app:smelly@5.161.100.126:5432/stinkin_catalog',
+  connectionString: process.env.CATALOG_DATABASE_URL,
   max: 5,
 });
 

@@ -16,13 +16,16 @@ import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const XLSX = require('xlsx');
 import pg from 'pg';
+import dotenv from 'dotenv';
+
+dotenv.config({ path: '.env.local' });
 
 const { Client } = pg;
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 const DB = {
-  host: process.env.CATALOG_DB_HOST || '2a01:4ff:f0:fa6f::1',
+  host: process.env.CATALOG_DB_HOST || '5.161.100.126',
   port: parseInt(process.env.CATALOG_DB_PORT || '5432'),
   user: process.env.CATALOG_DB_USER || 'catalog_app',
   password: process.env.CATALOG_DB_PASSWORD || 'smelly',

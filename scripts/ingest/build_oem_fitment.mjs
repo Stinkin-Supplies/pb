@@ -26,7 +26,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const DB_CONFIG = {
-  host:     '2a01:4ff:f0:fa6f::1',
+  host:     '5.161.100.126',
   port:     5432,
   user:     'catalog_app',
   password: 'smelly',
@@ -433,9 +433,10 @@ async function main() {
       let result;
       try {
         const argStr = JSON.stringify({ path: pdfPath, ys: cat.ys, ye: cat.ye, filename: cat.file });
-        const out = execSync(`python3 ${pyPath} '${argStr.replace(/'/g, "'\\''")}'`, {
+        const out = execSync(`/usr/bin/python3 ${pyPath} '${argStr.replace(/'/g, "'\\''")}'`, {
           timeout: 180_000,
           maxBuffer: 60 * 1024 * 1024,
+          env: process.env,
         });
         result = JSON.parse(out.toString());
       } catch (e) {

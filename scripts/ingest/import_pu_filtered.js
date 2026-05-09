@@ -24,7 +24,6 @@ const DATA_DIR  = path.resolve(__dirname, "../data/pu_pricefile/oldbook-fatbook"
 const BASE_FILE = path.join(DATA_DIR, "BasePriceFile.csv");
 const DEAL_FILE = path.join(DATA_DIR, "D00108_PriceFile.csv");
 const BATCH_SIZE = 500;
-const KEEP_CODES = new Set(["A", "E", "C"]);
 
 const pool = new pg.Pool({ connectionString: process.env.CATALOG_DATABASE_URL });
 
@@ -71,8 +70,9 @@ async function loadBaseFile(dealerPrices) {
     fs.createReadStream(BASE_FILE)
       .pipe(csv())
       .on("data", (row) => {
+        const isDrag = bool(row["Drag Part"]);
+        if (!isDrag) return;
         const code = str(row["Product Code"]);
-        if (!KEEP_CODES.has(code)) return;
         const sku = str(row["Part Number"]);
         if (!sku) return;
 

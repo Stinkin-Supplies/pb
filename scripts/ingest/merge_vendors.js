@@ -26,7 +26,11 @@ const BATCH_SIZE = 500;
 // ── SCHEMA ────────────────────────────────────────────────────────────────────
 
 async function createTable(client) {
-  await client.query(`DROP TABLE IF EXISTS catalog_unified CASCADE`);
+  await client.query(`DROP VIEW IF EXISTS v_catalog_fitment`);
+  await client.query(`ALTER TABLE IF EXISTS catalog_fitment_v2 DROP CONSTRAINT IF EXISTS catalog_fitment_v2_product_id_fkey`);
+  await client.query(`ALTER TABLE IF EXISTS product_fitment_year_model DROP CONSTRAINT IF EXISTS product_fitment_year_model_unified_id_fkey`);
+  await client.query(`ALTER TABLE IF EXISTS vendor_offers DROP CONSTRAINT IF EXISTS vendor_offers_catalog_product_id_fkey`);
+  await client.query(`DROP TABLE IF EXISTS catalog_unified`);
   await client.query(`
     CREATE TABLE catalog_unified (
       id                  SERIAL PRIMARY KEY,
@@ -110,6 +114,18 @@ async function createTable(client) {
       oldbook_page        VARCHAR(20),
       fatbook_page        VARCHAR(20),
 
+      -- Pipeline compatibility columns
+      internal_sku         VARCHAR(15) UNIQUE,
+      oem_numbers          TEXT[],
+      computed_price       NUMERIC(10,2),
+      in_harddrive         BOOLEAN DEFAULT FALSE,
+      in_street            BOOLEAN DEFAULT FALSE,
+      display_brand        VARCHAR(200),
+      manufacturer_brand   VARCHAR(200),
+      special_instructions TEXT,
+      pdp_payload          JSONB,
+      brand_part_number    VARCHAR(100),
+
       -- Meta
       part_add_date       DATE,
       slug                TEXT UNIQUE,
@@ -131,6 +147,26 @@ async function createTable(client) {
     CREATE INDEX idx_cu_features     ON catalog_unified USING GIN(features);
     CREATE INDEX idx_cu_product_code ON catalog_unified(product_code);
     CREATE INDEX idx_cu_drag         ON catalog_unified(drag_part);
+    CREATE UNIQUE INDEX idx_cu_internal_sku ON catalog_unified(internal_sku) WHERE internal_sku IS NOT NULL;
+    CREATE INDEX idx_cu_oem_numbers  ON catalog_unified USING GIN(oem_numbers);
+  `);
+  await client.query(`
+    CREATE OR REPLACE VIEW v_catalog_fitment AS
+    SELECT cu.sku, cu.name, cu.brand,
+      cu.fitment_hd_families, cu.fitment_hd_codes,
+      cu.fitment_year_start, cu.fitment_year_end,
+      cu.is_harley_fitment, cu.is_universal,
+      m.model_code, m.model_name, m.family AS resolved_family,
+      m.year_start AS model_year_start, m.year_end AS model_year_end,
+      m.engine_key, e.nickname AS engine_nickname, e.name AS engine_name
+    FROM catalog_unified cu
+    LEFT JOIN LATERAL unnest(cu.fitment_hd_codes) fc(code) ON true
+    LEFT JOIN hd_models m ON m.model_code = fc.code
+      AND (cu.fitment_year_start IS NULL
+        OR (cu.fitment_year_start <= COALESCE(m.year_end, 9999)
+        AND COALESCE(cu.fitment_year_end::integer, 9999) >= m.year_start))
+    LEFT JOIN hd_engine_types e ON e.engine_key = m.engine_key
+    WHERE cu.is_harley_fitment = true
   `);
   console.log("  ✓ catalog_unified table created\n");
 }
@@ -197,6 +233,7 @@ async function mergeWPS(client) {
       ARRAY_AGG(cm.url ORDER BY cm.priority) FILTER (WHERE cm.url IS NOT NULL) AS image_urls
     FROM catalog_products cp
     LEFT JOIN catalog_media cm ON cm.product_id = cp.id AND cm.media_type = 'image'
+    WHERE cp.harddrive_catalog = true
     GROUP BY cp.id
     ORDER BY cp.id
   `);
