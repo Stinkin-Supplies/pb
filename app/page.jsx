@@ -771,7 +771,7 @@ export default function HomePage() {
           filter: blur(18px);
         }
 
-        /* The dark glass pill itself */
+        /* The light cream pill itself */
         .float-nav {
           position: relative;
           z-index: 1;
@@ -780,25 +780,25 @@ export default function HomePage() {
           justify-content: space-between;
           gap: 32px;
           padding: 10px 20px 10px 14px;
-          background: rgba(8, 8, 8, 0.78);
-          backdrop-filter: blur(22px) saturate(160%);
-          -webkit-backdrop-filter: blur(22px) saturate(160%);
-          border: 1px solid rgba(201,168,76,0.22);
+          background: #FFF7E6;
+          backdrop-filter: blur(14px) saturate(120%);
+          -webkit-backdrop-filter: blur(14px) saturate(120%);
+          border: 1px solid rgba(201,168,76,0.35);
           border-radius: 999px;
           /* Subtle gold rim glow on the bottom edge */
           box-shadow:
             0 1px 0 rgba(201,168,76,0.18) inset,
             0 -1px 0 rgba(201,168,76,0.08) inset,
-            0 2px 12px rgba(0,0,0,0.6);
+            0 2px 12px rgba(120,90,20,0.18);
           transition: background 0.3s, border-color 0.3s;
         }
         .nav-cloud-wrap.scrolled .float-nav {
-          background: rgba(6, 6, 6, 0.9);
-          border-color: rgba(201,168,76,0.35);
+          background: #FFF7E6;
+          border-color: rgba(201,168,76,0.45);
           box-shadow:
-            0 1px 0 rgba(201,168,76,0.25) inset,
-            0 -1px 0 rgba(201,168,76,0.1) inset,
-            0 4px 20px rgba(0,0,0,0.7);
+            0 1px 0 rgba(201,168,76,0.3) inset,
+            0 -1px 0 rgba(201,168,76,0.12) inset,
+            0 4px 20px rgba(120,90,20,0.22);
         }
 
         /* ── HD Bar & Shield mini button ──────────────────── */
@@ -874,13 +874,13 @@ export default function HomePage() {
           border-radius: 50%;
           width: 30px; height: 30px;
           display: flex; align-items: center; justify-content: center;
-          color: var(--text-dim);
+          color: rgba(60,44,0,0.55);
           cursor: pointer;
           transition: color 0.2s, background 0.2s;
           margin-left: 4px;
           flex-shrink: 0;
         }
-        .nav-close:hover { color: var(--white); background: rgba(255,255,255,0.12); }
+        .nav-close:hover { color: #1a1200; background: rgba(255,255,255,0.12); }
 
         .nav-logo img { display: block; }
         .nav-links {
@@ -889,17 +889,19 @@ export default function HomePage() {
           gap: 6px;
         }
         .nav-links a {
-          font-family: var(--font-mono);
-          font-size: 12px;
-          letter-spacing: 0.1em;
+          font-family: 'Barlow Condensed', sans-serif;
+          font-size: 15px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
           text-transform: uppercase;
-          color: var(--text-dim);
+          color: #1a1200;
           text-decoration: none;
-          padding: 6px 12px;
+          padding: 6px 14px;
           border-radius: 999px;
           transition: color 0.2s, background 0.2s;
+          white-space: nowrap;
         }
-        .nav-links a:hover { color: var(--white); background: rgba(255,255,255,0.07); }
+        .nav-links a:hover { color: #000; background: rgba(180,140,20,0.12); }
 
         /* ── Mobile */
         @media (max-width: 768px) {

@@ -1,13 +1,5 @@
 'use client';
 
-/**
- * ScrollVelocity — magicui-style scroll-based velocity marquee.
- * Loops two rows of text in opposite directions, accelerating with
- * scroll speed. Tuned for medium height + slightly slower base speed.
- *
- * Docs: https://magicui.design/docs/components/scroll-based-velocity
- */
-
 import { useEffect, useRef, useState } from 'react';
 import {
   motion,
@@ -19,14 +11,12 @@ import {
   useVelocity,
 } from 'framer-motion';
 
-// Wrap helper (framer-motion's `wrap` import path moved around between
-// versions, so we ship our own to avoid runtime errors).
 const wrap = (min, max, v) => {
   const rangeSize = max - min;
   return ((((v - min) % rangeSize) + rangeSize) % rangeSize) + min;
 };
 
-function ParallaxRow({ children, baseVelocity = 3, className = '' }) {
+function ParallaxRow({ children, baseVelocity = 1.5, className = '' }) {
   const baseX = useMotionValue(0);
   const { scrollY } = useScroll();
   const scrollVelocity = useVelocity(scrollY);
@@ -42,8 +32,6 @@ function ParallaxRow({ children, baseVelocity = 3, className = '' }) {
   const textRef = useRef(null);
   const [repetitions, setRepetitions] = useState(4);
 
-  // Compute how many copies of the string we need to fill the viewport
-  // (and then some, so the loop feels seamless).
   useEffect(() => {
     const recalc = () => {
       if (containerRef.current && textRef.current) {
@@ -64,10 +52,8 @@ function ParallaxRow({ children, baseVelocity = 3, className = '' }) {
   const directionFactor = useRef(1);
   useAnimationFrame((_t, delta) => {
     let moveBy = directionFactor.current * baseVelocity * (delta / 1000);
-
     if (velocityFactor.get() < 0) directionFactor.current = -1;
     else if (velocityFactor.get() > 0) directionFactor.current = 1;
-
     moveBy += directionFactor.current * moveBy * velocityFactor.get();
     baseX.set(baseX.get() + moveBy);
   });
@@ -86,8 +72,8 @@ function ParallaxRow({ children, baseVelocity = 3, className = '' }) {
 }
 
 export default function ScrollVelocity({
-  text = 'BUY THE RIGHT PART THE FIRST TIME · LESS WRENCHING · MORE RIDING ·',
-  defaultVelocity = 3, // "slightly slower" — magicui default is 5
+  text = 'GET THE RIGHT STINKIN PART · LESS WRENCHING · MORE RIDING ·',
+  defaultVelocity = 1.5,
 }) {
   return (
     <section className="scroll-velocity-band" aria-hidden="true">
@@ -100,13 +86,11 @@ export default function ScrollVelocity({
         .scroll-velocity-band {
           position: relative;
           width: 100%;
-          padding: 14px 0;
-          /* Sit above the bento grid; clear the floating nav above */
-          margin-top: 96px;
+          padding: 20px 0;
+          margin-top: 140px;
           margin-bottom: 24px;
           z-index: 2;
           pointer-events: none;
-          /* Soft fade on the edges so words don't hard-clip */
           -webkit-mask-image: linear-gradient(
             to right,
             transparent 0%,
@@ -133,7 +117,6 @@ export default function ScrollVelocity({
           display: inline-flex;
           white-space: nowrap;
           font-family: 'Barlow Condensed', sans-serif;
-          /* Medium height — between the docs' small and huge demos */
           font-size: clamp(42px, 7vw, 88px);
           font-weight: 700;
           line-height: 1.05;
@@ -143,7 +126,6 @@ export default function ScrollVelocity({
           will-change: transform;
         }
 
-        /* Second row: gold outline for that two-tone marquee feel */
         .sv-row--dim {
           color: transparent;
           -webkit-text-stroke: 1px rgba(201, 168, 76, 0.55);
@@ -158,16 +140,16 @@ export default function ScrollVelocity({
 
         @media (max-width: 768px) {
           .scroll-velocity-band {
-            margin-top: 80px;
+            margin-top: 120px;
             margin-bottom: 16px;
-            padding: 10px 0;
+            padding: 14px 0;
           }
           .sv-row { font-size: clamp(34px, 9vw, 64px); }
         }
 
         @media (max-width: 480px) {
           .scroll-velocity-band {
-            margin-top: 72px;
+            margin-top: 108px;
           }
           .sv-row { font-size: clamp(28px, 10vw, 52px); }
         }

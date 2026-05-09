@@ -18,8 +18,8 @@ const NAV_LINKS = [
 const css = `
   .ss-nav {
     position: sticky; top: 0; z-index: 100;
-    background: rgba(10,9,9,0.96);
-    border-bottom: 1px solid #2a2828;
+    background: #FFF7E6;
+    border-bottom: 1px solid #e7d6b0;
     height: 54px;
     display: flex; align-items: center;
     padding: 0 20px; gap: 12px;
@@ -120,7 +120,7 @@ const css = `
   /* Mobile menu overlay */
   .ss-mobile-menu {
     position: fixed; inset: 54px 0 0;
-    background: #111010;
+    background: #FFF7E6;
     display: flex; flex-direction: column;
     padding: 20px 24px; gap: 0;
     z-index: 101; overflow-y: auto;

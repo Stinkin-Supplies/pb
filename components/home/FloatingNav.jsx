@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
-// ─── Inline SVG — HD bar & shield with metallic S (menubutton.svg v2) ─────────
 const ShieldSVG = ({ className }) => (
   <svg
     className={className}
@@ -26,16 +26,12 @@ const ShieldSVG = ({ className }) => (
         <feComposite result="result16" in2="SourceGraphic" operator="in" in="result15" />
       </filter>
     </defs>
-
     <g transform="translate(68.808883,-6.5206048)">
-      {/* Shield outline — dark fill, original gold stroke */}
       <path
         id="sb-shield"
         d="M 20.147494,7.1219051 C 2.5522939,18.818715 -18.361155,24.609085 -39.24578,26.526925 c -1.190163,7.20085 -1.087214,14.09053 5.729984,17.88892 4.465865,8.95735 -8.854132,4.05611 -13.562381,5.27274 -6.820111,0.0158 -13.642923,-0.029 -20.459415,0.23404 -0.729356,14.50717 -1.062609,29.0479 -0.456705,43.5661 10.773762,1.33789 21.775641,-1.30104 32.462153,0.88917 7.410526,3.74718 -10.862087,9.131695 -1.326084,13.123605 16.664659,12.2286 34.7167329,22.69538 53.733423,30.793 10.592292,4.41554 21.032685,-2.13824 29.556201,-7.90421 7.820168,-4.90723 15.810978,-9.51279 22.780628,-15.63086 4.00754,-5.25867 15.973268,-7.23705 14.054088,-14.65578 -3.30737,-2.642905 -8.933268,-7.875315 -0.72691,-6.535765 9.31216,-0.34087 18.634138,-0.0692 27.946938,-0.38538 -0.84994,-10.14998 -0.47107,-20.40154 -1.09636,-30.58665 -0.0848,-6.69003 1.12227,-15.57711 -8.21864,-13.90103 -9.462208,-0.85929 -18.964178,-0.1666 -28.443696,-0.16663 -1.64481,-7.57542 11.266288,-9.32472 7.708428,-17.52207 -3.181638,-10.20096 -17.213818,-6.08563 -25.193738,-9.65404 -12.357065,-2.78889 -24.522261,-7.13311 -35.09464,-14.2301799 z"
         style={{opacity:0.84, fill:'#000000', fillOpacity:1, stroke:'#947600', strokeOpacity:1}}
       />
-
-      {/* Metallic S — updated positioning from v2 */}
       <g transform="translate(-5.7434334,9.7183081)">
         <g transform="matrix(0.85184826,0.10114425,-0.10114425,0.85184826,24.128586,-69.943268)"
            style={{strokeWidth:'1.34991', strokeDasharray:'none'}}>
@@ -55,7 +51,6 @@ const ShieldSVG = ({ className }) => (
   </svg>
 );
 
-// ─── Floating Nav ─────────────────────────────────────────────────────────────
 function FloatingNav() {
   const [mounted, setMounted]       = useState(false);
   const [scrolled, setScrolled]     = useState(false);
@@ -63,6 +58,9 @@ function FloatingNav() {
   const [lastY, setLastY]           = useState(0);
   const [manualOpen, setManualOpen] = useState(false);
   const [clicking, setClicking]     = useState(false);
+  const [query, setQuery]           = useState('');
+  const inputRef                    = useRef(null);
+  const router                      = useRouter();
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -94,10 +92,19 @@ function FloatingNav() {
     setManualOpen(true);
   };
 
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (query.trim()) {
+      router.push(`/browse?q=${encodeURIComponent(query.trim())}`);
+      setQuery('');
+      inputRef.current?.blur();
+    }
+  };
+
   return (
     <>
       <style>{`
-        /* ── Shield button ─────────────────────────────────── */
+        /* ── Shield button ───────────────────────────────────── */
         .nav-mini-wrap {
           position: fixed;
           top: 14px;
@@ -108,7 +115,6 @@ function FloatingNav() {
           cursor: pointer;
           transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.22,1,0.36,1);
         }
-
         .nav-mini-btn {
           position: absolute;
           inset: 0;
@@ -119,13 +125,10 @@ function FloatingNav() {
           width: 100%;
           height: 100%;
         }
-
-        /* The SVG fills the button area */
         .nav-mini-svg {
           width: 100%;
           height: 100%;
           transition: filter 0.2s;
-          /* Default: gold cloud glow underneath */
           filter:
             drop-shadow(0 6px 14px rgba(201,168,76,0.45))
             drop-shadow(0 2px 4px rgba(0,0,0,0.85));
@@ -136,13 +139,8 @@ function FloatingNav() {
             drop-shadow(0 2px 6px rgba(0,0,0,0.9))
             brightness(1.15);
         }
+        .nav-mini-wrap:hover #sb-shield { stroke: #e8c43a; }
 
-        /* Gold stroke on the shield path brightens on hover */
-        .nav-mini-wrap:hover #sb-shield {
-          stroke: #e8c43a;
-        }
-
-        /* ── Click animations */
         @keyframes shieldPulse {
           0%   { transform: scale(1); }
           25%  { transform: scale(1.1); }
@@ -154,15 +152,11 @@ function FloatingNav() {
           30%  { filter: drop-shadow(0 0 28px rgba(255,220,60,1)) drop-shadow(0 0 12px rgba(255,200,30,0.9)) brightness(1.3); }
           100% { filter: drop-shadow(0 6px 14px rgba(201,168,76,0.45)) drop-shadow(0 2px 4px rgba(0,0,0,0.85)); }
         }
-        .nav-mini-wrap--clicking {
-          animation: shieldPulse 0.45s cubic-bezier(0.22,1,0.36,1) forwards;
-        }
-        .nav-mini-wrap--clicking .nav-mini-svg {
-          animation: glowBurst 0.45s ease forwards;
-        }
+        .nav-mini-wrap--clicking { animation: shieldPulse 0.45s cubic-bezier(0.22,1,0.36,1) forwards; }
+        .nav-mini-wrap--clicking .nav-mini-svg { animation: glowBurst 0.45s ease forwards; }
 
         /* ══════════════════════════════════════════════════════
-           FULL NAV — dark glass pill on a gold cloud
+           FULL NAV — gold glitter paste cloud
            ══════════════════════════════════════════════════════ */
         .nav-cloud-wrap {
           position: fixed;
@@ -170,91 +164,174 @@ function FloatingNav() {
           left: 50%;
           transform: translateX(-50%);
           z-index: 300;
-          width: min(860px, calc(100vw - 32px));
+          width: min(920px, calc(100vw - 32px));
           transition: opacity 0.35s ease, transform 0.35s cubic-bezier(0.22,1,0.36,1);
         }
+
+        /* Gold glitter cloud — layered radials, very light */
         .nav-cloud-wrap::before {
           content: '';
           position: absolute;
-          inset: 8px 20px -4px;
+          inset: 6px 16px -8px;
           border-radius: 999px;
-          background: radial-gradient(
-            ellipse 80% 60% at 50% 100%,
-            rgba(201,168,76,0.55) 0%,
-            rgba(180,140,20,0.28) 45%,
-            transparent 75%
-          );
-          filter: blur(14px);
+          background:
+            radial-gradient(ellipse 70% 55% at 30% 100%, rgba(212,175,55,0.22) 0%, transparent 65%),
+            radial-gradient(ellipse 50% 45% at 70% 100%, rgba(255,215,80,0.18) 0%, transparent 60%),
+            radial-gradient(ellipse 90% 65% at 50% 100%, rgba(201,168,76,0.14) 0%, transparent 70%);
+          filter: blur(10px);
           z-index: 0;
           pointer-events: none;
-          transition: opacity 0.3s;
         }
-        .nav-cloud-wrap.scrolled::before {
+        /* Extra shimmer layer */
+        .nav-cloud-wrap::after {
+          content: '';
+          position: absolute;
+          inset: 10px 30px -2px;
+          border-radius: 999px;
           background: radial-gradient(
-            ellipse 80% 60% at 50% 100%,
-            rgba(212,175,55,0.7) 0%,
-            rgba(180,140,20,0.38) 45%,
-            transparent 75%
+            ellipse 60% 40% at 50% 110%,
+            rgba(255,235,120,0.28) 0%,
+            rgba(212,175,55,0.1) 40%,
+            transparent 70%
           );
-          filter: blur(18px);
+          filter: blur(6px);
+          z-index: 0;
+          pointer-events: none;
         }
+
         .float-nav {
           position: relative;
           z-index: 1;
           display: flex;
           align-items: center;
-          justify-content: space-between;
-          gap: 32px;
-          padding: 10px 20px 10px 14px;
-          background: rgba(8, 8, 8, 0.78);
-          backdrop-filter: blur(22px) saturate(160%);
-          -webkit-backdrop-filter: blur(22px) saturate(160%);
-          border: 1px solid rgba(201,168,76,0.22);
+          gap: 8px;
+          padding: 8px 14px 8px 12px;
+          background: #FFF7E6;
+          
+          border: 1px solid rgba(212,175,55,0.35);
+          border-top-color: rgba(255,235,140,0.6);
           border-radius: 999px;
           box-shadow:
-            0 1px 0 rgba(201,168,76,0.18) inset,
-            0 -1px 0 rgba(201,168,76,0.08) inset,
-            0 2px 12px rgba(0,0,0,0.6);
-          transition: background 0.3s, border-color 0.3s;
+            0 1px 0 rgba(255,245,180,0.8) inset,
+            0 -1px 0 rgba(180,140,20,0.1) inset,
+            0 2px 20px rgba(160,120,0,0.12);
+          transition: background 0.3s, border-color 0.3s, box-shadow 0.3s;
         }
         .nav-cloud-wrap.scrolled .float-nav {
-          background: rgba(6, 6, 6, 0.9);
-          border-color: rgba(201,168,76,0.35);
+          background: #FFF7E6;
+          border-color: rgba(212,175,55,0.5);
+          box-shadow:
+            0 1px 0 rgba(255,245,180,0.9) inset,
+            0 -1px 0 rgba(180,140,20,0.12) inset,
+            0 4px 28px rgba(160,120,0,0.16);
         }
+
+        /* Logo */
         .nav-logo img { display: block; }
+
+        /* Nav links — bold, dark, readable on gold */
         .nav-links {
           display: flex;
           align-items: center;
-          gap: 6px;
+          gap: 2px;
+          flex-shrink: 0;
         }
         .nav-links a {
-          font-family: var(--font-mono);
-          font-size: 12px;
-          letter-spacing: 0.1em;
+          font-family: 'Barlow Condensed', sans-serif;
+          font-size: 15px;
+          font-weight: 700;
+          letter-spacing: 0.06em;
           text-transform: uppercase;
-          color: var(--text-dim);
+          color: #1a1400;
           text-decoration: none;
-          padding: 6px 12px;
+          padding: 7px 14px;
           border-radius: 999px;
-          transition: color 0.2s, background 0.2s;
+          transition: color 0.15s, background 0.15s;
+          white-space: nowrap;
         }
-        .nav-links a:hover { color: var(--white); background: rgba(255,255,255,0.07); }
+        .nav-links a:hover {
+          color: #000;
+          background: rgba(180,140,20,0.12);
+        }
+
+        /* Search bar */
+        .nav-search {
+          flex: 1;
+          min-width: 0;
+          display: flex;
+          align-items: center;
+          gap: 0;
+          background: rgba(255,248,220,0.55);
+          border: 1px solid rgba(180,140,20,0.28);
+          border-radius: 999px;
+          padding: 0 6px 0 14px;
+          transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+          height: 36px;
+        }
+        .nav-search:focus-within {
+          background: rgba(255,250,230,0.85);
+          border-color: rgba(180,140,20,0.55);
+          box-shadow: 0 0 0 3px rgba(212,175,55,0.15);
+        }
+        .nav-search input {
+          flex: 1;
+          min-width: 0;
+          background: none;
+          border: none;
+          outline: none;
+          font-family: 'Barlow Condensed', sans-serif;
+          font-size: 14px;
+          font-weight: 600;
+          letter-spacing: 0.04em;
+          color: #1a1200;
+          placeholder-color: rgba(80,60,0,0.45);
+        }
+        .nav-search input::placeholder {
+          color: rgba(100,78,0,0.5);
+          font-weight: 500;
+        }
+        .nav-search-btn {
+          background: rgba(180,140,20,0.18);
+          border: none;
+          border-radius: 999px;
+          width: 28px;
+          height: 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          color: #5a4200;
+          flex-shrink: 0;
+          transition: background 0.15s, color 0.15s;
+        }
+        .nav-search-btn:hover {
+          background: rgba(180,140,20,0.32);
+          color: #2a1e00;
+        }
+
+        /* Close button */
         .nav-close {
-          background: rgba(255,255,255,0.06);
-          border: 1px solid rgba(255,255,255,0.08);
+          background: rgba(180,140,20,0.12);
+          border: 1px solid rgba(180,140,20,0.25);
           border-radius: 50%;
           width: 30px; height: 30px;
           display: flex; align-items: center; justify-content: center;
-          color: rgba(245,240,232,0.5);
+          color: rgba(60,44,0,0.55);
           cursor: pointer;
           transition: color 0.2s, background 0.2s;
-          margin-left: 4px;
+          margin-left: 2px;
           flex-shrink: 0;
         }
-        .nav-close:hover { color: #fff; background: rgba(255,255,255,0.12); }
+        .nav-close:hover { color: #1a1200; background: rgba(180,140,20,0.25); }
+
+        /* Mobile */
+        @media (max-width: 640px) {
+          .nav-links a { font-size: 13px; padding: 6px 10px; }
+          .nav-search { min-width: 80px; }
+        }
       `}</style>
 
-      {/* ── HD Shield button — only visible when menu is minimized */}
+      {/* ── HD Shield button — only when minimized */}
       <div
         className={`nav-mini-wrap ${clicking ? 'nav-mini-wrap--clicking' : ''}`}
         style={{
@@ -272,7 +349,7 @@ function FloatingNav() {
         </button>
       </div>
 
-      {/* ── Gold cloud wrapper + dark glass pill */}
+      {/* ── Gold glitter cloud nav */}
       <div
         className={`nav-cloud-wrap ${scrolled ? 'scrolled' : ''}`}
         style={{
@@ -284,30 +361,51 @@ function FloatingNav() {
         }}
       >
         <nav className="float-nav">
-          <Link href="/" className="nav-logo">
-            <img src="/LOGO.svg" alt="Stinkin' Supplies" style={{ height: '88px', width: 'auto', objectFit: 'contain' }} />
+          {/* Logo */}
+          <Link href="/" className="nav-logo" style={{ flexShrink: 0 }}>
+            <img src="/LOGO.svg" alt="Stinkin' Supplies" style={{ height: '48px', width: 'auto', objectFit: 'contain' }} />
           </Link>
+
+          {/* Links */}
           <div className="nav-links">
             <Link href="/browse">Browse</Link>
             <Link href="/eras">Eras</Link>
             <Link href="/browse?category=all">Categories</Link>
-            <Link href="/browse?deals=true">Deals</Link>
-            <Link href="/admin/products">Admin</Link>
-            <button
-              className="nav-close"
-              style={{
-                opacity:       manualOpen ? 1 : 0,
-                pointerEvents: manualOpen ? 'auto' : 'none',
-                width:         manualOpen ? '30px' : '0',
-              }}
-              onClick={() => { setManualOpen(false); setMinimized(true); }}
-              aria-label="Close navigation"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
-                <path d="M18 6 6 18M6 6l12 12"/>
+          </div>
+
+          {/* Search */}
+          <form className="nav-search" onSubmit={handleSearch}>
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search parts…"
+              aria-label="Search parts"
+            />
+            <button type="submit" className="nav-search-btn" aria-label="Search">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="m21 21-4.35-4.35"/>
               </svg>
             </button>
-          </div>
+          </form>
+
+          {/* Close (only when manually opened) */}
+          <button
+            className="nav-close"
+            style={{
+              opacity:       manualOpen ? 1 : 0,
+              pointerEvents: manualOpen ? 'auto' : 'none',
+              width:         manualOpen ? '30px' : '0',
+            }}
+            onClick={() => { setManualOpen(false); setMinimized(true); }}
+            aria-label="Close navigation"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+              <path d="M18 6 6 18M6 6l12 12"/>
+            </svg>
+          </button>
         </nav>
       </div>
     </>
