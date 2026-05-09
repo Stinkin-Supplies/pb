@@ -345,7 +345,7 @@ function FloatingNav() {
           onClick={handleShieldClick}
           aria-label="Open navigation"
         >
-          <ShieldSVG className="nav-mini-svg" />
+          <img src="/images/menubutton.svg" alt="Menu" className="nav-mini-svg" />
         </button>
       </div>
 
