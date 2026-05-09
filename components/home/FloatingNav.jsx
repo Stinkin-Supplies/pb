@@ -363,7 +363,7 @@ function FloatingNav() {
         <nav className="float-nav">
           {/* Logo */}
           <Link href="/" className="nav-logo" style={{ flexShrink: 0 }}>
-            <img src="/LOGO.svg" alt="Stinkin' Supplies" style={{ height: '48px', width: 'auto', objectFit: 'contain' }} />
+            <img src="/logo.svg" alt="Stinkin' Supplies" style={{ height: '48px', width: 'auto', objectFit: 'contain' }} />
           </Link>
 
           {/* Links */}
