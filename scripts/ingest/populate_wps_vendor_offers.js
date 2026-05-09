@@ -18,7 +18,7 @@ const pool = new pg.Pool({
   host:     process.env.CATALOG_DB_HOST     || '5.161.100.126',
   port:     parseInt(process.env.CATALOG_DB_PORT || '5432'),
   database: process.env.CATALOG_DB_NAME     || 'stinkin_catalog',
-  user:     process.env.CATALOG_DB_USER     || 'deploy',
+  user:     process.env.CATALOG_DB_USER     || 'catalog_app',
   password: process.env.CATALOG_DB_PASSWORD || 'smelly',
 });
 
