@@ -774,13 +774,14 @@ export default function HomePage() {
         /* The light cream pill itself */
         .float-nav {
           position: relative;
+          overflow: hidden;
           z-index: 1;
           display: flex;
           align-items: center;
           justify-content: space-between;
           gap: 32px;
           padding: 10px 20px 10px 14px;
-          background: #FFF7E6;
+          background: rgba(255, 247, 230, 0.82);
           backdrop-filter: blur(14px) saturate(120%);
           -webkit-backdrop-filter: blur(14px) saturate(120%);
           border: 1px solid rgba(201,168,76,0.35);
@@ -791,6 +792,23 @@ export default function HomePage() {
             0 -1px 0 rgba(201,168,76,0.08) inset,
             0 2px 12px rgba(120,90,20,0.18);
           transition: background 0.3s, border-color 0.3s;
+        }
+        .float-nav::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          border-radius: 999px;
+          background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.08'/%3E%3C/svg%3E");
+          background-size: 128px 128px;
+          opacity: 0.35;
+          pointer-events: none;
+          z-index: 0;
+          mix-blend-mode: overlay;
+        }
+
+        .float-nav > * {
+          position: relative;
+          z-index: 1;
         }
         .nav-cloud-wrap.scrolled .float-nav {
           background: #FFF7E6;
