@@ -110,8 +110,8 @@ function FloatingNav() {
           top: 14px;
           left: 16px;
           z-index: 300;
-          width: 140px;
-          height: 104px;
+          width: 210px;
+          height: 156px;
           cursor: pointer;
           transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.22,1,0.36,1);
         }
