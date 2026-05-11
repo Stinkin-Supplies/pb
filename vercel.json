@@ -1,21 +1,7 @@
 {
-  "functions": {
-    "app/api/vendors/parts-unlimited/sync/route.ts": {
-      "maxDuration": 300
-    }
-  },
   "crons": [
-    {
-      "path": "/api/admin/run-pricing",
-      "schedule": "0 3 * * *"
-    },
-    {
-      "path": "/api/admin/pu-price-sync",
-      "schedule": "0 4 * * *"
-    },
-    {
-      "path": "/api/admin/reindex",
-      "schedule": "0 5 * * *"
-    }
+    { "path": "/api/admin/run-pricing", "schedule": "0 3 * * *" },
+    { "path": "/api/admin/pu-price-sync", "schedule": "0 4 * * *" },
+    { "path": "/api/admin/reindex", "schedule": "0 5 * * *" }
   ]
 }

@@ -369,8 +369,8 @@ function FloatingNav() {
           {/* Links */}
           <div className="nav-links">
             <Link href="/browse">Browse</Link>
-            <Link href="/eras">Eras</Link>
-            <Link href="/browse?category=all">Categories</Link>
+            <Link href="/era">Eras</Link>
+            <Link href="/categories">Categories</Link>
           </div>
 
           {/* Search */}
