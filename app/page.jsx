@@ -1,13 +1,13 @@
 'use client';
 
-import FloatingNav    from '@/components/home/FloatingNav';
+import FloatingNav     from '@/components/home/FloatingNav';
 import SmokeBackground from '@/components/home/SmokeBackground';
-import ModelSearch    from '@/components/home/ModelSearch';
-import EraCarousel   from '@/components/home/EraCarousel';
-import VideoHero from '@/components/home/VideoHero';
-import ScrollVelocity from '@/components/home/ScrollVelocity';
+import ModelSearch     from '@/components/home/ModelSearch';
+import EraCarousel     from '@/components/home/EraCarousel';
+import VideoHero       from '@/components/home/VideoHero';
+import ScrollVelocity  from '@/components/home/ScrollVelocity';
+import EraKineticTile  from '@/components/home/EraKineticTile';
 import Link from 'next/link';
-
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function HomePage() {
@@ -20,11 +20,9 @@ export default function HomePage() {
         <VideoHero />
         <ScrollVelocity />
         <div className="bento-page">
-        <Link href="/era" className="tile tile-era-kinetic" style={{ '--delay': '120ms' }} aria-label="Shop by Era">
-          <div className="era-kinetic-wrap">
-            <span className="era-kinetic-text" data-text="Shop by Era">Shop by Era</span>
-          </div>
-        </Link>
+
+        {/* ── Kinetic "SHOP BY ERA" heading tile — links to /era */}
+        <EraKineticTile />
 
         {/* ── Era 3D Carousel — full width */}
         <section
@@ -105,7 +103,6 @@ export default function HomePage() {
         .bento-page {
           min-height: 100vh;
           background: transparent;
-          /* Top padding handled by ScrollVelocity band sitting above */
           padding: 0 48px var(--gap);
           display: grid;
           grid-template-columns: 1fr 1fr 1fr;
@@ -148,62 +145,38 @@ export default function HomePage() {
         }
 
         /* ── Grid placement */
-        .tile-search   { grid-area: search;  min-height: 220px; }
-        .tile-video    { grid-area: video;   min-height: 220px; }
+        .tile-search      { grid-area: search;  min-height: 220px; }
+        .tile-video       { grid-area: video;   min-height: 220px; }
         .tile-era-kinetic { grid-area: erahead; min-height: 120px; }
-        .tile-eras     { grid-area: eras;    min-height: 580px; overflow: hidden; }
-        .tile-category { grid-area: cat;     min-height: 200px; }
-        .tile-model    { grid-area: model;   min-height: 200px; }
-        .tile-deals    { grid-area: deals;   min-height: 200px; background: var(--surface-2); }
+        .tile-eras        { grid-area: eras;    min-height: 580px; overflow: hidden; }
+        .tile-category    { grid-area: cat;     min-height: 200px; }
+        .tile-model       { grid-area: model;   min-height: 200px; }
+        .tile-deals       { grid-area: deals;   min-height: 200px; background: var(--surface-2); }
 
+        /* ── Era kinetic tile shell */
         .tile-era-kinetic {
           text-decoration: none;
           display: flex;
           align-items: center;
           justify-content: center;
           background:
-            radial-gradient(110% 180% at 10% 50%, rgba(201,168,76,0.2) 0%, transparent 60%),
-            radial-gradient(110% 180% at 90% 50%, rgba(201,168,76,0.15) 0%, transparent 60%),
-            rgba(10,10,10,0.88);
-          border-color: rgba(201,168,76,0.28);
-          overflow: hidden;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent; /* or just delete the background line */
+            border-color: rgba(201,168,76,0.28);
+            overflow: hidden;
         }
         .era-kinetic-wrap {
           position: relative;
           width: 100%;
           text-align: center;
           padding: 14px 20px;
-        }
-        .era-kinetic-text {
-          position: relative;
-          display: inline-block;
-          font-family: 'Barlow Condensed', sans-serif;
-          font-size: clamp(38px, 7vw, 84px);
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 0.08em;
-          color: #f5f0e8;
-          line-height: 1;
-          transform: skewX(-8deg);
-          animation: eraKineticFloat 2.2s ease-in-out infinite;
-        }
-        .era-kinetic-text::before {
-          content: attr(data-text);
-          position: absolute;
-          inset: 0;
-          color: transparent;
-          -webkit-text-stroke: 1px rgba(201,168,76,0.65);
-          transform: translate(4px, 3px);
-          opacity: 0.65;
-          pointer-events: none;
-        }
-        .tile-era-kinetic:hover .era-kinetic-text {
-          color: #fff8e6;
-          animation-duration: 1.3s;
-        }
-        @keyframes eraKineticFloat {
-          0%, 100% { transform: skewX(-8deg) translateY(0); }
-          50% { transform: skewX(-10deg) translateY(-3px); }
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 0;
         }
 
         /* ── Tile inner */
@@ -288,8 +261,7 @@ export default function HomePage() {
           align-items: center;
           justify-content: center;
           gap: 14px;
-          background:
-            linear-gradient(135deg, var(--surface-2) 0%, var(--surface-3) 100%);
+          background: linear-gradient(135deg, var(--surface-2) 0%, var(--surface-3) 100%);
           cursor: pointer;
         }
         .play-ring {
@@ -338,443 +310,11 @@ export default function HomePage() {
           border: 1px solid var(--border-dim);
           border-radius: var(--radius-sm);
           padding: 0 14px;
-          transition: border-color 0.2s;
-          cursor: pointer;
-        }
-        .year-select-row:focus-within { border-color: var(--gold-dim); }
-        .select-ico {
-          width: 15px; height: 15px;
-          color: var(--gold-dim);
-          flex-shrink: 0;
-        }
-        .year-select {
-          flex: 1;
-          background: transparent;
-          border: none;
-          outline: none;
-          padding: 14px 0;
-          font-family: var(--font-display);
-          font-size: 16px;
-          letter-spacing: 0.04em;
-          color: var(--white);
-          cursor: pointer;
-          appearance: none;
-          -webkit-appearance: none;
-        }
-        .year-select option { background: var(--surface-2); color: var(--white); }
-        .chevron-ico {
-          width: 16px; height: 16px;
-          color: var(--text-dim);
-          flex-shrink: 0;
-          pointer-events: none;
-        }
-        .change-year-btn {
-          background: transparent;
-          border: 1px solid var(--border-dim);
-          border-radius: var(--radius-sm);
-          padding: 8px 14px;
-          font-family: var(--font-mono);
-          font-size: 11px;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-          color: var(--text-dim);
-          cursor: pointer;
-          transition: color 0.2s, border-color 0.2s;
-          white-space: nowrap;
-        }
-        .change-year-btn:hover { color: var(--white); border-color: rgba(255,255,255,0.2); }
-
-        /* ── Spinner */
-        .spinner {
-          width: 18px; height: 18px;
-          border: 2px solid var(--border-dim);
-          border-top-color: var(--gold);
-          border-radius: 50%;
-          animation: spin 0.6s linear infinite;
-          flex-shrink: 0;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        /* ── Modal overlay */
-        .model-modal-overlay {
-          position: fixed;
-          inset: 0;
-          background: rgba(0,0,0,0.75);
-          backdrop-filter: blur(6px);
-          -webkit-backdrop-filter: blur(6px);
-          z-index: 1000;
-          display: flex;
-          align-items: flex-end;
-          justify-content: center;
-          animation: overlayIn 0.2s ease forwards;
-        }
-        @keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
-
-        .model-modal {
-          background: var(--surface);
-          border: 1px solid var(--border);
-          border-bottom: none;
-          border-radius: var(--radius) var(--radius) 0 0;
-          width: min(560px, 100vw);
-          max-height: 75vh;
-          display: flex;
-          flex-direction: column;
-          animation: modalUp 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-        }
-        @keyframes modalUp {
-          from { transform: translateY(40px); opacity: 0; }
-          to   { transform: translateY(0);    opacity: 1; }
-        }
-
-        .modal-header {
-          display: flex;
-          align-items: flex-start;
-          justify-content: space-between;
-          padding: 24px 24px 16px;
-          border-bottom: 1px solid var(--border-dim);
-          flex-shrink: 0;
-        }
-        .modal-eyebrow {
-          display: block;
-          font-family: var(--font-mono);
-          font-size: 10px;
-          letter-spacing: 0.14em;
-          text-transform: uppercase;
-          color: var(--gold);
-          margin-bottom: 4px;
-        }
-        .modal-title {
-          font-family: var(--font-display);
-          font-size: 26px;
-          font-weight: 700;
-          letter-spacing: 0.04em;
-          text-transform: uppercase;
-          color: var(--white);
-        }
-        .modal-close {
-          background: transparent;
-          border: 1px solid var(--border-dim);
-          border-radius: 50%;
-          width: 36px; height: 36px;
-          display: flex; align-items: center; justify-content: center;
-          color: var(--text-dim);
-          cursor: pointer;
-          transition: color 0.2s, border-color 0.2s;
-          flex-shrink: 0;
-        }
-        .modal-close:hover { color: var(--white); border-color: rgba(255,255,255,0.3); }
-
-        .modal-body {
-          overflow-y: auto;
-          flex: 1;
-          scrollbar-width: thin;
-          scrollbar-color: var(--gold-dim) transparent;
-        }
-
-        .modal-loading {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 12px;
-          padding: 48px;
-          font-family: var(--font-mono);
-          font-size: 12px;
-          color: var(--text-dim);
-          letter-spacing: 0.08em;
-        }
-        .modal-empty {
-          text-align: center;
-          padding: 48px;
-          font-family: var(--font-mono);
-          font-size: 13px;
-          color: var(--text-dim);
-        }
-
-        .model-list {
-          list-style: none;
-          padding: 8px 0;
-        }
-        .model-list-item {
-          width: 100%;
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 14px 24px;
-          background: transparent;
-          border: none;
-          border-bottom: 1px solid var(--border-dim);
-          cursor: pointer;
-          text-align: left;
-          transition: background 0.15s;
-        }
-        .model-list li:last-child .model-list-item { border-bottom: none; }
-        .model-list-item:hover { background: rgba(201,168,76,0.07); }
-
-        .mli-name {
-          font-family: var(--font-display);
-          font-size: 17px;
-          font-weight: 600;
-          letter-spacing: 0.03em;
-          color: var(--white);
-          flex: 1;
-        }
-        .mli-meta {
-          display: flex;
-          flex-direction: column;
-          align-items: flex-end;
-          gap: 2px;
-        }
-        .mli-code {
-          font-family: var(--font-mono);
-          font-size: 11px;
-          color: var(--gold);
-          letter-spacing: 0.08em;
-        }
-        .mli-family {
-          font-family: var(--font-mono);
-          font-size: 10px;
-          color: var(--text-dim);
-          letter-spacing: 0.06em;
-        }
-        .mli-arrow { color: var(--text-dim); flex-shrink: 0; }
-
-        /* ── Era Fan Carousel */
-        .tile-eras {
-          grid-area: eras;
-          min-height: 500px !important;
-          overflow: hidden !important;
-          position: relative;
-          width: calc(100% - 72px);
-          margin: 0 auto;
-          background: rgba(8,8,8,0.35) !important;
-          border-color: rgba(201,168,76,0.15);
-        }
-        .carousel-placeholder {
-          width: 100%;
-          min-height: 500px;
-          background: var(--surface);
-        }
-        .carousel-wrap {
-          position: relative;
-          width: 100%;
-          height: 100%;
-          min-height: 500px;
-          display: flex;
-          flex-direction: column;
-          user-select: none;
-          background: transparent;
-          isolation: isolate;
-        }
-        .carousel-stage {
-          position: absolute;
-          top: 0;
-          bottom: 52px;
-          left: 150px;
-          right: 150px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          perspective: 2000px;
-          perspective-origin: 55% 50%;
-          cursor: grab;
-          overflow: visible;
-        }
-        .carousel-stage:active { cursor: grabbing; }
-
-        /* Scene — constrained with gutters so side cards peek but stay in tile */
-        .carousel-scene {
-          position: relative;
-          width: 90%;
-          max-width: 880px;
-          aspect-ratio: 16/10;
-          transform-style: preserve-3d;
-          margin-left: 2%;
-          margin-top: 3%;
-        }
-
-        /* Cards — same size as scene, bleed past edges */
-        .era-card {
-          position: absolute;
-          top: 0; left: 0;
-          width: 100%;
-          height: 100%;
-          transition: transform 0.65s cubic-bezier(0.22, 1, 0.36, 1),
-                      opacity  0.55s ease;
-          transform-origin: center center;
-          will-change: transform, opacity;
-        }
-        .era-card-face {
-          width: 100%; height: 100%;
-          border-radius: 24px;
-          border: 1px solid rgba(255,255,255,0.07);
-          background: linear-gradient(145deg, #1e1e1e 0%, #121212 100%);
-          overflow: hidden;
-          position: relative;
-          box-shadow:
-            0 20px 70px rgba(0,0,0,0.65),
-            inset 0 1px 0 rgba(255,255,255,0.04);
-          transition: border-color 0.35s, box-shadow 0.35s;
-        }
-        .era-card--active .era-card-face {
-          border-color: rgba(201,168,76,0.6);
-          box-shadow:
-            0 0 0 1px rgba(201,168,76,0.22),
-            0 32px 100px rgba(0,0,0,0.8),
-            0 0 140px rgba(201,168,76,0.1);
-        }
-        .era-card-art {
-          position: absolute;
-          inset: 0;
-          background-size: cover;
-          background-position: center;
-          opacity: 0.25;
-          transition: opacity 0.4s;
-        }
-        .era-card--active .era-card-art { opacity: 0.48; }
-
-
-
-        .era-card-content {
-          position: absolute;
-          bottom: 0; left: 0; right: 0;
-          padding: clamp(18px, 4%, 40px);
-          background: linear-gradient(to top,
-            rgba(0,0,0,0.94) 0%,
-            rgba(0,0,0,0.5) 50%,
-            transparent 100%);
-        }
-        .era-card-years {
-          display: block;
-          font-family: var(--font-mono);
-          font-size: clamp(10px, 1.2vw, 13px);
-          color: var(--gold);
-          letter-spacing: 0.16em;
-          text-transform: uppercase;
-          margin-bottom: 6px;
-        }
-        .era-card-name {
-          font-family: var(--font-display);
-          font-size: clamp(24px, 4.5vw, 52px);
-          font-weight: 700;
-          letter-spacing: 0.03em;
-          text-transform: uppercase;
-          color: var(--white);
-          line-height: 1.0;
-          margin: 0;
-        }
-        .era-card-cta {
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-          margin-top: clamp(8px, 1.5%, 16px);
-          font-family: var(--font-mono);
-          font-size: clamp(9px, 1vw, 12px);
-          letter-spacing: 0.12em;
-          text-transform: uppercase;
-          color: var(--gold);
-          border: 1px solid var(--gold-dim);
-          border-radius: 999px;
-          padding: 6px 18px;
-          background: rgba(0,0,0,0.5);
-          transition: background 0.2s, border-color 0.2s;
-          width: fit-content;
-        }
-        .era-card--active:hover .era-card-cta {
-          background: rgba(201,168,76,0.18);
-          border-color: var(--gold);
-        }
-        .era-card-corner {
-          position: absolute;
-          top: 18px; right: 18px;
-          width: 22px; height: 22px;
-          border-top: 2px solid var(--gold);
-          border-right: 2px solid var(--gold);
-          border-radius: 0 6px 0 0;
-          opacity: 0;
-          transition: opacity 0.3s;
-        }
-        .era-card--active .era-card-corner { opacity: 1; }
-
-        /* Footer */
-        .carousel-footer {
-          position: absolute;
-          bottom: 0; left: 0; right: 0;
-          height: 52px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 14px;
-          z-index: 30;
-          background: linear-gradient(to top, rgba(10,10,10,0.7) 0%, transparent 100%);
-        }
-        .carousel-dots {
-          display: flex;
-          gap: 8px;
-          align-items: center;
-        }
-        .carousel-dot {
-          width: 5px; height: 5px;
-          border-radius: 50%;
-          background: rgba(255,255,255,0.18);
-          border: none;
-          cursor: pointer;
-          padding: 0;
-          transition: background 0.2s, transform 0.2s;
-        }
-        .carousel-dot--active {
-          background: var(--gold);
-          transform: scale(1.6);
-        }
-        .carousel-arrow-lg {
-          position: absolute;
-          top: 50%;
-          transform: translateY(-50%);
-          width: 78px;
-          height: 78px;
-          border-radius: 50%;
-          border: 1px solid rgba(201,168,76,0.55);
-          background: rgba(10,10,10,0.62);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: var(--gold);
-          cursor: pointer;
-          z-index: 35;
-          transition: background 0.2s, transform 0.2s, border-color 0.2s;
-          backdrop-filter: blur(8px);
-        }
-        .carousel-arrow-lg--left { left: 26px; }
-        .carousel-arrow-lg--right { right: 26px; }
-        .carousel-arrow-lg:hover {
-          background: rgba(201,168,76,0.2);
-          border-color: rgba(201,168,76,0.95);
-          transform: translateY(-50%) scale(1.06);
-        }
-
-        /* Mobile */
-        @media (max-width: 768px) {
-          .tile-eras      { min-height: 520px !important; width: calc(100% - 32px); }
-          .carousel-wrap  { min-height: 520px; }
-          .carousel-stage { left: 64px !important; right: 64px !important; }
-          .carousel-scene { width: 88%; margin-left: 0; }
-          .carousel-arrow-lg { width: 58px; height: 58px; }
-          .carousel-arrow-lg--left { left: 8px; }
-          .carousel-arrow-lg--right { right: 8px; }
-        }
-        @media (max-width: 480px) {
-          .tile-eras      { min-height: 420px !important; width: calc(100% - 20px); }
-          .carousel-wrap  { min-height: 420px; }
-          .carousel-stage { left: 44px !important; right: 44px !important; }
-          .carousel-scene { width: 92%; margin-left: 0; }
-          .era-card-face  { border-radius: 16px; }
-          .carousel-arrow-lg { width: 50px; height: 50px; }
         }
 
         /* ══════════════════════════════════════════════════════
            FLOATING NAV — dark glass pill sitting on a gold cloud
            ══════════════════════════════════════════════════════ */
-
-        /* Wrapper positions both the glow layer and the pill */
         .nav-cloud-wrap {
           position: fixed;
           top: 12px;
@@ -784,8 +324,6 @@ export default function HomePage() {
           width: min(860px, calc(100vw - 32px));
           transition: opacity 0.35s ease, transform 0.35s cubic-bezier(0.22,1,0.36,1);
         }
-
-        /* The golden cloud — blurred blob sitting behind the pill */
         .nav-cloud-wrap::before {
           content: '';
           position: absolute;
@@ -802,8 +340,6 @@ export default function HomePage() {
           transition: opacity 0.3s;
           pointer-events: none;
         }
-
-        /* Brighter cloud on scroll — nav is more prominent */
         .nav-cloud-wrap.scrolled::before {
           background: radial-gradient(
             ellipse 80% 60% at 50% 100%,
@@ -813,8 +349,6 @@ export default function HomePage() {
           );
           filter: blur(18px);
         }
-
-        /* The light cream pill itself */
         .float-nav {
           position: relative;
           overflow: hidden;
@@ -829,7 +363,6 @@ export default function HomePage() {
           -webkit-backdrop-filter: blur(14px) saturate(120%);
           border: 1px solid rgba(201,168,76,0.35);
           border-radius: 999px;
-          /* Subtle gold rim glow on the bottom edge */
           box-shadow:
             0 1px 0 rgba(201,168,76,0.18) inset,
             0 -1px 0 rgba(201,168,76,0.08) inset,
@@ -848,11 +381,7 @@ export default function HomePage() {
           z-index: 0;
           mix-blend-mode: overlay;
         }
-
-        .float-nav > * {
-          position: relative;
-          z-index: 1;
-        }
+        .float-nav > * { position: relative; z-index: 1; }
         .nav-cloud-wrap.scrolled .float-nav {
           background: #FFF7E6;
           border-color: rgba(201,168,76,0.45);
@@ -862,7 +391,7 @@ export default function HomePage() {
             0 4px 20px rgba(120,90,20,0.22);
         }
 
-        /* ── HD Bar & Shield mini button ──────────────────── */
+        /* ── HD Bar & Shield mini button */
         .nav-mini {
           position: fixed;
           top: 10px;
@@ -877,37 +406,15 @@ export default function HomePage() {
           display: flex;
           align-items: center;
           justify-content: center;
-          /* Clip to HD bar & shield silhouette */
           clip-path: polygon(
-            49.41% 0%,
-            32.99% 10.38%,
-            16.27% 14.57%,
-            16.12% 22.16%,
-            19.82% 28.94%,
-            19.23% 31.94%,
-            0.44%  32.34%,
-            0.59%  65.07%,
-            18.64% 65.87%,
-            19.38% 67.66%,
-            16.12% 72.65%,
-            16.57% 74.85%,
-            37.28% 92.22%,
-            48.37% 99.20%,
-            52.81% 99.80%,
-            61.39% 95.21%,
-            83.14% 75.05%,
-            84.76% 70.46%,
-            82.10% 65.07%,
-            99.85% 64.67%,
-            99.26% 36.73%,
-            98.22% 32.34%,
-            96.45% 31.14%,
-            78.70% 30.94%,
-            83.43% 20.36%,
-            81.66% 14.77%,
-            60.65% 7.58%
+            49.41% 0%,    32.99% 10.38%, 16.27% 14.57%, 16.12% 22.16%,
+            19.82% 28.94%, 19.23% 31.94%, 0.44%  32.34%, 0.59%  65.07%,
+            18.64% 65.87%, 19.38% 67.66%, 16.12% 72.65%, 16.57% 74.85%,
+            37.28% 92.22%, 48.37% 99.20%, 52.81% 99.80%, 61.39% 95.21%,
+            83.14% 75.05%, 84.76% 70.46%, 82.10% 65.07%, 99.85% 64.67%,
+            99.26% 36.73%, 98.22% 32.34%, 96.45% 31.14%, 78.70% 30.94%,
+            83.43% 20.36%, 81.66% 14.77%, 60.65% 7.58%
           );
-          /* Gold cloud glow underneath */
           filter: drop-shadow(0 6px 12px rgba(201,168,76,0.5)) drop-shadow(0 2px 4px rgba(0,0,0,0.8));
           transition: filter 0.2s, transform 0.2s, opacity 0.25s;
           animation: miniIn 0.3s cubic-bezier(0.22,1,0.36,1) forwards;
@@ -920,15 +427,8 @@ export default function HomePage() {
           filter: drop-shadow(0 8px 18px rgba(212,175,55,0.75)) drop-shadow(0 2px 6px rgba(0,0,0,0.9));
           transform: scale(1.08);
         }
-        .nav-mini-logo {
-          width: 38px;
-          height: 38px;
-          object-fit: contain;
-          display: block;
-          /* No border-radius — the clip-path handles the shape */
-        }
+        .nav-mini-logo { width: 38px; height: 38px; object-fit: contain; display: block; }
 
-        /* Close button inside nav when manually opened */
         .nav-close {
           background: rgba(255,255,255,0.06);
           border: 1px solid var(--border-dim);
@@ -944,11 +444,7 @@ export default function HomePage() {
         .nav-close:hover { color: #1a1200; background: rgba(255,255,255,0.12); }
 
         .nav-logo img { display: block; }
-        .nav-links {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-        }
+        .nav-links { display: flex; align-items: center; gap: 6px; }
         .nav-links a {
           font-family: 'Barlow Condensed', sans-serif;
           font-size: 15px;
@@ -976,13 +472,12 @@ export default function HomePage() {
               "cat     model"
               "deals   deals";
             padding-top: 0;
-          padding-left: 16px;
-          padding-right: 16px;
+            padding-left: 16px;
+            padding-right: 16px;
           }
           .tile-inner { padding: 24px 22px; }
           .tile-inner--eras { padding: 20px 0 20px 22px; }
           .tile-era-kinetic { min-height: 100px; }
-          .era-kinetic-text { font-size: clamp(30px, 9vw, 54px); }
           .float-nav { padding: 8px 14px 8px 12px; gap: 16px; }
           .nav-links { gap: 2px; }
           .nav-links a { font-size: 11px; padding: 5px 8px; }

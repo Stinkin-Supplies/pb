@@ -237,7 +237,7 @@ function FloatingNav() {
           flex-shrink: 0;
         }
         .nav-links a {
-          font-family: 'Barlow Condensed', sans-serif;
+          font-family: 'New Sailor', sans-serif;
           font-size: 15px;
           font-weight: 700;
           letter-spacing: 0.06em;
@@ -279,7 +279,7 @@ function FloatingNav() {
           background: none;
           border: none;
           outline: none;
-          font-family: 'Barlow Condensed', sans-serif;
+          font-family: 'New Sailor', sans-serif;
           font-size: 14px;
           font-weight: 600;
           letter-spacing: 0.04em;

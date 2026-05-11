@@ -8,6 +8,14 @@
   padding: 0;
 }
 
+@font-face {
+  font-family: 'New Sailor';
+  src: url('/fonts/new sailor.ttf') format('truetype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --black:   #0a0909;
   --coal:    #111010;

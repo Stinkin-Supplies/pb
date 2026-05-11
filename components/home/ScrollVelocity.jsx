@@ -84,8 +84,8 @@ export default function ScrollVelocity({
 
       <style>{`
         @font-face {
-          font-family: 'LGf Besitos Round';
-          src: url('/fonts/LGfBesitosRound-Light.otf') format('opentype');
+          font-family: 'New Sailor';
+          src: url('/fonts/newsailor.ttf') format('truetype');
           font-weight: 300;
           font-style: normal;
           font-display: swap;
@@ -128,7 +128,7 @@ export default function ScrollVelocity({
         .sv-row {
           display: inline-flex;
           white-space: nowrap;
-          font-family: 'LGf Besitos Round', 'Barlow Condensed', sans-serif;
+          font-family: 'New Sailor', 'Barlow Condensed', sans-serif;
           font-size: clamp(56px, 8.2vw, 112px);
           font-weight: 700;
           line-height: 1;
