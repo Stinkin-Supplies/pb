@@ -4,6 +4,7 @@ import FloatingNav    from '@/components/home/FloatingNav';
 import SmokeBackground from '@/components/home/SmokeBackground';
 import ModelSearch    from '@/components/home/ModelSearch';
 import EraCarousel   from '@/components/home/EraCarousel';
+import VideoHero from '@/components/home/VideoHero';
 import ScrollVelocity from '@/components/home/ScrollVelocity';
 import Link from 'next/link';
 
@@ -15,9 +16,18 @@ export default function HomePage() {
       <SmokeBackground />
       <FloatingNav />
 
-      <ScrollVelocity />
+      <main>
+        <VideoHero />
+        <ScrollVelocity />
+        <div className="bento-page">
 
-      <main className="bento-page">
+        {/* ── Era 3D Carousel — full width */}
+        <section
+          className="tile tile-eras"
+          style={{ '--delay': '160ms' }}
+        >
+          <EraCarousel />
+        </section>
 
         {/* ── Search tile — wide left top */}
         <section className="tile tile-search" style={{ '--delay': '0ms' }}>
@@ -26,26 +36,6 @@ export default function HomePage() {
             <h2 className="tile-heading">What are you riding?</h2>
             <ModelSearch />
           </div>
-        </section>
-
-        {/* ── Video tile — right top */}
-        <section className="tile tile-video" style={{ '--delay': '80ms' }}>
-          <div className="video-placeholder">
-            <div className="play-ring">
-              <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28">
-                <path d="M8 5v14l11-7z"/>
-              </svg>
-            </div>
-            <span className="video-label">Brand Reel</span>
-          </div>
-        </section>
-
-        {/* ── Era 3D Carousel — full width */}
-        <section
-          className="tile tile-eras"
-          style={{ '--delay': '160ms' }}
-        >
-          <EraCarousel />
         </section>
 
         {/* ── Category tile */}
@@ -78,6 +68,7 @@ export default function HomePage() {
           </div>
         </section>
 
+        </div>
       </main>
 
       <style>{`
