@@ -85,7 +85,7 @@ export default function ScrollVelocity({
       <style>{`
         @font-face {
           font-family: 'New Sailor';
-          src: url('/fonts/newsailor.ttf') format('truetype');
+          src: url('/fonts/New_Sailor.ttf') format('truetype');
           font-weight: 300;
           font-style: normal;
           font-display: swap;

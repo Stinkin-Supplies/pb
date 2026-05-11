@@ -18,7 +18,7 @@ export default function VideoHero() {
       <div className="video-hero-wrap">
         <video
           ref={videoRef}
-          src="/videos/triovideo.mp4"
+          src="https://pub-87823a6eaf5f4ed4aebf7415f970458e.r2.dev/triovideo.mp4"
           autoPlay
           muted
           loop
