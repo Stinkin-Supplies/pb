@@ -14,6 +14,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { getProductImage } from "@/lib/getProductImage";
 
 const GOLD       = "#b8922a";
+const CREAM      = "#faf7f2";
+const CREAM2     = "#f2ede4";
+const DARK       = "#0a0909";
 const PER_PAGE   = 48;
 
 const SORT_OPTIONS = [
@@ -46,18 +49,18 @@ function ProductCard({ product, index }) {
         style={{ textDecoration: "none", display: "block" }}
       >
         <motion.div
-          whileHover={{ y: -4, borderColor: "#2a2a2a" }}
+          whileHover={{ y: -4, borderColor: GOLD, boxShadow: `0 8px 32px rgba(184,146,42,0.15)` }}
           transition={{ type: "spring", stiffness: 400, damping: 25 }}
           style={{
-            background: "#111",
-            border: "1px solid #1a1a1a",
+            background: "#ffffff",
+            border: `1px solid rgba(184,146,42,0.35)`,
             overflow: "hidden",
           }}
         >
           {/* Image */}
           <div style={{
             aspectRatio: "1",
-            background: "#0f0f0f",
+            background: CREAM,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -82,7 +85,7 @@ function ProductCard({ product, index }) {
                 fontFamily: "var(--font-stencil, monospace)",
                 fontSize: "9px",
                 letterSpacing: "2px",
-                color: "#222",
+                color: "#ccc",
                 textTransform: "uppercase",
               }}>
                 No Image
@@ -93,12 +96,12 @@ function ProductCard({ product, index }) {
               <div style={{
                 position: "absolute",
                 top: 8, right: 8,
-                background: "rgba(10,9,9,0.85)",
-                border: "1px solid #2a2a2a",
+                background: "rgba(255,255,255,0.9)",
+                border: "1px solid #ddd",
                 fontFamily: "var(--font-stencil, monospace)",
                 fontSize: "8px",
                 letterSpacing: "1px",
-                color: "#666",
+                color: "#999",
                 padding: "3px 7px",
                 textTransform: "uppercase",
               }}>
@@ -110,8 +113,8 @@ function ProductCard({ product, index }) {
               <div style={{
                 position: "absolute",
                 top: 8, left: 8,
-                background: `rgba(184,146,42,0.15)`,
-                border: `1px solid rgba(184,146,42,0.3)`,
+                background: `rgba(184,146,42,0.1)`,
+                border: `1px solid rgba(184,146,42,0.4)`,
                 fontFamily: "var(--font-stencil, monospace)",
                 fontSize: "8px",
                 letterSpacing: "1px",
@@ -127,13 +130,13 @@ function ProductCard({ product, index }) {
           {/* Info */}
           <div style={{
             padding: "12px 14px 16px",
-            borderTop: "1px solid #1a1a1a",
+            borderTop: `1px solid rgba(184,146,42,0.2)`,
           }}>
             <div style={{
               fontFamily: "var(--font-stencil, monospace)",
               fontSize: "8px",
               letterSpacing: "2px",
-              color: "#555",
+              color: GOLD,
               textTransform: "uppercase",
               marginBottom: "4px",
             }}>
@@ -142,7 +145,7 @@ function ProductCard({ product, index }) {
             <div style={{
               fontFamily: "var(--font-stencil, monospace)",
               fontSize: "12px",
-              color: "#c4c0bc",
+              color: "#2a2018",
               lineHeight: 1.3,
               marginBottom: "10px",
               textTransform: "uppercase",
@@ -159,20 +162,20 @@ function ProductCard({ product, index }) {
                 fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
                 fontSize: "20px",
                 letterSpacing: "1px",
-                color: "#e0d8cc",
+                color: DARK,
               }}>
                 {product.computed_price
                   ? `$${Number(product.computed_price).toFixed(2)}`
                   : "—"}
               </div>
               <motion.button
-                whileHover={{ scale: 1.05, background: GOLD, color: "#0a0909" }}
+                whileHover={{ scale: 1.05, background: GOLD, color: "#fff" }}
                 whileTap={{ scale: 0.95 }}
-                onClick={e => { e.preventDefault(); /* add to cart */ }}
+                onClick={e => { e.preventDefault(); }}
                 style={{
-                  background: "#1a1a1a",
-                  border: "none",
-                  color: "#666",
+                  background: CREAM2,
+                  border: `1px solid rgba(184,146,42,0.3)`,
+                  color: GOLD,
                   width: 30,
                   height: 30,
                   fontSize: "18px",
@@ -215,7 +218,7 @@ function FilterSidebar({ facets, filters, onChange }) {
           border: "none",
           padding: "10px 0",
           cursor: "pointer",
-          borderBottom: "1px solid #1a1a1a",
+          borderBottom: `1px solid rgba(184,146,42,0.2)`,
         }}
       >
         <span style={{
@@ -223,12 +226,12 @@ function FilterSidebar({ facets, filters, onChange }) {
           fontSize: "9px",
           letterSpacing: "2px",
           textTransform: "uppercase",
-          color: openSections[sectionKey] ? GOLD : "#555",
+          color: openSections[sectionKey] ? GOLD : "#888",
           transition: "color 0.15s",
         }}>
           {label}
         </span>
-        <span style={{ color: "#333", fontSize: "10px" }}>
+        <span style={{ color: "#bbb", fontSize: "10px" }}>
           {openSections[sectionKey] ? "▲" : "▼"}
         </span>
       </button>
@@ -243,7 +246,7 @@ function FilterSidebar({ facets, filters, onChange }) {
         alignItems: "center",
         justifyContent: "space-between",
         padding: "12px 0",
-        borderBottom: "1px solid #1a1a1a",
+        borderBottom: `1px solid rgba(184,146,42,0.2)`,
         marginBottom: "4px",
       }}>
         <span style={{
@@ -251,7 +254,7 @@ function FilterSidebar({ facets, filters, onChange }) {
           fontSize: "9px",
           letterSpacing: "2px",
           textTransform: "uppercase",
-          color: "#666",
+          color: "#888",
         }}>
           In Stock Only
         </span>
@@ -275,7 +278,7 @@ function FilterSidebar({ facets, filters, onChange }) {
               width: 16,
               height: 16,
               borderRadius: "50%",
-              background: "#0a0909",
+              background: "#fff",
             }}
           />
         </motion.button>
@@ -312,14 +315,14 @@ function FilterSidebar({ facets, filters, onChange }) {
                     <div style={{
                       width: 10,
                       height: 10,
-                      border: `1px solid ${filters.category === cat.name ? GOLD : "#333"}`,
+                      border: `1px solid ${filters.category === cat.name ? GOLD : "rgba(184,146,42,0.25)"}`,
                       background: filters.category === cat.name ? GOLD : "transparent",
                       flexShrink: 0,
                     }} />
                     <span style={{
                       fontFamily: "var(--font-stencil, monospace)",
                       fontSize: "10px",
-                      color: filters.category === cat.name ? "#e0d8cc" : "#777",
+                      color: filters.category === cat.name ? DARK : "#888",
                       textTransform: "uppercase",
                       letterSpacing: "0.5px",
                       whiteSpace: "nowrap",
@@ -333,7 +336,7 @@ function FilterSidebar({ facets, filters, onChange }) {
                   <span style={{
                     fontFamily: "var(--font-stencil, monospace)",
                     fontSize: "8px",
-                    color: "#333",
+                    color: "#bbb",
                     flexShrink: 0,
                   }}>
                     {cat.count.toLocaleString()}
@@ -376,14 +379,14 @@ function FilterSidebar({ facets, filters, onChange }) {
                     <div style={{
                       width: 10,
                       height: 10,
-                      border: `1px solid ${filters.brand === b.name ? GOLD : "#333"}`,
+                      border: `1px solid ${filters.brand === b.name ? GOLD : "rgba(184,146,42,0.25)"}`,
                       background: filters.brand === b.name ? GOLD : "transparent",
                       flexShrink: 0,
                     }} />
                     <span style={{
                       fontFamily: "var(--font-stencil, monospace)",
                       fontSize: "10px",
-                      color: filters.brand === b.name ? "#e0d8cc" : "#777",
+                      color: filters.brand === b.name ? DARK : "#888",
                       textTransform: "uppercase",
                       letterSpacing: "0.5px",
                       whiteSpace: "nowrap",
@@ -397,7 +400,7 @@ function FilterSidebar({ facets, filters, onChange }) {
                   <span style={{
                     fontFamily: "var(--font-stencil, monospace)",
                     fontSize: "8px",
-                    color: "#333",
+                    color: "#bbb",
                     flexShrink: 0,
                   }}>
                     {b.count.toLocaleString()}
@@ -427,9 +430,9 @@ function FilterSidebar({ facets, filters, onChange }) {
                 onChange={e => onChange({ min_price: e.target.value || null })}
                 style={{
                   flex: 1,
-                  background: "#111",
-                  border: "1px solid #252525",
-                  color: "#c4c0bc",
+                  background: "#fff",
+                  border: `1px solid rgba(184,146,42,0.3)`,
+                  color: DARK,
                   fontFamily: "var(--font-stencil, monospace)",
                   fontSize: "11px",
                   padding: "7px 10px",
@@ -444,9 +447,9 @@ function FilterSidebar({ facets, filters, onChange }) {
                 onChange={e => onChange({ max_price: e.target.value || null })}
                 style={{
                   flex: 1,
-                  background: "#111",
-                  border: "1px solid #252525",
-                  color: "#c4c0bc",
+                  background: "#fff",
+                  border: `1px solid rgba(184,146,42,0.3)`,
+                  color: DARK,
                   fontFamily: "var(--font-stencil, monospace)",
                   fontSize: "11px",
                   padding: "7px 10px",
@@ -533,16 +536,16 @@ function BrowsePageInner() {
   const totalPages = Math.ceil(total / PER_PAGE);
 
   return (
-    <div style={{ background: "#0a0909", color: "#e0d8cc", minHeight: "100vh" }}>
+    <div style={{ background: CREAM, color: DARK, minHeight: "100vh" }}>
 
       {/* Top bar */}
       <div style={{
         position: "sticky",
         top: 0,
         zIndex: 50,
-        background: "rgba(10,9,9,0.95)",
+        background: "rgba(250,247,242,0.97)",
         backdropFilter: "blur(8px)",
-        borderBottom: "1px solid #1a1a1a",
+        borderBottom: `1px solid rgba(184,146,42,0.3)`,
         padding: "0 40px",
         height: 52,
         display: "flex",
@@ -554,7 +557,7 @@ function BrowsePageInner() {
           fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
           fontSize: "18px",
           letterSpacing: "3px",
-          color: "#e0d8cc",
+          color: DARK,
           textDecoration: "none",
         }}>
           STINKIN'<span style={{ color: GOLD }}>'</span> SUPPLIES
@@ -609,9 +612,9 @@ function BrowsePageInner() {
             }}
             style={{
               flex: 1,
-              background: "#111",
-              border: "1px solid #1e1e1e",
-              color: "#c4c0bc",
+              background: "#fff",
+              border: `1px solid rgba(184,146,42,0.3)`,
+              color: DARK,
               fontFamily: "var(--font-stencil, monospace)",
               fontSize: "11px",
               padding: "7px 14px",
@@ -626,9 +629,9 @@ function BrowsePageInner() {
             value={filters.sort}
             onChange={e => handleFilterChange({ sort: e.target.value })}
             style={{
-              background: "#111",
-              border: "1px solid #1e1e1e",
-              color: "#888",
+              background: "#fff",
+              border: `1px solid rgba(184,146,42,0.3)`,
+              color: DARK,
               fontFamily: "var(--font-stencil, monospace)",
               fontSize: "9px",
               letterSpacing: "1px",
@@ -647,7 +650,7 @@ function BrowsePageInner() {
             fontFamily: "var(--font-stencil, monospace)",
             fontSize: "9px",
             letterSpacing: "1px",
-            color: "#444",
+            color: "#999",
             textTransform: "uppercase",
             whiteSpace: "nowrap",
           }}>
@@ -664,9 +667,9 @@ function BrowsePageInner() {
       }}>
         {/* Sidebar */}
         <div style={{
-          borderRight: "1px solid #1a1a1a",
+          borderRight: `1px solid rgba(184,146,42,0.2)`,
           padding: "24px 20px",
-          background: "#0e0e0e",
+          background: CREAM2,
         }}>
           <div style={{
             fontFamily: "var(--font-stencil, monospace)",
@@ -696,7 +699,7 @@ function BrowsePageInner() {
               {Array.from({ length: 12 }).map((_, i) => (
                 <div key={i} style={{
                   aspectRatio: "0.8",
-                  background: "linear-gradient(90deg, #111 25%, #161616 50%, #111 75%)",
+                  background: "linear-gradient(90deg, #f0ebe3 25%, #faf7f2 50%, #f0ebe3 75%)",
                   backgroundSize: "600px 100%",
                   animation: "shimmer 1.4s infinite",
                 }} />
@@ -710,21 +713,21 @@ function BrowsePageInner() {
               justifyContent: "center",
               minHeight: 400,
               gap: "16px",
-              color: "#333",
+              color: "#ccc",
             }}>
               <div style={{ fontSize: "48px" }}>🔧</div>
               <div style={{
                 fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
                 fontSize: "28px",
                 letterSpacing: "2px",
-                color: "#444",
+                color: "#bbb",
               }}>
                 No Parts Found
               </div>
               <div style={{
                 fontFamily: "var(--font-stencil, monospace)",
                 fontSize: "11px",
-                color: "#333",
+                color: "#ccc",
                 textTransform: "uppercase",
                 letterSpacing: "1px",
               }}>
@@ -756,9 +759,9 @@ function BrowsePageInner() {
                     onClick={() => setPage(p => Math.max(1, p - 1))}
                     disabled={page === 1}
                     style={{
-                      background: "#111",
-                      border: "1px solid #1e1e1e",
-                      color: page === 1 ? "#333" : "#888",
+                      background: "#fff",
+                      border: `1px solid rgba(184,146,42,0.3)`,
+                      color: page === 1 ? "#ccc" : DARK,
                       fontFamily: "var(--font-stencil, monospace)",
                       fontSize: "10px",
                       padding: "7px 14px",
@@ -780,9 +783,9 @@ function BrowsePageInner() {
                         key={pg}
                         onClick={() => setPage(pg)}
                         style={{
-                          background: pg === page ? GOLD : "#111",
-                          border: `1px solid ${pg === page ? GOLD : "#1e1e1e"}`,
-                          color: pg === page ? "#0a0909" : "#666",
+                          background: pg === page ? GOLD : "#fff",
+                          border: `1px solid ${pg === page ? GOLD : "rgba(184,146,42,0.3)"}`,
+                          color: pg === page ? "#fff" : DARK,
                           fontFamily: "var(--font-stencil, monospace)",
                           fontSize: "10px",
                           padding: "7px 12px",
@@ -799,9 +802,9 @@ function BrowsePageInner() {
                     onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                     disabled={page === totalPages}
                     style={{
-                      background: "#111",
-                      border: "1px solid #1e1e1e",
-                      color: page === totalPages ? "#333" : "#888",
+                      background: "#fff",
+                      border: `1px solid rgba(184,146,42,0.3)`,
+                      color: page === totalPages ? "#ccc" : DARK,
                       fontFamily: "var(--font-stencil, monospace)",
                       fontSize: "10px",
                       padding: "7px 14px",
@@ -823,6 +826,7 @@ function BrowsePageInner() {
           from { background-position: -600px 0; }
           to   { background-position:  600px 0; }
         }
+        * { box-sizing: border-box; }
       `}</style>
     </div>
   );
@@ -831,8 +835,8 @@ function BrowsePageInner() {
 export default function BrowsePage() {
   return (
     <Suspense fallback={
-      <div style={{ background: "#0a0909", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "9px", letterSpacing: "3px", color: "#444", textTransform: "uppercase" }}>
+      <div style={{ background: CREAM, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "9px", letterSpacing: "3px", color: "#bbb", textTransform: "uppercase" }}>
           Loading…
         </div>
       </div>
