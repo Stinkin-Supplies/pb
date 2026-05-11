@@ -49,3 +49,4 @@ Downloads/
 *.dump
 *.sql
 scripts/ingest/master-item-list.csv
+public/videos/triovideo.mp4
