@@ -20,6 +20,11 @@ export default function HomePage() {
         <VideoHero />
         <ScrollVelocity />
         <div className="bento-page">
+        <Link href="/era" className="tile tile-era-kinetic" style={{ '--delay': '120ms' }} aria-label="Shop by Era">
+          <div className="era-kinetic-wrap">
+            <span className="era-kinetic-text" data-text="Shop by Era">Shop by Era</span>
+          </div>
+        </Link>
 
         {/* ── Era 3D Carousel — full width */}
         <section
@@ -107,6 +112,7 @@ export default function HomePage() {
           grid-template-rows: auto auto auto auto;
           grid-template-areas:
             "search  search  video"
+            "erahead erahead erahead"
             "eras    eras    eras"
             "cat     model   deals";
           gap: var(--gap);
@@ -144,10 +150,61 @@ export default function HomePage() {
         /* ── Grid placement */
         .tile-search   { grid-area: search;  min-height: 220px; }
         .tile-video    { grid-area: video;   min-height: 220px; }
+        .tile-era-kinetic { grid-area: erahead; min-height: 120px; }
         .tile-eras     { grid-area: eras;    min-height: 580px; overflow: hidden; }
         .tile-category { grid-area: cat;     min-height: 200px; }
         .tile-model    { grid-area: model;   min-height: 200px; }
         .tile-deals    { grid-area: deals;   min-height: 200px; background: var(--surface-2); }
+
+        .tile-era-kinetic {
+          text-decoration: none;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background:
+            radial-gradient(110% 180% at 10% 50%, rgba(201,168,76,0.2) 0%, transparent 60%),
+            radial-gradient(110% 180% at 90% 50%, rgba(201,168,76,0.15) 0%, transparent 60%),
+            rgba(10,10,10,0.88);
+          border-color: rgba(201,168,76,0.28);
+          overflow: hidden;
+        }
+        .era-kinetic-wrap {
+          position: relative;
+          width: 100%;
+          text-align: center;
+          padding: 14px 20px;
+        }
+        .era-kinetic-text {
+          position: relative;
+          display: inline-block;
+          font-family: 'Barlow Condensed', sans-serif;
+          font-size: clamp(38px, 7vw, 84px);
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          color: #f5f0e8;
+          line-height: 1;
+          transform: skewX(-8deg);
+          animation: eraKineticFloat 2.2s ease-in-out infinite;
+        }
+        .era-kinetic-text::before {
+          content: attr(data-text);
+          position: absolute;
+          inset: 0;
+          color: transparent;
+          -webkit-text-stroke: 1px rgba(201,168,76,0.65);
+          transform: translate(4px, 3px);
+          opacity: 0.65;
+          pointer-events: none;
+        }
+        .tile-era-kinetic:hover .era-kinetic-text {
+          color: #fff8e6;
+          animation-duration: 1.3s;
+        }
+        @keyframes eraKineticFloat {
+          0%, 100% { transform: skewX(-8deg) translateY(0); }
+          50% { transform: skewX(-10deg) translateY(-3px); }
+        }
 
         /* ── Tile inner */
         .tile-inner {
@@ -487,6 +544,8 @@ export default function HomePage() {
           min-height: 500px !important;
           overflow: hidden !important;
           position: relative;
+          width: calc(100% - 72px);
+          margin: 0 auto;
           background: rgba(8,8,8,0.35) !important;
           border-color: rgba(201,168,76,0.15);
         }
@@ -510,8 +569,8 @@ export default function HomePage() {
           position: absolute;
           top: 0;
           bottom: 52px;
-          left: 220px;
-          right: 220px;
+          left: 150px;
+          right: 150px;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -666,56 +725,49 @@ export default function HomePage() {
           background: var(--gold);
           transform: scale(1.6);
         }
-        .carousel-arrow-sm {
-          background: rgba(10,10,10,0.5);
-          border: 1px solid var(--border-dim);
-          border-radius: 50%;
-          width: 32px; height: 32px;
-          display: flex; align-items: center; justify-content: center;
-          color: var(--text-dim);
-          cursor: pointer;
-          transition: color 0.2s, border-color 0.2s, background 0.2s;
-          backdrop-filter: blur(8px);
-        }
-        .carousel-arrow-sm:hover {
-          color: var(--gold);
-          border-color: var(--gold-dim);
-          background: rgba(201,168,76,0.1);
-        }
-        .scroll-hint {
+        .carousel-arrow-lg {
           position: absolute;
-          bottom: 58px;
-          right: 20px;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 78px;
+          height: 78px;
+          border-radius: 50%;
+          border: 1px solid rgba(201,168,76,0.55);
+          background: rgba(10,10,10,0.62);
           display: flex;
           align-items: center;
-          gap: 6px;
-          font-family: var(--font-mono);
-          font-size: 10px;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-          color: var(--text-dim);
-          animation: hintPulse 2.5s ease-in-out infinite;
-          pointer-events: none;
-          z-index: 10;
+          justify-content: center;
+          color: var(--gold);
+          cursor: pointer;
+          z-index: 35;
+          transition: background 0.2s, transform 0.2s, border-color 0.2s;
+          backdrop-filter: blur(8px);
         }
-        @keyframes hintPulse {
-          0%, 100% { opacity: 0.35; transform: translateY(0); }
-          50%       { opacity: 0.75; transform: translateY(3px); }
+        .carousel-arrow-lg--left { left: 26px; }
+        .carousel-arrow-lg--right { right: 26px; }
+        .carousel-arrow-lg:hover {
+          background: rgba(201,168,76,0.2);
+          border-color: rgba(201,168,76,0.95);
+          transform: translateY(-50%) scale(1.06);
         }
 
         /* Mobile */
         @media (max-width: 768px) {
-          .tile-eras      { min-height: 520px !important; }
+          .tile-eras      { min-height: 520px !important; width: calc(100% - 32px); }
           .carousel-wrap  { min-height: 520px; }
-          .carousel-stage { left: 60px !important; right: 60px !important; }
+          .carousel-stage { left: 64px !important; right: 64px !important; }
           .carousel-scene { width: 88%; margin-left: 0; }
+          .carousel-arrow-lg { width: 58px; height: 58px; }
+          .carousel-arrow-lg--left { left: 8px; }
+          .carousel-arrow-lg--right { right: 8px; }
         }
         @media (max-width: 480px) {
-          .tile-eras      { min-height: 420px !important; }
+          .tile-eras      { min-height: 420px !important; width: calc(100% - 20px); }
           .carousel-wrap  { min-height: 420px; }
-          .carousel-stage { left: 40px !important; right: 40px !important; }
+          .carousel-stage { left: 44px !important; right: 44px !important; }
           .carousel-scene { width: 92%; margin-left: 0; }
           .era-card-face  { border-radius: 16px; }
+          .carousel-arrow-lg { width: 50px; height: 50px; }
         }
 
         /* ══════════════════════════════════════════════════════
@@ -919,6 +971,7 @@ export default function HomePage() {
             grid-template-areas:
               "search  search"
               "video   video"
+              "erahead erahead"
               "eras    eras"
               "cat     model"
               "deals   deals";
@@ -928,6 +981,8 @@ export default function HomePage() {
           }
           .tile-inner { padding: 24px 22px; }
           .tile-inner--eras { padding: 20px 0 20px 22px; }
+          .tile-era-kinetic { min-height: 100px; }
+          .era-kinetic-text { font-size: clamp(30px, 9vw, 54px); }
           .float-nav { padding: 8px 14px 8px 12px; gap: 16px; }
           .nav-links { gap: 2px; }
           .nav-links a { font-size: 11px; padding: 5px 8px; }
@@ -939,6 +994,7 @@ export default function HomePage() {
             grid-template-areas:
               "search"
               "video"
+              "erahead"
               "eras"
               "cat"
               "model"

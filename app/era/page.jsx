@@ -12,7 +12,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
-import SideNav from "@/components/SideNav";
+import FloatingNav from "@/components/home/FloatingNav";
 import HeroSearch from "@/components/HeroSearch";
 import { ERAS } from "@/lib/eras/config";
 import { HARLEY_CATEGORIES } from "@/lib/harley/config";
@@ -42,37 +42,6 @@ const CAT_ICONS = {
   "windshields":    "◻",
   "oils-chemicals": "◬",
 };
-
-// ─── Floating Header ──────────────────────────────────────────────────────────
-
-function FloatingHeader() {
-  const [scrolled, setScrolled] = useState(false);
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 40);
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
-  return (
-    <motion.header
-      animate={{
-        background: 'rgba(8,8,8,0.96)',
-        borderBottomColor: scrolled ? '#1a1a1a' : 'rgba(26,26,26,0)',
-      }}
-      transition={{ duration: 0.3 }}
-      style={{
-        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 90,
-        height: 120, display: 'flex', alignItems: 'center',
-        justifyContent: 'flex-end', padding: '0 20px',
-        borderBottom: '1px solid rgba(0,0,0,0)',
-        backdropFilter: 'blur(12px)',
-      }}
-    >
-      <SideNav />
-    </motion.header>
-  );
-}
 
 // ─── Split Text ───────────────────────────────────────────────────────────────
 
@@ -398,7 +367,7 @@ function CornerNav() {
 export default function HomePage() {
   return (
     <div style={{ background: DARK, color: LIGHT, minHeight: "100vh" }}>
-      <FloatingHeader />
+      <FloatingNav />
         
 
       {/* Hero — era cards */}

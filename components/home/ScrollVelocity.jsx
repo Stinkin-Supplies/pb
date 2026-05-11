@@ -72,7 +72,7 @@ function ParallaxRow({ children, baseVelocity = 1.5, className = '' }) {
 }
 
 export default function ScrollVelocity({
-  text = 'GET THE RIGHT STINKIN PART · LESS WRENCHING · MORE RIDING ·',
+  text = 'THE RIGHT STINKIN PARTS',
   defaultVelocity = 1.5,
 }) {
   return (
@@ -83,14 +83,26 @@ export default function ScrollVelocity({
       </ParallaxRow>
 
       <style>{`
+        @font-face {
+          font-family: 'LGf Besitos Round';
+          src: url('/fonts/LGfBesitosRound-Light.otf') format('opentype');
+          font-weight: 300;
+          font-style: normal;
+          font-display: swap;
+        }
+
         .scroll-velocity-band {
           position: relative;
           width: 100%;
-          padding: 20px 0;
-          margin-top: 140px;
-          margin-bottom: 24px;
+          min-height: 210px;
+          padding: 12px 0;
+          margin-top: 60px;
+          margin-bottom: 60px;
           z-index: 2;
           pointer-events: none;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
           -webkit-mask-image: linear-gradient(
             to right,
             transparent 0%,
@@ -116,10 +128,10 @@ export default function ScrollVelocity({
         .sv-row {
           display: inline-flex;
           white-space: nowrap;
-          font-family: 'Barlow Condensed', sans-serif;
-          font-size: clamp(42px, 7vw, 88px);
+          font-family: 'LGf Besitos Round', 'Barlow Condensed', sans-serif;
+          font-size: clamp(56px, 8.2vw, 112px);
           font-weight: 700;
-          line-height: 1.05;
+          line-height: 1;
           letter-spacing: 0.02em;
           text-transform: uppercase;
           color: #F5F0E8;
@@ -140,18 +152,20 @@ export default function ScrollVelocity({
 
         @media (max-width: 768px) {
           .scroll-velocity-band {
+            min-height: 170px;
             margin-top: 120px;
             margin-bottom: 16px;
-            padding: 14px 0;
+            padding: 10px 0;
           }
-          .sv-row { font-size: clamp(34px, 9vw, 64px); }
+          .sv-row { font-size: clamp(44px, 10vw, 82px); }
         }
 
         @media (max-width: 480px) {
           .scroll-velocity-band {
+            min-height: 140px;
             margin-top: 108px;
           }
-          .sv-row { font-size: clamp(28px, 10vw, 52px); }
+          .sv-row { font-size: clamp(36px, 11vw, 64px); }
         }
 
         @media (prefers-reduced-motion: reduce) {

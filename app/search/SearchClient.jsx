@@ -1,22 +1,21 @@
 "use client";
 // ============================================================
 // app/search/SearchClient.jsx
-// ============================================================
-// Live search UI — filters mock catalog as you type.
-// TODO Phase 5: replace mock search with Typesense API call
-//   on each keystroke (debounced 300ms).
+// Updated: collapsible sidebar sections, HD fitment filter,
+//          mobile slide-in drawer
 // ============================================================
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useCartSafe } from "@/components/CartContext";
 import NavBar from "@/components/NavBar";
 
-
 const css = `
   *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
   body { background:#0a0909; color:#f0ebe3; font-family:var(--font-stencil),sans-serif; }
   ::-webkit-scrollbar { width:4px; } ::-webkit-scrollbar-thumb { background:#e8621a; }
   @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes drawerIn { from{transform:translateX(-100%)} to{transform:translateX(0)} }
+  @keyframes backdropIn { from{opacity:0} to{opacity:1} }
 
   /* SEARCH HERO */
   .search-hero { background:#111010;border-bottom:1px solid #2a2828;padding:32px 24px 28px; }
@@ -72,12 +71,31 @@ const css = `
   .result-count span { color:#e8621a; }
   .sort-select { background:#1a1919;border:1px solid #2a2828;color:#f0ebe3;font-family:var(--font-stencil),sans-serif;font-size:13px;padding:5px 9px;border-radius:2px;outline:none; }
 
-  /* RESULTS GRID */
+  /* Mobile filter button — hidden on desktop */
+  .mobile-filter-btn {
+    display:none;
+    align-items:center;gap:6px;
+    font-family:var(--font-stencil),monospace;font-size:9px;letter-spacing:0.14em;
+    background:#1a1919;border:1px solid #2a2828;color:#c4c0bc;
+    padding:6px 12px;border-radius:2px;cursor:pointer;
+    transition:all 0.15s;
+  }
+  .mobile-filter-btn:hover { border-color:#e8621a;color:#e8621a; }
+  .mobile-filter-btn .filter-badge {
+    background:#e8621a;color:#0a0909;
+    font-size:8px;font-weight:700;
+    border-radius:50%;width:14px;height:14px;
+    display:flex;align-items:center;justify-content:center;
+  }
+
+  /* LAYOUT */
   .search-body { max-width:1200px;margin:0 auto;padding:24px; }
   .shop-layout {
     display: grid;
     grid-template-columns: 215px 1fr;
   }
+
+  /* ── SIDEBAR (shared styles — desktop + drawer) ── */
   .shop-sidebar {
     background:#111010;
     border-right:1px solid #2a2828;
@@ -87,47 +105,30 @@ const css = `
     top:54px;
     align-self:start;
   }
-  .shop-main { padding:18px 20px; }
-  .chip {
-    font-family:var(--font-stencil),monospace;font-size:8px;
-    background:rgba(232,98,26,0.1); border:1px solid rgba(232,98,26,0.25);
-    border-radius:2px; padding:2px 8px; color:#e8621a;
-    letter-spacing:0.1em; cursor:pointer; user-select:none; transition:all 0.15s;
-  }
-  .chip:hover { background:rgba(232,98,26,0.18); }
-  .facet-count {
-    font-family:var(--font-stencil),monospace; font-size:8px; color:#8a8784;
-    background:#1a1919; border:1px solid #2a2828;
-    padding:1px 5px; border-radius:1px;
-    min-width:32px; text-align:center; transition:color 0.2s;
-  }
-  .facet-count.dim { color:#3a3838; }
-  .price-input {
-    background:#1a1919; border:1px solid #2a2828; color:#f0ebe3;
-    font-family:var(--font-stencil),sans-serif; font-size:13px;
-    padding:6px 9px; border-radius:2px; outline:none; width:100%;
-    transition:border-color 0.15s;
-  }
-  .price-input:focus { border-color:rgba(232,98,26,0.4); }
-  .price-input::placeholder { color:#3a3838; }
-  .page-btn {
-    font-family:var(--font-stencil),monospace; font-size:10px; letter-spacing:0.08em;
-    background:#111010; border:1px solid #2a2828; color:#8a8784;
-    padding:7px 13px; border-radius:2px; cursor:pointer;
-    transition:all 0.15s; min-width:36px; text-align:center;
-  }
-  .page-btn:hover:not(:disabled) { border-color:#e8621a; color:#e8621a; }
-  .page-btn.active { background:#e8621a; border-color:#e8621a; color:#0a0909; }
-  .page-btn:disabled { opacity:0.3; cursor:default; }
 
-  .sidebar-section-title {
-    font-family:var(--font-stencil),monospace;font-size:9px;color:#e8621a;letter-spacing:0.2em;
-    padding:12px 14px 8px; display:block;
+  /* Collapsible section header */
+  .sidebar-section-header {
+    font-family:var(--font-stencil),monospace;
+    font-size:9px;color:#e8621a;letter-spacing:0.2em;
+    padding:12px 14px 10px;
+    display:flex;align-items:center;justify-content:space-between;
+    cursor:pointer;user-select:none;
+    transition:color 0.15s;
   }
+  .sidebar-section-header:hover { color:#f0ebe3; }
+  .sidebar-section-chevron {
+    font-size:8px;color:#8a8784;
+    transition:transform 0.2s;
+    flex-shrink:0;
+  }
+  .sidebar-section-chevron.open { transform:rotate(180deg); }
   .sidebar-section-body {
     padding:0 10px 14px;
     border-bottom:1px solid #1a1919;
+    overflow:hidden;
   }
+  .sidebar-section-body.collapsed { display:none; }
+
   .sidebar-row {
     display:flex; align-items:center; justify-content:space-between;
     padding:5px 6px; border-radius:2px; cursor:pointer;
@@ -148,6 +149,115 @@ const css = `
     font-size:12px; font-weight:500; color:#c4c0bc;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   }
+  .facet-count {
+    font-family:var(--font-stencil),monospace; font-size:8px; color:#8a8784;
+    background:#1a1919; border:1px solid #2a2828;
+    padding:1px 5px; border-radius:1px;
+    min-width:32px; text-align:center; transition:color 0.2s;
+  }
+  .facet-count.dim { color:#3a3838; }
+
+  /* Price + year inputs */
+  .price-input {
+    background:#1a1919; border:1px solid #2a2828; color:#f0ebe3;
+    font-family:var(--font-stencil),sans-serif; font-size:13px;
+    padding:6px 9px; border-radius:2px; outline:none; width:100%;
+    transition:border-color 0.15s;
+  }
+  .price-input:focus { border-color:rgba(232,98,26,0.4); }
+  .price-input::placeholder { color:#3a3838; }
+
+  /* HD Fitment year inputs */
+  .year-input {
+    background:#1a1919; border:1px solid #2a2828; color:#f0ebe3;
+    font-family:var(--font-stencil),monospace; font-size:12px; letter-spacing:0.05em;
+    padding:5px 8px; border-radius:2px; outline:none; width:100%;
+    transition:border-color 0.15s;
+  }
+  .year-input:focus { border-color:rgba(232,98,26,0.4); }
+  .year-input::placeholder { color:#3a3838; }
+
+  /* Apply / Clear buttons */
+  .sidebar-apply-btn {
+    width:100%; background:#e8621a; border:none; color:#0a0909;
+    font-family:var(--font-caesar),sans-serif; font-size:14px; letter-spacing:0.08em;
+    padding:7px; border-radius:2px; cursor:pointer; transition:background 0.15s;
+  }
+  .sidebar-apply-btn:hover { background:#c94f0f; }
+  .sidebar-clear-btn {
+    width:100%; background:transparent; border:1px solid #2a2828; color:#8a8784;
+    font-family:var(--font-stencil),monospace; font-size:8px; letter-spacing:0.12em;
+    padding:6px; border-radius:2px; cursor:pointer; transition:all 0.15s;
+    margin-top:6px;
+  }
+  .sidebar-clear-btn:hover { border-color:#e8621a;color:#e8621a; }
+
+  /* Active filter dot on section header */
+  .sidebar-active-dot {
+    width:5px;height:5px;border-radius:50%;
+    background:#e8621a;flex-shrink:0;
+    box-shadow:0 0 4px #e8621a;
+  }
+
+  /* ── MOBILE DRAWER ── */
+  .drawer-backdrop {
+    display:none;
+    position:fixed;inset:0;z-index:200;
+    background:rgba(0,0,0,0.7);
+    animation:backdropIn 0.2s ease;
+  }
+  .drawer-backdrop.open { display:block; }
+  .drawer-panel {
+    position:fixed;top:0;left:0;bottom:0;
+    width:280px;z-index:201;
+    background:#111010;border-right:1px solid #2a2828;
+    display:flex;flex-direction:column;
+    animation:drawerIn 0.25s ease;
+  }
+  .drawer-header {
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 16px;border-bottom:1px solid #2a2828;
+    flex-shrink:0;
+  }
+  .drawer-title {
+    font-family:var(--font-stencil),monospace;
+    font-size:10px;color:#e8621a;letter-spacing:0.2em;
+  }
+  .drawer-close {
+    background:none;border:none;color:#8a8784;
+    font-size:18px;cursor:pointer;padding:0;
+    transition:color 0.15s;line-height:1;
+  }
+  .drawer-close:hover { color:#f0ebe3; }
+  .drawer-body {
+    flex:1;overflow-y:auto;
+  }
+  .drawer-footer {
+    padding:14px 16px;border-top:1px solid #2a2828;flex-shrink:0;
+  }
+
+  /* CHIP / active filters bar */
+  .chip {
+    font-family:var(--font-stencil),monospace;font-size:8px;
+    background:rgba(232,98,26,0.1); border:1px solid rgba(232,98,26,0.25);
+    border-radius:2px; padding:2px 8px; color:#e8621a;
+    letter-spacing:0.1em; cursor:pointer; user-select:none; transition:all 0.15s;
+  }
+  .chip:hover { background:rgba(232,98,26,0.18); }
+
+  /* PAGINATION */
+  .page-btn {
+    font-family:var(--font-stencil),monospace; font-size:10px; letter-spacing:0.08em;
+    background:#111010; border:1px solid #2a2828; color:#8a8784;
+    padding:7px 13px; border-radius:2px; cursor:pointer;
+    transition:all 0.15s; min-width:36px; text-align:center;
+  }
+  .page-btn:hover:not(:disabled) { border-color:#e8621a; color:#e8621a; }
+  .page-btn.active { background:#e8621a; border-color:#e8621a; color:#0a0909; }
+  .page-btn:disabled { opacity:0.3; cursor:default; }
+
+  /* PRODUCT GRID */
+  .shop-main { padding:18px 20px; }
   .product-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -189,12 +299,17 @@ const css = `
   .cat-pill { background:#111010;border:1px solid #2a2828;border-radius:2px;padding:10px 18px;cursor:pointer;transition:all 0.2s;font-family:var(--font-caesar),sans-serif;font-size:16px;letter-spacing:0.07em;color:#8a8784; }
   .cat-pill:hover { border-color:#e8621a;color:#f0ebe3;background:rgba(232,98,26,0.05); }
 
+  /* ── RESPONSIVE ── */
   @media (max-width:700px) {
     .shop-layout { grid-template-columns:1fr; }
+    /* Desktop sidebar hidden on mobile — drawer replaces it */
     .shop-sidebar { display:none; }
     .shop-main { padding:12px 16px; }
+    .mobile-filter-btn { display:flex; }
   }
-
+  @media (min-width:701px) {
+    .drawer-backdrop { display:none !important; }
+  }
   @media (min-width:768px) {
     .product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   }
@@ -203,7 +318,7 @@ const css = `
   }
 `;
 
-// Highlight matching text in search results
+// ── Helpers ───────────────────────────────────────────────────
 function highlight(text, query) {
   if (!query) return text;
   const idx = text.toLowerCase().indexOf(query.toLowerCase());
@@ -217,108 +332,233 @@ function highlight(text, query) {
   );
 }
 
-function FacetSection({ label, items, selected, loading, onSelect }) {
-  const [showAll, setShowAll] = useState(false);
-  const visible = showAll ? items : items.slice(0, 10);
-  const hasMore = items.length > 10;
-
+// ── Collapsible sidebar section ───────────────────────────────
+function SidebarSection({ label, active, defaultOpen = true, children }) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
     <div>
-      <div className="sidebar-section-title">{label}</div>
-      <div className="sidebar-section-body">
-        {items.length === 0 && loading
-          ? Array.from({ length: 5 }).map((_, i) => (
-              <div
-                key={i}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  padding: "5px 6px",
-                  marginBottom: 2,
-                  gap: 8,
-                }}
-              >
-                <div style={{ height: 10, flex: 1, background: "#1a1919", borderRadius: 2 }} />
-                <div style={{ height: 10, width: 28, background: "#1a1919", borderRadius: 2 }} />
-              </div>
-            ))
-          : <>
-              {visible.map((item) => {
-                const on = selected === item.name;
-                return (
-                  <div key={item.name} className="sidebar-row" onClick={() => onSelect(item.name)}>
-                    <div className="sidebar-row-inner">
-                      <div className={`sidebar-check ${on ? "on" : ""}`}>
-                        {on ? "✓" : ""}
-                      </div>
-                      <span className="sidebar-label">{item.name}</span>
-                    </div>
-                    <span className={`facet-count ${loading ? "dim" : ""}`}>
-                      {item.count.toLocaleString()}
-                    </span>
-                  </div>
-                );
-              })}
-              {hasMore && (
-                <button
-                  onClick={() => setShowAll((s) => !s)}
-                  style={{
-                    fontFamily: "var(--font-stencil),monospace",
-                    fontSize: 8,
-                    color: "#8a8784",
-                    letterSpacing: "0.1em",
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    marginTop: 6,
-                    padding: "0 6px",
-                  }}
-                >
-                  {showAll ? "SHOW LESS ▴" : `+${items.length - 10} MORE ▾`}
-                </button>
-              )}
-            </>
-        }
+      <div
+        className="sidebar-section-header"
+        onClick={() => setOpen(o => !o)}
+      >
+        <div style={{ display:"flex", alignItems:"center", gap:7 }}>
+          {label}
+          {active && <span className="sidebar-active-dot" />}
+        </div>
+        <span className={`sidebar-section-chevron ${open ? "open" : ""}`}>▾</span>
+      </div>
+      <div className={`sidebar-section-body ${open ? "" : "collapsed"}`}>
+        {children}
       </div>
     </div>
   );
 }
 
+// ── Facet list with show-more ─────────────────────────────────
+function FacetList({ items, selected, loading, onSelect }) {
+  const [showAll, setShowAll] = useState(false);
+  const visible = showAll ? items : items.slice(0, 10);
+  const hasMore = items.length > 10;
+
+  if (items.length === 0 && loading) {
+    return Array.from({ length: 5 }).map((_, i) => (
+      <div key={i} style={{ display:"flex", justifyContent:"space-between", padding:"5px 6px", marginBottom:2, gap:8 }}>
+        <div style={{ height:10, flex:1, background:"#1a1919", borderRadius:2 }} />
+        <div style={{ height:10, width:28, background:"#1a1919", borderRadius:2 }} />
+      </div>
+    ));
+  }
+
+  return (
+    <>
+      {visible.map((item) => {
+        const on = selected === item.name;
+        return (
+          <div key={item.name} className="sidebar-row" onClick={() => onSelect(item.name)}>
+            <div className="sidebar-row-inner">
+              <div className={`sidebar-check ${on ? "on" : ""}`}>{on ? "✓" : ""}</div>
+              <span className="sidebar-label">{item.name}</span>
+            </div>
+            <span className={`facet-count ${loading ? "dim" : ""}`}>{item.count.toLocaleString()}</span>
+          </div>
+        );
+      })}
+      {hasMore && (
+        <button
+          onClick={() => setShowAll(s => !s)}
+          style={{ fontFamily:"var(--font-stencil),monospace", fontSize:8, color:"#8a8784", letterSpacing:"0.1em", background:"none", border:"none", cursor:"pointer", marginTop:6, padding:"0 6px" }}
+        >
+          {showAll ? "SHOW LESS ▴" : `+${items.length - 10} MORE ▾`}
+        </button>
+      )}
+    </>
+  );
+}
+
+// ── Toggle ────────────────────────────────────────────────────
 function Toggle({ on, onChange }) {
   return (
     <div
       onClick={() => onChange(!on)}
-      style={{
-        width: 32,
-        height: 18,
-        borderRadius: 9,
-        background: on ? "#e8621a" : "#2a2828",
-        position: "relative",
-        cursor: "pointer",
-        transition: "background 0.2s",
-        flexShrink: 0,
-      }}
+      style={{ width:32, height:18, borderRadius:9, background:on ? "#e8621a" : "#2a2828", position:"relative", cursor:"pointer", transition:"background 0.2s", flexShrink:0 }}
     >
-      <div
-        style={{
-          position: "absolute",
-          top: 2,
-          left: on ? 14 : 2,
-          width: 14,
-          height: 14,
-          borderRadius: "50%",
-          background: "#f0ebe3",
-          transition: "left 0.2s",
-        }}
-      />
+      <div style={{ position:"absolute", top:2, left:on ? 14 : 2, width:14, height:14, borderRadius:"50%", background:"#f0ebe3", transition:"left 0.2s" }} />
     </div>
+  );
+}
+
+// ── HD Fitment filter panel ───────────────────────────────────
+function FitmentFilter({ hdFamilies, filters, loading, onFamilySelect, onYearApply, onClear }) {
+  const [yearFrom, setYearFrom] = useState(filters.yearStart ? String(filters.yearStart) : "");
+  const [yearTo,   setYearTo]   = useState(filters.yearEnd   ? String(filters.yearEnd)   : "");
+
+  // keep local inputs in sync if parent clears
+  useEffect(() => {
+    setYearFrom(filters.yearStart ? String(filters.yearStart) : "");
+    setYearTo(filters.yearEnd ? String(filters.yearEnd) : "");
+  }, [filters.yearStart, filters.yearEnd]);
+
+  const applyYears = () => {
+    onYearApply(
+      yearFrom ? parseInt(yearFrom) : null,
+      yearTo   ? parseInt(yearTo)   : null,
+    );
+  };
+
+  const hasAny = filters.hdFamily || filters.yearStart || filters.yearEnd;
+
+  return (
+    <>
+      {/* Family facet list */}
+      {hdFamilies.length > 0 && (
+        <FacetList
+          items={hdFamilies}
+          selected={filters.hdFamily}
+          loading={loading}
+          onSelect={val => onFamilySelect("hdFamily", val)}
+        />
+      )}
+      {hdFamilies.length === 0 && !loading && (
+        <div style={{ fontFamily:"var(--font-stencil),monospace", fontSize:9, color:"#3a3838", letterSpacing:"0.08em", padding:"4px 6px 8px" }}>
+          SEARCH TO SEE FAMILIES
+        </div>
+      )}
+
+      {/* Year range */}
+      <div style={{ marginTop:10 }}>
+        <div style={{ fontFamily:"var(--font-stencil),monospace", fontSize:8, color:"#8a8784", letterSpacing:"0.12em", marginBottom:6, paddingLeft:2 }}>
+          YEAR RANGE
+        </div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6, marginBottom:8 }}>
+          <input
+            className="year-input"
+            placeholder="FROM"
+            type="number"
+            min="1903" max="2030"
+            value={yearFrom}
+            onChange={e => setYearFrom(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && applyYears()}
+          />
+          <input
+            className="year-input"
+            placeholder="TO"
+            type="number"
+            min="1903" max="2030"
+            value={yearTo}
+            onChange={e => setYearTo(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && applyYears()}
+          />
+        </div>
+        <button className="sidebar-apply-btn" onClick={applyYears}>APPLY</button>
+        {hasAny && (
+          <button className="sidebar-clear-btn" onClick={onClear}>CLEAR FITMENT</button>
+        )}
+      </div>
+    </>
+  );
+}
+
+// ── The full sidebar contents (reused in desktop + drawer) ────
+function SidebarContents({ facets, filters, loading, setFilters, minInput, setMinInput, maxInput, setMaxInput, applyPrice }) {
+  const handleFamilySelect = (key, val) => {
+    // toggle family selection
+    setFilters(prev => ({ ...prev, hdFamily: prev.hdFamily === val ? null : val }));
+  };
+
+  const handleYearApply = (from, to) => {
+    setFilters(prev => ({ ...prev, yearStart: from, yearEnd: to }));
+  };
+
+  const clearFitment = () => {
+    setFilters(prev => ({ ...prev, hdFamily: null, yearStart: null, yearEnd: null }));
+  };
+
+  const categoryActive = !!filters.category;
+  const brandActive    = !!filters.brand;
+  const priceActive    = filters.minPrice != null || filters.maxPrice != null;
+  const fitmentActive  = !!filters.hdFamily || !!filters.yearStart || !!filters.yearEnd;
+
+  return (
+    <>
+      <SidebarSection label="CATEGORY" active={categoryActive}>
+        <FacetList
+          items={facets.categories}
+          selected={filters.category}
+          loading={loading}
+          onSelect={val => setFilters(prev => ({ ...prev, category: prev.category === val ? null : val }))}
+        />
+      </SidebarSection>
+
+      <SidebarSection label="BRAND" active={brandActive}>
+        <FacetList
+          items={facets.brands}
+          selected={filters.brand}
+          loading={loading}
+          onSelect={val => setFilters(prev => ({ ...prev, brand: prev.brand === val ? null : val }))}
+        />
+      </SidebarSection>
+
+      <SidebarSection label="HD FITMENT" active={fitmentActive} defaultOpen={false}>
+        <FitmentFilter
+          hdFamilies={facets.hdFamilies ?? []}
+          filters={filters}
+          loading={loading}
+          onFamilySelect={handleFamilySelect}
+          onYearApply={handleYearApply}
+          onClear={clearFitment}
+        />
+      </SidebarSection>
+
+      <SidebarSection label="PRICE RANGE" active={priceActive}>
+        {facets.priceRange?.max > 0 && (
+          <div style={{ fontFamily:"var(--font-stencil),monospace", fontSize:8, color:"#8a8784", letterSpacing:"0.08em", marginBottom:8 }}>
+            ${Math.floor(facets.priceRange.min).toLocaleString()} – ${Math.ceil(facets.priceRange.max).toLocaleString()}
+          </div>
+        )}
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6, marginBottom:8 }}>
+          <input className="price-input" placeholder="Min $" type="number" value={minInput}
+            onChange={e => setMinInput(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && applyPrice()} />
+          <input className="price-input" placeholder="Max $" type="number" value={maxInput}
+            onChange={e => setMaxInput(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && applyPrice()} />
+        </div>
+        <button className="sidebar-apply-btn" onClick={applyPrice}>APPLY</button>
+      </SidebarSection>
+
+      <SidebarSection label="AVAILABILITY" active={filters.inStock}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"2px 4px" }}>
+          <span style={{ fontSize:13, fontWeight:500, color:"#c4c0bc" }}>In Stock Only</span>
+          <Toggle on={filters.inStock} onChange={val => setFilters(prev => ({ ...prev, inStock: val }))} />
+        </div>
+      </SidebarSection>
+    </>
   );
 }
 
 // ── Result card ───────────────────────────────────────────────
 function ResultCard({ p, i, query, onAdd }) {
   const M = s => ({ fontFamily:"var(--font-stencil),monospace", ...s });
-  const B = s => ({ fontFamily:"var(--font-caesar),sans-serif", ...s });
   const img = p.image ?? (Array.isArray(p.images) && p.images.length > 0 ? p.images[0] : null);
   return (
     <div
@@ -356,10 +596,12 @@ function ResultCard({ p, i, query, onAdd }) {
   );
 }
 
-const POPULAR      = ["exhaust", "air cleaner", "handlebars", "seat", "wheels", "shocks", "battery", "footpegs", "helmet", "tires"];
-const CATEGORIES   = ["Street","ATV","Common Parts","MX / Off-Road","Watercraft","Scooter","Drag Specialties","Moose ATV"];
-const DEBOUNCE_MS  = 350;
+// ── Constants ─────────────────────────────────────────────────
+const POPULAR    = ["exhaust", "air cleaner", "handlebars", "seat", "wheels", "shocks", "battery", "footpegs", "helmet", "tires"];
+const CATEGORIES = ["Street","ATV","Common Parts","MX / Off-Road","Watercraft","Scooter","Drag Specialties","Moose ATV"];
+const DEBOUNCE_MS = 350;
 
+// ── Main component ────────────────────────────────────────────
 export default function SearchClient({ initialQuery = "" }) {
   const [query,        setQuery]        = useState(initialQuery);
   const [input,        setInput]        = useState(initialQuery);
@@ -367,20 +609,34 @@ export default function SearchClient({ initialQuery = "" }) {
   const [results,      setResults]      = useState([]);
   const [total,        setTotal]        = useState(0);
   const [loading,      setLoading]      = useState(false);
-  const [facets,       setFacets]       = useState({ categories: [], brands: [], priceRange: { min: 0, max: 0 } });
-  const [filters,      setFilters]      = useState({ category: null, brand: null, minPrice: null, maxPrice: null, inStock: false });
+  const [facets,       setFacets]       = useState({ categories: [], brands: [], hdFamilies: [], priceRange: { min: 0, max: 0 } });
+  const [filters,      setFilters]      = useState({
+    category: null, brand: null,
+    minPrice: null, maxPrice: null,
+    inStock: false,
+    // HD fitment
+    hdFamily: null, yearStart: null, yearEnd: null,
+  });
   const [minInput,     setMinInput]     = useState("");
   const [maxInput,     setMaxInput]     = useState("");
   const [saleProducts, setSaleProducts] = useState([]);
+  const [drawerOpen,   setDrawerOpen]   = useState(false);
+
   const inputRef = useRef(null);
   const abortRef = useRef(null);
-
   const { addItem } = useCartSafe();
 
   // Focus on mount
   useEffect(() => { inputRef.current?.focus(); }, []);
 
-  // Load sale products for landing page
+  // Lock body scroll when drawer open
+  useEffect(() => {
+    if (drawerOpen) document.body.style.overflow = "hidden";
+    else document.body.style.overflow = "";
+    return () => { document.body.style.overflow = ""; };
+  }, [drawerOpen]);
+
+  // Sale products for landing
   useEffect(() => {
     fetch("/api/search?q=*&per_page=8&sort=relevance&closeout=true")
       .then(r => r.json())
@@ -388,22 +644,25 @@ export default function SearchClient({ initialQuery = "" }) {
       .catch(() => {});
   }, []);
 
-  // Keep category/brand filters in sync with the current URL if present.
+  // Sync filters from URL on mount
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     setFilters({
-      category: params.get("category"),
-      brand: params.get("brand"),
-      minPrice: params.get("minPrice") ? Number(params.get("minPrice")) : null,
-      maxPrice: params.get("maxPrice") ? Number(params.get("maxPrice")) : null,
-      inStock: params.get("inStock") === "true",
+      category:  params.get("category") || null,
+      brand:     params.get("brand")    || null,
+      minPrice:  params.get("minPrice") ? Number(params.get("minPrice")) : null,
+      maxPrice:  params.get("maxPrice") ? Number(params.get("maxPrice")) : null,
+      inStock:   params.get("inStock") === "true",
+      hdFamily:  params.get("hd_family") || null,
+      yearStart: params.get("year_start") ? parseInt(params.get("year_start")) : null,
+      yearEnd:   params.get("year_end")   ? parseInt(params.get("year_end"))   : null,
     });
     setMinInput(params.get("minPrice") ?? "");
     setMaxInput(params.get("maxPrice") ?? "");
   }, []);
 
-  // Debounced search
+  // Debounced search — sends all active filters to the API
   const fetchResults = useCallback(async (q, s) => {
     if (!q.trim()) { setResults([]); setTotal(0); return; }
     if (abortRef.current) abortRef.current.abort();
@@ -411,26 +670,26 @@ export default function SearchClient({ initialQuery = "" }) {
     setLoading(true);
     try {
       const params = new URLSearchParams({
-        search: q,
+        search:   q,
         pageSize: "48",
-        ...(filters.category && { category: filters.category }),
-        ...(filters.brand && { brand: filters.brand }),
-        ...(filters.minPrice != null && { minPrice: String(filters.minPrice) }),
-        ...(filters.maxPrice != null && { maxPrice: String(filters.maxPrice) }),
-        ...(filters.inStock && { inStock: "true" }),
-        ...(s !== "relevance" && { sort: s }),
+        ...(filters.category  && { category:    filters.category }),
+        ...(filters.brand     && { brand:        filters.brand }),
+        ...(filters.minPrice  != null && { minPrice:    String(filters.minPrice) }),
+        ...(filters.maxPrice  != null && { maxPrice:    String(filters.maxPrice) }),
+        ...(filters.inStock   && { inStock:      "true" }),
+        ...(filters.hdFamily  && { hd_family:    filters.hdFamily }),
+        ...(filters.yearStart && { year_start:   String(filters.yearStart) }),
+        ...(filters.yearEnd   && { year_end:     String(filters.yearEnd) }),
+        ...(s !== "relevance" && { sort:         s }),
       });
       const res  = await fetch(`/api/search?${params}`, { signal: abortRef.current.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setResults(data.products ?? []);
       setTotal(data.total ?? 0);
-      setFacets(data.facets ?? { categories: [], brands: [], priceRange: { min: 0, max: 0 } });
+      setFacets(data.facets ?? { categories: [], brands: [], hdFamilies: [], priceRange: { min: 0, max: 0 } });
     } catch (err) {
-      if (err.name !== "AbortError") {
-        console.error("[Search]", err.message);
-        setResults([]);
-      }
+      if (err.name !== "AbortError") { console.error("[Search]", err.message); setResults([]); }
     } finally {
       setLoading(false);
     }
@@ -442,19 +701,13 @@ export default function SearchClient({ initialQuery = "" }) {
   }, [query, sort, filters, fetchResults]);
 
   const doSearch = (q) => {
-    setQuery(q);
-    setInput(q);
+    setQuery(q); setInput(q);
     const url = q ? `/search?q=${encodeURIComponent(q)}` : "/search";
     window.history.replaceState(null, "", url);
   };
 
-  const setFilter = useCallback((key, val) => {
-    setFilters((prev) => ({ ...prev, [key]: val }));
-    setQuery((prev) => prev);
-  }, []);
-
   const applyPrice = useCallback(() => {
-    setFilters((prev) => ({
+    setFilters(prev => ({
       ...prev,
       minPrice: minInput ? Number(minInput) : null,
       maxPrice: maxInput ? Number(maxInput) : null,
@@ -462,46 +715,51 @@ export default function SearchClient({ initialQuery = "" }) {
   }, [minInput, maxInput]);
 
   const clearAll = useCallback(() => {
-    setFilters({ category: null, brand: null, minPrice: null, maxPrice: null, inStock: false });
-    setMinInput("");
-    setMaxInput("");
+    setFilters({ category: null, brand: null, minPrice: null, maxPrice: null, inStock: false, hdFamily: null, yearStart: null, yearEnd: null });
+    setMinInput(""); setMaxInput("");
   }, []);
 
+  // Active filter chips
   const chips = [
-    filters.category && { key: "category", label: filters.category },
-    filters.brand && { key: "brand", label: filters.brand },
-    filters.minPrice != null && { key: "minPrice", label: `$${filters.minPrice}+` },
-    filters.maxPrice != null && { key: "maxPrice", label: `≤$${filters.maxPrice}` },
-    filters.inStock && { key: "inStock", label: "In Stock" },
+    filters.category  && { key: "category",  label: filters.category },
+    filters.brand     && { key: "brand",      label: filters.brand },
+    filters.minPrice  != null && { key: "minPrice",  label: `$${filters.minPrice}+` },
+    filters.maxPrice  != null && { key: "maxPrice",  label: `≤$${filters.maxPrice}` },
+    filters.inStock   && { key: "inStock",   label: "In Stock" },
+    filters.hdFamily  && { key: "hdFamily",  label: filters.hdFamily },
+    filters.yearStart && { key: "yearStart", label: `From ${filters.yearStart}` },
+    filters.yearEnd   && { key: "yearEnd",   label: `To ${filters.yearEnd}` },
   ].filter(Boolean);
 
   const removeChip = (key) => {
     if (key === "minPrice" || key === "maxPrice") {
-      setFilters((prev) => ({ ...prev, minPrice: null, maxPrice: null }));
-      setMinInput("");
-      setMaxInput("");
+      setFilters(prev => ({ ...prev, minPrice: null, maxPrice: null }));
+      setMinInput(""); setMaxInput("");
+    } else if (key === "yearStart" || key === "yearEnd") {
+      setFilters(prev => ({ ...prev, yearStart: null, yearEnd: null }));
     } else if (key === "inStock") {
-      setFilters((prev) => ({ ...prev, inStock: false }));
+      setFilters(prev => ({ ...prev, inStock: false }));
     } else {
-      setFilters((prev) => ({ ...prev, [key]: null }));
+      setFilters(prev => ({ ...prev, [key]: null }));
     }
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    doSearch(input.trim());
-  };
+  const handleSubmit = (e) => { e.preventDefault(); doSearch(input.trim()); };
 
-  const B = s => ({ fontFamily:"var(--font-caesar),sans-serif",     ...s });
   const M = s => ({ fontFamily:"var(--font-stencil),monospace", ...s });
+  const B = s => ({ fontFamily:"var(--font-caesar),sans-serif",  ...s });
+
+  // Shared sidebar props
+  const sidebarProps = { facets, filters, loading, setFilters, minInput, setMinInput, maxInput, setMaxInput, applyPrice };
+
+  const activeFilterCount = chips.length;
 
   return (
     <div style={{ background:"#0a0909", minHeight:"100vh", color:"#f0ebe3", fontFamily:"var(--font-stencil),sans-serif" }}>
       <style>{css}</style>
-
       <NavBar activePage="search" />
 
-      {/* SEARCH HERO */}
+      {/* ── SEARCH HERO ── */}
       <div className="search-hero">
         <div className="search-hero-inner">
           <div className="search-eyebrow">SEARCH 500K+ PARTS</div>
@@ -516,14 +774,10 @@ export default function SearchClient({ initialQuery = "" }) {
             />
             {input && (
               <button type="button" className="search-clear"
-                onClick={() => { setInput(""); doSearch(""); inputRef.current?.focus(); }}>
-                ✕
-              </button>
+                onClick={() => { setInput(""); doSearch(""); inputRef.current?.focus(); }}>✕</button>
             )}
             <button type="submit" className="search-btn">🔍</button>
           </form>
-
-          {/* Popular searches */}
           {!query && (
             <div className="popular-wrap">
               <span className="popular-label">POPULAR:</span>
@@ -535,19 +789,27 @@ export default function SearchClient({ initialQuery = "" }) {
         </div>
       </div>
 
-      {/* RESULTS */}
+      {/* ── RESULTS ── */}
       {query ? (
         <>
           {/* Toolbar */}
           <div className="search-toolbar">
-            <span className="result-count">
-              {loading
-                ? <span style={M({color:"#3a3838"})}>SEARCHING…</span>
-                : <><span>{total.toLocaleString()}</span> RESULTS FOR "{query.toUpperCase()}"</>
-              }
-            </span>
-            <select className="sort-select" value={sort}
-              onChange={e => setSort(e.target.value)}>
+            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+              {/* Mobile: filter button */}
+              <button className="mobile-filter-btn" onClick={() => setDrawerOpen(true)}>
+                ⇌ FILTERS
+                {activeFilterCount > 0 && (
+                  <span className="filter-badge">{activeFilterCount}</span>
+                )}
+              </button>
+              <span className="result-count">
+                {loading
+                  ? <span style={M({color:"#3a3838"})}>SEARCHING…</span>
+                  : <><span>{total.toLocaleString()}</span> RESULTS FOR "{query.toUpperCase()}"</>
+                }
+              </span>
+            </div>
+            <select className="sort-select" value={sort} onChange={e => setSort(e.target.value)}>
               <option value="relevance">Relevance</option>
               <option value="price-asc">Price: Low→High</option>
               <option value="price-desc">Price: High→Low</option>
@@ -556,111 +818,30 @@ export default function SearchClient({ initialQuery = "" }) {
           </div>
 
           <div className="shop-layout">
+            {/* ── DESKTOP SIDEBAR ── */}
             <aside className="shop-sidebar">
-              <FacetSection
-                label="CATEGORY"
-                items={facets.categories}
-                selected={filters.category}
-                loading={loading}
-                onSelect={(val) => setFilters((prev) => ({ ...prev, category: prev.category === val ? null : val }))}
-              />
-
-              <FacetSection
-                label="BRAND"
-                items={facets.brands}
-                selected={filters.brand}
-                loading={loading}
-                onSelect={(val) => setFilters((prev) => ({ ...prev, brand: prev.brand === val ? null : val }))}
-              />
-
-              <div>
-                <div className="sidebar-section-title">PRICE RANGE</div>
-                <div className="sidebar-section-body">
-                  {facets.priceRange?.max > 0 && (
-                    <div style={{ fontFamily: "var(--font-stencil),monospace", fontSize: 8, color: "#8a8784", letterSpacing: "0.08em", marginBottom: 8 }}>
-                      ${Math.floor(facets.priceRange.min).toLocaleString()} – ${Math.ceil(facets.priceRange.max).toLocaleString()}
-                    </div>
-                  )}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 8 }}>
-                    <input
-                      className="price-input"
-                      placeholder="Min $"
-                      type="number"
-                      value={minInput}
-                      onChange={(e) => setMinInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          applyPrice();
-                        }
-                      }}
-                    />
-                    <input
-                      className="price-input"
-                      placeholder="Max $"
-                      type="number"
-                      value={maxInput}
-                      onChange={(e) => setMaxInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          applyPrice();
-                        }
-                      }}
-                    />
-                  </div>
-                  <button
-                    onClick={applyPrice}
-                    style={{
-                      width: "100%",
-                      background: "#e8621a",
-                      border: "none",
-                      color: "#0a0909",
-                      fontFamily: "var(--font-caesar),sans-serif",
-                      fontSize: 14,
-                      letterSpacing: "0.08em",
-                      padding: "7px",
-                      borderRadius: 2,
-                      cursor: "pointer",
-                    }}
-                  >
-                    APPLY
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <div className="sidebar-section-title">AVAILABILITY</div>
-                <div className="sidebar-section-body" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: 13, fontWeight: 500, color: "#c4c0bc" }}>In Stock Only</span>
-                  <Toggle on={filters.inStock} onChange={(val) => setFilters((prev) => ({ ...prev, inStock: val }))} />
-                </div>
-              </div>
+              <SidebarContents {...sidebarProps} />
             </aside>
 
             <div className="shop-main">
+              {/* Active filter chips */}
               {chips.length > 0 && (
-                <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap", marginBottom: 14 }}>
-                  {chips.map((f) => (
+                <div style={{ display:"flex", alignItems:"center", gap:7, flexWrap:"wrap", marginBottom:14 }}>
+                  {chips.map(f => (
                     <span key={f.key} className="chip" onClick={() => removeChip(f.key)}>
                       {f.label} ×
                     </span>
                   ))}
                   <button
                     onClick={clearAll}
-                    style={{
-                      fontFamily: "var(--font-stencil),monospace",
-                      fontSize: 8,
-                      letterSpacing: "0.1em",
-                      color: "#8a8784",
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                    }}
+                    style={M({ fontSize:8, letterSpacing:"0.1em", color:"#8a8784", background:"none", border:"none", cursor:"pointer" })}
                   >
                     CLEAR ALL
                   </button>
                 </div>
               )}
 
+              {/* Results */}
               {loading ? (
                 <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))", gap:12 }}>
                   {Array.from({length:8}).map((_,i) => (
@@ -695,7 +876,7 @@ export default function SearchClient({ initialQuery = "" }) {
           </div>
         </>
       ) : (
-        /* LANDING */
+        /* ── LANDING ── */
         <div className="search-landing">
           <div className="landing-section-title">BROWSE BY <span>CATEGORY</span></div>
           <div className="cat-pills">
@@ -706,7 +887,6 @@ export default function SearchClient({ initialQuery = "" }) {
               </div>
             ))}
           </div>
-
           {saleProducts.length > 0 && (
             <>
               <div className="landing-section-title">ON <span>SALE NOW</span></div>
@@ -716,6 +896,27 @@ export default function SearchClient({ initialQuery = "" }) {
                 ))}
               </div>
             </>
+          )}
+        </div>
+      )}
+
+      {/* ── MOBILE DRAWER ── */}
+      <div className={`drawer-backdrop ${drawerOpen ? "open" : ""}`} onClick={() => setDrawerOpen(false)} />
+      {drawerOpen && (
+        <div className="drawer-panel">
+          <div className="drawer-header">
+            <span className="drawer-title">FILTERS {activeFilterCount > 0 ? `(${activeFilterCount})` : ""}</span>
+            <button className="drawer-close" onClick={() => setDrawerOpen(false)}>✕</button>
+          </div>
+          <div className="drawer-body">
+            <SidebarContents {...sidebarProps} />
+          </div>
+          {activeFilterCount > 0 && (
+            <div className="drawer-footer">
+              <button className="sidebar-clear-btn" onClick={() => { clearAll(); setDrawerOpen(false); }}>
+                CLEAR ALL FILTERS
+              </button>
+            </div>
           )}
         </div>
       )}

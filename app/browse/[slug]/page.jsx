@@ -156,71 +156,85 @@ export default async function ProductDetailPage({ params }) {
 
   if (!productRow) notFound();
 
-  // ── Fetch variants, fitment, specs, related in parallel ──────
+  // ── Fetch variants, fitment, specs, related — each isolated ──
   let variants     = [];
   let fitment      = [];
   let catalogSpecs = [];
   let related      = [];
 
+  // Variants — table may not exist yet
   try {
-    const [variantRows, fitmentRows, specRows, relatedRows] = await Promise.all([
-      catalogDb.query(
-        `SELECT option_name, option_value
-         FROM catalog_variants
-         WHERE product_id = $1
-         ORDER BY option_name, option_value`,
-        [productRow.id]
-      ),
-      // Phase 10 — read from catalog_fitment_readable (view over catalog_fitment_v2)
-      // Returns: family (as make), model_code (as model), year
-      catalogDb.query(
-        `SELECT
-           'Harley-Davidson'   AS make,
-           model_code          AS model,
-           year                AS year_start,
-           year                AS year_end
-         FROM catalog_fitment_readable
-         WHERE product_id = $1
-         ORDER BY family, model_code, year`,
-        [productRow.id]
-      ),
-      catalogDb.query(
-        `SELECT attribute, value
-         FROM catalog_specs
-         WHERE product_id = $1
-         ORDER BY attribute`,
-        [productRow.id]
-      ),
-      catalogDb.query(
-        `SELECT
-          cp.id, cp.slug, cp.name, cp.brand, cp.category,
-          COALESCE(cp.computed_price, cp.msrp) AS price,
-          cp.msrp,
-          COALESCE((
-            SELECT cm.url FROM public.catalog_media cm
-            WHERE cm.product_id = cp.id ORDER BY cm.priority ASC LIMIT 1
-          ), cu.image_url) AS image,
-          COALESCE((
-            SELECT SUM(vo.total_qty) FROM public.vendor_offers vo
-            WHERE vo.catalog_product_id = cp.id AND vo.is_active = true
-          ), cu.stock_quantity, 0) AS stock_quantity
-         FROM public.catalog_products cp
-         INNER JOIN public.catalog_unified cu ON cu.sku = cp.sku
-         WHERE cp.category = $1
-           AND cp.slug <> $2
-           AND cp.is_active = true
-         ORDER BY cp.created_at DESC
-         LIMIT 4`,
-        [productRow.category, slug]
-      ),
-    ]);
-
-    variants     = variantRows.rows ?? [];
-    fitment      = fitmentRows.rows ?? [];
-    catalogSpecs = specRows.rows ?? [];
-    related      = (relatedRows.rows ?? []).map(normalizeProductRow);
+    const { rows } = await catalogDb.query(
+      `SELECT option_name, option_value
+       FROM catalog_variants
+       WHERE product_id = $1
+       ORDER BY option_name, option_value`,
+      [productRow.id]
+    );
+    variants = rows;
   } catch (e) {
-    console.error("[PDP] secondary fetch failed:", e.message);
+    // table doesn't exist yet — skip silently
+  }
+
+  // Fitment — Phase 10: catalog_fitment_readable view over catalog_fitment_v2
+  try {
+    const { rows } = await catalogDb.query(
+      `SELECT
+         'Harley-Davidson' AS make,
+         model_code        AS model,
+         year              AS year_start,
+         year              AS year_end
+       FROM catalog_fitment_readable
+       WHERE product_id = $1
+       ORDER BY family, model_code, year`,
+      [productRow.id]
+    );
+    fitment = rows;
+  } catch (e) {
+    console.error("[PDP] fitment fetch failed:", e.message);
+  }
+
+  // Specs — table may not exist yet
+  try {
+    const { rows } = await catalogDb.query(
+      `SELECT attribute, value
+       FROM catalog_specs
+       WHERE product_id = $1
+       ORDER BY attribute`,
+      [productRow.id]
+    );
+    catalogSpecs = rows;
+  } catch (e) {
+    // table doesn't exist yet — skip silently
+  }
+
+  // Related products
+  try {
+    const { rows } = await catalogDb.query(
+      `SELECT
+        cp.id, cp.slug, cp.name, cp.brand, cp.category,
+        COALESCE(cp.computed_price, cp.msrp) AS price,
+        cp.msrp,
+        COALESCE((
+          SELECT cm.url FROM public.catalog_media cm
+          WHERE cm.product_id = cp.id ORDER BY cm.priority ASC LIMIT 1
+        ), cu.image_url) AS image,
+        COALESCE((
+          SELECT SUM(vo.total_qty) FROM public.vendor_offers vo
+          WHERE vo.catalog_product_id = cp.id AND vo.is_active = true
+        ), cu.stock_quantity, 0) AS stock_quantity
+       FROM public.catalog_products cp
+       INNER JOIN public.catalog_unified cu ON cu.sku = cp.sku
+       WHERE cp.category = $1
+         AND cp.slug <> $2
+         AND cp.is_active = true
+       ORDER BY cp.created_at DESC
+       LIMIT 4`,
+      [productRow.category, slug]
+    );
+    related = rows.map(normalizeProductRow);
+  } catch (e) {
+    console.error("[PDP] related fetch failed:", e.message);
   }
 
   const specs = catalogSpecs

@@ -28,11 +28,6 @@ export default function VideoHero() {
 
         <div className="video-hero-overlay" />
 
-        <div className="video-hero-wordmark">
-          <span className="wordmark-stinkin">STINKIN'</span>
-          <span className="wordmark-supplies">SUPPLIES</span>
-        </div>
-
         <button
           className="video-hero-sound-btn"
           onClick={toggleSound}
@@ -59,8 +54,8 @@ export default function VideoHero() {
         .video-hero-wrap {
           position: relative;
           width: 100%;
-          height: 480px;
-          max-height: 60vh;
+          height: 560px;
+          max-height: 70vh;
           overflow: hidden;
           background: #0a0a0a;
           display: block;
@@ -94,38 +89,6 @@ export default function VideoHero() {
             rgba(0,0,0,0.55) 100%
           );
           pointer-events: none;
-        }
-
-        .video-hero-wordmark {
-          position: absolute;
-          top: 24px;
-          left: 28px;
-          display: flex;
-          flex-direction: column;
-          line-height: 1;
-          pointer-events: none;
-          user-select: none;
-        }
-
-        .wordmark-stinkin {
-          font-family: 'Barlow Condensed', sans-serif;
-          font-weight: 800;
-          font-size: clamp(20px, 3vw, 40px);
-          letter-spacing: 0.1em;
-          color: #FFF7E6;
-          text-transform: uppercase;
-          text-shadow: 0 2px 12px rgba(0,0,0,0.6);
-        }
-
-        .wordmark-supplies {
-          font-family: 'Barlow Condensed', sans-serif;
-          font-weight: 400;
-          font-size: clamp(11px, 1.3vw, 17px);
-          letter-spacing: 0.35em;
-          color: #C9A84C;
-          text-transform: uppercase;
-          margin-top: 3px;
-          text-shadow: 0 1px 8px rgba(0,0,0,0.5);
         }
 
         .video-hero-sound-btn {

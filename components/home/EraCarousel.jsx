@@ -10,14 +10,12 @@ function EraCarousel() {
   const total = ERAS.length;
   const [mounted, setMounted] = useState(false);
   const [active, setActive] = useState(0);
-  const [scrollProgress, setScrollProgress] = useState(0);
   const wrapRef = useRef(null);
   const autoRef = useRef(null);
   const touchStartX = useRef(null);
   const isDragging = useRef(false);
   const dragStartX = useRef(0);
   const dragDelta = useRef(0);
-  const lastScrollIdx = useRef(0);
 
   // ── Auto-rotate
   const resetAuto = useCallback(() => {
@@ -38,41 +36,6 @@ function EraCarousel() {
     setActive((idx + total) % total);
     resetAuto();
   };
-
-  // ── Scroll-driven advance
-  // When the tile is in view, scroll within it advances the active card
-  useEffect(() => {
-    const el = wrapRef.current;
-    if (!el) return;
-
-    const onWheel = (e) => {
-      // Only intercept if tile is roughly centered in viewport
-      const rect = el.getBoundingClientRect();
-      const inView = rect.top < window.innerHeight * 0.6 && rect.bottom > window.innerHeight * 0.4;
-      if (!inView) return;
-
-      e.preventDefault();
-      const delta = e.deltaY;
-
-      // Accumulate scroll, advance card every ~120px of scroll
-      lastScrollIdx.current += delta;
-      if (lastScrollIdx.current > 120) {
-        lastScrollIdx.current = 0;
-        goTo(active + 1);
-      } else if (lastScrollIdx.current < -120) {
-        lastScrollIdx.current = 0;
-        goTo(active - 1);
-      }
-
-      // Also drive a smooth progress value for parallax feel
-      setScrollProgress(p => Math.max(0, Math.min(1,
-        p + delta / (window.innerHeight * 2)
-      )));
-    };
-
-    el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
-  }, [active, goTo]);
 
   // ── Drag
   const onMouseDown = (e) => {
@@ -109,12 +72,9 @@ function EraCarousel() {
 
     if (absP > 4) return { display: 'none' };
 
-    // Subtle extra rotation driven by scroll progress
-    const scrollBias = scrollProgress * 4;
-
     // Fixed offsets — no window access (avoids SSR hydration mismatch)
     const unit  = 140; // px per step — tighter spread keeps cards in tile
-    const rotZ  = pos * -15 - (pos !== 0 ? scrollBias * Math.sign(pos) : 0);
+    const rotZ  = pos * -15;
     const rotX  = 10 + absP * 5;
     const tx    = pos * unit;
     const ty    = pos * unit * 0.72;
@@ -137,6 +97,16 @@ function EraCarousel() {
 
   return (
     <div ref={wrapRef} className="carousel-wrap">
+      <button
+        className="carousel-arrow-lg carousel-arrow-lg--left"
+        onClick={() => goTo(active - 1)}
+        aria-label="Previous era"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" width="28" height="28">
+          <path d="m15 18-6-6 6-6"/>
+        </svg>
+      </button>
+
       <div
         className="carousel-stage"
         onMouseDown={onMouseDown}
@@ -183,27 +153,23 @@ function EraCarousel() {
         </div>
       </div>
 
+      <button
+        className="carousel-arrow-lg carousel-arrow-lg--right"
+        onClick={() => goTo(active + 1)}
+        aria-label="Next era"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" width="28" height="28">
+          <path d="m9 18 6-6-6-6"/>
+        </svg>
+      </button>
+
       {/* Footer */}
       <div className="carousel-footer">
-        <button className="carousel-arrow-sm" onClick={() => goTo(active - 1)} aria-label="Previous">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="16" height="16"><path d="m15 18-6-6 6-6"/></svg>
-        </button>
         <div className="carousel-dots">
           {ERAS.map((era, i) => (
             <button key={era.slug} className={`carousel-dot ${i === active ? 'carousel-dot--active' : ''}`} onClick={() => goTo(i)} aria-label={era.name} />
           ))}
         </div>
-        <button className="carousel-arrow-sm" onClick={() => goTo(active + 1)} aria-label="Next">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="16" height="16"><path d="m9 18 6-6-6-6"/></svg>
-        </button>
-      </div>
-
-      {/* Scroll hint — fades out after first interaction */}
-      <div className="scroll-hint">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="16" height="16">
-          <path d="M12 5v14M5 12l7 7 7-7"/>
-        </svg>
-        <span>Scroll to browse eras</span>
       </div>
     </div>
   );
