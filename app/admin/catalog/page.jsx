@@ -5,14 +5,15 @@
 
 import Link from "next/link";
 import { getCatalogDb } from "@/lib/db/catalog";
+import CatalogTable from "./CatalogTable";
 
 const CATEGORIES = [
   "General","Engine","Exhaust","Brakes","Suspension","Electrical",
-  "Illumination","Handlebars","Foot Controls","Intake/Carb/Fuel System",
+  "Lighting","Handlebars","Hand Controls","Foot Controls","Intake/Carb/Fuel System",
   "Clutch","Drive","Wheels/Tires","Body","Cable/Hydraulic Control Lines",
   "Hardware/Fasteners/Fittings","Chemicals","Apparel/Helmets","Luggage",
-  "Gaskets/Seals","Tools","Windshield/Windscreen","Seat","Air Filters",
-  "Seat","Hardware","Sprockets",
+  "Gaskets/Seals","Tools","Windshield/Windscreen","Seat","Maintenance",
+  "Chopper",
 ];
 
 const VENDORS = ["PU","WPS","VTWIN"];
@@ -422,10 +423,10 @@ export default async function AdminCatalogPage({ searchParams }) {
           defaultValue={q}
           placeholder="Search name, SKU, brand…"
         />
-        <select name="vendor">
+        <select name="vendor" defaultValue={vendor}>
           <option value="">All Vendors</option>
           {VENDORS.map(v => (
-            <option key={v} value={v} selected={vendor === v}>{v}</option>
+            <option key={v} value={v}>{v}</option>
           ))}
         </select>
         <button className="btn" type="submit">Filter</button>
@@ -436,120 +437,8 @@ export default async function AdminCatalogPage({ searchParams }) {
         )}
       </form>
 
-      {/* Bulk reassign bar */}
-      <div className="bulk-bar" id="bulk-bar" style={{display:"none"}}>
-        <span className="bulk-bar-label" id="bulk-label">0 SELECTED</span>
-        <select className="bulk-select" id="bulk-cat-select">
-          <option value="">Move to category…</option>
-          {CATEGORIES.filter((c, i, a) => a.indexOf(c) === i).sort().map(c => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </select>
-        <button
-          className="btn"
-          type="button"
-          onclick="bulkSave()"
-        >
-          Apply to Selected
-        </button>
-        <button
-          className="btn btn-ghost"
-          type="button"
-          onclick="clearSelection()"
-        >
-          Clear
-        </button>
-      </div>
-
-      {/* Table */}
-      <div className="cm-table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th style={{width:"3%"}}>
-                <input type="checkbox" id="select-all" />
-              </th>
-              <th style={{width:"30%"}}>Product</th>
-              <th style={{width:"14%"}}>Brand</th>
-              <th style={{width:"8%"}}>Vendor</th>
-              <th style={{width:"6%"}}>Stock</th>
-              <th style={{width:"24%"}}>Category</th>
-              <th style={{width:"15%"}}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.length ? items.map(p => (
-              <tr key={p.id} data-id={p.id} data-category={p.category ?? ""}>
-                <td>
-                  <input
-                    type="checkbox"
-                    className="row-check"
-                    data-id={p.id}
-                    onchange="updateBulkBar()"
-                  />
-                </td>
-                <td>
-                  <div className="product-name" title={p.name}>{p.name}</div>
-                  <div className="product-sku">{p.internal_sku ?? p.sku}</div>
-                </td>
-                <td className="muted" title={p.brand ?? ""}>{p.brand ?? "—"}</td>
-                <td>
-                  <span className={`pill ${vendorClass(p.source_vendor)}`}>
-                    {p.source_vendor ?? "—"}
-                  </span>
-                </td>
-                <td>
-                  <span style={{
-                    fontFamily: "var(--font-stencil), monospace",
-                    fontSize: "10px",
-                    color: (p.stock_quantity ?? 0) > 0 ? "#62d18c" : "#555"
-                  }}>
-                    {p.stock_quantity ?? 0}
-                  </span>
-                </td>
-                <td>
-                  <select
-                    className={`cat-select ${p.category === "General" ? "changed" : ""}`}
-                    data-id={p.id}
-                    data-original={p.category ?? ""}
-                    onchange={`onCatChange(this)`}
-                  >
-                    {CATEGORIES.filter((c, i, a) => a.indexOf(c) === i).sort().map(c => (
-                      <option key={c} value={c} selected={p.category === c}>{c}</option>
-                    ))}
-                  </select>
-                </td>
-                <td>
-                  <span style={{display:"flex", gap:6, alignItems:"center"}}>
-                    <button
-                      className="save-btn"
-                      id={`save-${p.id}`}
-                      type="button"
-                      onclick={`saveCategory(${p.id})`}
-                    >
-                      Save
-                    </button>
-                    <Link
-                      className="muted"
-                      href={`/browse/${p.slug}`}
-                      target="_blank"
-                      style={{fontSize:9, letterSpacing:"0.1em", color:"#444", textDecoration:"none"}}
-                    >
-                      ↗ View
-                    </Link>
-                  </span>
-                </td>
-              </tr>
-            )) : (
-              <tr>
-                <td colSpan={7} className="muted" style={{textAlign:"center", padding:"32px"}}>
-                  No products match your filters.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      {/* Interactive table — client component handles checkboxes, dropdowns, saves */}
+      <CatalogTable initialItems={items} />
 
       {/* Pager */}
       <div className="cm-pager">
@@ -563,107 +452,6 @@ export default async function AdminCatalogPage({ searchParams }) {
           <Link className="btn btn-ghost" href={buildHref("/admin/catalog", {...baseParams, page: pageCount-1})}>Last</Link>
         </div>
       </div>
-
-      {/* Client-side JS — inline save + bulk */}
-      <script dangerouslySetInnerHTML={{ __html: `
-        // Single row save
-        function onCatChange(sel) {
-          const id = sel.dataset.id;
-          const original = sel.dataset.original;
-          const saveBtn = document.getElementById('save-' + id);
-          if (sel.value !== original) {
-            sel.classList.add('changed');
-            saveBtn.classList.add('visible');
-          } else {
-            sel.classList.remove('changed');
-            saveBtn.classList.remove('visible');
-          }
-        }
-
-        async function saveCategory(id) {
-          const sel = document.querySelector('.cat-select[data-id="' + id + '"]');
-          const btn = document.getElementById('save-' + id);
-          const newCat = sel.value;
-          btn.textContent = '...';
-          btn.disabled = true;
-          try {
-            const res = await fetch('/api/admin/catalog/update-category', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id: parseInt(id), category: newCat }),
-            });
-            if (!res.ok) throw new Error('Failed');
-            sel.dataset.original = newCat;
-            sel.classList.remove('changed');
-            btn.classList.remove('visible');
-            btn.textContent = 'Save';
-            btn.disabled = false;
-          } catch(e) {
-            btn.textContent = 'Error';
-            btn.style.color = '#ff7a7a';
-            setTimeout(() => {
-              btn.textContent = 'Save';
-              btn.style.color = '';
-              btn.disabled = false;
-            }, 2000);
-          }
-        }
-
-        // Bulk selection
-        function updateBulkBar() {
-          const checked = document.querySelectorAll('.row-check:checked');
-          const bar = document.getElementById('bulk-bar');
-          const label = document.getElementById('bulk-label');
-          if (checked.length > 0) {
-            bar.style.display = 'flex';
-            label.textContent = checked.length + ' SELECTED';
-          } else {
-            bar.style.display = 'none';
-          }
-        }
-
-        function clearSelection() {
-          document.querySelectorAll('.row-check:checked').forEach(c => c.checked = false);
-          document.getElementById('select-all').checked = false;
-          updateBulkBar();
-        }
-
-        document.getElementById('select-all').addEventListener('change', function() {
-          document.querySelectorAll('.row-check').forEach(c => c.checked = this.checked);
-          updateBulkBar();
-        });
-
-        async function bulkSave() {
-          const checked = document.querySelectorAll('.row-check:checked');
-          const newCat = document.getElementById('bulk-cat-select').value;
-          if (!newCat) { alert('Select a category first'); return; }
-          const ids = Array.from(checked).map(c => parseInt(c.dataset.id));
-          if (!ids.length) return;
-
-          try {
-            const res = await fetch('/api/admin/catalog/bulk-update-category', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ ids, category: newCat }),
-            });
-            if (!res.ok) throw new Error('Failed');
-            // Update UI
-            ids.forEach(id => {
-              const sel = document.querySelector('.cat-select[data-id="' + id + '"]');
-              if (sel) {
-                sel.value = newCat;
-                sel.dataset.original = newCat;
-                sel.classList.remove('changed');
-                const btn = document.getElementById('save-' + id);
-                if (btn) btn.classList.remove('visible');
-              }
-            });
-            clearSelection();
-          } catch(e) {
-            alert('Bulk update failed');
-          }
-        }
-      `}} />
     </div>
   );
 }

@@ -193,6 +193,7 @@ const NAV = [
   {
     section: "VENDOR",
     links: [
+      { href: "/admin/fitment",      icon: "⇌", label: "FITMENT & OEM"  },
       { href: "/admin/catalog",      icon: "◧", label: "CATALOG"        },
       { href: "/admin/sync",         icon: "↺", label: "SYNC"           },
       { href: "/admin/products",     icon: "▤", label: "PRODUCTS"       },
