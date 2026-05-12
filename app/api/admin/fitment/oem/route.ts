@@ -4,7 +4,7 @@
 // PUT THIS FILE AT: app/api/admin/fitment/oem/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
-import { getCatalogDb } from "@/lib/db/catalog";
+import getCatalogDb from "@/lib/db/catalog";
 
 export async function GET(req: NextRequest) {
   const sku = req.nextUrl.searchParams.get("sku");

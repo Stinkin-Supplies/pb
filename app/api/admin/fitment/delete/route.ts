@@ -2,7 +2,7 @@
 // app/api/admin/fitment/delete/route.ts
 // ============================================================
 import { NextRequest, NextResponse } from "next/server";
-import { getCatalogDb } from "@/lib/db/catalog";
+import getCatalogDb from "@/lib/db/catalog";
 
 export async function DELETE(req: NextRequest) {
   const id = req.nextUrl.searchParams.get("id");

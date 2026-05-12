@@ -345,7 +345,10 @@ export default function AdminFitmentPage() {
                       </td>
                       <td>
                         <span style={{fontFamily:"var(--font-stencil),monospace", fontSize:10, color:"#8a8784", letterSpacing:"0.06em"}}>
-                          {p.vendor_sku || p.brand_part_number || <span style={{color:"#333"}}>—</span>}
+                          {p.source_vendor === "WPS"
+                            ? (p.vendor_sku || p.sku)
+                            : p.sku
+                          }
                         </span>
                       </td>
                       <td>
@@ -559,17 +562,38 @@ function ReportsTab({ stats }) {
 
 // ── Product Fitment + OEM Editor Modal ───────────────────────────────────────
 function ProductFitmentModal({ product, onClose, onSaved, showToast }) {
-  const [fitmentRows, setFitmentRows] = useState([]);
-  const [oemRows,     setOemRows]     = useState([]);
-  const [loading,     setLoading]     = useState(true);
-  const [saving,      setSaving]      = useState(false);
-  const [activeTab,   setActiveTab]   = useState("fitment");
+  const [fitmentRows,   setFitmentRows]   = useState([]);
+  const [oemRows,       setOemRows]       = useState([]);
+  const [loading,       setLoading]       = useState(true);
+  const [saving,        setSaving]        = useState(false);
+  const [activeTab,     setActiveTab]     = useState("fitment");
+  const [fitsAllModels, setFitsAllModels] = useState(product.fits_all_models ?? false);
+  const [savingFlag,    setSavingFlag]    = useState(false);
 
   // New fitment form
   const [newFit, setNewFit] = useState({ family: "", model_code: "", year: "" });
   // New OEM form
   const [newOem, setNewOem] = useState({ oem_number: "", oem_manufacturer: "Harley-Davidson" });
   const [formError, setFormError] = useState("");
+
+  async function toggleFitsAll(val) {
+    setSavingFlag(true);
+    try {
+      const res = await fetch("/api/admin/fitment/fits-all", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: product.id, fits_all_models: val }),
+      });
+      if (!res.ok) throw new Error();
+      setFitsAllModels(val);
+      showToast(val ? "Marked as fits all models" : "Removed fits all models flag");
+      onSaved();
+    } catch {
+      showToast("Failed to update flag", "error");
+    } finally {
+      setSavingFlag(false);
+    }
+  }
 
   // Fetch existing data
   useEffect(() => {
@@ -620,14 +644,15 @@ function ProductFitmentModal({ product, onClose, onSaved, showToast }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ product_id: product.id, ...newFit, year: parseInt(newFit.year) }),
       });
-      if (!res.ok) throw new Error("Failed");
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed");
       setFitmentRows(r => [...r, data.row]);
       setNewFit({ family: "", model_code: "", year: "" });
-      showToast("Fitment row added");
+      setFormError("");
+      showToast(`Added ${newFit.model_code} ${newFit.year}`);
       onSaved();
-    } catch {
-      setFormError("Failed to add fitment row.");
+    } catch(e) {
+      setFormError(e.message || "Failed to add fitment row.");
     } finally {
       setSaving(false);
     }
@@ -692,11 +717,9 @@ function ProductFitmentModal({ product, onClose, onSaved, showToast }) {
             <div className="modal-title">EDIT <span>PRODUCT</span></div>
             <div className="modal-subtitle">
               {product.name} · {product.internal_sku ?? product.sku}
-              {(product.vendor_sku || product.brand_part_number) && (
-                <span style={{color:"var(--orange)", marginLeft:8}}>
-                  · {product.vendor_sku || product.brand_part_number}
-                </span>
-              )}
+              <span style={{color:"var(--orange)", marginLeft:8}}>
+                · {product.source_vendor === "WPS" ? (product.vendor_sku || product.sku) : product.sku}
+              </span>
             </div>
           </div>
           <button className="modal-close" onClick={onClose}>✕</button>
@@ -730,6 +753,50 @@ function ProductFitmentModal({ product, onClose, onSaved, showToast }) {
 
               {activeTab === "fitment" && (
                 <>
+                  {/* Fits all models toggle */}
+                  <div style={{
+                    display:"flex", alignItems:"center", justifyContent:"space-between",
+                    padding:"10px 14px", marginBottom:16,
+                    background: fitsAllModels ? "rgba(34,197,94,0.06)" : "rgba(255,255,255,0.02)",
+                    border: `1px solid ${fitsAllModels ? "rgba(34,197,94,0.25)" : "var(--steel)"}`,
+                    borderRadius:2,
+                  }}>
+                    <div>
+                      <div style={{fontSize:10, color: fitsAllModels ? "var(--green)" : "var(--chrome)", letterSpacing:"0.12em", marginBottom:2}}>
+                        FITS ALL MODELS / UNIVERSAL
+                      </div>
+                      <div style={{fontSize:9, color:"#444", letterSpacing:"0.08em"}}>
+                        {fitsAllModels
+                          ? "Marked as universal fit — excluded from missing fitment reports"
+                          : "Enable to mark as universal fit — removes from missing fitment report"}
+                      </div>
+                    </div>
+                    <div style={{display:"flex", alignItems:"center", gap:10, flexShrink:0}}>
+                      {savingFlag && (
+                        <span style={{fontSize:9, color:"var(--chrome)", letterSpacing:"0.1em"}}>SAVING…</span>
+                      )}
+                      <button
+                        onClick={() => toggleFitsAll(!fitsAllModels)}
+                        disabled={savingFlag}
+                        style={{
+                          width:40, height:22, borderRadius:11, border:"none",
+                          background: fitsAllModels ? "var(--green)" : "var(--steel)",
+                          cursor: savingFlag ? "not-allowed" : "pointer",
+                          position:"relative", flexShrink:0,
+                          transition:"background 0.2s",
+                          opacity: savingFlag ? 0.5 : 1,
+                        }}
+                      >
+                        <div style={{
+                          position:"absolute", top:3,
+                          left: fitsAllModels ? 20 : 3,
+                          width:16, height:16, borderRadius:"50%",
+                          background:"#f0ebe3",
+                          transition:"left 0.2s",
+                        }} />
+                      </button>
+                    </div>
+                  </div>
                   <div className="modal-section">
                     <div className="modal-section-title">VEHICLE FITMENT — {fitmentRows.length} ROWS</div>
                     {fitmentRows.length === 0 ? (

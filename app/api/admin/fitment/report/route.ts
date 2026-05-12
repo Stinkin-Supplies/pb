@@ -2,7 +2,7 @@
 // app/api/admin/fitment/report/route.ts
 // ============================================================
 import { NextRequest, NextResponse } from "next/server";
-import { getCatalogDb } from "@/lib/db/catalog";
+import getCatalogDb from "@/lib/db/catalog";
 
 export async function GET(req: NextRequest) {
   const type = req.nextUrl.searchParams.get("type");
