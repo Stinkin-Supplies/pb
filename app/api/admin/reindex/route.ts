@@ -15,7 +15,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const scriptPath = path.join(process.cwd(), "scripts/ingest/indexTypesense.js");
+  const scriptPath = path.join(process.cwd(), "scripts/ingest/index_unified.js");
 
   try {
     const { stdout, stderr } = await execFileAsync(process.execPath, [scriptPath], {
