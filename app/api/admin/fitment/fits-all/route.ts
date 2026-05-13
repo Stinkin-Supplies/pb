@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
       [fits_all_models, id]
     );
     return NextResponse.json({ ok: true });
-  } catch (err) {
+  } catch (err: any) {
     console.error("[fitment/fits-all]", err.message);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
