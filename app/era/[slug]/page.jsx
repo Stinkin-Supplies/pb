@@ -498,7 +498,7 @@ function ActiveTag({ label, onRemove, accent }) {
 
 function CategoryTabBar({ categories, active, onChange, accent }) {
   const ALL = { slug: null, label: "All Parts" };
-  const tabs = [ALL, ...(categories ?? [])];
+  const tabs = [ALL, ...(categories ?? []).filter(cat => cat.name != null)];
 
   return (
     <div style={{
@@ -667,7 +667,7 @@ export default function EraPage({ params }) {
           fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
           fontSize: 18, letterSpacing: "3px", color: "#e0d8cc", textDecoration: "none",
         }}>
-          STINKIN'<span style={{ color: era.accent }}>'</span> SUPPLIES
+          STINKIN'<span style={{ color: era.accent }}></span> SUPPLIES
         </Link>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <Link href="/browse" style={{
