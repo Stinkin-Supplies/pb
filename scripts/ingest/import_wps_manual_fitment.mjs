@@ -94,6 +94,98 @@ function parseYearToken(token) {
   return null; // unrecognizable — skip
 }
 
+
+// ─── Name inference — model codes + year range extraction ────────────────────
+// WPS product names frequently contain HD model codes (FXD, FLHT, FXST) and
+// embedded year ranges (91-17, 06-UP). We extract both to generate real
+// fitment rows where possible, falling back to flag-only when no year found.
+
+// Model code → family name(s)
+const WPS_MODEL_CODE_MAP = {
+  // Touring
+  "FLHR": ["Touring"], "FLHRC": ["Touring"], "FLHT": ["Touring"],
+  "FLHX": ["Touring"], "FLTR":  ["Touring"], "FLT":  ["Touring"],
+  "FLH":  ["Touring"],
+  // Softail
+  "FXST": ["Softail"], "FXSTB": ["Softail"], "FXSTC": ["Softail"],
+  "FXSTS":["Softail"], "FXCW":  ["Softail"], "FXSB":  ["Softail"],
+  "FLST": ["Softail"], "FLSTC": ["Softail"], "FLSTF": ["Softail"],
+  "FLSTN":["Softail"], "FXWG":  ["Softail"],
+  // Dyna
+  "FXD":  ["Dyna"], "FXDL": ["Dyna"], "FXDB": ["Dyna"],
+  "FXDC": ["Dyna"], "FXDF": ["Dyna"], "FXDWG":["Dyna"],
+  "FXDX": ["Dyna"],
+  // FXR
+  "FXR":  ["FXR"], "FXRS": ["FXR"], "FXRT": ["FXR"], "FXLR": ["FXR"],
+  // Sportster
+  "XL":   ["Sportster"], "XLH":  ["Sportster"], "XLCH": ["Sportster"],
+  "XL883":["Sportster"], "XL1200":["Sportster"],
+  // Vintage / pre-unit
+  "FL":   ["Panhead", "Shovelhead"],
+  "EL":   ["Knucklehead"],
+  "WL":   ["Flathead"], "WLA": ["Flathead"],
+  "UL":   ["Flathead"],
+  // Era keywords
+  "SOFTAIL":   ["Softail"],
+  "DYNA":      ["Dyna"],
+  "TOURING":   ["Touring"],
+  "SPORTSTER": ["Sportster"],
+  "IRONHEAD":  ["Sportster"],
+  "KNUCKLEHEAD":["Knucklehead"],
+  "PANHEAD":   ["Panhead"],
+  "SHOVELHEAD":["Shovelhead"],
+  "EVOLUTION": ["Softail", "Dyna", "FXR", "Sportster"],
+  "TWIN CAM":  ["Softail", "Dyna", "Touring"],
+  "M8":        ["Softail", "Touring"],
+};
+
+// Sorted longest-first so FXDWG matches before FXD, XLCH before XL, etc.
+const WPS_CODE_ENTRIES = Object.entries(WPS_MODEL_CODE_MAP)
+  .sort((a, b) => b[0].length - a[0].length);
+
+// Two-digit year → four-digit year (WPS catalogs span 1976–2025)
+function expandYear(yy) {
+  const n = parseInt(yy);
+  return n <= 30 ? 2000 + n : 1900 + n;
+}
+
+// Extract { familyIds, yearMin, yearMax } from a WPS product name.
+// Returns null if no model code found.
+function parseWpsName(name, familyByName) {
+  const upper = name.toUpperCase();
+  const familyIds = new Set();
+
+  for (const [code, families] of WPS_CODE_ENTRIES) {
+    // Word-boundary match — avoids FLH matching FLHX, FXD matching FXDWG etc.
+    const re = new RegExp("\\b" + code.replace(/ /g, "\\s+") + "\\b");
+    if (re.test(upper)) {
+      for (const fname of families) {
+        const fid = familyByName[fname];
+        if (fid) familyIds.add(fid);
+      }
+    }
+  }
+
+  if (familyIds.size === 0) return null;
+
+  // Extract year range — patterns: "91-17", "06-UP", "\`09-UP", "84-UP"
+  let yearMin = null, yearMax = null;
+  const yrRange = name.match(/['\`]?(\d{2})-(\d{2})/);
+  const yrUp    = name.match(/['\`]?(\d{2})-UP/i);
+
+  if (yrRange) {
+    yearMin = expandYear(yrRange[1]);
+    yearMax = expandYear(yrRange[2]);
+    // Sanity: if min > max, year century boundary (e.g. 99-06 → 1999-2006)
+    if (yearMin > yearMax) yearMax += 100;
+  } else if (yrUp) {
+    yearMin = expandYear(yrUp[1]);
+    yearMax = 2025; // "UP" = current
+  }
+
+  return { familyIds, yearMin, yearMax };
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -169,6 +261,26 @@ async function main() {
   let inserted           = 0;
   let would_insert       = 0;
 
+  // ── Pass 1: OEM number collection ──────────────────────────────────────────
+  // Scan all rows for fitment_hd_oem regardless of whether fitment data exists.
+  // Handles comma-separated values (e.g. "3720215, 3720215").
+  const oemByProductId = {}; // product_id → Set<oem_number>
+
+  for (const row of rows) {
+    const sku = (row.sku || "").trim();
+    const productId = cuByWpsSku[sku];
+    if (!productId) continue;
+    const raw = (row.fitment_hd_oem || "").toString().trim();
+    if (!raw || raw === "nan") continue;
+    const nums = raw.split(",").map(s => s.trim()).filter(s => s.length > 3);
+    if (nums.length > 0) {
+      if (!oemByProductId[productId]) oemByProductId[productId] = new Set();
+      for (const n of nums) oemByProductId[productId].add(n);
+    }
+  }
+  console.log(`OEM pass: ${Object.keys(oemByProductId).length} products with OEM numbers (${Object.values(oemByProductId).reduce((s,v)=>s+v.size,0)} total entries)`);
+
+  // ── Pass 2: Fitment + name inference ────────────────────────────────────────
   const toInsert = []; // { product_id, model_year_id }
   const noYearRangeSkus = new Set(); // model-only SKUs — flag is_harley_fitment, no fitment rows
 
@@ -178,7 +290,34 @@ async function main() {
     const sku  = (row.sku               || "").trim();
 
     if (!yr && !mod) {
-      skipped_no_fitment++;
+      // Try name inference before giving up
+      const productId2 = cuByWpsSku[sku];
+      if (productId2) {
+        const parsed = parseWpsName(row.name || "", familyByName);
+        if (parsed && parsed.familyIds.size > 0) {
+          if (parsed.yearMin !== null) {
+            // Has year range — generate real fitment rows inline
+            for (const familyId of parsed.familyIds) {
+              for (let y = parsed.yearMin; y <= parsed.yearMax; y++) {
+                const myIds = myIndex[`${familyId}:${y}`];
+                if (!myIds) continue;
+                for (const myId of myIds) {
+                  const key = `${productId2}:${myId}`;
+                  if (existingSet.has(key)) { already_exists++; continue; }
+                  existingSet.add(key);
+                  toInsert.push({ product_id: productId2, model_year_id: myId });
+                }
+              }
+            }
+          } else {
+            noYearRangeSkus.add(sku); // flag-only — no year found in name
+          }
+        } else {
+          skipped_no_fitment++;
+        }
+      } else {
+        skipped_no_fitment++;
+      }
       continue;
     }
 
@@ -318,6 +457,7 @@ async function main() {
   console.log(`\n── Pre-insert summary ──`);
   console.log(`  Rows with no fitment data:    ${skipped_no_fitment}`);
   console.log(`  Model-only (flag only):       ${noYearRangeProductIds.length}`);
+  console.log(`  Products with OEM numbers:    ${Object.keys(oemByProductId).length}`);
   console.log(`  SKU not in catalog_unified:   ${skipped_no_product}`);
   console.log(`  Unknown alias/no family:      ${skipped_no_family}`);
   console.log(`  No years in DB for range:     ${skipped_no_years}`);
@@ -326,6 +466,7 @@ async function main() {
 
   if (DRY_RUN) {
     console.log("\nDRY RUN — no writes. Re-run without --dry-run to commit.");
+  console.log(`Would update OEM numbers on ${Object.keys(oemByProductId).length} products (${Object.values(oemByProductId).reduce((s,v)=>s+v.size,0)} total OEM numbers).`);
   console.log(`Would also set is_harley_fitment=true on ${noYearRangeProductIds.length} model-only products.`);
     console.log("\nSample of what would be inserted:");
     for (const r of toInsert.slice(0, 20)) {
@@ -352,6 +493,27 @@ async function main() {
     process.stdout.write(`\r  Inserted ${done} / ${toInsert.length}`);
   }
   console.log(`\nDone. ${toInsert.length} rows inserted into catalog_fitment_v2.`);
+
+  // ── Update oem_numbers on catalog_unified ──────────────────────────────────
+  const oemEntries = Object.entries(oemByProductId);
+  if (oemEntries.length > 0) {
+    console.log(`\nUpdating OEM numbers on ${oemEntries.length} products...`);
+    let oemUpdated = 0;
+    for (const [productId, numSet] of oemEntries) {
+      const nums = [...numSet];
+      await pool.query(
+        `UPDATE catalog_unified
+         SET oem_numbers = (
+           SELECT array_agg(DISTINCT n ORDER BY n)
+           FROM unnest(COALESCE(oem_numbers, ARRAY[]::text[]) || $2::text[]) AS n
+         )
+         WHERE id = $1`,
+        [parseInt(productId), nums]
+      );
+      oemUpdated++;
+    }
+    console.log(`OEM numbers updated on ${oemUpdated} products.`);
+  }
 
   // Flag products with actual fitment rows
   const productIds = [...new Set(toInsert.map((r) => r.product_id))];
