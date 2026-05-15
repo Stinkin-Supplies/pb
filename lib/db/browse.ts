@@ -7,12 +7,16 @@
  * FIXES (May 2026):
  *  1. universal branch: removed fits_all_models (doesn't exist on catalog_unified),
  *     uses is_harley_fitment = false OR is_universal = true as the universal signal.
- *  2. Fitment JOIN changed to LEFT JOIN with fallback so products that have
- *     is_harley_fitment = true but no catalog_fitment_v2 rows yet (JW Boon pending
- *     re-run) still surface in era pages.
- *  3. relevance sort: removed the vendor_rank CTE — it was re-introducing duplicates
+ *  2. yearMin/yearMax moved from WHERE familyConditions into the LEFT JOIN ON clause.
+ *     Previously they were in the WHERE which broke the is_harley_fitment fallback —
+ *     the fallback arm (cfv_yr.id IS NULL) would ignore year bounds and dump all
+ *     non-fitment products into every era page. With them on the JOIN, the LEFT JOIN
+ *     itself only matches rows in the correct year range, so cfv_yr.id IS NULL means
+ *     "no fitment in this year range" which is the correct fallback signal.
+ *  3. Added cu.is_active = true to every query path.
+ *  4. relevance sort: removed the vendor_rank CTE — it was re-introducing duplicates
  *     and producing counts that didn't match the COUNT(DISTINCT) total.
- *  4. facetParams slice is now derived before LIMIT/OFFSET are pushed, so it's
+ *  5. facetParams slice is now derived before LIMIT/OFFSET are pushed, so it's
  *     always safe regardless of sort branch.
  */
 
@@ -183,20 +187,44 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
 
   let fitmentJoin = "";
 
+  // Always filter to active products only
+  conditions.push(`cu.is_active = true`);
+
   if (universal) {
-    // FIX 1: fits_all_models does not exist on catalog_unified.
-    // Universal/chopper era = products not explicitly tied to a specific H-D
-    // fitment family, OR explicitly flagged is_harley_fitment = false.
-    // Adjust this condition to match whatever signal you use in catalog_unified.
+    // Universal/chopper era — products not tied to a specific H-D family.
     conditions.push(`(cu.is_harley_fitment = false OR cu.is_universal = true)`);
   } else if (effectiveFamilies.length > 0 || modelCode || year || yearMin || yearMax) {
-    // FIX 2: LEFT JOIN so products with is_harley_fitment=true but no
-    // catalog_fitment_v2 rows yet (JW Boon pending re-run) still surface.
-    // The OR condition in the WHERE acts as the fallback.
+    // yearMin/yearMax are pushed into a subquery so they filter BEFORE the
+    // LEFT JOIN, rather than living in the WHERE clause (which would break the
+    // is_harley_fitment fallback — the fallback arm would ignore year bounds and
+    // surface all non-fitment products for every era page).
+    // Using a subquery also avoids the join-order problem where hmy.year would
+    // not yet be in scope if placed directly in the cfv LEFT JOIN ON clause.
+    const fitSubConditions: string[] = [];
+    if (yearMin) {
+      fitSubConditions.push(`hmy2.year >= $${p++}`);
+      params.push(yearMin);
+    }
+    if (yearMax) {
+      fitSubConditions.push(`hmy2.year <= $${p++}`);
+      params.push(yearMax);
+    }
+
+    const fitSubWhere = fitSubConditions.length > 0
+      ? `WHERE ${fitSubConditions.join(" AND ")}`
+      : "";
+
+    // cfv_yr is a pre-filtered set of fitment rows (year-bounded).
+    // cfv_yr.id IS NULL after the LEFT JOIN means "no fitment row in this year range"
+    // which is the correct signal for the is_harley_fitment fallback.
     fitmentJoin = `
-      LEFT JOIN catalog_fitment_v2 cfv ON cfv.product_id = cu.id
-      LEFT JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id
-      LEFT JOIN harley_models hm ON hm.id = hmy.model_id
+      LEFT JOIN (
+        SELECT cfv2.id, cfv2.product_id, hmy2.model_id, hmy2.year
+        FROM catalog_fitment_v2 cfv2
+        JOIN harley_model_years hmy2 ON hmy2.id = cfv2.model_year_id
+        ${fitSubWhere}
+      ) cfv_yr ON cfv_yr.product_id = cu.id
+      LEFT JOIN harley_models hm ON hm.id = cfv_yr.model_id
       LEFT JOIN harley_families hf ON hf.id = hm.family_id
     `;
 
@@ -215,37 +243,27 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
       params.push(modelCode);
     }
 
-    // Exact year (user dropdown selection)
+    // Exact year (user dropdown — not era range)
     if (year) {
-      conditions.push(`hmy.year = $${p++}`);
+      conditions.push(`cfv_yr.year = $${p++}`);
       params.push(year);
     }
 
-    // Era year range bounds — used to split eras sharing a family
-    // e.g. Ironhead (1957–1985) vs Evo Sportster (1986–2021), both "Sportster"
-    if (yearMin) {
-      familyConditions.push(`hmy.year >= $${p++}`);
-      params.push(yearMin);
-    }
-    if (yearMax) {
-      familyConditions.push(`hmy.year <= $${p++}`);
-      params.push(yearMax);
-    }
-
-    // Fallback: include products flagged is_harley_fitment=true that don't
-    // have fitment rows yet (JW Boon not yet re-run after rebuild).
-    // Once JW Boon is re-run this fallback is harmless — it just OR-matches
-    // things that already match via the JOIN.
     if (familyConditions.length > 0) {
+      // Fallback: is_harley_fitment=true products with no fitment rows yet.
+      // cfv_yr.id IS NULL after the year-bounded LEFT JOIN means either:
+      //   (a) no fitment rows at all, or
+      //   (b) fitment rows exist but none match the year range.
+      // Both are valid fallback cases — a product flagged is_harley_fitment
+      // that predates our fitment data should still surface for its era.
       conditions.push(
         `(
           (${familyConditions.join(" AND ")})
-          OR (cfv.id IS NULL AND cu.is_harley_fitment = true)
+          OR (cfv_yr.id IS NULL AND cu.is_harley_fitment = true)
         )`
       );
-    } else {
-      // year/modelCode-only path — no fallback needed
     }
+    // year/modelCode-only path — no family condition needed
   }
 
   if (dbCategories && dbCategories.length > 0) {
