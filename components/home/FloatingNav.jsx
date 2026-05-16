@@ -280,8 +280,8 @@ function FloatingNav() {
           border: none;
           outline: none;
           font-family: 'New Sailor', sans-serif;
-          font-size: 14px;
-          font-weight: 600;
+          font-size: 15px;
+          font-weight: 700;
           letter-spacing: 0.04em;
           color: #1a1200;
           placeholder-color: rgba(80,60,0,0.45);

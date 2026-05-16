@@ -7,6 +7,7 @@ import EraCarousel     from '@/components/home/EraCarousel';
 import VideoHero       from '@/components/home/VideoHero';
 import ScrollVelocity  from '@/components/home/ScrollVelocity';
 import EraKineticTile  from '@/components/home/EraKineticTile';
+import { BrandRolodex } from '@/components/home/BrandRolodex';
 import Link from 'next/link';
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -72,6 +73,9 @@ export default function HomePage() {
         </section>
 
         </div>
+
+        <BrandRolodex />
+
       </main>
 
       <style>{`
