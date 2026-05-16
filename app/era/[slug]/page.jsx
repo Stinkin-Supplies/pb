@@ -588,15 +588,10 @@ export default function EraPage({ params }) {
     try {
       const params = new URLSearchParams();
 
-      // Era-specific fitment params
-      if (era.universal) {
-        params.set("universal", "true");
-      } else {
-        era.families.forEach(fam => params.append("family", fam));
-        // Year range bounds — splits eras sharing a family (e.g. Ironhead vs Evo Sportster)
-        if (era.year_min) params.set("year_min", String(era.year_min));
-        if (era.year_max) params.set("year_max", String(era.year_max));
-      }
+      // Era filtering — pass slug directly, API maps to era_* boolean column.
+      // This replaces the old family + year_min/year_max approach which failed
+      // for vintage eras (0 fitment rows) and had wrong family name mismatches.
+      params.set("era", slug);
 
       // Category filter from live catalog facets
       if (f.category) {

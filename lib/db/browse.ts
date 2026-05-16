@@ -84,7 +84,22 @@ export interface HarleyModel {
   family_id: number;
 }
 
+// Era slug → catalog_unified boolean column map
+const ERA_COLUMN_MAP: Record<string, string> = {
+  "flathead":            "era_flathead",
+  "knucklehead":         "era_knucklehead",
+  "panhead":             "era_panhead",
+  "ironhead-sportster":  "era_ironhead",
+  "shovelhead":          "era_shovelhead",
+  "evolution":           "era_evolution",
+  "evo-sportster":       "era_evo_sportster",
+  "twin-cam":            "era_twin_cam",
+  "milwaukee-8":         "era_milwaukee8",
+  "chopper":             "era_chopper",
+};
+
 export interface BrowseFilters {
+  eraSlug?: string;      // era page slug — uses era_* boolean columns directly
   family?: string;
   families?: string[];
   // Era year range bounds — splits shared families (e.g. Ironhead vs Evo Sportster)
@@ -156,6 +171,7 @@ export async function getFamilyProductCounts(): Promise<Record<string, number>> 
 
 export async function browseProducts(filters: BrowseFilters): Promise<BrowseResult> {
   const {
+    eraSlug,
     family,
     families,
     yearMin,
@@ -190,7 +206,12 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
   // Always filter to active products only
   conditions.push(`cu.is_active = true`);
 
-  if (universal) {
+  if (eraSlug && ERA_COLUMN_MAP[eraSlug]) {
+    // Era page — direct boolean column lookup, no fitment JOIN needed.
+    // These columns are pre-populated by era_columns_populate.sql and cover
+    // all vendors including vintage eras via name inference.
+    conditions.push(`cu.${ERA_COLUMN_MAP[eraSlug]} = true`);
+  } else if (universal) {
     // Universal/chopper era — products not tied to a specific H-D family.
     conditions.push(`(cu.is_harley_fitment = false OR cu.is_universal = true)`);
   } else if (effectiveFamilies.length > 0 || modelCode || year || yearMin || yearMax) {

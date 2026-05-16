@@ -104,6 +104,18 @@ const SCHEMA = {
     { name: 'is_harley_fitment',   type: 'bool',     facet: true },
     { name: 'is_universal',        type: 'bool',     facet: true },
 
+    // Era boolean flags — pre-populated by era_columns_populate.sql
+    { name: 'era_flathead',        type: 'bool',     facet: true },
+    { name: 'era_knucklehead',     type: 'bool',     facet: true },
+    { name: 'era_panhead',         type: 'bool',     facet: true },
+    { name: 'era_shovelhead',      type: 'bool',     facet: true },
+    { name: 'era_ironhead',        type: 'bool',     facet: true },
+    { name: 'era_evolution',       type: 'bool',     facet: true },
+    { name: 'era_evo_sportster',   type: 'bool',     facet: true },
+    { name: 'era_twin_cam',        type: 'bool',     facet: true },
+    { name: 'era_milwaukee8',      type: 'bool',     facet: true },
+    { name: 'era_chopper',         type: 'bool',     facet: true },
+
     // Catalog flags
     { name: 'in_harddrive',      type: 'bool',     facet: true },
     { name: 'in_oldbook',        type: 'bool',     facet: true },
@@ -189,6 +201,17 @@ function transform(row) {
     fitment_other_makes: row.fitment_other_makes?.length ? row.fitment_other_makes : undefined,
     is_harley_fitment:   row.is_harley_fitment || false,
     is_universal:        row.is_universal || false,
+
+    era_flathead:        row.era_flathead        || false,
+    era_knucklehead:     row.era_knucklehead     || false,
+    era_panhead:         row.era_panhead         || false,
+    era_shovelhead:      row.era_shovelhead      || false,
+    era_ironhead:        row.era_ironhead        || false,
+    era_evolution:       row.era_evolution       || false,
+    era_evo_sportster:   row.era_evo_sportster   || false,
+    era_twin_cam:        row.era_twin_cam        || false,
+    era_milwaukee8:      row.era_milwaukee8      || false,
+    era_chopper:         row.era_chopper         || false,
 
     in_harddrive:     row.in_harddrive || false,
     in_oldbook:       row.in_oldbook || false,

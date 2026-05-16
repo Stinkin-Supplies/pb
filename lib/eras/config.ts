@@ -1,6 +1,10 @@
 // lib/eras/config.ts
 // Era definitions — maps era slugs to harley_families and filter logic.
 // Used by app/era/[slug]/page.jsx and the homepage era cards.
+//
+// NOTE: Era pages should pass ?era=<slug> to /api/browse/products.
+// The API maps the slug to an era_* boolean column in catalog_unified.
+// Do NOT pass family + year_min/year_max for era pages — use era slug only.
 
 import { HARLEY_CATEGORIES } from "@/lib/harley/config";
 
@@ -10,14 +14,12 @@ export type Era = {
   subtitle: string;
   year_range: string;
   description: string;
-  // harley_families.name values to filter by (empty = universal/chopper)
+  // harley_families.name values — kept for reference/display only.
+  // Browse filtering uses era_* boolean columns, not these family names.
   families: string[];
-  // Year bounds for filtering within a family (e.g. Sportster eras)
   year_min?: number;
   year_max?: number;
-  // If true, filter by fits_all_models / is_universal instead of families
   universal: boolean;
-  // Accent color for hero
   accent: string;
 };
 
@@ -34,7 +36,7 @@ export const ERAS: Era[] = [
     universal:    false,
     accent:       "#6b7c5a",
   },
-    {
+  {
     slug:         "knucklehead",
     display_name: "Knucklehead",
     subtitle:     "Where it began. 1936–1947.",
@@ -88,7 +90,7 @@ export const ERAS: Era[] = [
     subtitle:     "The comeback. 1984–1999.",
     year_range:   "1984–1999",
     description:  "The Evo saved the company and gave a generation their first Harley. Big Twin parts for the comeback era.",
-    families:     ["Evolution", "Softail Evo"],
+    families:     ["Evolution", "Softail"],   // was "Softail Evo" — not a real family name
     year_min:     1984,
     year_max:     1999,
     universal:    false,
@@ -112,7 +114,7 @@ export const ERAS: Era[] = [
     subtitle:     "Power and refinement. 1999–2017.",
     year_range:   "1999–2017",
     description:  "More displacement, more reliability, more of everything. Dyna, Touring, and Softail parts.",
-    families:     ["Twin Cam", "Dyna", "Touring", "Softail Evo"],
+    families:     ["Twin Cam", "Dyna", "Touring", "Softail"],  // was "Softail Evo"
     year_min:     1999,
     year_max:     2017,
     universal:    false,
@@ -124,7 +126,7 @@ export const ERAS: Era[] = [
     subtitle:     "Modern muscle. 2017–present.",
     year_range:   "2017–present",
     description:  "The most powerful stock engine in Harley history. Touring, Softail M8, and Revolution Max parts.",
-    families:     ["Touring", "Softail M8", "Revolution Max"],
+    families:     ["Touring", "Softail", "Revolution Max"],  // was "Softail M8"
     year_min:     2017,
     universal:    false,
     accent:       "#27ae60",
