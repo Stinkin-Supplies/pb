@@ -3,6 +3,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import CartRoot from "@/components/CartRoot";
 import Footer from "@/components/Footer";
 import { Bebas_Neue, Share_Tech_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
@@ -21,6 +22,12 @@ const shareTech = Share_Tech_Mono({
   display: "swap",
 });
 
+const newSailor = localFont({
+  src: "../public/fonts/New_Sailor.ttf",
+  variable: "--font-sailor",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "Stinkin' Supplies | Powersports Parts & Accessories",
   description:
@@ -29,7 +36,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${bebas.variable} ${shareTech.variable}`}>
+    <html lang="en" className={`${bebas.variable} ${shareTech.variable} ${newSailor.variable}`}>
       <body>
         <CartRoot>
           {children}
