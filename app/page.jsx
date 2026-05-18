@@ -1,6 +1,5 @@
 'use client';
 
-import FloatingNav     from '@/components/home/FloatingNav';
 import SmokeBackground from '@/components/home/SmokeBackground';
 import ModelSearch     from '@/components/home/ModelSearch';
 import EraCarousel     from '@/components/home/EraCarousel';
@@ -15,8 +14,6 @@ export default function HomePage() {
   return (
     <>
       <SmokeBackground />
-      <FloatingNav />
-
       <main>
         <VideoHero />
         <ScrollVelocity />
@@ -163,14 +160,9 @@ export default function HomePage() {
           display: flex;
           align-items: center;
           justify-content: center;
-          background:
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: transparent; /* or just delete the background line */
-            border-color: rgba(201,168,76,0.28);
-            overflow: hidden;
+          background: transparent;
+          border-color: rgba(201,168,76,0.28);
+          overflow: hidden;
         }
         .era-kinetic-wrap {
           position: relative;
@@ -315,154 +307,6 @@ export default function HomePage() {
           border-radius: var(--radius-sm);
           padding: 0 14px;
         }
-
-        /* ══════════════════════════════════════════════════════
-           FLOATING NAV — dark glass pill sitting on a gold cloud
-           ══════════════════════════════════════════════════════ */
-        .nav-cloud-wrap {
-          position: fixed;
-          top: 12px;
-          left: 50%;
-          transform: translateX(-50%);
-          z-index: 300;
-          width: min(860px, calc(100vw - 32px));
-          transition: opacity 0.35s ease, transform 0.35s cubic-bezier(0.22,1,0.36,1);
-        }
-        .nav-cloud-wrap::before {
-          content: '';
-          position: absolute;
-          inset: 8px 20px -4px;
-          border-radius: 999px;
-          background: radial-gradient(
-            ellipse 80% 60% at 50% 100%,
-            rgba(201,168,76,0.55) 0%,
-            rgba(180,140,20,0.28) 45%,
-            transparent 75%
-          );
-          filter: blur(14px);
-          z-index: 0;
-          transition: opacity 0.3s;
-          pointer-events: none;
-        }
-        .nav-cloud-wrap.scrolled::before {
-          background: radial-gradient(
-            ellipse 80% 60% at 50% 100%,
-            rgba(212,175,55,0.7) 0%,
-            rgba(180,140,20,0.38) 45%,
-            transparent 75%
-          );
-          filter: blur(18px);
-        }
-        .float-nav {
-          position: relative;
-          overflow: hidden;
-          z-index: 1;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 32px;
-          padding: 10px 20px 10px 14px;
-          background: rgba(255, 247, 230, 0.82);
-          backdrop-filter: blur(14px) saturate(120%);
-          -webkit-backdrop-filter: blur(14px) saturate(120%);
-          border: 1px solid rgba(201,168,76,0.35);
-          border-radius: 999px;
-          box-shadow:
-            0 1px 0 rgba(201,168,76,0.18) inset,
-            0 -1px 0 rgba(201,168,76,0.08) inset,
-            0 2px 12px rgba(120,90,20,0.18);
-          transition: background 0.3s, border-color 0.3s;
-        }
-        .float-nav::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          border-radius: 999px;
-          background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.08'/%3E%3C/svg%3E");
-          background-size: 128px 128px;
-          opacity: 0.35;
-          pointer-events: none;
-          z-index: 0;
-          mix-blend-mode: overlay;
-        }
-        .float-nav > * { position: relative; z-index: 1; }
-        .nav-cloud-wrap.scrolled .float-nav {
-          background: #FFF7E6;
-          border-color: rgba(201,168,76,0.45);
-          box-shadow:
-            0 1px 0 rgba(201,168,76,0.3) inset,
-            0 -1px 0 rgba(201,168,76,0.12) inset,
-            0 4px 20px rgba(120,90,20,0.22);
-        }
-
-        /* ── HD Bar & Shield mini button */
-        .nav-mini {
-          position: fixed;
-          top: 10px;
-          left: 16px;
-          z-index: 300;
-          width: 62px;
-          height: 46px;
-          background: rgba(8,8,8,0.88);
-          border: none;
-          cursor: pointer;
-          padding: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          clip-path: polygon(
-            49.41% 0%,    32.99% 10.38%, 16.27% 14.57%, 16.12% 22.16%,
-            19.82% 28.94%, 19.23% 31.94%, 0.44%  32.34%, 0.59%  65.07%,
-            18.64% 65.87%, 19.38% 67.66%, 16.12% 72.65%, 16.57% 74.85%,
-            37.28% 92.22%, 48.37% 99.20%, 52.81% 99.80%, 61.39% 95.21%,
-            83.14% 75.05%, 84.76% 70.46%, 82.10% 65.07%, 99.85% 64.67%,
-            99.26% 36.73%, 98.22% 32.34%, 96.45% 31.14%, 78.70% 30.94%,
-            83.43% 20.36%, 81.66% 14.77%, 60.65% 7.58%
-          );
-          filter: drop-shadow(0 6px 12px rgba(201,168,76,0.5)) drop-shadow(0 2px 4px rgba(0,0,0,0.8));
-          transition: filter 0.2s, transform 0.2s, opacity 0.25s;
-          animation: miniIn 0.3s cubic-bezier(0.22,1,0.36,1) forwards;
-        }
-        @keyframes miniIn {
-          from { opacity: 0; transform: scale(0.7); }
-          to   { opacity: 1; transform: scale(1); }
-        }
-        .nav-mini:hover {
-          filter: drop-shadow(0 8px 18px rgba(212,175,55,0.75)) drop-shadow(0 2px 6px rgba(0,0,0,0.9));
-          transform: scale(1.08);
-        }
-        .nav-mini-logo { width: 38px; height: 38px; object-fit: contain; display: block; }
-
-        .nav-close {
-          background: rgba(255,255,255,0.06);
-          border: 1px solid var(--border-dim);
-          border-radius: 50%;
-          width: 30px; height: 30px;
-          display: flex; align-items: center; justify-content: center;
-          color: rgba(60,44,0,0.55);
-          cursor: pointer;
-          transition: color 0.2s, background 0.2s;
-          margin-left: 4px;
-          flex-shrink: 0;
-        }
-        .nav-close:hover { color: #1a1200; background: rgba(255,255,255,0.12); }
-
-        .nav-logo img { display: block; }
-        .nav-links { display: flex; align-items: center; gap: 6px; }
-        .nav-links a {
-          font-family: 'Barlow Condensed', sans-serif;
-          font-size: 15px;
-          font-weight: 700;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          color: #1a1200;
-          text-decoration: none;
-          padding: 6px 14px;
-          border-radius: 999px;
-          transition: color 0.2s, background 0.2s;
-          white-space: nowrap;
-        }
-        .nav-links a:hover { color: #000; background: rgba(180,140,20,0.12); }
 
         /* ── Mobile */
         @media (max-width: 768px) {
