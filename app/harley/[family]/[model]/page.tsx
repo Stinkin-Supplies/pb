@@ -42,7 +42,7 @@ function CategoryTabBar({ categories, active, onChange }: {
   return (
     <div style={{
       background: BLACK, borderBottom: '2px solid #1c1c1c',
-      position: 'sticky', top: 52, zIndex: 40,
+      position: 'sticky', top: 0, zIndex: 40,
       backgroundImage: 'repeating-linear-gradient(-45deg,transparent,transparent 8px,rgba(201,168,76,0.02) 8px,rgba(201,168,76,0.02) 9px)',
     }}>
       <div style={{

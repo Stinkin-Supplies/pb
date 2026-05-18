@@ -16,7 +16,6 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import NavBar from "@/components/NavBar";
 import { useCartSafe } from "@/components/CartContext";
 import NotifyMeButton from "@/components/NotifyMeButton";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";

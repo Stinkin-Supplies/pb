@@ -9,7 +9,6 @@
 import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import AddressAutocomplete from "@/components/AddressAutocomplete";
-import NavBar from "@/components/NavBar";
 
 const supabase = createBrowserSupabaseClient();
 

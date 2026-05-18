@@ -7,7 +7,6 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useCartSafe } from "@/components/CartContext";
-import NavBar from "@/components/NavBar";
 
 const css = `
   *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }

@@ -30,7 +30,7 @@
   --orange2: #c94f0f;
   --gold:    #c9a84c;
   --red:     #b91c1c;
-  --green:   #22c55e;
+  --gold:   #c5a722;
 }
 
 html {
@@ -80,13 +80,6 @@ body::before {
 .font-caesar  { font-family: var(--font-caesar); }
 .font-stencil { font-family: var(--font-stencil); }
 
-@utility font-caesar {
-  font-family: var(--font-caesar);
-}
-
-@utility font-stencil {
-  font-family: var(--font-stencil);
-}
 
 .font-mono    { font-family: var(--font-stencil), monospace; }
 .font-display { font-family: var(--font-caesar), sans-serif; }

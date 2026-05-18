@@ -18,7 +18,7 @@ export default function BottomNav() {
 
   return (
     <>
-      <div style={{ height: 82 }} />
+      <div style={{ height: 0 }} />
 
       <AnimatePresence>
         {open && (

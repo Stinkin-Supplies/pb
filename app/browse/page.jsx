@@ -547,7 +547,7 @@ function BrowsePageInner() {
         backdropFilter: "blur(8px)",
         borderBottom: `1px solid rgba(184,146,42,0.3)`,
         padding: "0 40px",
-        height: 52,
+        height: 0, overflow: "hidden", padding: 0, border: "none",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
@@ -689,7 +689,7 @@ function BrowsePageInner() {
         </div>
 
         {/* Grid */}
-        <div style={{ padding: "24px 32px" }}>
+        <div style={{ padding: "0 32px" }}>
           {loading ? (
             <div style={{
               display: "grid",
