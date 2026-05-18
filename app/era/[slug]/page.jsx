@@ -637,6 +637,33 @@ function ActiveTag({ label, onRemove, accent }) {
   );
 }
 
+const CATEGORY_LABELS = {
+  'ENGINE GROUP':                     'Engine',
+  'HANDLEBAR-CONTROLS-MIRRORS GROUP': 'Controls & Bars',
+  'BRAKING GROUP':                    'Brakes',
+  'ELECTRICAL SYSTEM GROUP':          'Electrical',
+  'CARBURETION-FUEL GROUP':           'Carb / Fuel',
+  'TRANSMISSION-CLUTCH GROUP':        'Transmission',
+  'SEATING GROUP':                    'Seats',
+  'WHEEL AND RIM GROUP':              'Tires & Wheels',
+  'LIGHTING-LICENSE GROUP':           'Lighting',
+  'HARDWARE GROUP':                   'Hardware',
+  'FOOT CONTROLS GROUP':              'Foot Controls',
+  'EXHAUST GROUP':                    'Exhaust',
+  'FRAME AND BODY GROUP':             'Frame & Body',
+  'MEDIA PRODUCTS GROUP':             'Swag',
+  'HELMET AND SHIELD GROUP':          'Helmets',
+  'SUSPENSION GROUP-FRONT':           'Suspension Front',
+  'TANK GROUP-GAS AND OIL':           'Tanks',
+  'DRIVE TRAIN GROUP':                'Drive Train',
+  'SECURITY-COVERS-SHELTERS GROUP':   'Luggage & Covers',
+  'WINDSHIELD-FAIRING GROUP':         'Windshield',
+  'INSTRUMENT GROUP':                 'Gauges',
+  'SUSPENSION GROUP-REAR':            'Suspension Rear',
+  'COMMON MISC GROUP':                'General',
+  'TOOLS GROUP':                      'Tools',
+};
+
 // ─── Category Tab Bar ────────────────────────────────────────────────────────
 
 function CategoryTabBar({ categories, active, onChange }) {
@@ -646,9 +673,9 @@ function CategoryTabBar({ categories, active, onChange }) {
   const ALL = { name: null, label: "All Parts", count: null };
   const tabs = [ALL, ...(categories ?? []).filter(cat => cat.name != null).map(cat => ({
     name: cat.name,
-    label: cat.name,
+    label: CATEGORY_LABELS[cat.name] ?? cat.name,
     count: cat.count ?? null,
-  }))];
+  })).sort((a, b) => a.label.localeCompare(b.label))];
 
   // Split into two rows — first row gets ceil(n/2), second gets the rest
   const mid = Math.ceil(tabs.length / 2);
