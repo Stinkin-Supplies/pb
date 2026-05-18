@@ -13,6 +13,26 @@ import { ERAS, getEra } from "@/lib/eras/config";
 
 const PER_PAGE = 48;
 
+
+// ─── Era coverage tiers ───────────────────────────────────────────────────────
+// Update these when VTwin data lands — promote slugs from "pending" → "limited" → "full"
+const ERA_COVERAGE = {
+  "evolution":          "full",
+  "twin-cam":           "full",
+  "milwaukee-8":        "full",
+  "evo-sportster":      "full",
+  "shovelhead":         "full",
+  "ironhead-sportster": "full",
+  "chopper":            "full",
+  "flathead":           "limited",
+  "knucklehead":        "pending",
+  "panhead":            "pending",
+};
+
+function getEraCoverage(slug) {
+  return ERA_COVERAGE[slug] ?? "full";
+}
+
 const SORT_OPTIONS = [
   { value: "relevance",  label: "Relevance"  },
   { value: "price_asc",  label: "Price ↑"    },
@@ -401,6 +421,133 @@ function SidePanel({ open, onClose, filters, onChange, facets, accent }) {
   );
 }
 
+
+// ─── Vintage Fallback ─────────────────────────────────────────────────────────
+
+function LimitedBanner({ era }) {
+  return (
+    <div style={{
+      background: `${"#c9a84c"}10`,
+      border: `1px solid ${"#c9a84c"}33`,
+      borderLeft: `3px solid ${"#c9a84c"}`,
+      padding: "14px 20px",
+      margin: "0 0 24px",
+      display: "flex",
+      alignItems: "flex-start",
+      gap: 12,
+    }}>
+      <span style={{ fontSize: 16, flexShrink: 0 }}>⚠</span>
+      <div>
+        <div style={{
+          fontFamily: "var(--font-stencil, monospace)",
+          fontSize: 9, letterSpacing: "0.18em",
+          textTransform: "uppercase", color: "#c9a84c",
+          marginBottom: 4,
+        }}>Limited Parts Available</div>
+        <div style={{
+          fontFamily: "var(--font-stencil, monospace)",
+          fontSize: 10, color: "#666", lineHeight: 1.5,
+        }}>
+          We have some parts on file for this era but coverage is incomplete.
+          More vintage fitment data is on the way.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function VintagePendingState({ era }) {
+  return (
+    <div style={{
+      minHeight: 480,
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 0,
+      padding: "60px 40px",
+      position: "relative",
+      overflow: "hidden",
+    }}>
+      {/* Background glyph */}
+      <div style={{
+        position: "absolute",
+        fontSize: "clamp(180px, 30vw, 320px)",
+        fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
+        color: "#0e0e0e",
+        letterSpacing: "-0.05em",
+        lineHeight: 1,
+        userSelect: "none",
+        pointerEvents: "none",
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%, -50%)",
+        whiteSpace: "nowrap",
+      }}>{era.display_name}</div>
+
+      {/* Content */}
+      <div style={{ position: "relative", textAlign: "center", maxWidth: 480 }}>
+        <div style={{
+          width: 40, height: 2,
+          background: "#c9a84c",
+          margin: "0 auto 24px",
+        }} />
+        <div style={{
+          fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
+          fontSize: "clamp(28px, 5vw, 42px)",
+          letterSpacing: "0.06em",
+          color: "#e0d8cc",
+          marginBottom: 12,
+          lineHeight: 1,
+        }}>Parts Coming Soon</div>
+        <div style={{
+          fontFamily: "var(--font-stencil, monospace)",
+          fontSize: 10, letterSpacing: "0.16em",
+          color: "#555", textTransform: "uppercase",
+          lineHeight: 1.7, marginBottom: 32,
+        }}>
+          We&apos;re sourcing fitment data for {era.display_name} machines.<br />
+          Check back soon — these parts are worth the wait.
+        </div>
+        <div style={{
+          display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap",
+        }}>
+          <a href="/" style={{
+            fontFamily: "var(--font-stencil, monospace)",
+            fontSize: 9, letterSpacing: "0.18em",
+            textTransform: "uppercase",
+            color: "#444", textDecoration: "none",
+            border: "1px solid #222",
+            padding: "10px 20px",
+            transition: "all 0.15s",
+          }}
+            onMouseEnter={e => { e.currentTarget.style.color = "#888"; e.currentTarget.style.borderColor = "#444"; }}
+            onMouseLeave={e => { e.currentTarget.style.color = "#444"; e.currentTarget.style.borderColor = "#222"; }}
+          >← Home</a>
+          <a href="/era" style={{
+            fontFamily: "var(--font-stencil, monospace)",
+            fontSize: 9, letterSpacing: "0.18em",
+            textTransform: "uppercase",
+            color: "#c9a84c", textDecoration: "none",
+            border: `1px solid ${"#c9a84c"}55`,
+            padding: "10px 20px",
+            transition: "all 0.15s",
+          }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = "#c9a84c"; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = `${"#c9a84c"}55`; }}
+          >Browse Eras</a>
+        </div>
+        <div style={{
+          width: 40, height: 2,
+          background: "#c9a84c",
+          margin: "32px auto 0",
+          opacity: 0.3,
+        }} />
+      </div>
+    </div>
+  );
+}
+
 // ─── Era Hero ─────────────────────────────────────────────────────────────────
 
 function EraHero({ era, total, filters, onFilterChange }) {
@@ -411,10 +558,10 @@ function EraHero({ era, total, filters, onFilterChange }) {
       borderBottom: "1px solid #ddd8d0",
       overflow: "hidden",
     }}>
-      {/* Accent stripe */}
+      {/* Accent stripe — hardcoded gold, never era accent */}
       <div style={{
         position: "absolute", top: 0, left: 0, right: 0,
-        height: 2, background: era.accent,
+        height: 2, background: "#c9a84c",
       }} />
 
       {/* Noise texture overlay */}
@@ -426,7 +573,7 @@ function EraHero({ era, total, filters, onFilterChange }) {
       }} />
 
       <div style={{
-        padding: "48px 40px 36px",
+        padding: "28px 40px 16px",
         position: "relative",
         maxWidth: 1400, margin: "0 auto",
       }}>
@@ -448,7 +595,7 @@ function EraHero({ era, total, filters, onFilterChange }) {
           <span style={{ color: "#bbb", fontSize: 10 }}>›</span>
           <span style={{
             fontFamily: "var(--font-stencil, monospace)", fontSize: 9,
-            letterSpacing: "0.18em", color: era.accent, textTransform: "uppercase",
+            letterSpacing: "0.18em", color: "#c9a84c", textTransform: "uppercase",
           }}>{era.display_name}</span>
         </div>
 
@@ -463,13 +610,9 @@ function EraHero({ era, total, filters, onFilterChange }) {
             letterSpacing: "0.04em",
             lineHeight: 0.92,
             color: "#111",
-            margin: "0 0 12px",
+            margin: "0",
           }}
         >{era.display_name}</motion.h1>
-
-
-
-
       </div>
     </div>
   );
@@ -496,63 +639,112 @@ function ActiveTag({ label, onRemove, accent }) {
 
 // ─── Category Tab Bar ────────────────────────────────────────────────────────
 
-function CategoryTabBar({ categories, active, onChange, accent }) {
-  const ALL = { slug: null, label: "All Parts" };
-  const tabs = [ALL, ...(categories ?? []).filter(cat => cat.name != null)];
+function CategoryTabBar({ categories, active, onChange }) {
+  const GOLD = "#c9a84c";
+  const BLACK = "#080706";
+
+  const ALL = { name: null, label: "All Parts", count: null };
+  const tabs = [ALL, ...(categories ?? []).filter(cat => cat.name != null).map(cat => ({
+    name: cat.name,
+    label: cat.name,
+    count: cat.count ?? null,
+  }))];
 
   return (
     <div style={{
-      background: "#080808",
-      borderBottom: "1px solid #1c1c1c",
+      background: BLACK,
+      borderBottom: "2px solid #2a1e06",
       position: "sticky",
       top: 52,
       zIndex: 40,
+      overflow: "hidden",
+      backgroundImage: "repeating-linear-gradient(-45deg, transparent, transparent 8px, rgba(201,168,76,0.025) 8px, rgba(201,168,76,0.025) 9px)",
     }}>
       <div style={{
         maxWidth: 1400,
         margin: "0 auto",
-        padding: "0 40px",
+        padding: "10px 32px 0",
         display: "flex",
-        alignItems: "stretch",
-        gap: 0,
+        alignItems: "flex-end",
+        gap: 4,
         overflowX: "auto",
         scrollbarWidth: "none",
         msOverflowStyle: "none",
+        perspective: "800px",
+        perspectiveOrigin: "50% 100%",
       }}>
         {tabs.map((cat) => {
-          const value = cat.slug ?? cat.name ?? null;
-          const label = cat.label ?? cat.name ?? "All Parts";
-          const isActive = active === value;
+          const isActive = active === cat.name;
           return (
-            <button
-              key={value ?? "__all__"}
-              onClick={() => onChange(value)}
+            <motion.button
+              key={cat.name ?? "__all__"}
+              onClick={() => onChange(cat.name)}
+              whileHover={!isActive ? { y: -3 } : {}}
+              transition={{ type: "spring", stiffness: 340, damping: 28 }}
               style={{
+                flexShrink: 0,
                 background: "none",
                 border: "none",
-                borderBottom: isActive
-                  ? `2px solid ${accent}`
-                  : "2px solid transparent",
-                color: isActive ? accent : "#555",
-                fontFamily: "var(--font-stencil, 'Share Tech Mono', monospace)",
-                fontSize: 9,
-                letterSpacing: "0.18em",
-                textTransform: "uppercase",
-                padding: "16px 20px 14px",
                 cursor: "pointer",
-                whiteSpace: "nowrap",
-                transition: "color 0.15s, border-color 0.15s",
-                flexShrink: 0,
-              }}
-              onMouseEnter={e => {
-                if (!isActive) e.currentTarget.style.color = "#999";
-              }}
-              onMouseLeave={e => {
-                if (!isActive) e.currentTarget.style.color = "#555";
+                padding: 0,
+                transformOrigin: "bottom center",
+                position: "relative",
+                opacity: 1,
               }}
             >
-              {label}
-            </button>
+              <div style={{
+                padding: "9px 20px 9px",
+                position: "relative",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                whiteSpace: "nowrap",
+                background: GOLD,
+                borderTop: isActive ? `2px solid #f0d870` : `2px solid #8a6820`,
+                borderRight: `1px solid #8a6820`,
+                borderLeft: `1px solid #8a6820`,
+                borderBottom: "none",
+                boxShadow: isActive
+                  ? "inset 0 -2px 8px rgba(0,0,0,0.3), 0 -2px 0 rgba(255,220,100,0.2)"
+                  : "inset 0 -3px 6px rgba(0,0,0,0.4)",
+              }}>
+                {/* Bottom seal for active — merges tab into bar area */}
+                {isActive && (
+                  <div style={{
+                    position: "absolute",
+                    bottom: -3,
+                    left: 0, right: 0,
+                    height: 4,
+                    background: GOLD,
+                    zIndex: 2,
+                  }} />
+                )}
+                <span style={{
+                  fontFamily: "var(--font-stencil, 'Share Tech Mono', monospace)",
+                  fontSize: 11,
+                  letterSpacing: "0.14em",
+                  textTransform: "uppercase",
+                  lineHeight: 1,
+                  color: BLACK,
+                  fontWeight: isActive ? 700 : 500,
+                  position: "relative",
+                  zIndex: 1,
+                }}>
+                  {cat.label}
+                </span>
+                {cat.count != null && (
+                  <span style={{
+                    fontFamily: "monospace",
+                    fontSize: 9,
+                    color: "rgba(8,7,6,0.45)",
+                    position: "relative",
+                    zIndex: 1,
+                  }}>
+                    {cat.count}
+                  </span>
+                )}
+              </div>
+            </motion.button>
           );
         })}
       </div>
@@ -566,6 +758,7 @@ export default function EraPage({ params }) {
   const { slug } = use(params);
   const era = getEra(slug);
 
+  const coverage = getEraCoverage(slug);
   const [products, setProducts]   = useState([]);
   const [total, setTotal]         = useState(0);
   const [facets, setFacets]       = useState({ categories: [], brands: [], priceRange: { min: 0, max: 0 } });
@@ -650,41 +843,6 @@ export default function EraPage({ params }) {
   return (
     <div style={{ background: "#080808", color: "#e0d8cc", minHeight: "100vh" }}>
 
-      {/* Nav bar */}
-      <div style={{
-        position: "sticky", top: 0, zIndex: 50,
-        background: "rgba(8,8,8,0.96)", backdropFilter: "blur(10px)",
-        borderBottom: "1px solid #161616",
-        padding: "0 40px", height: 52,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-      }}>
-        <Link href="/" style={{
-          fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
-          fontSize: 18, letterSpacing: "3px", color: "#e0d8cc", textDecoration: "none",
-        }}>
-          STINKIN'<span style={{ color: era.accent }}></span> SUPPLIES
-        </Link>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <Link href="/browse" style={{
-            fontFamily: "var(--font-stencil, monospace)", fontSize: 9,
-            letterSpacing: "0.18em", color: "#444", textDecoration: "none",
-            textTransform: "uppercase", transition: "color 0.15s",
-          }}
-            onMouseEnter={e => e.currentTarget.style.color = "#888"}
-            onMouseLeave={e => e.currentTarget.style.color = "#444"}
-          >All Parts</Link>
-          <Link href="/my-garage" style={{
-            fontFamily: "var(--font-stencil, monospace)", fontSize: 9,
-            letterSpacing: "0.18em", color: "#444", textDecoration: "none",
-            textTransform: "uppercase", border: "1px solid #222",
-            padding: "6px 14px", transition: "all 0.15s",
-          }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = era.accent; e.currentTarget.style.color = era.accent; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = "#222"; e.currentTarget.style.color = "#444"; }}
-          >My Garage</Link>
-        </div>
-      </div>
-
       {/* Hero */}
       <EraHero
         era={era}
@@ -698,7 +856,6 @@ export default function EraPage({ params }) {
         categories={facets.categories}
         active={filters.category}
         onChange={category => handleFilterChange({ category })}
-        accent={era.accent}
       />
 
       {/* Side panel */}
@@ -708,7 +865,7 @@ export default function EraPage({ params }) {
         filters={filters}
         onChange={updates => { handleFilterChange(updates); }}
         facets={facets}
-        accent={era.accent}
+        accent={"#c9a84c"}
       />
 
       {/* Product grid */}
@@ -734,38 +891,43 @@ export default function EraPage({ params }) {
             ))}
           </div>
         ) : products.length === 0 ? (
-          <div style={{
-            display: "flex", flexDirection: "column",
-            alignItems: "center", justifyContent: "center",
-            minHeight: 400, gap: 16,
-          }}>
+          coverage === "pending" ? (
+            <VintagePendingState era={era} />
+          ) : (
             <div style={{
-              fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
-              fontSize: 36, letterSpacing: "0.04em", color: "#222",
-            }}>No Parts Found</div>
-            <div style={{
-              fontFamily: "var(--font-stencil, monospace)", fontSize: 10,
-              letterSpacing: "0.18em", color: "#333", textTransform: "uppercase",
-            }}>Try adjusting your filters</div>
-            <button
-              onClick={() => handleFilterChange({ category: null, brand: null, min_price: null, max_price: null, in_stock: false })}
-              style={{
-                marginTop: 8, background: "none", border: `1px solid ${era.accent}44`,
-                color: era.accent, fontFamily: "var(--font-stencil, monospace)",
-                fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase",
-                padding: "10px 24px", cursor: "pointer",
-              }}
-            >Clear Filters</button>
-          </div>
+              display: "flex", flexDirection: "column",
+              alignItems: "center", justifyContent: "center",
+              minHeight: 400, gap: 16,
+            }}>
+              <div style={{
+                fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
+                fontSize: 36, letterSpacing: "0.04em", color: "#222",
+              }}>No Parts Found</div>
+              <div style={{
+                fontFamily: "var(--font-stencil, monospace)", fontSize: 10,
+                letterSpacing: "0.18em", color: "#333", textTransform: "uppercase",
+              }}>Try adjusting your filters</div>
+              <button
+                onClick={() => handleFilterChange({ category: null, brand: null, min_price: null, max_price: null, in_stock: false })}
+                style={{
+                  marginTop: 8, background: "none", border: `1px solid ${"#c9a84c"}44`,
+                  color: "#c9a84c", fontFamily: "var(--font-stencil, monospace)",
+                  fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase",
+                  padding: "10px 24px", cursor: "pointer",
+                }}
+              >Clear Filters</button>
+            </div>
+          )
         ) : (
           <>
+            {coverage === "limited" && <LimitedBanner era={era} />}
             <div style={{
               display: "grid",
               gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
               gap: 12,
             }}>
               {products.map((p, i) => (
-                <ProductCard key={p.id ?? i} product={p} index={i} accent={era.accent} />
+                <ProductCard key={p.id ?? i} product={p} index={i} accent={"#c9a84c"} />
               ))}
             </div>
 
@@ -775,17 +937,17 @@ export default function EraPage({ params }) {
                 display: "flex", justifyContent: "center",
                 gap: 6, marginTop: 56, flexWrap: "wrap",
               }}>
-                <PaginationBtn disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))} accent={era.accent}>← Prev</PaginationBtn>
+                <PaginationBtn disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))} accent={"#c9a84c"}>← Prev</PaginationBtn>
                 {Array.from({ length: Math.min(7, totalPages) }, (_, i) => {
                   const pg = page <= 4 ? i + 1 : page >= totalPages - 3 ? totalPages - 6 + i : page - 3 + i;
                   if (pg < 1 || pg > totalPages) return null;
                   return (
-                    <PaginationBtn key={pg} active={pg === page} onClick={() => setPage(pg)} accent={era.accent}>
+                    <PaginationBtn key={pg} active={pg === page} onClick={() => setPage(pg)} accent={"#c9a84c"}>
                       {pg}
                     </PaginationBtn>
                   );
                 })}
-                <PaginationBtn disabled={page === totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))} accent={era.accent}>Next →</PaginationBtn>
+                <PaginationBtn disabled={page === totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))} accent={"#c9a84c"}>Next →</PaginationBtn>
               </div>
             )}
           </>
@@ -793,6 +955,11 @@ export default function EraPage({ params }) {
       </div>
 
       <style>{`
+        @font-face {
+          font-family: 'New Sailor';
+          src: url('/New_Sailor.ttf') format('truetype');
+          font-display: swap;
+        }
         @keyframes shimmer {
           from { background-position: -600px 0; }
           to   { background-position:  600px 0; }
