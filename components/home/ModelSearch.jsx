@@ -109,14 +109,14 @@ export default function ModelSearch() {
   const selectModel = (item) => {
     setModalOpen(false);
     // Route to the model product page if we have enough info, else fall back to /browse
-    if (item.family_slug && item.filter_group) {
-      router.push(
-        `/harley/${item.family_slug}/${item.filter_group.toLowerCase()}?year=${item.year}`
-      );
+    if (item.is_catchall && item.era_slug) {
+      // Catch-all era entry (shovelhead, panhead, evolution_bigtwin) — send to era page
+      router.push(`/era/${item.era_slug}`);
+    } else if (item.family_slug && item.filter_group) {
+      // Real model code — send to model product page with year pre-filtered
+      router.push(`/harley/${item.family_slug}/${item.filter_group.toLowerCase()}?year=${item.year}`);
     } else {
-      router.push(
-        `/browse?year=${item.year}&model=${encodeURIComponent(item.model_code)}`
-      );
+      router.push(`/browse?year=${item.year}&model=${encodeURIComponent(item.model_code)}`);
     }
   };
 
@@ -289,10 +289,14 @@ export default function ModelSearch() {
                   }
                   acc.push(
                     <li key={`${item.year}-${item.model_code}`}>
-                      <button className="ms-model-item" onClick={() => selectModel(item)}>
+                      <button className="ms-model-item" onClick={() => selectModel(item)}
+                        style={item.is_catchall ? { opacity: 0.7, borderLeft: '2px solid rgba(201,168,76,0.4)' } : {}}>
                         <span className="ms-item-name">{item.model_name}</span>
                         <span className="ms-item-meta">
-                          <span className="ms-item-code">{item.model_code}</span>
+                          {item.is_catchall
+                            ? <span className="ms-item-code" style={{ letterSpacing: '0.08em' }}>ERA PAGE →</span>
+                            : <span className="ms-item-code">{item.model_code}</span>
+                          }
                         </span>
                         <svg className="ms-item-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="15" height="15">
                           <path d="m9 18 6-6-6-6"/>
