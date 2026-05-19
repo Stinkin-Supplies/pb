@@ -102,8 +102,9 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json({ results: rows });
-  } catch (err) {
-    console.error('[api/models/search] error:', err.message);
-    return NextResponse.json({ error: err.message, results: [] }, { status: 500 });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[api/models/search] error:', msg);
+    return NextResponse.json({ error: msg, results: [] }, { status: 500 });
   }
 }
