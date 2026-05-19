@@ -95,7 +95,7 @@ export default function ScrollVelocity({
           position: relative;
           width: 100%;
           min-height: 210px;
-          padding: 12px 0;
+          padding: 50px 0;
           margin-top: 60px;
           margin-bottom: 60px;
           z-index: 2;

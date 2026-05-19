@@ -396,9 +396,9 @@ export default function ModelSearch() {
         }} />
 
         <div style={{
-          width: '100%', maxWidth: 460,
+          width: '100%', maxWidth: 800,
           display: 'flex', flexDirection: 'column',
-          alignItems: 'center', gap: 16,
+          alignItems: 'center', justifyContent: 'center', gap: 16,
           position: 'relative', zIndex: 1,
         }}>
 
@@ -407,7 +407,7 @@ export default function ModelSearch() {
             <div style={{ flex: 1, height: 1, background: GOLD, opacity: 0.3 }} />
             <span style={{
               fontFamily: "'New Sailor', serif",
-              fontSize: 10, letterSpacing: '0.28em',
+              fontSize: 57, fontWeight: 600, letterSpacing: '0.28em',
               textTransform: 'uppercase', color: GOLD, opacity: 0.6,
               whiteSpace: 'nowrap',
             }}>

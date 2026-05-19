@@ -25,8 +25,8 @@ const ERA_COVERAGE = {
   "ironhead-sportster": "full",
   "chopper":            "full",
   "flathead":           "limited",
-  "knucklehead":        "pending",
-  "panhead":            "pending",
+  "knucklehead":        "limited",
+  "panhead":            "limited",
 };
 
 function getEraCoverage(slug) {

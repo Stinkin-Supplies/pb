@@ -1,118 +1,182 @@
-# STINKIN' SUPPLIES — HANDOFF LOG
-## Session: Harley Shop UI + Fitment Infrastructure
+# STINKIN' SUPPLIES
+## HANDOFF LOG
+**Session: Model Pages + Era Cleanup + Category Overhaul · May 18, 2026**
+
 ---
 
 ## WHERE WE ARE
 
-### What was built this session
-1. **Fitment import pipeline** — `import_pu_fitment.mjs` in `scripts/ingest/`
-   - Imports `catalog_fitment_enriched.csv` (PU enrichment file) into `catalog_fitment_v2`
-   - Cleans OEM numbers into `catalog_oem_crossref`
-   - Currently: 430K rows in `catalog_fitment_v2` with `fitment_source = 'pu_enriched_csv'`
-   - **An updated enrichment CSV is coming — re-run the import script to refresh**
+### What Was Built This Session
 
-2. **Filter group schema** — `harley_models.filter_group` column + `model_filter_groups` join table
-   - 293 models, all grouped
-   - `v_model_all_groups` view for querying across primary + cross-membership groups
-   - Migration: `migrate_filter_groups_ab.sql` (already run)
+#### 1. ModelShop — app/modelshop/ModelShop.tsx
+Industrial gold tile grid replacing the old FilterGroupLinks component. 7 families (Evolution removed — it's an era, not a model family). Each tile routes to `/harley/[slug]`. New Sailor font loaded via @font-face. Vintage metal inset border via layered box-shadow. Hover lift via framer-motion whileHover. Diagonal hatch texture on background.
 
-3. **`FilterGroupLinks.tsx`** — `components/FilterGroupLinks.tsx`
-   - 7-tile bento grid: Touring, Softail, Dyna, FXR, Sportster, Revolution Max, Vintage
-   - 5 tiles open LayeredStack modals with sub-model cards
-   - 2 tiles (Dyna, FXR) go direct
-   - Uses `gsap` for LayeredStack card stacking animation
-   - Uses `framer-motion` for tile hover + modal transitions
-   - Font: `var(--font-sailor)` = New Sailor (loaded via `next/font/local` in `layout.tsx`)
-   - **UI DIRECTION HAS CHANGED — see below**
+Families: Touring, Softail, Sportster, Dyna (paired with FXR), FXR, Vintage, Revolution Max
+
+#### 2. Family Page — app/harley/[family]/page.tsx
+Fetches filter_groups from `/api/harley/[family]/models`. Renders industrial tiles (black bg, cream text, corner ornaments, hover lift + border glow). Pairs configured per family (Road King + Road Glide side by side for Touring, etc). Breadcrumb back to /modelshop. Stagger animation on load.
+
+#### 3. Model Product Page — app/harley/[family]/[model]/page.tsx
+Full product grid page. Uses `HarleyProduct` type from `@/lib/harley/catalog` and `getCatalogDb()`. Year range filter inline in hero (two number inputs, gold underline style). Two-row gold CategoryTabBar. Breadcrumb: Families → [Family] → [Model]. Pagination. Shimmer loading skeleton.
+
+#### 4. API — app/api/harley/[family]/models/route.ts
+Returns distinct filter_groups for a family with year range and product count. Uses `getCatalogDb()`. `params` is `Promise<{family}>` — awaited at top (Next.js 15+ requirement).
+
+#### 5. API — app/api/harley/[family]/[model]/products/route.ts
+Products by filter_group with year filter (inside EXISTS subquery), category filter using HARLEY_CATEGORIES dbCategories map, pagination, sort. Returns year_range for slider init and facets.categories. model_filter_groups cross-membership join included. `params` is `Promise<{family, model}>`.
+
+#### 6. harley_models DB Cleanup
+Based on official HD model diagram. Changes committed:
+- FXLR/FXLRS/FXLRST → Softail family, filter_group = LOW_RIDER
+- FXSB/FXSBSE/FXSE → Softail family, filter_group = SOFTAIL
+- FXDRS → Dyna family, filter_group = DYNA
+- FXRPF/FXRDG/FXEF → FXR family, filter_group = FXR
+- FLHXXX/FLTRT/FLHLT/FLHLTSE → Trike family, filter_group = TRIKE
+- FXWG/FXDG (Shovelhead) → filter_group = SUPER_GLIDE
+- EL → Knucklehead family, filter_group = VINTAGE
+- evolution_bigtwin → filter_group = EVOLUTION
+
+#### 7. Category Cleanup DB
+Merged 32 → 24 categories in catalog_unified:
+- ELECTRONICS GROUP → ELECTRICAL SYSTEM GROUP
+- TIRE AND TUBE GROUP → WHEEL AND RIM GROUP
+- SISSY BAR-BACKREST-RACK GROUP → SEATING GROUP
+- GRAPHICS GROUP → MEDIA PRODUCTS GROUP
+- FENDER GROUP → FRAME AND BODY GROUP
+- LUGGAGE GROUP + TRANSPORTATION GROUP → SECURITY-COVERS-SHELTERS GROUP
+- RADIATOR GROUP → ENGINE GROUP
+
+#### 8. Category Labels + Sort
+Built `apply_category_labels.py` — run locally at `~/Downloads/apply_category_labels.py`. Maps raw DB category strings to clean display labels. Alphabetically sorted (All Parts pinned first). Applied to both era page and model page CategoryTabBar.
+
+Display label map:
+- ENGINE GROUP → Engine
+- HANDLEBAR-CONTROLS-MIRRORS GROUP → Controls & Bars
+- BRAKING GROUP → Brakes
+- ELECTRICAL SYSTEM GROUP → Electrical
+- CARBURETION-FUEL GROUP → Carb / Fuel
+- TRANSMISSION-CLUTCH GROUP → Transmission
+- SEATING GROUP → Seats
+- WHEEL AND RIM GROUP → Tires & Wheels
+- LIGHTING-LICENSE GROUP → Lighting
+- HARDWARE GROUP → Hardware
+- FOOT CONTROLS GROUP → Foot Controls
+- EXHAUST GROUP → Exhaust
+- FRAME AND BODY GROUP → Frame & Body
+- MEDIA PRODUCTS GROUP → Swag
+- HELMET AND SHIELD GROUP → Helmets
+- SUSPENSION GROUP-FRONT → Suspension Front
+- TANK GROUP-GAS AND OIL → Tanks
+- DRIVE TRAIN GROUP → Drive Train
+- SECURITY-COVERS-SHELTERS GROUP → Luggage & Covers
+- WINDSHIELD-FAIRING GROUP → Windshield
+- INSTRUMENT GROUP → Gauges
+- SUSPENSION GROUP-REAR → Suspension Rear
+- COMMON MISC GROUP → General
+- TOOLS GROUP → Tools
+
+#### 9. CategoryTabBar — Two-Row Layout
+Rebuilt in both era and model pages. Splits tabs at ceil(n/2) — row 1 gets first half, row 2 gets second half. Each row scrolls horizontally independently. Gold background, black text, active = lighter top border + bottom seal. Smaller font (10px vs 11px) to fit two rows. No opacity dimming on inactive.
+
+#### 10. Gap Fix — BottomNav Spacer
+`components/BottomNav.tsx` line 21: `height: 82` → `height: 0`. This spacer was adding 82px at the top of every page globally.
+
+#### 11. Gap Fix — Sticky Tab Offset
+`app/era/[slug]/page.jsx` + `app/harley/[family]/[model]/page.tsx`: CategoryTabBar `top: 52` → `top: 0`. Was reserving space for a navbar that no longer exists.
+
+#### 12. Era Page Fixes
+- All `era.accent` references replaced with hardcoded `#c9a84c`
+- Hero padding tightened to `28px 40px 16px`
+- ERA_COVERAGE map: flathead=limited, knucklehead=full (promoted after VTwin data), panhead=pending
+- VintagePendingState component: full holding page with era name as giant background glyph
+- LimitedBanner component: amber left-border notice for sparse eras
+
+#### 13. NavBar Shim
+Created `components/NavBar.tsx` as re-export of BottomNav to fix 8 broken imports across account/admin/brands/checkout/order pages.
 
 ---
 
 ## WHAT NEEDS TO HAPPEN NEXT
 
-### 1. UI redesign — white/gold/black palette
-The current `FilterGroupLinks.tsx` uses the dark teal/charcoal palette.
-**New direction: white, gold (#c9a84c), black — bold graphic, vintage badge/license plate aesthetic.**
-The reference screenshot shows New Sailor font, gold fill tiles, black background, thick black border.
-Rebuild the bento tiles + modal cards in this palette before wiring in.
-
-### 2. Updated enrichment CSV import
-User has a new version of `catalog_fitment_enriched.csv` with more complete data.
-Run the existing import script — it deletes and re-inserts `pu_enriched_csv` rows cleanly:
+### 1. Run Category Label Script
 ```bash
-node scripts/ingest/import_pu_fitment.mjs --dry-run   # check stats
-node scripts/ingest/import_pu_fitment.mjs              # live run
+python3 ~/Downloads/apply_category_labels.py
 ```
 
-### 3. New API route — `/api/harley/[family]/[model]/products`
-Needs to be built from scratch. Query pattern:
+### 2. vendor_offers Rebuild
+Schema: `catalog_product_id (int FK) + vendor_code`. Use `part_number_dupes.csv` for routing logic. Script: `scripts/ingest/populate_wps_vendor_offers.js`
+
+### 3. Fix STINKIN'' Double Apostrophe
+```bash
+grep -rn "STINKIN''" ~/Desktop/Stinkin-Supplies/app
+```
+
+### 4. Category Subcategory Filter
+Second-level filter row appearing when a category is active. Query:
 ```sql
-SELECT DISTINCT cu.*
-FROM catalog_unified cu
-JOIN catalog_fitment_v2 cfv ON cfv.product_id = cu.id
-JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id
-JOIN harley_models hm ON hm.id = hmy.model_id
-WHERE cu.is_active = true
-  AND (
-    hm.filter_group = $1                          -- e.g. 'ROAD_KING'
-    OR EXISTS (
-      SELECT 1 FROM model_filter_groups mfg
-      WHERE mfg.model_id = hm.id AND mfg.filter_group = $1
-    )
-  )
-ORDER BY cu.name
-LIMIT $2 OFFSET $3
+SELECT name, COUNT(*) as products
+FROM catalog_unified
+WHERE is_active = true
+AND category = 'LIGHTING-LICENSE GROUP'
+GROUP BY name -- or whatever subcategory field exists
+ORDER BY products DESC;
 ```
-Helper functions already written in `fitment_filter.mjs` (in project root or scripts/).
+Need to identify what field holds subcategory data first.
 
-### 4. Clean URL routing
-Structure: `/harley/[family]/[model]`
-Examples:
-- `/harley/touring/road-king`
-- `/harley/softail/fat-boy`
-- `/harley/sportster/ironhead`
-- `/harley/vintage/panhead`
-
-Needs:
-- `app/harley/[family]/[model]/page.tsx` — server component, passes params to client
-- `app/harley/[family]/[model]/ProductsClient.tsx` — fetches from new API, renders grid
-
-### 5. Wire FilterGroupLinks into the new routing
-`FilterGroupLinks.tsx` `onSelect` currently receives a `familyName` string.
-After routing is built, it should instead call `router.push('/harley/touring/road-king')` etc.
-The `FILTER_GROUP_TO_FAMILY` map in the component will need a slug version too.
+### 5. git commit
+```bash
+cd ~/Desktop/Stinkin-Supplies
+git add -A
+git commit -m "feat: model pages, category cleanup, gap fix, era improvements"
+git push
+```
 
 ---
 
 ## KEY FILES
 
 | File | Location | Status |
-|---|---|---|
-| `FilterGroupLinks.tsx` | `components/FilterGroupLinks.tsx` | Built, needs palette update |
-| `HarleySearchClient.tsx` | `app/harley/HarleySearchClient.tsx` | Old flow, being replaced |
-| `import_pu_fitment.mjs` | `scripts/ingest/import_pu_fitment.mjs` | Done, re-run with new CSV |
-| `fitment_filter.mjs` | project root or scripts/ | Helper query functions |
-| `layout.tsx` | `app/layout.tsx` | New Sailor font loaded as `--font-sailor` |
-| `config.ts` | `lib/harley/config.ts` | HARLEY_FAMILIES has 6 entries |
+|------|----------|--------|
+| ModelShop.tsx | app/modelshop/ModelShop.tsx | ✅ Rebuilt this session |
+| harley family page | app/harley/[family]/page.tsx | ✅ Built this session |
+| harley model page | app/harley/[family]/[model]/page.tsx | ✅ Built this session |
+| models API route | app/api/harley/[family]/models/route.ts | ✅ Built this session |
+| products API route | app/api/harley/[family]/[model]/products/route.ts | ✅ Built this session |
+| era page | app/era/[slug]/page.jsx | ✅ Major cleanup this session |
+| BottomNav.tsx | components/BottomNav.tsx | ✅ Spacer fixed (0px) |
+| NavBar.tsx | components/NavBar.tsx | ✅ Shim created this session |
+| Footer.tsx | components/Footer.tsx | ✅ Padding fixed this session |
+| apply_category_labels.py | ~/Downloads/ | ⚠️ NEEDS TO BE RUN |
+| browse/page.jsx | app/browse/page.jsx | ✅ Gap fixed, topbar height reduced |
 
 ---
 
 ## DB STATE
 
-```
-catalog_unified          96,655 products
-catalog_fitment_v2       ~1.2M rows total
-  pu_enriched_csv        430,608 rows  ← will grow with new enrichment CSV
-  oem_crossref           631 rows
-  (null source)          769,113 rows  ← legacy, provenance unknown
-catalog_oem_crossref     ~7,700 rows
-harley_models            293 models, all have filter_group
-harley_model_years       ~2,065 rows
-model_filter_groups      81 cross-membership rows
-v_model_all_groups       view — use this for filter queries
-```
+| Table | Rows | Notes |
+|-------|------|-------|
+| catalog_unified | 96,655 / 87,219 active | Stable |
+| catalog_fitment_v2 | ~1.54M total | 897,958 PU + JW Boon + OEM |
+| catalog_oem_crossref | ~10,953 | Stable |
+| harley_models | 293 | Cleaned up this session — families/filter_groups corrected |
+| harley_model_years | ~2,075 | 5 new rows from PU import |
+| harley_families | 17 | DO NOT MODIFY |
+| model_filter_groups | 81 | Cross-membership rows |
+| vendor_offers | 0 | ⚠️ NEEDS REBUILD |
+| oem_fitment | 379,899 | All families intact |
+| catalog_unified categories | 24 distinct | Down from 32 — merged this session |
 
-**DB connection (Node.js — use object form, not connection string):**
-```js
+---
+
+## DB CONNECTION
+
+```javascript
+// Node.js — Vercel (IPv4 only)
+const pool = new Pool({
+  connectionString: process.env.CATALOG_DATABASE_URL,
+});
+
+// Node.js — local dev
 const pool = new Pool({
   host: '2a01:4ff:f0:fa6f::1',
   port: 5432,
@@ -120,59 +184,32 @@ const pool = new Pool({
   password: 'smelly',
   database: 'stinkin_catalog',
 });
-```
-**psql (CLI — brackets required):**
-```bash
+
+// psql CLI
 psql "postgresql://catalog_app:smelly@[2a01:4ff:f0:fa6f::1]:5432/stinkin_catalog"
+
+// Preferred: use getCatalogDb() from @/lib/db/catalog in all new routes
 ```
 
----
-
-## MODAL SUB-MODEL MAP
-
-| Tile | Modal Cards | Maps to Family |
-|---|---|---|
-| Touring | Touring, Road King, Street Glide, Road Glide, Trike | Touring |
-| Softail | Softail, Fat Boy, Heritage, Springer, Deluxe, Night Train, Breakout, Low Rider S | Softail |
-| Sportster | Sportster, Ironhead | Sportster |
-| Revolution Max | Pan America, Nightster, Sportster S | Sportster |
-| Vintage | Panhead, Knucklehead, Flathead, Shovelhead, WL Series, Super Glide | FXR / Dyna |
-| Dyna | (direct) | Dyna |
-| FXR | (direct) | FXR |
+⚠️ NEVER use IPv6 in Vercel-deployed code — use CATALOG_DATABASE_URL env var.
+⚠️ Next.js 15+: params in route handlers is a Promise — always `await params` before destructuring.
 
 ---
 
-## FILTER GROUP → DB MODEL CODES (key ones)
-```
-ROAD_KING    → harley_models WHERE model_code IN (FLHR, FLHRC, FLHRCI, FLHRSE, ...)
-STREET_GLIDE → harley_models WHERE model_code IN (FLHX, FLHXI, FLHXSE, ...)
-ROAD_GLIDE   → harley_models WHERE model_code IN (FLTR, FLTRI, FLTRX, ...)
-TOURING      → harley_models WHERE filter_group = 'TOURING'
-SPORTSTER    → harley_models WHERE filter_group = 'SPORTSTER'
-IRONHEAD     → subset of SPORTSTER (XL, XLCH, XLH, year <= 1985)
-PANHEAD      → model_code = 'panhead', year 1948-1965
-```
-Use `v_model_all_groups` view to query — handles cross-membership automatically.
+## FITMENT COVERAGE (as of May 18)
 
----
-
-## DESIGN DIRECTION
-
-**Palette:** Black background `#080706`, Gold `#c9a84c`, White `#f0ebe3`
-**Font:** New Sailor (`var(--font-sailor)`) for tile labels and modal headers
-**Stencil font:** `var(--font-stencil)` = Share Tech Mono for sub-labels
-**Caesar font:** `var(--font-caesar)` = Bebas Neue for product names/prices
-**Reference:** Bold graphic tiles, thick borders, vintage badge/license plate feel
-**Tile layout:** 3-column bento grid, mixed span-1 and span-2
-**Interaction:** Hover = image slides in from alternating directions + teal border
-**Modal:** LayeredStack (gsap) — cards stacked on open, spread on hover, click to select
-
----
-
-## NEXT STEPS IN ORDER
-1. Upload new enrichment CSV → re-run `import_pu_fitment.mjs`
-2. Rebuild `FilterGroupLinks.tsx` in white/gold/black palette
-3. Build `/api/harley/[family]/[model]/products` API route
-4. Build `app/harley/[family]/[model]/page.tsx` + `ProductsClient.tsx`
-5. Wire `FilterGroupLinks` to push to clean URLs instead of calling `onSelect`
-6. Test end-to-end: tile → modal → model → product grid
+| Family | Products | Notes |
+|--------|----------|-------|
+| Touring | 10,191 | Strong |
+| Softail | 8,669 | Strong |
+| Dyna | 6,534 | Strong |
+| FXR | 4,094 | Good |
+| Sportster | 4,721 | Good |
+| Shovelhead | 1,028 | Decent |
+| Trike | 2,526 | Good |
+| Revolution Max | 126 | Thin |
+| V-Rod | 175 | Thin |
+| Flathead | 26 | Limited — banner shown |
+| Knucklehead | ~200+ | VTwin scan added data |
+| Panhead | 1 | Pending — VTwin scan in progress |
+| Total covered | 17,431 | 20% of 87,219 active products |

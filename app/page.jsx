@@ -17,6 +17,9 @@ export default function HomePage() {
       <main>
         <VideoHero />
         <ScrollVelocity />
+        <div className="tile-inner tile-inner--search">
+          <ModelSearch />
+        </div>
         <div className="bento-page">
 
         {/* ── Kinetic "SHOP BY ERA" heading tile — links to /era */}
@@ -28,15 +31,6 @@ export default function HomePage() {
           style={{ '--delay': '160ms' }}
         >
           <EraCarousel />
-        </section>
-
-        {/* ── Search tile — wide left top */}
-        <section className="tile tile-search" style={{ '--delay': '0ms' }}>
-          <div className="tile-inner">
-            <p className="tile-eyebrow">Find parts for your bike</p>
-            <h2 className="tile-heading">What are you riding?</h2>
-            <ModelSearch />
-          </div>
         </section>
 
         {/* ── Category tile */}
@@ -107,9 +101,8 @@ export default function HomePage() {
           padding: 0 48px var(--gap);
           display: grid;
           grid-template-columns: 1fr 1fr 1fr;
-          grid-template-rows: auto auto auto auto;
+          grid-template-rows: auto auto auto;
           grid-template-areas:
-            "search  search  video"
             "erahead erahead erahead"
             "eras    eras    eras"
             "cat     model   deals";
@@ -146,7 +139,6 @@ export default function HomePage() {
         }
 
         /* ── Grid placement */
-        .tile-search      { grid-area: search;  min-height: 220px; }
         .tile-video       { grid-area: video;   min-height: 220px; }
         .tile-era-kinetic { grid-area: erahead; min-height: 120px; }
         .tile-eras        { grid-area: eras;    min-height: 580px; overflow: hidden; }
@@ -183,6 +175,17 @@ export default function HomePage() {
           flex-direction: column;
           justify-content: center;
           gap: 10px;
+        }
+        .tile-inner--search {
+          align-items: center;
+          justify-content: center;
+          width: 100%;
+          box-sizing: border-box;
+          font-family: 'New Sailor', serif;
+          text-align: center;
+          padding: 0 48px 14px;
+          max-width: 1400px;
+          margin: 0 auto;
         }
         .tile-inner--center {
           align-items: center;
@@ -313,8 +316,6 @@ export default function HomePage() {
           .bento-page {
             grid-template-columns: 1fr 1fr;
             grid-template-areas:
-              "search  search"
-              "video   video"
               "erahead erahead"
               "eras    eras"
               "cat     model"
@@ -324,6 +325,7 @@ export default function HomePage() {
             padding-right: 16px;
           }
           .tile-inner { padding: 24px 22px; }
+          .tile-inner--search { padding: 0 16px 14px; }
           .tile-inner--eras { padding: 20px 0 20px 22px; }
           .tile-era-kinetic { min-height: 100px; }
           .float-nav { padding: 8px 14px 8px 12px; gap: 16px; }
@@ -335,8 +337,6 @@ export default function HomePage() {
           .bento-page {
             grid-template-columns: 1fr;
             grid-template-areas:
-              "search"
-              "video"
               "erahead"
               "eras"
               "cat"

@@ -116,7 +116,7 @@ export default function EraKineticTile() {
               fontSize: 9,
               letterSpacing: "0.22em",
               textTransform: "uppercase",
-              color: hovered !== null ? "rgba(219, 125, 10, 0.7)" : "rgba(233, 147, 55, 0.2)",
+              color: hovered !== null ? "rgba(253, 202, 73, 0.93)" : "rgba(233, 147, 55, 0.98)",
               transition: "color 0.1s ease",
             }}
           >
