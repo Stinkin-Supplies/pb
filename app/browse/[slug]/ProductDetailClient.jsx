@@ -1,4 +1,5 @@
 "use client";
+import NavBar from "@/components/NavBar";
 // ============================================================
 // app/shop/[slug]/ProductDetailClient.jsx
 // ============================================================
