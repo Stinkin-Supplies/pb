@@ -42,7 +42,7 @@ const ERA_SLUG_EXPR = `
     ELSE NULL
   END`;
 
-export async function GET(request) {
+export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const q = searchParams.get('q')?.trim() ?? '';
   if (!q) return NextResponse.json({ results: [] });
