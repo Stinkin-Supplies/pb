@@ -1,1361 +1,953 @@
 "use client";
-import NavBar from "@/components/NavBar";
 // ============================================================
-// app/shop/[slug]/ProductDetailClient.jsx
-// ============================================================
-// Full product detail page UI:
-//   - Image gallery with thumbnail rail
-//   - Fitment check badge + full fitment table
-//   - Price / MAP display
-//   - Points earned preview
-//   - Add to cart with quantity selector
-//   - Tabbed content: Description | Features | Fitment | Specs
-//   - OEM numbers + page references
-//   - Related products strip
+// app/browse/[slug]/ProductDetailClient.jsx
+// Rewritten — cream/gold theme, vertical scroll gallery,
+// placeholder cart, product detail modal
 // ============================================================
 
-import { useState, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useCartSafe } from "@/components/CartContext";
-import NotifyMeButton from "@/components/NotifyMeButton";
-import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import NavBar from "@/components/NavBar";
 
-// Saved garage vehicle — hardcoded until Phase 3 auth
-const SAVED_VEHICLE = { id:1, year:2022, make:"Harley-Davidson", model:"Road King" };
+// ── Theme ────────────────────────────────────────────────────
+const GOLD   = "#b8922a";
+const CREAM  = "#f5f0e8";
+const CREAM2 = "#ede8df";
+const DARK   = "#2a2018";
+const BORDER = "rgba(184,146,42,0.25)";
+const FONT   = "var(--font-stencil, monospace)";
 
-const css = `
-  *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+// ── Helpers ──────────────────────────────────────────────────
+const fmt = (n) => n != null ? `$${Number(n).toFixed(2)}` : null;
 
-  .pdp-wrap {
-    background: #0a0909;
-    min-height: 100vh;
-    color: #f0ebe3;
-    font-family: var(--font-stencil), sans-serif;
-  }
+function proxyImg(src) {
+  if (!src) return null;
+  if (typeof src === "string" && src.includes("lemansnet.com"))
+    return `/api/img?u=${encodeURIComponent(src)}`;
+  return src;
+}
 
-  /* ── BREADCRUMB ── */
-  .pdp-breadcrumb {
-    background: #111010;
-    border-bottom: 1px solid #2a2828;
-    padding: 10px 24px;
-    font-family: var(--font-stencil), monospace;
-    font-size: 9px; color: #8a8784; letter-spacing: 0.15em;
-    display: flex; align-items: center; gap: 6px;
-  }
-  .pdp-breadcrumb a { color: #8a8784; text-decoration: none; transition: color 0.2s; }
-  .pdp-breadcrumb a:hover { color: #e8621a; }
-  .pdp-breadcrumb .sep { color: #3a3838; }
-  .pdp-breadcrumb .current { color: #f0ebe3; }
+// ── Vertical Gallery ─────────────────────────────────────────
+function VerticalGallery({ images, name }) {
+  const [active, setActive] = useState(0);
+  const imgRefs = useRef([]);
+  const containerRef = useRef(null);
 
-  /* ── MAIN LAYOUT ── */
-  .pdp-main {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 32px 24px;
-    display: grid;
-    grid-template-columns: 1fr 420px;
-    gap: 48px;
-  }
-
-  /* ── GALLERY ── */
-  .gallery-col {}
-  .gallery-main {
-    width: 100%;
-    aspect-ratio: 1;
-    background: #ffffff;
-    border: 1px solid #2a2828;
-    border-radius: 2px;
-    display: flex; align-items: center; justify-content: center;
-    position: relative; overflow: hidden; cursor: zoom-in;
-    margin-bottom: 10px;
-  }
-  .gallery-main::before {
-    content: '';
-    position: absolute; inset: 0;
-    background-image:
-      linear-gradient(rgba(232,98,26,0.04) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(232,98,26,0.04) 1px, transparent 1px);
-    background-size: 24px 24px;
-  }
-  .gallery-main img {
-    width: 100%; height: 100%; object-fit: contain; position: relative; z-index: 1;
-  }
-  .gallery-placeholder {
-    font-family: var(--font-stencil), monospace;
-    font-size: 10px; color: #3a3838; letter-spacing: 0.15em;
-    position: relative; z-index: 1;
-  }
-  .gallery-badge {
-    position: absolute; top: 12px; left: 12px; z-index: 2;
-    font-family: var(--font-stencil), monospace;
-    font-size: 9px; font-weight: 700; letter-spacing: 0.1em;
-    padding: 4px 9px; border-radius: 1px;
-  }
-  .gallery-badge.sale { background: #b91c1c; color: #fff; }
-  .gallery-badge.new  { background: #c9a84c; color: #0a0909; }
-
-  .gallery-thumbs {
-    display: flex; gap: 8px; flex-wrap: wrap;
-  }
-  .gallery-thumb {
-    width: 72px; height: 72px;
-    background: #1a1919;
-    border: 1px solid #2a2828;
-    border-radius: 2px;
-    display: flex; align-items: center; justify-content: center;
-    position: relative; cursor: pointer; transition: border-color 0.2s; overflow: hidden;
-    flex-shrink: 0;
-  }
-  .gallery-thumb.active { border-color: #e8621a; }
-  .gallery-thumb:hover  { border-color: rgba(232,98,26,0.4); }
-  .gallery-thumb img { width: 100%; height: 100%; object-fit: cover; }
-
-  /* ── INFO COL ── */
-  .info-col { display: flex; flex-direction: column; gap: 0; }
-
-  .info-brand {
-    font-family: var(--font-stencil), monospace;
-    font-size: 10px; color: #e8621a; letter-spacing: 0.2em;
-    margin-bottom: 8px;
-  }
-  .info-name {
-    font-family: var(--font-stencil), monospace;
-    font-size: 38px; line-height: 0.95; letter-spacing: 0.03em;
-    color: #f0ebe3; margin-bottom: 14px;
-  }
-  .info-sku {
-    font-family: var(--font-stencil), monospace;
-    font-size: 9px; color: #8a8784; letter-spacing: 0.15em;
-    margin-bottom: 20px;
-  }
-
-  /* fitment badge */
-  .fitment-badge {
-    display: inline-flex; align-items: center; gap: 8px;
-    padding: 8px 14px;
-    border-radius: 2px; margin-bottom: 20px;
-    font-family: var(--font-stencil), monospace;
-    font-size: 9px; letter-spacing: 0.14em;
-  }
-  .fitment-badge.fits {
-    background: rgba(34,197,94,0.08);
-    border: 1px solid rgba(34,197,94,0.25);
-    color: #22c55e;
-  }
-  .fitment-badge.no-data {
-    background: rgba(138,135,132,0.08);
-    border: 1px solid rgba(138,135,132,0.15);
-    color: #8a8784;
-  }
-  .fitment-badge.no-fit {
-    background: rgba(185,28,28,0.08);
-    border: 1px solid rgba(185,28,28,0.2);
-    color: #ef4444;
-  }
-  .fitment-dot {
-    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
-  }
-  .fitment-badge.fits    .fitment-dot { background: #22c55e; box-shadow: 0 0 5px #22c55e; }
-  .fitment-badge.no-data .fitment-dot { background: #8a8784; }
-  .fitment-badge.no-fit  .fitment-dot { background: #ef4444; }
-
-  /* price block */
-  .price-block { margin-bottom: 20px; }
-  .price-was {
-    font-family: var(--font-stencil), sans-serif;
-    font-size: 14px; color: #8a8784;
-    text-decoration: line-through; margin-bottom: 2px;
-  }
-  .price-main {
-    font-family: var(--font-stencil), monospace;
-    font-size: 52px; color: #f0ebe3;
-    letter-spacing: 0.03em; line-height: 1;
-  }
-  .price-map-note {
-    font-family: var(--font-stencil), monospace;
-    font-size: 8px; color: #8a8784; letter-spacing: 0.12em;
-    margin-top: 4px;
-  }
-  .price-points {
-    display: inline-flex; align-items: center; gap: 6px;
-    background: rgba(201,168,76,0.08);
-    border: 1px solid rgba(201,168,76,0.2);
-    padding: 5px 11px; border-radius: 2px; margin-top: 8px;
-    font-family: var(--font-stencil), monospace;
-    font-size: 9px; color: #c9a84c; letter-spacing: 0.12em;
-  }
-
-  /* stock indicator */
-  .stock-row {
-    display: flex; align-items: center; gap: 8px;
-    margin-bottom: 20px;
-  }
-  .stock-dot {
-    width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
-  }
-  .stock-dot.in  { background: #22c55e; box-shadow: 0 0 5px #22c55e; }
-  .stock-dot.out { background: #8a8784; }
-  .stock-label {
-    font-family: var(--font-stencil), monospace;
-    font-size: 9px; letter-spacing: 0.14em;
-  }
-  .stock-label.in  { color: #22c55e; }
-  .stock-label.out { color: #8a8784; }
-
-  /* qty + add */
-  .purchase-row {
-    display: flex; gap: 10px; margin-bottom: 14px;
-  }
-  .qty-wrap {
-    display: flex; align-items: center;
-    border: 1px solid #2a2828; border-radius: 2px;
-    overflow: hidden; flex-shrink: 0;
-  }
-  .qty-btn {
-    width: 36px; height: 48px;
-    background: #1a1919; border: none;
-    color: #f0ebe3; font-size: 18px;
-    cursor: pointer; transition: background 0.15s;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .qty-btn:hover:not(:disabled) { background: #2a2828; }
-  .qty-btn:disabled { color: #3a3838; cursor: not-allowed; }
-  .qty-val {
-    width: 44px; height: 48px;
-    background: #111010; border: none;
-    color: #f0ebe3; font-family: var(--font-stencil), monospace;
-    font-size: 20px; letter-spacing: 0.05em;
-    text-align: center; outline: none;
-    display: flex; align-items: center; justify-content: center;
-    line-height: 1;
-  }
-  .add-to-cart-btn {
-    flex: 1; height: 48px;
-    background: #e8621a; border: none;
-    color: #0a0909;
-    font-family: var(--font-caesar), sans-serif;
-    font-size: 22px; letter-spacing: 0.1em;
-    border-radius: 2px; cursor: pointer;
-    transition: all 0.2s;
-    box-shadow: 0 4px 24px rgba(232,98,26,0.25);
-  }
-  .add-to-cart-btn:hover:not(:disabled) {
-    background: #c94f0f;
-    box-shadow: 0 6px 32px rgba(232,98,26,0.4);
-    transform: translateY(-1px);
-  }
-  .add-to-cart-btn:disabled {
-    background: #2a2828; color: #8a8784;
-    cursor: not-allowed; box-shadow: none; transform: none;
-  }
-  .add-to-cart-btn.added {
-    background: #22c55e; color: #0a0909;
-  }
-
-  .wishlist-btn {
-    height: 48px; width: 48px;
-    background: #111010; border: 1px solid #2a2828;
-    color: #8a8784; font-size: 18px;
-    border-radius: 2px; cursor: pointer;
-    transition: all 0.2s; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .wishlist-btn:hover { border-color: #e8621a; color: #e8621a; }
-  .wishlist-btn.active { border-color: #e8621a; color: #e8621a; background: rgba(232,98,26,0.06); }
-
-  /* perks strip */
-  .perks-strip {
-    display: grid; grid-template-columns: 1fr 1fr;
-    gap: 8px; margin-bottom: 24px;
-  }
-  .perk {
-    display: flex; align-items: center; gap: 8px;
-    padding: 10px 12px;
-    background: #111010; border: 1px solid #2a2828;
-    border-radius: 2px;
-  }
-  .perk-icon { font-size: 16px; flex-shrink: 0; }
-  .perk-text {
-    font-family: var(--font-stencil), monospace;
-    font-size: 9px; color: #8a8784; letter-spacing: 0.1em; line-height: 1.4;
-  }
-  .perk-text strong { color: #f0ebe3; display: block; }
-
-  /* enriched data block */
-  .enriched-section {
-    padding-top: 18px;
-    margin-bottom: 18px;
-    border-top: 1px solid #2a2828;
-  }
-  .enriched-section + .enriched-section {
-    margin-top: 0;
-  }
-  .enriched-heading {
-    font-family: var(--font-stencil), monospace;
-    font-size: 9px;
-    letter-spacing: 0.16em;
-    color: #e8621a;
-    text-transform: uppercase;
-    margin-bottom: 10px;
-  }
-  .enriched-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: grid;
-    gap: 8px;
-  }
-  .enriched-list li {
-    display: flex;
-    gap: 8px;
-    font-family: var(--font-stencil), monospace;
-    font-size: 10px;
-    letter-spacing: 0.06em;
-    line-height: 1.5;
-    color: #c4c0bc;
-  }
-  .enriched-bullet {
-    color: #e8621a;
-    flex-shrink: 0;
-  }
-  .enriched-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px 14px;
-  }
-  .enriched-term {
-    font-family: var(--font-stencil), monospace;
-    font-size: 8px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: #8a8784;
-    margin-bottom: 2px;
-  }
-  .enriched-value {
-    font-family: var(--font-stencil), monospace;
-    font-size: 11px;
-    letter-spacing: 0.05em;
-    color: #f0ebe3;
-    line-height: 1.5;
-  }
-  .enriched-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-  .enriched-chip {
-    display: inline-flex;
-    align-items: center;
-    border: 1px solid #2a2828;
-    border-radius: 999px;
-    padding: 4px 8px;
-    background: #111010;
-    color: #c4c0bc;
-    font-family: var(--font-stencil), monospace;
-    font-size: 9px;
-    letter-spacing: 0.08em;
-  }
-
-  /* special instructions */
-  .special-instructions {
-    margin-bottom: 20px;
-    padding: 14px 16px;
-    background: rgba(201,168,76,0.06);
-    border: 1px solid rgba(201,168,76,0.2);
-    border-radius: 2px;
-  }
-  .special-instructions-label {
-    font-family: var(--font-stencil), monospace;
-    font-size: 8px; letter-spacing: 0.2em;
-    color: #c9a84c; margin-bottom: 8px;
-    text-transform: uppercase;
-  }
-  .special-instructions-text {
-    font-family: var(--font-stencil), monospace;
-    font-size: 11px; letter-spacing: 0.05em;
-    color: #e8d5a0; line-height: 1.7;
-  }
-
-  /* divider */
-  .pdp-divider {
-    border: none; border-top: 1px solid #2a2828;
-    margin: 20px 0;
-  }
-
-  /* ── VARIANT SELECTOR ── */
-  .variants-section { margin-bottom: 20px; }
-  .variant-group { margin-bottom: 14px; }
-  .variant-group-label {
-    font-family: var(--font-stencil), monospace;
-    font-size: 9px; color: #8a8784;
-    letter-spacing: 0.18em; text-transform: uppercase;
-    margin-bottom: 8px;
-  }
-  .variant-btns { display: flex; flex-wrap: wrap; gap: 6px; }
-  .variant-btn {
-    padding: 6px 14px;
-    background: #111010; border: 1px solid #2a2828;
-    color: #c4c0bc; border-radius: 2px;
-    font-family: var(--font-stencil), monospace;
-    font-size: 11px; letter-spacing: 0.08em;
-    cursor: pointer; transition: all 0.15s;
-  }
-  .variant-btn:hover  { border-color: rgba(232,98,26,0.5); color: #f0ebe3; }
-  .variant-btn.selected {
-    background: rgba(232,98,26,0.1);
-    border-color: #e8621a; color: #e8621a;
-  }
-
-  /* ── TABS ── */
-  .pdp-tabs-section {
-    max-width: 1200px; margin: 0 auto;
-    padding: 0 24px 60px;
-    border-top: 1px solid #2a2828;
-  }
-  .pdp-tab-strip {
-    display: flex; gap: 0;
-    border-bottom: 1px solid #2a2828;
-    margin-bottom: 24px;
-  }
-  .pdp-tab {
-    padding: 14px 24px;
-    font-family: var(--font-stencil), monospace;
-    font-size: 10px; letter-spacing: 0.18em;
-    color: #8a8784; cursor: pointer;
-    border: none; background: none;
-    border-bottom: 2px solid rgba(0,0,0,0);
-    transition: all 0.2s; margin-bottom: -1px;
-  }
-  .pdp-tab:hover  { color: #f0ebe3; }
-  .pdp-tab.active { color: #e8621a; border-bottom-color: #e8621a; }
-
-  /* ── SPECS TABLE ── */
-  .specs-table { width: 100%; border-collapse: collapse; }
-  .specs-table tr:nth-child(odd) td { background: #111010; }
-  .specs-table td {
-    padding: 10px 14px;
-    font-size: 13px;
-    border-bottom: 1px solid #1a1919;
-    vertical-align: top;
-  }
-  .pdp-specs-table td:first-child {
-    font-family: var(--font-stencil), monospace;
-    font-size: 9px; color: #8a8784;
-    letter-spacing: 0.15em; text-transform: uppercase;
-    width: 180px; white-space: nowrap;
-  }
-  .pdp-specs-table td:last-child {
-    color: #f0ebe3;
-    font-family: var(--font-stencil), monospace;
-    font-size: 11px; letter-spacing: 0.06em;
-  }
-
-  /* OEM numbers strip */
-  .pdp-oem-strip {
-    margin-top: 32px;
-    padding-top: 24px;
-    border-top: 1px solid #2a2828;
-  }
-  .pdp-oem-label {
-    font-family: var(--font-stencil), monospace;
-    font-size: 8px; letter-spacing: 0.2em; color: #8a8784;
-    margin-bottom: 10px;
-  }
-  .pdp-oem-chips {
-    display: flex; gap: 8px; flex-wrap: wrap;
-  }
-  .pdp-oem-chip {
-    font-family: var(--font-stencil), monospace;
-    font-size: 10px; letter-spacing: 0.1em;
-    padding: 4px 10px;
-    background: #111010; border: 1px solid #2a2828;
-    border-radius: 2px; color: #c8c3bc;
-  }
-
-  /* ── FITMENT TABLE ── */
-  .fitment-table { width: 100%; border-collapse: collapse; }
-  .fitment-table thead td {
-    font-family: var(--font-stencil), monospace;
-    font-size: 9px; color: #e8621a;
-    letter-spacing: 0.15em; padding: 8px 14px;
-    border-bottom: 1px solid #2a2828;
-    text-transform: uppercase;
-  }
-  .fitment-table tbody tr:nth-child(odd) td { background: #111010; }
-  .fitment-table tbody td {
-    padding: 9px 14px; font-size: 13px; font-weight: 500;
-    color: #f0ebe3; border-bottom: 1px solid #1a1919;
-  }
-  .fitment-empty {
-    font-family: var(--font-stencil), monospace;
-    font-size: 10px; color: #8a8784;
-    letter-spacing: 0.12em; padding: 24px 0;
-  }
-
-  /* ── RELATED ── */
-  .related-section {
-    max-width: 1200px; margin: 0 auto;
-    padding: 0 24px 60px;
-  }
-  .related-head {
-    display: flex; align-items: baseline;
-    justify-content: space-between;
-    border-bottom: 1px solid #2a2828;
-    padding-bottom: 14px; margin-bottom: 20px;
-  }
-  .related-title {
-    font-family: var(--font-stencil), monospace;
-    font-size: 30px; letter-spacing: 0.05em;
-  }
-  .related-title span { color: #e8621a; }
-  .related-link {
-    font-family: var(--font-stencil), monospace;
-    font-size: 10px; color: #8a8784;
-    letter-spacing: 0.15em; cursor: pointer;
-    text-decoration: none; transition: color 0.2s;
-  }
-  .related-link:hover { color: #e8621a; }
-  .related-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 12px;
-  }
-  .related-card {
-    background: #111010; border: 1px solid #2a2828;
-    border-radius: 2px; overflow: hidden;
-    cursor: pointer; transition: all 0.22s;
-  }
-  .related-card:hover {
-    border-color: rgba(232,98,26,0.4);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 28px rgba(0,0,0,0.4);
-  }
-  .related-img {
-    width: 100%; aspect-ratio: 4/3;
-    background: #1a1919;
-    display: flex; align-items: center; justify-content: center;
-    position: relative; overflow: hidden;
-  }
-  .related-img::before {
-    content: ''; position: absolute; inset: 0;
-    background-image:
-      linear-gradient(rgba(232,98,26,0.04) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(232,98,26,0.04) 1px, transparent 1px);
-    background-size: 16px 16px;
-  }
-  .related-body { padding: 11px 13px; }
-  .related-brand {
-    font-family: var(--font-stencil), monospace;
-    font-size: 9px; color: #e8621a; letter-spacing: 0.14em; margin-bottom: 4px;
-  }
-  .related-name {
-    font-size: 13px; font-weight: 700;
-    color: #f0ebe3; line-height: 1.3; margin-bottom: 8px;
-  }
-  .related-footer { display: flex; justify-content: space-between; align-items: center; }
-  .related-price {
-    font-family: var(--font-stencil), monospace;
-    font-size: 20px; color: #f0ebe3; letter-spacing: 0.04em;
-  }
-  .related-oos-badge {
-    position: absolute; bottom: 7px; left: 7px; z-index: 2;
-    font-family: var(--font-stencil), monospace;
-    font-size: 7px; color: #8a8784; letter-spacing: 0.1em;
-    background: rgba(0,0,0,0.7); padding: 2px 6px; border-radius: 1px;
-  }
-  .related-notify-btn {
-    width: 100%; margin-top: 8px;
-    padding: 6px 10px;
-    background: transparent; border: 1px solid #e8621a;
-    color: #e8621a; border-radius: 2px; cursor: pointer;
-    font-family: var(--font-stencil), monospace;
-    font-size: 8px; letter-spacing: 0.1em;
-    transition: all 0.15s;
-  }
-  .related-notify-btn:hover { background: rgba(232,98,26,0.1); }
-  .related-notify-btn.done {
-    border-color: #22c55e; color: #22c55e;
-    background: rgba(34,197,94,0.08); cursor: default;
-  }
-
-  /* ── TOAST ── */
-  .toast {
-    position: fixed; bottom: 24px; right: 24px; z-index: 200;
-    background: #22c55e; color: #0a0909;
-    font-family: var(--font-caesar), sans-serif;
-    font-size: 16px; letter-spacing: 0.1em;
-    padding: 12px 24px; border-radius: 2px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-    animation: toastIn 0.25s ease;
-  }
-  @keyframes toastIn {
-    from { opacity:0; transform:translateY(12px); }
-    to   { opacity:1; transform:translateY(0); }
-  }
-
-  @media (max-width: 860px) {
-    .pdp-breadcrumb { padding: 10px 16px; }
-    .pdp-main { grid-template-columns: 1fr; gap: 20px; padding: 20px 16px 28px; }
-    .info-name { font-size: 28px; }
-    .price-main { font-size: 36px; }
-    .purchase-row { flex-wrap: wrap; }
-    .qty-wrap { width: 100%; }
-    .qty-btn { width: 42px; }
-    .qty-val { flex: 1; width: auto; }
-    .add-to-cart-btn, .wishlist-btn { width: 100%; }
-    .wishlist-btn { flex: 1 1 100%; }
-    .pdp-features-list { grid-template-columns: 1fr; }
-    .pdp-tab-btn { padding: 12px 14px; font-size: 9px; }
-    .pdp-tab-strip { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    .pdp-tab { white-space: nowrap; padding: 12px 16px; }
-    .fitment-table thead td,
-    .fitment-table tbody td { padding: 8px 10px; font-size: 11px; }
-    .specs-table td { padding: 8px 10px; font-size: 12px; }
-    .pdp-specs-table td:first-child { width: 118px; white-space: normal; }
-    .related-section { padding: 0 16px 48px; }
-    .related-head { flex-direction: column; align-items: flex-start; gap: 8px; }
-    .related-title { font-size: 24px; }
-    .related-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .toast { left: 16px; right: 16px; bottom: 16px; text-align: center; }
-  }
-
-  @media (max-width: 520px) {
-    .info-name { font-size: 24px; }
-    .gallery-main { aspect-ratio: 1 / 1; }
-    .gallery-thumb { width: 64px; height: 64px; }
-    .perks-strip { grid-template-columns: 1fr; }
-    .variant-btns { gap: 8px; }
-    .variant-btn { width: 100%; justify-content: center; }
-    .related-grid { grid-template-columns: 1fr; }
-  }
-`;
-
-export default function ProductDetailClient({ product, variants = [], fitment = [], relatedProducts = [] }) {
-  const [activeImg,  setActiveImg]  = useState(0);
-  const [qty,        setQty]        = useState(1);
-  const [activeTab,  setActiveTab]  = useState(() => {
-    if (!product.description && !product.features?.length) {
-      if (product.fitmentHdFamilies?.length || product.fitmentYearStart) {
-        return "fitment";
-      }
-    }
-    return "description";
-  });
-
-  // Group variants by option_name: { Size: ["S","M","L"], Color: ["Red","Black"] }
-  const variantGroups = variants.reduce((acc, v) => {
-    if (!acc[v.option_name]) acc[v.option_name] = [];
-    if (!acc[v.option_name].includes(v.option_value)) acc[v.option_name].push(v.option_value);
-    return acc;
-  }, {});
-  const variantGroupEntries = Object.entries(variantGroups);
-
-  const [selectedVariants, setSelectedVariants] = useState(() =>
-    Object.fromEntries(variantGroupEntries.map(([k, vals]) => [k, vals[0] ?? null]))
-  );
-  const [wishlisted, setWishlisted] = useState(false);
-  const [wishlistBusy, setWishlistBusy] = useState(false);
-  const [wishlistToast, setWishlistToast] = useState(null);
-  const [added,      setAdded]      = useState(false);
-  const [toast,      setToast]      = useState(false);
-  const { addItem } = useCartSafe();
-
-  // ── Brand / vendor option cards ───────────────────────────────
-  const [groupOptions, setGroupOptions] = useState(null);
-  const [selectedSku,  setSelectedSku]  = useState(product.sku);
-
+  // Intersection observer to update active dot as user scrolls
   useEffect(() => {
-    let cancelled = false;
-    const slug = product.slug ?? window.location.pathname.split("/").pop();
-    fetch(`/api/products/group?slug=${encodeURIComponent(slug)}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (cancelled || !data) return;
-        if (data.options?.length > 1) {
-          setGroupOptions(data.options);
-          const canon = data.options.find(o => o.is_canonical) ?? data.options[0];
-          setSelectedSku(canon.vendor_sku);
-        } else {
-          setGroupOptions([]);
-        }
-      })
-      .catch(() => { if (!cancelled) setGroupOptions([]); });
-    return () => { cancelled = true; };
-  }, [product.slug, product.sku]);
-
-  // Derive active product data from the selected option
-  const activeOption  = groupOptions?.find(o => o.vendor_sku === selectedSku);
-  const activePrice   = activeOption ? Number(activeOption.msrp ?? product.price) : product.price;
-  const activeInStock = activeOption ? activeOption.in_stock : product.inStock;
-  const activeStock   = activeOption ? Number(activeOption.stock_quantity ?? 0) : Number(product.stockQty ?? 0);
-  const activeBrand   = activeOption
-    ? (activeOption.display_brand || activeOption.brand || product.display_brand || product.brand)
-    : (product.display_brand || product.brand);
-
-  const [supabase] = useState(() => createBrowserSupabaseClient());
-
-  // ── Fitment check ──────────────────────────────────────────
-  const fitmentStatus =
-    !product.fitmentIds                              ? "no-data" :
-    product.fitmentIds.includes(SAVED_VEHICLE.id)   ? "fits"    : "no-fit";
-
-  const fitmentLabel = {
-    "fits":    `✓ FITS YOUR ${SAVED_VEHICLE.year} ${SAVED_VEHICLE.make} ${SAVED_VEHICLE.model}`,
-    "no-fit":  `✗ DOES NOT FIT YOUR ${SAVED_VEHICLE.year} ${SAVED_VEHICLE.make}`,
-    "no-data": `FITMENT DATA PENDING — ADD TO VERIFY`,
-  }[fitmentStatus];
-
-  // ── Add to cart ────────────────────────────────────────────
-  const handleAdd = () => {
-    if (!activeInStock) return;
-    setAdded(true);
-    addItem({
-      ...product,
-      sku:    activeOption?.vendor_sku ?? product.sku,
-      price:  activePrice,
-      brand:  activeBrand,
-      image:  (activeOption?.image_url ? activeOption.image_url : resolvedGallery[0]) ?? null,
-      images: resolvedGallery,
-    }, qty);
-    setToast(true);
-    setTimeout(() => setAdded(false), 2000);
-    setTimeout(() => setToast(false),  2500);
-  };
-
-  // ── Wishlist (Supabase) ────────────────────────────────────
-  const showWishlistToast = (msg) => {
-    setWishlistToast(msg);
-    setTimeout(() => setWishlistToast(null), 2000);
-  };
-
-  useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { if (mounted) setWishlisted(false); return; }
-      const { data, error } = await supabase
-        .from("wishlists")
-        .select("user_id")
-        .eq("user_id", user.id)
-        .eq("product_sku", product.sku)
-        .maybeSingle();
-      if (!mounted) return;
-      if (!error && data?.user_id) setWishlisted(true);
-      else setWishlisted(false);
-    };
-    load();
-    return () => { mounted = false; };
-  }, [product.id, product.sku, supabase]);
-
-  const handleWishlistToggle = async () => {
-    if (wishlistBusy) return;
-    setWishlistBusy(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { window.location.href = "/auth"; return; }
-      if (wishlisted) {
-        const { error } = await supabase.from("wishlists").delete()
-          .eq("user_id", user.id).eq("product_sku", product.sku);
-        if (!error) { setWishlisted(false); showWishlistToast("Removed from wishlist"); }
-        else showWishlistToast("Could not remove");
-      } else {
-        const { error } = await supabase.from("wishlists").insert({
-          user_id: user.id,
-          product_sku: product.sku,
-          product_name: product.name,
-          notify_in_stock: !product.inStock,
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(e => {
+          if (e.isIntersecting) {
+            const idx = imgRefs.current.indexOf(e.target);
+            if (idx !== -1) setActive(idx);
+          }
         });
-        if (!error) { setWishlisted(true); showWishlistToast("Saved to wishlist"); }
-        else showWishlistToast("Could not save");
-      }
-    } finally {
-      setWishlistBusy(false);
-    }
-  };
-
-  const resolvedGallery = (() => {
-    const rawGallery = Array.isArray(product.gallery) ? product.gallery.filter(Boolean) : [];
-    return rawGallery.length > 0
-      ? rawGallery
-      : (typeof product.primaryImage === "string" && product.primaryImage.length > 0)
-        ? [product.primaryImage]
-        : [];
-  })();
-
-  // ── Features data ──────────────────────────────────────────
-  // product.features can be:
-  //   a) an array of plain-text strings  ["trivalent plating...", "pure alumina..."]
-  //   b) an array with ONE HTML string   ["<UL><LI>trivalent...</LI></UL>"]
-  //   c) null / empty
-  const featuresRaw = Array.isArray(product.features) ? product.features.filter(Boolean) : [];
-  // Detect if the first item is an HTML blob (vendor catalogs often store it this way)
-  const featuresIsHtml =
-    featuresRaw.length === 1 &&
-    typeof featuresRaw[0] === "string" &&
-    /<[a-z][^>]*>/i.test(featuresRaw[0]);
-  // Plain-text items only (used for bullet-list rendering)
-  const featuresArray = featuresIsHtml ? [] : featuresRaw;
-  // HTML blob (used for dangerouslySetInnerHTML)
-  const featuresHtml  = featuresIsHtml ? featuresRaw[0] : null;
-  // Total feature count for the tab label
-  const featuresCount = featuresIsHtml ? 1 : featuresArray.length;
-  const displaySku = product.internal_sku ?? product.sku;
-
-  // Inline notify button for related cards
-  function RelatedNotifyButton({ sku, productName, vendor }) {
-    const [state, setState] = useState("idle");
-    const handleClick = async (e) => {
-      e.stopPropagation();
-      if (state !== "idle" && state !== "error") return;
-      setState("loading");
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) { window.location.href = "/auth"; return; }
-        await fetch("/api/notifications/restock", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ product_sku: sku, product_name: productName, vendor, source: "pdp" }),
-        });
-        setState("done");
-      } catch { setState("error"); }
-    };
-    const label = { idle: "🔔 NOTIFY ME", loading: "...", done: "✓ ON THE LIST", error: "RETRY" }[state];
-    return (
-      <button
-        className={`related-notify-btn ${state === "done" ? "done" : ""}`}
-        onClick={handleClick}
-        disabled={state === "loading" || state === "done"}
-      >
-        {label}
-      </button>
+      },
+      { threshold: 0.5, root: containerRef.current }
     );
-  }
+    imgRefs.current.forEach(el => el && observer.observe(el));
+    return () => observer.disconnect();
+  }, [images]);
 
-  const toProxySrc = (src) =>
-    typeof src === "string" && src.startsWith("http") && src.includes("lemansnet.com")
-      ? `/api/img?u=${encodeURIComponent(src)}`
-      : (src ?? null);
+  const scrollTo = (i) => {
+    imgRefs.current[i]?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    setActive(i);
+  };
 
-  function RelatedCardImage({ product }) {
-    const src = toProxySrc(product.primaryImage ?? product.gallery?.[0] ?? "/images/placeholder.jpg");
-    const isPlaceholder = src === "/placeholder-product.png" || src === "/images/placeholder.jpg";
+  if (!images?.length) {
     return (
-      <div className="related-img">
-        {isPlaceholder ? (
-          <span style={{ fontFamily:"var(--font-stencil),monospace", fontSize:8, color:"#3a3838", letterSpacing:"0.1em", position:"relative", zIndex:1 }}>
-            NO IMAGE
-          </span>
-        ) : (
-          <Image
-            src={src}
-            alt={product.name}
-            fill
-            style={{ objectFit:"cover", opacity: product.inStock ? 1 : 0.5 }}
-            unoptimized
-          />
-        )}
-        {!product.inStock && <span className="related-oos-badge">OUT OF STOCK</span>}
+      <div style={{
+        aspectRatio: "1",
+        background: CREAM2,
+        border: `1px solid ${BORDER}`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}>
+        <span style={{ fontFamily: FONT, fontSize: 9, letterSpacing: "2px", color: "#bbb" }}>
+          NO IMAGE
+        </span>
       </div>
     );
   }
 
   return (
-    <div className="pdp-wrap">
-      <style>{css}</style>
-
-      <NavBar activePage="shop" />
-
-      {/* ── BREADCRUMB ── */}
-      <div className="pdp-breadcrumb">
-        <Link href="/">HOME</Link>
-        <span className="sep">→</span>
-        <Link href="/browse">SHOP</Link>
-        <span className="sep">→</span>
-        <Link href={`/browse?category=${product.category}`}>{product.category?.toUpperCase()}</Link>
-        <span className="sep">→</span>
-        <span className="current">{product.name?.toUpperCase()}</span>
+    <div style={{ position: "relative" }}>
+      {/* Scrollable image stack */}
+      <div
+        ref={containerRef}
+        style={{
+          overflowY: images.length > 1 ? "auto" : "visible",
+          maxHeight: images.length > 1 ? "520px" : "none",
+          scrollSnapType: "y mandatory",
+          borderRadius: 2,
+          border: `1px solid ${BORDER}`,
+          background: "#fff",
+        }}
+      >
+        {images.map((src, i) => (
+          <div
+            key={i}
+            ref={el => imgRefs.current[i] = el}
+            style={{
+              aspectRatio: "1",
+              scrollSnapAlign: "start",
+              position: "relative",
+              background: "#fff",
+              flexShrink: 0,
+            }}
+          >
+            <Image
+              src={proxyImg(src) ?? src}
+              alt={`${name} ${i + 1}`}
+              fill
+              sizes="(max-width: 768px) 100vw, 50vw"
+              style={{ objectFit: "contain", padding: "12px" }}
+              unoptimized
+            />
+          </div>
+        ))}
       </div>
 
-      {/* ── MAIN GRID ── */}
-      <div className="pdp-main">
+      {/* Dot nav — right side */}
+      {images.length > 1 && (
+        <div style={{
+          position: "absolute",
+          right: -20,
+          top: "50%",
+          transform: "translateY(-50%)",
+          display: "flex",
+          flexDirection: "column",
+          gap: "8px",
+          alignItems: "center",
+        }}>
+          <button
+            onClick={() => scrollTo(Math.max(0, active - 1))}
+            style={{
+              background: "rgba(0,0,0,0.5)",
+              border: "none",
+              color: "#fff",
+              width: 20,
+              height: 20,
+              borderRadius: "50%",
+              cursor: "pointer",
+              fontSize: 10,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 0,
+            }}
+          >▲</button>
+          {images.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => scrollTo(i)}
+              style={{
+                width: i === active ? 8 : 6,
+                height: i === active ? 8 : 6,
+                borderRadius: "50%",
+                background: i === active ? GOLD : "rgba(0,0,0,0.25)",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+                transition: "all 0.2s",
+              }}
+            />
+          ))}
+          <button
+            onClick={() => scrollTo(Math.min(images.length - 1, active + 1))}
+            style={{
+              background: "rgba(0,0,0,0.5)",
+              border: "none",
+              color: "#fff",
+              width: 20,
+              height: 20,
+              borderRadius: "50%",
+              cursor: "pointer",
+              fontSize: 10,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 0,
+            }}
+          >▼</button>
+        </div>
+      )}
 
-        {/* LEFT — Gallery */}
-        <div className="gallery-col">
-          <div className="gallery-main">
-            {product.badge && (
-              <span className={`gallery-badge ${product.badge}`}>
-                {product.badge.toUpperCase()}
-              </span>
-            )}
-            {resolvedGallery.length > 0 && (resolvedGallery[activeImg] ?? resolvedGallery[0]) ? (
+      {/* Thumbnail strip */}
+      {images.length > 1 && (
+        <div style={{
+          display: "flex",
+          gap: "6px",
+          marginTop: "10px",
+          flexWrap: "wrap",
+        }}>
+          {images.map((src, i) => (
+            <button
+              key={i}
+              onClick={() => scrollTo(i)}
+              style={{
+                width: 56,
+                height: 56,
+                border: `2px solid ${i === active ? GOLD : BORDER}`,
+                background: "#fff",
+                padding: 2,
+                cursor: "pointer",
+                flexShrink: 0,
+                position: "relative",
+                overflow: "hidden",
+                transition: "border-color 0.15s",
+              }}
+            >
               <Image
-                src={resolvedGallery[activeImg] ?? resolvedGallery[0]}
-                alt={product.name}
+                src={proxyImg(src) ?? src}
+                alt={`thumb ${i + 1}`}
                 fill
-                sizes="(max-width: 768px) 100vw, 70vw"
-                style={{ objectFit:"contain", zIndex:1 }}
+                style={{ objectFit: "contain" }}
+                unoptimized
               />
-            ) : (
-              <div className="gallery-placeholder">NO IMAGE AVAILABLE</div>
-            )}
-          </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
-          {/* Thumbnails */}
-          {resolvedGallery.length > 1 && (
-            <div className="gallery-thumbs">
-              {resolvedGallery.map((img, i) => (
-                <div
-                  key={i}
-                  className={`gallery-thumb ${activeImg === i ? "active" : ""}`}
-                  onClick={() => setActiveImg(i)}
-                >
-                  <Image
-                    src={img}
-                    alt={`${product.name} view ${i + 1}`}
-                    fill
-                    sizes="72px"
-                    style={{ objectFit:"cover" }}
-                  />
-                </div>
-              ))}
+// ── OEM Ribbon badge ─────────────────────────────────────────
+function OemRibbon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 22" width={72} height={22}>
+      <defs>
+        <linearGradient id="oem-g" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#ffd700" />
+          <stop offset="50%" stopColor="#c8a800" />
+          <stop offset="100%" stopColor="#a88800" />
+        </linearGradient>
+      </defs>
+      <path d="M6,2 L66,2 L72,11 L66,20 L6,20 L0,11 Z" fill="rgba(0,0,0,0.12)" transform="translate(1,1.5)" />
+      <path d="M6,2 L66,2 L72,11 L66,20 L6,20 L0,11 Z" fill="url(#oem-g)" />
+      <path d="M8,5 L64,5 L69,11 L64,17 L8,17 L3,11 Z" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="0.75" />
+      <text x="36" y="15" textAnchor="middle" fontFamily="'Barlow Condensed','Arial Narrow',sans-serif" fontWeight="700" fontSize="9" letterSpacing="1.5" fill="rgba(0,0,0,0.75)">OEM</text>
+    </svg>
+  );
+}
+
+// ── Tabs ─────────────────────────────────────────────────────
+function Tabs({ tabs, active, onChange }) {
+  return (
+    <div style={{
+      display: "flex",
+      borderBottom: `2px solid ${BORDER}`,
+      marginBottom: "20px",
+      gap: 0,
+      overflowX: "auto",
+    }}>
+      {tabs.map(t => (
+        <button
+          key={t.key}
+          onClick={() => onChange(t.key)}
+          style={{
+            padding: "10px 18px",
+            background: "none",
+            border: "none",
+            borderBottom: `2px solid ${active === t.key ? GOLD : "transparent"}`,
+            marginBottom: "-2px",
+            fontFamily: FONT,
+            fontSize: "9px",
+            letterSpacing: "2px",
+            textTransform: "uppercase",
+            color: active === t.key ? GOLD : "#888",
+            cursor: "pointer",
+            whiteSpace: "nowrap",
+            transition: "color 0.15s",
+          }}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ── Fitment Table ─────────────────────────────────────────────
+function FitmentTable({ fitment }) {
+  if (!fitment?.length) {
+    return (
+      <p style={{ fontFamily: FONT, fontSize: 10, color: "#aaa", letterSpacing: "1px" }}>
+        FITMENT DATA PENDING
+      </p>
+    );
+  }
+
+  // Group by model_code
+  const grouped = {};
+  fitment.forEach(f => {
+    const key = f.model ?? f.model_code ?? "—";
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(f.year_start === f.year_end ? `${f.year_start}` : `${f.year_start}–${f.year_end}`);
+  });
+
+  return (
+    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <thead>
+        <tr>
+          {["Make", "Model", "Years"].map(h => (
+            <td key={h} style={{
+              fontFamily: FONT,
+              fontSize: "8px",
+              letterSpacing: "2px",
+              color: GOLD,
+              padding: "8px 12px",
+              borderBottom: `1px solid ${BORDER}`,
+              textTransform: "uppercase",
+            }}>{h}</td>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {Object.entries(grouped).map(([model, years], i) => (
+          <tr key={model} style={{ background: i % 2 === 0 ? CREAM : "#fff" }}>
+            <td style={{ padding: "8px 12px", fontFamily: FONT, fontSize: 11, color: DARK }}>Harley-Davidson</td>
+            <td style={{ padding: "8px 12px", fontFamily: FONT, fontSize: 11, color: DARK }}>{model}</td>
+            <td style={{ padding: "8px 12px", fontFamily: FONT, fontSize: 11, color: DARK }}>{years.join(", ")}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+// ── Product Modal ─────────────────────────────────────────────
+function ProductModal({ product, fitment, onClose }) {
+  const [tab, setTab] = useState("description");
+  const gallery = Array.isArray(product.gallery) ? product.gallery.filter(Boolean) : [];
+
+  const tabs = [
+    { key: "description", label: "Description" },
+    ...(product.features?.length ? [{ key: "features", label: `Features` }] : []),
+    { key: "fitment", label: `Fitment${fitment?.length ? ` (${fitment.length})` : ""}` },
+    ...(product.oemNumbers?.length ? [{ key: "oem", label: "OEM" }] : []),
+  ];
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.55)",
+        zIndex: 200,
+        display: "flex",
+        alignItems: "flex-end",
+        justifyContent: "center",
+        padding: "0",
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: CREAM,
+          width: "100%",
+          maxWidth: 680,
+          maxHeight: "92vh",
+          overflowY: "auto",
+          borderRadius: "12px 12px 0 0",
+          padding: "24px 20px 48px",
+        }}
+      >
+        {/* Handle bar */}
+        <div style={{
+          width: 40,
+          height: 4,
+          background: BORDER,
+          borderRadius: 2,
+          margin: "0 auto 20px",
+        }} />
+
+        {/* Header */}
+        <div style={{ display: "flex", gap: 16, marginBottom: 20 }}>
+          {gallery[0] && (
+            <div style={{ width: 80, height: 80, flexShrink: 0, position: "relative", border: `1px solid ${BORDER}`, background: "#fff" }}>
+              <Image src={proxyImg(gallery[0]) ?? gallery[0]} alt={product.name} fill style={{ objectFit: "contain", padding: 4 }} unoptimized />
             </div>
           )}
-
-          {/* Specs/Fitment/Description moved to tabbed section below */}
+          <div style={{ flex: 1 }}>
+            <div style={{ fontFamily: FONT, fontSize: 9, color: GOLD, letterSpacing: "2px", marginBottom: 4 }}>{product.brand}</div>
+            <div style={{ fontFamily: FONT, fontSize: 14, color: DARK, lineHeight: 1.3, textTransform: "uppercase", letterSpacing: "0.5px" }}>{product.name}</div>
+            <div style={{ fontFamily: FONT, fontSize: 9, color: "#aaa", letterSpacing: "1px", marginTop: 4 }}>SKU: {product.sku}</div>
+          </div>
+          <div style={{ fontFamily: FONT, fontSize: 22, color: DARK, fontWeight: 700, letterSpacing: "0.5px" }}>
+            {fmt(product.price)}
+          </div>
         </div>
 
-        {/* RIGHT — Info */}
-        <div className="info-col">
-          {activeBrand && <div className="info-brand">{activeBrand}</div>}
-          <div className="info-name">{product.name}</div>
-          {(displaySku || product.oemPartNumber) && (
-            <div className="info-sku">
-              {displaySku && `SKU: ${displaySku}`}
-              {displaySku && product.oemPartNumber && ` · `}
-              {product.oemPartNumber && `OEM: ${product.oemPartNumber}`}
-            </div>
-          )}
-
-          {/* Brand / vendor option cards */}
-          {groupOptions && groupOptions.length > 1 && (
-            <div>
-              <div className="brand-opts-label">SELECT BRAND / OPTION</div>
-              <div className="brand-opts">
-                {groupOptions.map((opt) => {
-                  const optBrand  = opt.display_brand || opt.brand || "Unknown Brand";
-                  const optPrice  = opt.msrp ? Number(opt.msrp) : null;
-                  const selected  = opt.vendor_sku === selectedSku;
-                  return (
-                    <div
-                      key={opt.vendor_sku}
-                      className={`brand-opt${selected ? " selected" : ""}${!opt.in_stock ? " oos" : ""}`}
-                      onClick={() => setSelectedSku(opt.vendor_sku)}
-                      role="radio"
-                      aria-checked={selected}
-                    >
-                      <div className="brand-opt-radio">
-                        <div className="brand-opt-radio-dot" />
-                      </div>
-                      <div className="brand-opt-body">
-                        <div className="brand-opt-name">{optBrand.toUpperCase()}</div>
-                        {opt.internal_sku && <div className="brand-opt-part">{opt.internal_sku}</div>}
-                      </div>
-                      <div className="brand-opt-right">
-                        {optPrice != null && (
-                          <div className="brand-opt-price">${optPrice.toFixed(2)}</div>
-                        )}
-                        <div className={`brand-opt-stock ${opt.in_stock ? "in" : "out"}`}>
-                          {opt.in_stock
-                            ? (opt.stock_quantity > 5 ? "IN STOCK" : `ONLY ${opt.stock_quantity} LEFT`)
-                            : "OUT OF STOCK"}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Fitment badge */}
-          <div className={`fitment-badge ${fitmentStatus}`}>
-            <div className="fitment-dot"/>
-            {fitmentLabel}
+        {/* Stock + OEM badges */}
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16 }}>
+          <div style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            fontFamily: FONT,
+            fontSize: 9,
+            letterSpacing: "1px",
+            color: product.inStock ? "#22a85a" : "#aaa",
+          }}>
+            <div style={{ width: 6, height: 6, borderRadius: "50%", background: product.inStock ? "#22a85a" : "#aaa" }} />
+            {product.inStock ? "IN STOCK" : "OUT OF STOCK"}
           </div>
+          {product.oemNumbers?.length > 0 && <OemRibbon />}
+        </div>
 
-          {/* Variant selector */}
-          {variantGroupEntries.length > 0 && (
-            <div className="variants-section">
-              {variantGroupEntries.map(([groupName, values]) => (
-                <div key={groupName} className="variant-group">
-                  <div className="variant-group-label">
-                    {groupName}: <span style={{ color:"#f0ebe3" }}>{selectedVariants[groupName]}</span>
-                  </div>
-                  <div className="variant-btns">
-                    {values.map(val => (
-                      <button
-                        key={val}
-                        className={`variant-btn ${selectedVariants[groupName] === val ? "selected" : ""}`}
-                        onClick={() => setSelectedVariants(prev => ({ ...prev, [groupName]: val }))}
-                      >
-                        {val}
-                      </button>
-                    ))}
-                  </div>
+        {/* Placeholder Add to Cart */}
+        <button
+          disabled={!product.inStock}
+          style={{
+            width: "100%",
+            height: 48,
+            background: product.inStock ? GOLD : CREAM2,
+            border: `1px solid ${product.inStock ? GOLD : BORDER}`,
+            color: product.inStock ? "#fff" : "#aaa",
+            fontFamily: FONT,
+            fontSize: "11px",
+            letterSpacing: "3px",
+            textTransform: "uppercase",
+            cursor: product.inStock ? "pointer" : "not-allowed",
+            marginBottom: 24,
+            transition: "all 0.15s",
+          }}
+        >
+          {product.inStock ? "Add to Cart" : "Out of Stock"}
+        </button>
+
+        {/* Tabs */}
+        <Tabs tabs={tabs} active={tab} onChange={setTab} />
+
+        {tab === "description" && (
+          <div style={{ fontFamily: FONT, fontSize: 12, color: DARK, lineHeight: 1.8, letterSpacing: "0.3px" }}>
+            {product.description
+              ? <div dangerouslySetInnerHTML={{ __html: product.description }} />
+              : <p style={{ color: "#aaa" }}>{product.name} by {product.brand}.</p>
+            }
+          </div>
+        )}
+
+        {tab === "features" && (
+          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+            {(Array.isArray(product.features) ? product.features : []).filter(Boolean).map((f, i) => (
+              <li key={i} style={{
+                display: "flex",
+                gap: 10,
+                padding: "8px 0",
+                borderBottom: `1px solid ${BORDER}`,
+                fontFamily: FONT,
+                fontSize: 11,
+                color: DARK,
+                lineHeight: 1.6,
+              }}>
+                <span style={{ color: GOLD, flexShrink: 0 }}>▸</span> {f}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {tab === "fitment" && (
+          <div>
+            <FitmentTable fitment={fitment} />
+            {product.oemNumbers?.length > 0 && (
+              <div style={{ marginTop: 24, paddingTop: 16, borderTop: `1px solid ${BORDER}` }}>
+                <div style={{ fontFamily: FONT, fontSize: 8, letterSpacing: "2px", color: "#aaa", marginBottom: 10 }}>OEM NUMBERS</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {product.oemNumbers.map((n, i) => (
+                    <span key={i} style={{
+                      fontFamily: FONT,
+                      fontSize: 10,
+                      padding: "4px 10px",
+                      background: "#fff",
+                      border: `1px solid ${BORDER}`,
+                      color: DARK,
+                    }}>{n}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {tab === "oem" && (
+          <div>
+            <div style={{ fontFamily: FONT, fontSize: 8, letterSpacing: "2px", color: "#aaa", marginBottom: 10 }}>OEM NUMBERS</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 24 }}>
+              {product.oemNumbers.map((n, i) => (
+                <span key={i} style={{
+                  fontFamily: FONT,
+                  fontSize: 11,
+                  padding: "6px 12px",
+                  background: "#fff",
+                  border: `1px solid ${BORDER}`,
+                  color: DARK,
+                  letterSpacing: "1px",
+                }}>{n}</span>
+              ))}
+            </div>
+            {product.specialInstructions && (
+              <div style={{
+                padding: "14px 16px",
+                background: "rgba(184,146,42,0.06)",
+                border: `1px solid rgba(184,146,42,0.2)`,
+                marginBottom: 16,
+              }}>
+                <div style={{ fontFamily: FONT, fontSize: 8, letterSpacing: "2px", color: GOLD, marginBottom: 8 }}>⚠ SPECIAL INSTRUCTIONS</div>
+                <div style={{ fontFamily: FONT, fontSize: 11, color: DARK, lineHeight: 1.7 }}>{product.specialInstructions}</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Dimensions */}
+        {(product.weight || product.heightIn || product.widthIn || product.lengthIn) && (
+          <div style={{ marginTop: 20, paddingTop: 16, borderTop: `1px solid ${BORDER}` }}>
+            <div style={{ fontFamily: FONT, fontSize: 8, letterSpacing: "2px", color: "#aaa", marginBottom: 10 }}>DIMENSIONS</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 16px" }}>
+              {[
+                ["Weight", product.weight && `${product.weight} lb`],
+                ["Height", product.heightIn && `${product.heightIn} in`],
+                ["Width",  product.widthIn  && `${product.widthIn} in`],
+                ["Length", product.lengthIn && `${product.lengthIn} in`],
+              ].filter(([,v]) => v).map(([label, val]) => (
+                <div key={label}>
+                  <div style={{ fontFamily: FONT, fontSize: 8, color: "#aaa", letterSpacing: "1px" }}>{label}</div>
+                  <div style={{ fontFamily: FONT, fontSize: 11, color: DARK }}>{val}</div>
                 </div>
               ))}
             </div>
-          )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Related Product Card ──────────────────────────────────────
+function RelatedCard({ product, onOpenModal, fitment }) {
+  const [imgErr, setImgErr] = useState(false);
+  const src = proxyImg(product.primaryImage ?? product.gallery?.[0]);
+
+  return (
+    <div
+      onClick={() => onOpenModal(product)}
+      style={{
+        background: "#fff",
+        border: `1px solid ${BORDER}`,
+        cursor: "pointer",
+        transition: "border-color 0.15s, transform 0.15s",
+        overflow: "hidden",
+      }}
+      onMouseEnter={e => { e.currentTarget.style.borderColor = GOLD; e.currentTarget.style.transform = "translateY(-2px)"; }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = BORDER; e.currentTarget.style.transform = ""; }}
+    >
+      <div style={{ aspectRatio: "1", background: CREAM, position: "relative" }}>
+        {src && !imgErr ? (
+          <Image src={src} alt={product.name} fill style={{ objectFit: "contain", padding: 8 }} unoptimized onError={() => setImgErr(true)} />
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", fontFamily: FONT, fontSize: 8, color: "#ccc", letterSpacing: "1px" }}>NO IMAGE</div>
+        )}
+        {product.oemNumbers?.length > 0 && (
+          <div style={{ position: "absolute", top: 6, left: 0 }}><OemRibbon /></div>
+        )}
+        {!product.inStock && (
+          <div style={{
+            position: "absolute", top: 6, right: 6,
+            background: "rgba(255,255,255,0.9)",
+            border: "1px solid #ddd",
+            fontFamily: FONT, fontSize: 8, color: "#aaa",
+            padding: "2px 6px", letterSpacing: "1px",
+          }}>OUT OF STOCK</div>
+        )}
+      </div>
+      <div style={{ padding: "10px 12px 14px", borderTop: `1px solid ${BORDER}` }}>
+        <div style={{ fontFamily: FONT, fontSize: 8, color: GOLD, letterSpacing: "2px", marginBottom: 3 }}>{product.brand}</div>
+        <div style={{
+          fontFamily: FONT, fontSize: 11, color: DARK, lineHeight: 1.3,
+          textTransform: "uppercase", letterSpacing: "0.5px",
+          display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
+          marginBottom: 8,
+        }}>{product.name}</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontFamily: FONT, fontSize: 14, color: DARK }}>{fmt(product.price)}</span>
+          <span style={{ fontFamily: FONT, fontSize: 8, color: GOLD, letterSpacing: "1px" }}>VIEW →</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Component ────────────────────────────────────────────
+export default function ProductDetailClient({ product, variants = [], fitment = [], relatedProducts = [] }) {
+  const [tab, setTab]           = useState("description");
+  const [qty, setQty]           = useState(1);
+  const [modalProduct, setModalProduct] = useState(null);
+  const [cartToast, setCartToast] = useState(false);
+
+  const gallery = Array.isArray(product.gallery) ? product.gallery.filter(Boolean) : [];
+
+  const tabs = [
+    { key: "description", label: "Description" },
+    ...(product.features?.length ? [{ key: "features", label: `Features (${product.features.filter(Boolean).length})` }] : []),
+    { key: "fitment", label: `Fitment${fitment?.length ? ` (${fitment.length})` : ""}` },
+    ...(product.oemNumbers?.length ? [{ key: "oem", label: "OEM" }] : []),
+    ...(product.specs?.length ? [{ key: "specs", label: "Specs" }] : []),
+  ];
+
+  const handleAddToCart = () => {
+    // Placeholder — cart not yet wired
+    setCartToast(true);
+    setTimeout(() => setCartToast(false), 2000);
+  };
+
+  const featuresRaw = Array.isArray(product.features) ? product.features.filter(Boolean) : [];
+  const featuresIsHtml = featuresRaw.length === 1 && /<[a-z][^>]*>/i.test(featuresRaw[0] ?? "");
+  const featuresHtml  = featuresIsHtml ? featuresRaw[0] : null;
+  const featuresArray = featuresIsHtml ? [] : featuresRaw;
+
+  return (
+    <div style={{ background: CREAM, minHeight: "100vh" }}>
+      <NavBar activePage="shop" />
+
+      {/* Breadcrumb */}
+      <div style={{
+        background: CREAM2,
+        borderBottom: `1px solid ${BORDER}`,
+        padding: "10px 24px",
+        display: "flex",
+        alignItems: "center",
+        gap: "6px",
+        fontFamily: FONT,
+        fontSize: 9,
+        color: "#aaa",
+        letterSpacing: "1px",
+        flexWrap: "wrap",
+      }}>
+        <Link href="/" style={{ color: "#aaa", textDecoration: "none" }}>HOME</Link>
+        <span>→</span>
+        <Link href="/browse" style={{ color: "#aaa", textDecoration: "none" }}>SHOP</Link>
+        <span>→</span>
+        <Link href={`/browse?category=${product.category}`} style={{ color: "#aaa", textDecoration: "none" }}>
+          {product.category?.toUpperCase()}
+        </Link>
+        <span>→</span>
+        <span style={{ color: DARK }}>{product.name?.toUpperCase()}</span>
+      </div>
+
+      {/* Main grid */}
+      <div style={{
+        maxWidth: 1200,
+        margin: "0 auto",
+        padding: "32px 24px",
+        display: "grid",
+        gridTemplateColumns: "1fr 400px",
+        gap: "48px",
+      }} className="pdp-main-grid">
+
+        {/* Gallery */}
+        <div style={{ paddingRight: 24 }}>
+          <VerticalGallery images={gallery} name={product.name} />
+        </div>
+
+        {/* Info */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+
+          {/* Brand */}
+          <div style={{ fontFamily: FONT, fontSize: 9, color: GOLD, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 8 }}>
+            {product.brand}
+          </div>
+
+          {/* Name */}
+          <h1 style={{ fontFamily: FONT, fontSize: 28, color: DARK, lineHeight: 1.1, letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: 10 }}>
+            {product.name}
+          </h1>
+
+          {/* SKU + OEM badges */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+            <span style={{ fontFamily: FONT, fontSize: 9, color: "#aaa", letterSpacing: "1px" }}>
+              SKU: {product.sku}
+            </span>
+            {product.oemNumbers?.length > 0 && <OemRibbon />}
+          </div>
 
           {/* Price */}
-          <div className="price-block">
+          <div style={{ marginBottom: 16 }}>
             {product.was && (
-              <div className="price-was">${product.was.toFixed(2)}</div>
+              <div style={{ fontFamily: FONT, fontSize: 13, color: "#aaa", textDecoration: "line-through", marginBottom: 2 }}>
+                {fmt(product.was)}
+              </div>
             )}
-            <div className="price-main">${activePrice.toFixed(2)}</div>
-            {product.mapPrice && (
-              <div className="price-map-note">MAP PRICE: ${product.mapPrice.toFixed(2)}</div>
-            )}
-            {product.pointsEarned > 0 && (
-              <div className="price-points">
-                EARN {product.pointsEarned.toLocaleString()} POINTS ON THIS ORDER
+            <div style={{ fontFamily: FONT, fontSize: 42, color: DARK, letterSpacing: "0.5px", lineHeight: 1 }}>
+              {fmt(product.price)}
+            </div>
+            {product.hasMapPolicy && (
+              <div style={{ fontFamily: FONT, fontSize: 8, color: "#aaa", letterSpacing: "1px", marginTop: 4 }}>
+                MAP POLICY APPLIES
               </div>
             )}
           </div>
 
           {/* Stock */}
-          <div className="stock-row">
-            <div className={`stock-dot ${activeInStock ? "in" : "out"}`}/>
-            <span className={`stock-label ${activeInStock ? "in" : "out"}`}>
-              {(() => {
-                if (!activeInStock || activeStock <= 0) return "OUT OF STOCK";
-                if (activeStock > 5) return "IN STOCK";
-                return `ONLY ${activeStock} LEFT`;
-              })()}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
+            <div style={{
+              width: 7, height: 7, borderRadius: "50%",
+              background: product.inStock ? "#22a85a" : "#aaa",
+              boxShadow: product.inStock ? "0 0 5px #22a85a" : "none",
+            }} />
+            <span style={{ fontFamily: FONT, fontSize: 9, letterSpacing: "1px", color: product.inStock ? "#22a85a" : "#aaa" }}>
+              {product.inStock ? "IN STOCK" : "OUT OF STOCK"}
             </span>
           </div>
 
           {/* Qty + Add to Cart */}
-          <div className="purchase-row">
-            <div className="qty-wrap">
-              <button className="qty-btn" onClick={() => setQty(q => Math.max(1, q-1))} disabled={qty <= 1}>−</button>
-              <div className="qty-val">QTY: {qty}</div>
-              <button className="qty-btn" onClick={() => setQty(q => Math.min(Number(product.stockQty ?? 10), q+1))} disabled={!activeInStock}>+</button>
+          <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              border: `1px solid ${BORDER}`,
+              background: "#fff",
+              flexShrink: 0,
+            }}>
+              <button
+                onClick={() => setQty(q => Math.max(1, q - 1))}
+                style={{ width: 36, height: 48, background: "none", border: "none", cursor: "pointer", fontFamily: FONT, fontSize: 18, color: DARK }}
+              >−</button>
+              <span style={{ width: 40, textAlign: "center", fontFamily: FONT, fontSize: 16, color: DARK }}>{qty}</span>
+              <button
+                onClick={() => setQty(q => q + 1)}
+                style={{ width: 36, height: 48, background: "none", border: "none", cursor: "pointer", fontFamily: FONT, fontSize: 18, color: DARK }}
+              >+</button>
             </div>
-
-            {activeInStock ? (
-              <button className={`add-to-cart-btn ${added ? "added" : ""}`} onClick={handleAdd}>
-                {added ? "✓ ADDED TO CART" : "ADD TO CART"}
-              </button>
-            ) : (
-              <NotifyMeButton
-                sku={activeOption?.vendor_sku ?? product.sku}
-                productName={product.name}
-                vendor={product.vendor ?? "wps"}
-                source="pdp"
-              />
-            )}
-
             <button
-              className={`wishlist-btn ${wishlisted ? "active" : ""}`}
-              onClick={handleWishlistToggle}
-              title={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
-              disabled={wishlistBusy}
+              onClick={handleAddToCart}
+              disabled={!product.inStock}
+              style={{
+                flex: 1,
+                height: 48,
+                background: product.inStock ? GOLD : CREAM2,
+                border: `1px solid ${product.inStock ? GOLD : BORDER}`,
+                color: product.inStock ? "#fff" : "#aaa",
+                fontFamily: FONT,
+                fontSize: "11px",
+                letterSpacing: "3px",
+                textTransform: "uppercase",
+                cursor: product.inStock ? "pointer" : "not-allowed",
+                transition: "all 0.15s",
+              }}
             >
-              {wishlisted ? "♥" : "♡"}
+              {cartToast ? "✓ Added" : product.inStock ? "Add to Cart" : "Out of Stock"}
             </button>
           </div>
 
           {/* Perks */}
-          <div className="perks-strip">
-            <div className="perk">
-              <span className="perk-icon">🚚</span>
-              <div className="perk-text">
-                <strong>{product.shipping ? "FREE SHIPPING" : "FLAT RATE $9.99"}</strong>
-                {product.shipping ? "ON THIS ORDER" : "SHIPS IN 1–2 DAYS"}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 24 }}>
+            {[
+              ["🚚", "Free Shipping", "Orders over $99"],
+              ["↩", "Easy Returns", "30-day policy"],
+              ["🔒", "Secure Checkout", "SSL encrypted"],
+              ["📦", "Fast Dispatch", "Same day on most"],
+            ].map(([icon, title, sub]) => (
+              <div key={title} style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "10px 12px",
+                background: "#fff",
+                border: `1px solid ${BORDER}`,
+              }}>
+                <span style={{ fontSize: 16 }}>{icon}</span>
+                <div>
+                  <div style={{ fontFamily: FONT, fontSize: 9, color: DARK, letterSpacing: "0.5px" }}>{title}</div>
+                  <div style={{ fontFamily: FONT, fontSize: 8, color: "#aaa", letterSpacing: "0.5px" }}>{sub}</div>
+                </div>
               </div>
+            ))}
+          </div>
+
+          {/* Special instructions */}
+          {product.specialInstructions && (
+            <div style={{
+              padding: "14px 16px",
+              background: "rgba(184,146,42,0.06)",
+              border: `1px solid rgba(184,146,42,0.2)`,
+              marginBottom: 20,
+            }}>
+              <div style={{ fontFamily: FONT, fontSize: 8, letterSpacing: "2px", color: GOLD, marginBottom: 8 }}>⚠ SPECIAL INSTRUCTIONS</div>
+              <div style={{ fontFamily: FONT, fontSize: 11, color: DARK, lineHeight: 1.7 }}>{product.specialInstructions}</div>
             </div>
-            <div className="perk">
-              <span className="perk-icon">↩</span>
-              <div className="perk-text">
-                <strong>30-DAY RETURNS</strong>
-                HASSLE-FREE POLICY
-              </div>
-            </div>
-            <div className="perk">
-              <span className="perk-icon">🔒</span>
-              <div className="perk-text">
-                <strong>MAP PROTECTED</strong>
-                BEST PRICE GUARANTEED
-              </div>
-            </div>
-            {product.pointsEarned > 0 && (
-              <div className="perk">
-                <span className="perk-icon">★</span>
-                <div className="perk-text">
-                  <strong>{product.pointsEarned.toLocaleString()} POINTS</strong>
-                  EARNED ON THIS ORDER
+          )}
+        </div>
+      </div>
+
+      {/* Tabs section */}
+      <div style={{
+        maxWidth: 1200,
+        margin: "0 auto",
+        padding: "0 24px 60px",
+        borderTop: `1px solid ${BORDER}`,
+      }}>
+        <div style={{ paddingTop: 24 }}>
+          <Tabs tabs={tabs} active={tab} onChange={setTab} />
+        </div>
+
+        {tab === "description" && (
+          <div style={{ fontFamily: FONT, fontSize: 13, color: DARK, lineHeight: 1.8, maxWidth: 780 }}>
+            {product.description
+              ? <div dangerouslySetInnerHTML={{ __html: product.description }} />
+              : (
+                <div style={{ color: "#aaa" }}>
+                  <p>{product.name} by {product.brand}.</p>
+                  {product.weight && <p style={{ marginTop: 8 }}>Weight: {product.weight} lbs</p>}
+                  <p style={{ marginTop: 8 }}>Category: {product.category}</p>
+                </div>
+              )
+            }
+          </div>
+        )}
+
+        {tab === "features" && (
+          <div style={{ maxWidth: 780 }}>
+            {featuresHtml ? (
+              <div style={{ fontFamily: FONT, fontSize: 13, color: DARK, lineHeight: 1.8 }}
+                dangerouslySetInnerHTML={{ __html: featuresHtml }} />
+            ) : (
+              <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                {featuresArray.map((f, i) => (
+                  <li key={i} style={{
+                    display: "flex", gap: 10, padding: "9px 0",
+                    borderBottom: `1px solid ${BORDER}`,
+                    fontFamily: FONT, fontSize: 12, color: DARK, lineHeight: 1.6,
+                  }}>
+                    <span style={{ color: GOLD, flexShrink: 0 }}>▸</span> {f}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {tab === "fitment" && (
+          <div>
+            <FitmentTable fitment={fitment} />
+            {product.oemNumbers?.length > 0 && (
+              <div style={{ marginTop: 32, paddingTop: 20, borderTop: `1px solid ${BORDER}` }}>
+                <div style={{ fontFamily: FONT, fontSize: 8, letterSpacing: "2px", color: "#aaa", marginBottom: 10 }}>OEM NUMBERS</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {product.oemNumbers.map((n, i) => (
+                    <span key={i} style={{
+                      fontFamily: FONT, fontSize: 10, padding: "4px 10px",
+                      background: CREAM2, border: `1px solid ${BORDER}`, color: DARK,
+                    }}>{n}</span>
+                  ))}
                 </div>
               </div>
             )}
           </div>
-        </div>
+        )}
+
+        {tab === "oem" && (
+          <div style={{ maxWidth: 780 }}>
+            <div style={{ fontFamily: FONT, fontSize: 8, letterSpacing: "2px", color: "#aaa", marginBottom: 12 }}>OEM NUMBERS</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 24 }}>
+              {product.oemNumbers?.map((n, i) => (
+                <span key={i} style={{
+                  fontFamily: FONT, fontSize: 12, padding: "6px 14px",
+                  background: "#fff", border: `1px solid ${BORDER}`, color: DARK, letterSpacing: "1px",
+                }}>{n}</span>
+              ))}
+            </div>
+            {product.upc && (
+              <div style={{ fontFamily: FONT, fontSize: 10, color: "#aaa", letterSpacing: "1px" }}>
+                UPC: {product.upc}
+              </div>
+            )}
+          </div>
+        )}
+
+        {tab === "specs" && product.specs?.length > 0 && (
+          <table style={{ width: "100%", maxWidth: 600, borderCollapse: "collapse" }}>
+            <tbody>
+              {product.specs.map((s, i) => (
+                <tr key={i} style={{ background: i % 2 === 0 ? CREAM : "#fff" }}>
+                  <td style={{ padding: "10px 14px", fontFamily: FONT, fontSize: 9, color: "#aaa", letterSpacing: "1px", width: 180, textTransform: "uppercase" }}>{s.label}</td>
+                  <td style={{ padding: "10px 14px", fontFamily: FONT, fontSize: 11, color: DARK }}>{s.value}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
-          {/* Enriched data */}
-          {featuresCount > 0 && (
-            <section className="enriched-section">
-              <h2 className="enriched-heading">Features</h2>
-              {featuresHtml ? (
-                <div
-                  className="prose prose-invert max-w-none text-sm text-gray-300"
-                  style={{ lineHeight: 1.7, color: "#c4c0bc", fontSize: 14 }}
-                  dangerouslySetInnerHTML={{ __html: featuresHtml }}
-                />
-              ) : (
-                <ul className="enriched-list">
-                  {featuresArray.map((feature, i) => (
-                    <li key={i}>
-                      <span className="enriched-bullet">▸</span>
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          )}
-
-          {(product.heightIn || product.widthIn || product.lengthIn || product.weight) && (
-            <section className="enriched-section">
-              <h2 className="enriched-heading">Specs / Dimensions</h2>
-              <dl className="enriched-grid">
-                {product.heightIn && (
-                  <>
-                    <dt className="enriched-term">Height</dt>
-                    <dd className="enriched-value">{product.heightIn} in</dd>
-                  </>
-                )}
-                {product.widthIn && (
-                  <>
-                    <dt className="enriched-term">Width</dt>
-                    <dd className="enriched-value">{product.widthIn} in</dd>
-                  </>
-                )}
-                {product.lengthIn && (
-                  <>
-                    <dt className="enriched-term">Length</dt>
-                    <dd className="enriched-value">{product.lengthIn} in</dd>
-                  </>
-                )}
-                {product.weight && (
-                  <>
-                    <dt className="enriched-term">Weight</dt>
-                    <dd className="enriched-value">{product.weight} lb</dd>
-                  </>
-                )}
-              </dl>
-            </section>
-          )}
-
-          {product.oemNumbers?.length > 0 && (
-            <section className="enriched-section">
-              <h2 className="enriched-heading">OEM Information</h2>
-              <dl className="enriched-grid">
-                <>
-                  <dt className="enriched-term">OEM Numbers</dt>
-                  <dd className="enriched-value">
-                    <div className="enriched-chips">
-                      {product.oemNumbers.map((n, i) => (
-                        <span key={i} className="enriched-chip">
-                          {n}
-                        </span>
-                      ))}
-                    </div>
-                  </dd>
-                </>
-              </dl>
-            </section>
-          )}
-
-          {/* Special Instructions */}
-          {product.specialInstructions && (
-            <div className="special-instructions">
-              <div className="special-instructions-label">⚠ SPECIAL INSTRUCTIONS</div>
-              <div className="special-instructions-text">{product.specialInstructions}</div>
-            </div>
-          )}
-
-          {/* Tab shortcuts */}
-          {fitment.length > 0 && (
-            <div style={{ display:"flex", gap:8, marginTop:16 }}>
-              <button
-                onClick={() => { setActiveTab("fitment"); document.getElementById("pdp-tabs")?.scrollIntoView({ behavior:"smooth", block:"start" }); }}
-                style={{ background:"transparent", border:"1px solid #2a2828", color:"#8a8784",
-                         fontFamily:"var(--font-stencil),monospace", fontSize:9, letterSpacing:"0.12em",
-                         padding:"5px 12px", borderRadius:2, cursor:"pointer", transition:"all 0.15s" }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor="#e8621a"; e.currentTarget.style.color="#e8621a"; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor="#2a2828"; e.currentTarget.style.color="#8a8784"; }}
-              >
-                VIEW FITMENT ↓
-              </button>
-            </div>
-          )}
-	      {/* ── TABS: Description | Features | Fitment ── */}
-	      <div id="pdp-tabs" className="pdp-tabs-section">
-	        <div className="pdp-tab-strip">
-	          <button
-	            className={`pdp-tab ${activeTab === "description" ? "active" : ""}`}
-	            onClick={() => setActiveTab("description")}
-	          >
-	            DESCRIPTION
-	          </button>
-	          {featuresCount > 0 && (
-	            <button
-	              className={`pdp-tab ${activeTab === "features" ? "active" : ""}`}
-	              onClick={() => setActiveTab("features")}
-	            >
-	              FEATURES ({featuresCount})
-	            </button>
-	          )}
-	          <button
-	            className={`pdp-tab ${activeTab === "fitment" ? "active" : ""}`}
-	            onClick={() => setActiveTab("fitment")}
-	          >
-	            FITMENT {fitment.length > 0 ? `(${fitment.length})` : ""}
-	          </button>
-	        </div>
-
-	        {/* DESCRIPTION */}
-	        {activeTab === "description" && (
-	          <div>
-	            {product.description ? (
-	              <div
-	                className="prose prose-invert max-w-none text-sm text-gray-300"
-	                style={{ lineHeight:1.8, color:"#c4c0bc", fontSize:14 }}
-	                dangerouslySetInnerHTML={{ __html: product.description }}
-	              />
-	            ) : (
-	              <div style={{ fontFamily:"var(--font-stencil),monospace", fontSize:12, color:"#8a8784", letterSpacing:"0.05em", lineHeight:1.8 }}>
-	                <p>{product.name} by {product.brand}.</p>
-	                {product.weight && <p style={{ marginTop:8 }}>WEIGHT: {product.weight} LBS</p>}
-	                <p style={{ marginTop:8 }}>CATEGORY: {product.category?.toUpperCase()}</p>
-	              </div>
-	            )}
-	          </div>
-	        )}
-
-	        {/* FEATURES */}
-	        {activeTab === "features" && featuresCount > 0 && (
-	          <div>
-	            {featuresHtml ? (
-	              <div
-	                style={{ lineHeight:1.8, color:"#c4c0bc", fontSize:14 }}
-	                dangerouslySetInnerHTML={{ __html: featuresHtml }}
-	              />
-	            ) : (
-	              <ul style={{ listStyle:"none", padding:0, margin:0 }}>
-	                {featuresArray.map((f, i) => (
-	                  <li key={i} style={{
-	                    display:"flex", alignItems:"flex-start", gap:10,
-	                    padding:"9px 0", borderBottom:"1px solid #1a1919",
-	                    fontFamily:"var(--font-stencil),monospace",
-	                    fontSize:12, color:"#c4c0bc", letterSpacing:"0.04em", lineHeight:1.6
-	                  }}>
-	                    <span style={{ color:"#e8621a", flexShrink:0, marginTop:2 }}>▸</span>
-	                    {f}
-	                  </li>
-	                ))}
-	              </ul>
-	            )}
-	          </div>
-	        )}
-
-	        {/* FITMENT */}
-	        {activeTab === "fitment" && (
-	          fitment.length > 0 ? (
-	            <table className="fitment-table">
-	              <thead>
-	                <tr>
-	                  <td>MAKE</td>
-	                  <td>MODEL</td>
-	                  <td>YEARS</td>
-	                </tr>
-	              </thead>
-	              <tbody>
-	                {fitment.map((f, i) => (
-	                  <tr key={i}>
-	                    <td>{f.make ?? "—"}</td>
-	                    <td>{f.model ?? "—"}</td>
-	                    <td>
-	                      {f.year_start === f.year_end
-	                        ? f.year_start
-	                        : `${f.year_start}–${f.year_end}`}
-	                    </td>
-	                  </tr>
-	                ))}
-	              </tbody>
-	            </table>
-	          ) : (
-	            <div className="fitment-empty">
-	              FITMENT DATA PENDING — CHECK BACK AFTER ACES SYNC
-	            </div>
-	          )
-	        )}
-	      </div>
-
-      {/* ── RELATED PRODUCTS ── */}
+      {/* Related products */}
       {relatedProducts.length > 0 && (
-        <div className="related-section">
-          <div className="related-head">
-            <div className="related-title">
-              MORE FROM <span>{(activeBrand || "THIS CATEGORY").toUpperCase()}</span>
-            </div>
-            <a href={`/browse?category=${product.category}`} className="related-link">
-              VIEW ALL IN CATEGORY →
-            </a>
+        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px 60px" }}>
+          <div style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "baseline",
+            marginBottom: 20,
+            paddingTop: 24,
+            borderTop: `1px solid ${BORDER}`,
+          }}>
+            <span style={{ fontFamily: FONT, fontSize: 10, letterSpacing: "3px", color: DARK, textTransform: "uppercase" }}>
+              More from <span style={{ color: GOLD }}>{product.brand}</span>
+            </span>
+            <Link href={`/browse?category=${product.category}`} style={{
+              fontFamily: FONT, fontSize: 8, color: GOLD, letterSpacing: "1px", textDecoration: "none",
+            }}>
+              View All →
+            </Link>
           </div>
-          <div className="related-grid">
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
+            gap: 12,
+          }} className="related-grid">
             {relatedProducts.map(p => (
-              <div
+              <RelatedCard
                 key={p.id}
-                className="related-card"
-                onClick={() => window.location.href = `/browse/${p.slug}`}
-              >
-                <RelatedCardImage product={p} />
-                <div className="related-body">
-                  <div className="related-brand">{p.display_brand || p.brand}</div>
-                  <div className="related-name">{p.name}</div>
-                  <div className="related-footer">
-                    <div className="related-price" style={{ color: p.inStock ? "#f0ebe3" : "#8a8784" }}>
-                      ${p.price.toFixed(2)}
-                    </div>
-                    {p.inStock
-                      ? <span style={{fontFamily:"var(--font-stencil),monospace",fontSize:9,color:"#e8621a",letterSpacing:"0.1em"}}>VIEW →</span>
-                      : <span style={{fontFamily:"var(--font-stencil),monospace",fontSize:9,color:"#8a8784",letterSpacing:"0.1em"}}>OOS</span>
-                    }
-                  </div>
-                  {!p.inStock && (
-                    <RelatedNotifyButton sku={p.sku} productName={p.name} vendor={p.vendor ?? "wps"} />
-                  )}
-                </div>
-              </div>
+                product={p}
+                fitment={[]}
+                onOpenModal={setModalProduct}
+              />
             ))}
           </div>
         </div>
       )}
 
-      {/* ── TOASTS ── */}
-      {toast && (
-        <div className="toast">
-          ✓ {qty > 1 ? `${qty}× ` : ""}{product.name.split(" ").slice(0,3).join(" ")} ADDED TO CART
-        </div>
+      {/* Product Modal */}
+      {modalProduct && (
+        <ProductModal
+          product={modalProduct}
+          fitment={[]}
+          onClose={() => setModalProduct(null)}
+        />
       )}
-      {wishlistToast && (
-        <div className="toast" style={{background:"#e8621a"}}>
-          {wishlistToast.toUpperCase()}
-        </div>
-      )}
+
+      {/* Responsive styles */}
+      <style>{`
+        * { box-sizing: border-box; }
+        @media (max-width: 768px) {
+          .pdp-main-grid {
+            grid-template-columns: 1fr !important;
+            gap: 24px !important;
+            padding: 20px 16px !important;
+          }
+          .pdp-main-grid > div:first-child {
+            padding-right: 32px !important;
+          }
+          .related-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

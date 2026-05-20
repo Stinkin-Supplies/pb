@@ -27,12 +27,12 @@ const EXIT_KEYFRAMES: Record<string, string[]> = {
 const BRANDS_GRID = [
   // Row 1 — 2 hero brands
   { name: "Drag Specialties",   logo: "/brands/drag-specialties.svg",   href: "/browse?brand=Drag+Specialties"   },
-  { name: "V-Twin",             logo: "/brands/v-twin.svg",             href: "/browse?brand=V-Twin"             },
+  { name: "Cometic",            logo: "/brands/cometic.svg",            href: "/browse?brand=Cometic"            },
   // Row 2 — 4
   { name: "Arlen Ness",         logo: "/brands/arlen-ness.svg",         href: "/browse?brand=Arlen+Ness"         },
   { name: "S&S Cycle",          logo: "/brands/ss-cycle.svg",           href: "/browse?brand=S%26S+Cycle"        },
   { name: "Saddlemen",          logo: "/brands/saddlemen.svg",          href: "/browse?brand=Saddlemen"          },
-  { name: "Cometic",            logo: "/brands/cometic.svg",            href: "/browse?brand=Cometic"            },
+  { name: "V-Twin",             logo: "/brands/v-twin.svg",             href: "/browse?brand=V-Twin"             },
   // Row 3 — 4
   { name: "James Gaskets",      logo: "/brands/james-gasket.svg",       href: "/browse?brand=James+Gaskets"      },
   { name: "Motion Pro",         logo: "/brands/motion-pro.svg",         href: "/browse?brand=Motion+Pro"         },
@@ -47,6 +47,32 @@ const BRANDS_GRID = [
   { name: "Klock Werks",        logo: "/brands/klock-werks.svg",        href: "/browse?brand=Klock+Werks"        },
   { name: "Kibblewhite",        logo: "/brands/kibblewhite.svg",        href: "/browse?brand=Kibblewhite"        },
 ];
+
+const TILE_HEIGHT = 100;
+const LOGO_MAX_W  = "80";
+const LOGO_MAX_H  = 85;
+
+// ─── Logo image (shared between default + hover) ───────────────────────────────
+function LogoImg({ logo, name, opacity, onError }: {
+  logo: string; name: string; opacity: number; onError?: () => void;
+}) {
+  return (
+    <img
+      src={logo}
+      alt={name}
+      onError={onError}
+      style={{
+        display:       "block",
+        width:         "auto",
+        height:        "auto",
+        maxWidth:      LOGO_MAX_W,
+        maxHeight:     LOGO_MAX_H,
+        objectFit:     "contain",
+        opacity,
+      }}
+    />
+  );
+}
 
 // ─── Single brand tile ────────────────────────────────────────────────────────
 function BrandBox({ name, logo, href }: { name: string; logo: string; href: string }) {
@@ -63,55 +89,56 @@ function BrandBox({ name, logo, href }: { name: string; logo: string; href: stri
     ].sort((a, b) => a.proximity - b.proximity)[0].side;
   };
 
+  const centerStyle: React.CSSProperties = {
+    position:       "absolute",
+    inset:          0,
+    display:        "flex",
+    alignItems:     "center",
+    justifyContent: "center",
+  };
+
   return (
     <a
       href={href}
       onMouseEnter={(e) => animate(scope.current, { clipPath: ENTRANCE_KEYFRAMES[getNearestSide(e)] })}
       onMouseLeave={(e) => animate(scope.current, { clipPath: EXIT_KEYFRAMES[getNearestSide(e)] })}
       style={{
-        position: "relative",
-        display: "grid",
-        placeContent: "center",
-        height: 150,
-        width: "100%",
-        background: "#f5f0e8",
-        overflow: "hidden",
+        position:       "relative",
+        display:        "block",
+        height:         TILE_HEIGHT,
+        width:          "100%",
+        background:     "#f5f0e8",
+        overflow:       "hidden",
         textDecoration: "none",
-        padding: 0,
+        padding:        0,
       }}
     >
       {/* Default state */}
-      {!imgFailed ? (
-        <img
-          src={logo}
-          alt={name}
-          onError={() => setImgFailed(true)}
-          style={{ width: "80%", height: "70%", objectFit: "contain", opacity: 0.7, maxWidth: "none" }}
-        />
-      ) : (
-        <span style={{ color: "#7a6e5f", fontSize: 13, letterSpacing: "0.1em", textTransform: "uppercase" }}>
-          {name}
-        </span>
-      )}
+      <div style={centerStyle}>
+        {!imgFailed ? (
+          <LogoImg logo={logo} name={name} opacity={0.7} onError={() => setImgFailed(true)} />
+        ) : (
+          <span style={{ color: "#7a6e5f", fontSize: 13, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+            {name}
+          </span>
+        )}
+      </div>
 
       {/* Hover overlay */}
       <div
         ref={scope}
         style={{
-          clipPath: BOTTOM_RIGHT_CLIP,
-          position: "absolute",
-          inset: 0,
-          display: "grid",
-          placeContent: "center",
+          clipPath:   BOTTOM_RIGHT_CLIP,
+          position:   "absolute",
+          inset:      0,
+          display:    "flex",
+          alignItems: "center",
+          justifyContent: "center",
           background: "#e0d9cc",
         }}
       >
         {!imgFailed ? (
-          <img
-            src={logo}
-            alt={name}
-            style={{ width: "80%", height: "70%", objectFit: "contain", opacity: 1, maxWidth: "none" }}
-          />
+          <LogoImg logo={logo} name={name} opacity={1} />
         ) : (
           <span style={{ color: "#2a2218", fontSize: 13, letterSpacing: "0.1em", textTransform: "uppercase" }}>
             {name}
@@ -138,9 +165,9 @@ function BrandGrid() {
         <div
           key={ri}
           style={{
-            display: "grid",
+            display:             "grid",
             gridTemplateColumns: row.cols,
-            borderBottom: ri < rows.length - 1 ? divider : "none",
+            borderBottom:        ri < rows.length - 1 ? divider : "none",
           }}
         >
           {row.brands.map((b, i) => (
@@ -158,10 +185,10 @@ function BrandGrid() {
 export function BrandRolodex() {
   return (
     <section style={{
-      width: "100%",
-      background: "#f5f0e8",
-      padding: "56px 48px",
-      boxSizing: "border-box",
+      width:       "100%",
+      background:  "#f5f0e8",
+      padding:     "56px 48px",
+      boxSizing:   "border-box",
     }}>
       <BrandGrid />
     </section>

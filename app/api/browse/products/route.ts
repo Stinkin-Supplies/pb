@@ -25,6 +25,8 @@ export async function GET(req: NextRequest) {
       year:         p.get("year")        ? parseInt(p.get("year")!)        : undefined,
       dbCategories: dbCategoriesRaw.length > 0 ? dbCategoriesRaw : undefined,
       category:     dbCategoriesRaw.length === 0 ? (p.get("category") || undefined) : undefined,
+      subcategory:  p.get("subcategory") || undefined,
+      modelCodes:   p.getAll("model_code").length > 0 ? p.getAll("model_code") : undefined,
       brand:        p.get("brand")       || undefined,
       inStock:      p.get("in_stock")    === "true",
       search:       p.get("q")           || undefined,

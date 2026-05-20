@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { getProductImage } from "@/lib/getProductImage";
+import FilterSidebar from "@/components/browse/FilterSidebar";
 
 const GOLD       = "#b8922a";
 const CREAM      = "#faf7f2";
@@ -108,8 +109,24 @@ function ProductCard({ product, index }) {
                 Out of Stock
               </div>
             )}
-            {/* Fitment badge */}
-            {product.is_harley_fitment && (
+            {/* OEM / Fitment badge */}
+            {product.oem_numbers?.length > 0 ? (
+              <div style={{ position: "absolute", top: 8, left: 0 }}>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 22" width={72} height={22} style={{ display: "block" }}>
+                  <defs>
+                    <linearGradient id="oem-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%"   stopColor="#ffd700" />
+                      <stop offset="50%"  stopColor="#c8a800" />
+                      <stop offset="100%" stopColor="#a88800" />
+                    </linearGradient>
+                  </defs>
+                  <path d="M6,2 L66,2 L72,11 L66,20 L6,20 L0,11 Z" fill="rgba(0,0,0,0.15)" transform="translate(1,1.5)" />
+                  <path d="M6,2 L66,2 L72,11 L66,20 L6,20 L0,11 Z" fill="url(#oem-grad)" />
+                  <path d="M8,5 L64,5 L69,11 L64,17 L8,17 L3,11 Z" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="0.75" />
+                  <text x="36" y="15" textAnchor="middle" fontFamily="'Barlow Condensed','Arial Narrow',sans-serif" fontWeight="700" fontSize="9" letterSpacing="1.5" fill="rgba(0,0,0,0.75)">OEM</text>
+                </svg>
+              </div>
+            ) : product.is_harley_fitment ? (
               <div style={{
                 position: "absolute",
                 top: 8, left: 8,
@@ -124,7 +141,7 @@ function ProductCard({ product, index }) {
               }}>
                 HD Fit
               </div>
-            )}
+            ) : null}
           </div>
 
           {/* Info */}
@@ -196,274 +213,6 @@ function ProductCard({ product, index }) {
   );
 }
 
-// ─── Filter Sidebar ───────────────────────────────────────────────────────────
-
-function FilterSidebar({ facets, filters, onChange }) {
-  const [openSections, setOpenSections] = useState({ category: true, brand: true, price: true });
-
-  function toggle(key) {
-    setOpenSections(s => ({ ...s, [key]: !s[key] }));
-  }
-
-  function SectionHeader({ label, sectionKey }) {
-    return (
-      <button
-        onClick={() => toggle(sectionKey)}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          width: "100%",
-          background: "none",
-          border: "none",
-          padding: "10px 0",
-          cursor: "pointer",
-          borderBottom: `1px solid rgba(184,146,42,0.2)`,
-        }}
-      >
-        <span style={{
-          fontFamily: "var(--font-stencil, monospace)",
-          fontSize: "9px",
-          letterSpacing: "2px",
-          textTransform: "uppercase",
-          color: openSections[sectionKey] ? GOLD : "#888",
-          transition: "color 0.15s",
-        }}>
-          {label}
-        </span>
-        <span style={{ color: "#bbb", fontSize: "10px" }}>
-          {openSections[sectionKey] ? "▲" : "▼"}
-        </span>
-      </button>
-    );
-  }
-
-  return (
-    <div style={{ position: "sticky", top: 72 }}>
-      {/* In Stock toggle */}
-      <div style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "12px 0",
-        borderBottom: `1px solid rgba(184,146,42,0.2)`,
-        marginBottom: "4px",
-      }}>
-        <span style={{
-          fontFamily: "var(--font-stencil, monospace)",
-          fontSize: "9px",
-          letterSpacing: "2px",
-          textTransform: "uppercase",
-          color: "#888",
-        }}>
-          In Stock Only
-        </span>
-        <motion.button
-          onClick={() => onChange({ in_stock: !filters.in_stock })}
-          animate={{ background: filters.in_stock ? GOLD : "#1a1a1a" }}
-          style={{
-            width: 36,
-            height: 20,
-            borderRadius: 10,
-            border: "none",
-            cursor: "pointer",
-            position: "relative",
-          }}
-        >
-          <motion.div
-            animate={{ x: filters.in_stock ? 18 : 2 }}
-            style={{
-              position: "absolute",
-              top: 2,
-              width: 16,
-              height: 16,
-              borderRadius: "50%",
-              background: "#fff",
-            }}
-          />
-        </motion.button>
-      </div>
-
-      {/* Category */}
-      <SectionHeader label="Category" sectionKey="category" />
-      <AnimatePresence>
-        {openSections.category && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            style={{ overflow: "hidden" }}
-          >
-            <div style={{ paddingTop: "8px", paddingBottom: "8px", maxHeight: 240, overflowY: "auto" }}>
-              {facets.categories.slice(0, 15).map(cat => (
-                <button
-                  key={cat.name}
-                  onClick={() => onChange({ category: filters.category === cat.name ? null : cat.name })}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    width: "100%",
-                    background: "none",
-                    border: "none",
-                    padding: "5px 0",
-                    cursor: "pointer",
-                    gap: "8px",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      width: 10,
-                      height: 10,
-                      border: `1px solid ${filters.category === cat.name ? GOLD : "rgba(184,146,42,0.25)"}`,
-                      background: filters.category === cat.name ? GOLD : "transparent",
-                      flexShrink: 0,
-                    }} />
-                    <span style={{
-                      fontFamily: "var(--font-stencil, monospace)",
-                      fontSize: "10px",
-                      color: filters.category === cat.name ? DARK : "#888",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.5px",
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      textAlign: "left",
-                    }}>
-                      {cat.name}
-                    </span>
-                  </div>
-                  <span style={{
-                    fontFamily: "var(--font-stencil, monospace)",
-                    fontSize: "8px",
-                    color: "#bbb",
-                    flexShrink: 0,
-                  }}>
-                    {cat.count.toLocaleString()}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Brand */}
-      <SectionHeader label="Brand" sectionKey="brand" />
-      <AnimatePresence>
-        {openSections.brand && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            style={{ overflow: "hidden" }}
-          >
-            <div style={{ paddingTop: "8px", paddingBottom: "8px", maxHeight: 240, overflowY: "auto" }}>
-              {facets.brands.slice(0, 20).map(b => (
-                <button
-                  key={b.name}
-                  onClick={() => onChange({ brand: filters.brand === b.name ? null : b.name })}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    width: "100%",
-                    background: "none",
-                    border: "none",
-                    padding: "5px 0",
-                    cursor: "pointer",
-                    gap: "8px",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      width: 10,
-                      height: 10,
-                      border: `1px solid ${filters.brand === b.name ? GOLD : "rgba(184,146,42,0.25)"}`,
-                      background: filters.brand === b.name ? GOLD : "transparent",
-                      flexShrink: 0,
-                    }} />
-                    <span style={{
-                      fontFamily: "var(--font-stencil, monospace)",
-                      fontSize: "10px",
-                      color: filters.brand === b.name ? DARK : "#888",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.5px",
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      textAlign: "left",
-                    }}>
-                      {b.name}
-                    </span>
-                  </div>
-                  <span style={{
-                    fontFamily: "var(--font-stencil, monospace)",
-                    fontSize: "8px",
-                    color: "#bbb",
-                    flexShrink: 0,
-                  }}>
-                    {b.count.toLocaleString()}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Price Range */}
-      <SectionHeader label="Price" sectionKey="price" />
-      <AnimatePresence>
-        {openSections.price && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            style={{ overflow: "hidden" }}
-          >
-            <div style={{ paddingTop: "12px", paddingBottom: "12px", display: "flex", gap: "8px" }}>
-              <input
-                type="number"
-                placeholder="Min"
-                value={filters.min_price ?? ""}
-                onChange={e => onChange({ min_price: e.target.value || null })}
-                style={{
-                  flex: 1,
-                  background: "#fff",
-                  border: `1px solid rgba(184,146,42,0.3)`,
-                  color: DARK,
-                  fontFamily: "var(--font-stencil, monospace)",
-                  fontSize: "11px",
-                  padding: "7px 10px",
-                  outline: "none",
-                  textTransform: "none",
-                }}
-              />
-              <input
-                type="number"
-                placeholder="Max"
-                value={filters.max_price ?? ""}
-                onChange={e => onChange({ max_price: e.target.value || null })}
-                style={{
-                  flex: 1,
-                  background: "#fff",
-                  border: `1px solid rgba(184,146,42,0.3)`,
-                  color: DARK,
-                  fontFamily: "var(--font-stencil, monospace)",
-                  fontSize: "11px",
-                  padding: "7px 10px",
-                  outline: "none",
-                  textTransform: "none",
-                }}
-              />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
 
 // ─── Main Browse Page ─────────────────────────────────────────────────────────
 
@@ -477,27 +226,35 @@ function BrowsePageInner() {
   const [page, setPage] = useState(1);
 
   // Build filters from URL params
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [filters, setFilters] = useState({
-    family:    searchParams.get("family")   || null,
-    model:     searchParams.get("model")    || null,
-    year:      searchParams.get("year")     ? parseInt(searchParams.get("year")) : null,
-    category:  searchParams.get("category") || null,
-    brand:     searchParams.get("brand")    || null,
-    q:         searchParams.get("q")        || null,
-    in_stock:  false,
-    min_price: null,
-    max_price: null,
-    sort:      "relevance",
+    era:         searchParams.get("era")       || null,
+    family:      searchParams.get("family")   || null,
+    model:       null,
+    modelCodes:  null,
+    model:       searchParams.get("model")    || null,
+    year:        searchParams.get("year")     ? parseInt(searchParams.get("year")) : null,
+    category:    searchParams.get("category") || null,
+    subcategory: null,
+    brand:       searchParams.get("brand")    || null,
+    q:           searchParams.get("q")        || null,
+    in_stock:    false,
+    min_price:   null,
+    max_price:   null,
+    sort:        "relevance",
   });
 
   const fetchProducts = useCallback(async (f, pg) => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
+      if (f.era)       params.set("era",        f.era);
       if (f.family)    params.set("family",    f.family);
+      if (f.modelCodes) f.modelCodes.forEach(c => params.append("model_code", c));
       if (f.model)     params.set("model",     f.model);
       if (f.year)      params.set("year",      f.year);
-      if (f.category)  params.set("category",  f.category);
+      if (f.category)    params.set("category",    f.category);
+      if (f.subcategory) params.set("subcategory", f.subcategory);
       if (f.brand)     params.set("brand",     f.brand);
       if (f.q)         params.set("q",         f.q);
       if (f.in_stock)  params.set("in_stock",  "true");
@@ -560,7 +317,7 @@ function BrowsePageInner() {
           color: DARK,
           textDecoration: "none",
         }}>
-          STINKIN'<span style={{ color: GOLD }}>'</span> SUPPLIES
+          STINKIN' SUPPLIES
         </Link>
 
         <div style={{ display: "flex", alignItems: "center", gap: "16px", flex: 1, maxWidth: 480 }}>
@@ -660,36 +417,50 @@ function BrowsePageInner() {
       </div>
 
       {/* Layout */}
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "220px 1fr",
-        minHeight: "calc(100vh - 52px)",
-      }}>
-        {/* Sidebar */}
-        <div style={{
-          borderRight: `1px solid rgba(184,146,42,0.2)`,
-          padding: "24px 20px",
-          background: CREAM2,
+      <div style={{ display: "flex", minHeight: "100vh", position: "relative" }}>
+
+        {/* Mobile filter button */}
+        <div className="mobile-filter-btn" style={{
+          position: "fixed",
+          bottom: 80,
+          left: 16,
+          zIndex: 100,
+          display: "none",
         }}>
-          <div style={{
-            fontFamily: "var(--font-stencil, monospace)",
-            fontSize: "9px",
-            letterSpacing: "3px",
-            textTransform: "uppercase",
-            color: GOLD,
-            marginBottom: "16px",
-          }}>
-            Filter
-          </div>
-          <FilterSidebar
-            facets={facets}
-            filters={filters}
-            onChange={handleFilterChange}
-          />
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setSidebarOpen(true)}
+            style={{
+              background: GOLD,
+              border: "none",
+              color: "#fff",
+              fontFamily: "var(--font-stencil, monospace)",
+              fontSize: "9px",
+              letterSpacing: "2px",
+              textTransform: "uppercase",
+              padding: "10px 18px",
+              cursor: "pointer",
+              boxShadow: "0 4px 16px rgba(184,146,42,0.4)",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+            }}
+          >
+            ⚙ Filter
+          </motion.button>
         </div>
 
+        {/* Sidebar */}
+        <FilterSidebar
+          facets={facets}
+          filters={filters}
+          onChange={handleFilterChange}
+          open={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+        />
+
         {/* Grid */}
-        <div style={{ padding: "0 32px" }}>
+        <div style={{ flex: 1, padding: "0 24px", minWidth: 0 }}>
           {loading ? (
             <div style={{
               display: "grid",
@@ -736,7 +507,7 @@ function BrowsePageInner() {
             </div>
           ) : (
             <>
-              <div style={{
+              <div className="product-grid" style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(4, 1fr)",
                 gap: "12px",
@@ -827,6 +598,28 @@ function BrowsePageInner() {
           to   { background-position:  600px 0; }
         }
         * { box-sizing: border-box; }
+
+        @media (max-width: 768px) {
+          .mobile-filter-btn { display: block !important; }
+          .mobile-backdrop   { display: block !important; }
+          .filter-sidebar-wrap {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            height: 100vh !important;
+            width: 280px !important;
+            z-index: 100 !important;
+            transform: translateX(-100%);
+            transition: transform 0.25s ease;
+            box-shadow: 4px 0 24px rgba(0,0,0,0.15);
+          }
+          .filter-sidebar-wrap.open {
+            transform: translateX(0);
+          }
+          .product-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+          }
+        }
       `}</style>
     </div>
   );

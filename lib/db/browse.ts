@@ -107,6 +107,7 @@ export interface BrowseFilters {
   yearMax?: number;
   universal?: boolean;
   modelCode?: string;
+  modelCodes?: string[];
   year?: number;
   category?: string;
   dbCategories?: string[];
@@ -117,6 +118,7 @@ export interface BrowseFilters {
   maxPrice?: number;
   page?: number;
   perPage?: number;
+  subcategory?: string;
   sort?: "relevance" | "price_asc" | "price_desc" | "name_asc" | "newest";
 }
 
@@ -128,6 +130,7 @@ export interface BrowseResult {
   facets: {
     categories: { name: string; count: number }[];
     brands: { name: string; count: number }[];
+    subcategories: { name: string; count: number }[];
     priceRange: { min: number; max: number };
   };
 }
@@ -178,8 +181,10 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
     yearMax,
     universal,
     modelCode,
+    modelCodes,
     year,
     category,
+    subcategory,
     dbCategories,
     brand,
     inStock,
@@ -214,7 +219,7 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
   } else if (universal) {
     // Universal/chopper era — products not tied to a specific H-D family.
     conditions.push(`(cu.is_harley_fitment = false OR cu.is_universal = true)`);
-  } else if (effectiveFamilies.length > 0 || modelCode || year || yearMin || yearMax) {
+  } else if (effectiveFamilies.length > 0 || modelCode || modelCodes?.length || year || yearMin || yearMax) {
     // yearMin/yearMax are pushed into a subquery so they filter BEFORE the
     // LEFT JOIN, rather than living in the WHERE clause (which would break the
     // is_harley_fitment fallback — the fallback arm would ignore year bounds and
@@ -259,7 +264,10 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
       params.push(effectiveFamilies);
     }
 
-    if (modelCode) {
+    if (modelCodes && modelCodes.length > 0) {
+      conditions.push(`hm.model_code = ANY($${p++}::text[])`);
+      params.push(modelCodes);
+    } else if (modelCode) {
       conditions.push(`hm.model_code = $${p++}`);
       params.push(modelCode);
     }
@@ -298,6 +306,11 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
   } else if (category) {
     conditions.push(`cu.category = $${p++}`);
     params.push(category);
+  }
+
+  if (subcategory) {
+    conditions.push(`cu.subcategory = $${p++}`);
+    params.push(subcategory);
   }
 
   if (brand) {
@@ -368,7 +381,7 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
 
   const facetBase = `FROM catalog_unified cu ${fitmentJoin} ${where}`;
 
-  const [dataRes, countRes, catRes, brandRes, priceRes] = await Promise.all([
+  const [dataRes, countRes, catRes, brandRes, priceRes, subCatRes] = await Promise.all([
     pool.query(dataQuery, params),
     pool.query(
       `SELECT COUNT(DISTINCT cu.id) AS total FROM catalog_unified cu ${fitmentJoin} ${where}`,
@@ -386,6 +399,10 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
       `SELECT MIN(cu.computed_price) AS min, MAX(cu.computed_price) AS max ${facetBase}`,
       facetParams
     ),
+    pool.query(
+      `SELECT cu.subcategory AS name, COUNT(DISTINCT cu.id) AS count FROM catalog_unified cu ${fitmentJoin} ${where ? where + " AND cu.subcategory IS NOT NULL" : "WHERE cu.subcategory IS NOT NULL"} GROUP BY cu.subcategory ORDER BY count DESC LIMIT 30`,
+      facetParams
+    ),
   ]);
 
   return {
@@ -399,6 +416,10 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
         count: parseInt(r.count),
       })),
       brands: brandRes.rows.map((r) => ({
+        name: r.name,
+        count: parseInt(r.count),
+      })),
+      subcategories: subCatRes.rows.map((r) => ({
         name: r.name,
         count: parseInt(r.count),
       })),
