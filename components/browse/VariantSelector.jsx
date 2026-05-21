@@ -10,35 +10,78 @@ const DARK   = '#2a1f0e';
 const CREAM  = '#fdfaf5';
 const CREAM2 = '#f5f0e8';
 
+// "100' Wire Spool - 18 Gauge" → "18g"
+// "100-Foot OEM Color Wire Spools" → "OEM"
+function extractGaugeTab(displayName) {
+  const m = displayName?.match(/(\d+)\s*Gauge/i);
+  if (m) return `${m[1]}g`;
+  if (/OEM/i.test(displayName)) return 'OEM';
+  const parts = displayName?.split(' - ');
+  const last = parts?.[parts.length - 1] ?? displayName;
+  return last.length > 8 ? last.slice(0, 6) + '…' : last;
+}
+
+// "100' Wire Spool - 18 Gauge" → "100' Wire Spool"
+function extractBaseName(displayName) {
+  return displayName?.replace(/\s*-\s*\d+\s*Gauge\s*$/i, '').trim() ?? displayName;
+}
+
 export default function VariantSelector({ productId, currentSku }) {
   const router = useRouter();
-  const [data, setData]         = useState(null);
-  const [loading, setLoading]   = useState(true);
-  const [selected, setSelected] = useState(productId); // updated to currentId after load
-  const [expanded, setExpanded] = useState(false);
+  const [data, setData]               = useState(null);
+  const [loading, setLoading]         = useState(true);
+  const [selected, setSelected]       = useState(productId);
+  const [expanded, setExpanded]       = useState(false);
 
   useEffect(() => {
     fetch(`/api/browse/variants/${productId}`)
       .then(r => r.json())
-      .then(d => { setData(d); setSelected(d.currentProductId ?? productId); setLoading(false); })
+      .then(d => {
+        setData(d);
+        setSelected(d.currentProductId ?? productId);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
   }, [productId]);
 
   if (loading) return <VariantSkeleton />;
   if (!data?.hasVariants || data.variants.length <= 1) return null;
 
-  const { variants, currentProductId } = data;
+  const { variants, currentProductId, group, siblingGroups } = data;
   const currentId = currentProductId ?? productId;
 
+  const hasTabs = siblingGroups?.length > 0;
+  const allGroups = hasTabs
+    ? (() => {
+        // Deduplicate by tab label — if PU 18g and WPS 18g both exist,
+        // keep only the current group for that gauge, drop the duplicate.
+        const all = [group, ...siblingGroups].sort((a, b) => {
+          const ga = parseInt(a.displayName?.match(/(\d+)\s*Gauge/i)?.[1] ?? '999');
+          const gb = parseInt(b.displayName?.match(/(\d+)\s*Gauge/i)?.[1] ?? '999');
+          return ga - gb;
+        });
+        const seen = new Map();
+        for (const g of all) {
+          const label = extractGaugeTab(g.displayName);
+          if (!seen.has(label)) seen.set(label, g);
+          else if (g.id === group?.id) seen.set(label, g); // prefer current group
+        }
+        return [...seen.values()];
+      })()
+    : null;
+
+
+
+
+  const SHOW_INITIAL = 4;
   const sortedVariants = [...variants].sort((a, b) => {
     if (a.id === currentId) return -1;
     if (b.id === currentId) return 1;
-    if (a.stock_qty > 0 && b.stock_qty === 0) return -1;
-    if (b.stock_qty > 0 && a.stock_qty === 0) return 1;
-    return (parseFloat(a.offer_price) || 0) - (parseFloat(b.offer_price) || 0);
+    const la = (a.option_1_value || a.name || '').toLowerCase();
+    const lb = (b.option_1_value || b.name || '').toLowerCase();
+    return la.localeCompare(lb);
   });
 
-  const SHOW_INITIAL = 4;
   const displayVariants = expanded ? sortedVariants : sortedVariants.slice(0, SHOW_INITIAL);
   const hasMore = sortedVariants.length > SHOW_INITIAL;
 
@@ -47,6 +90,11 @@ export default function VariantSelector({ productId, currentSku }) {
     if (variant.slug && variant.id !== productId) {
       router.push(`/browse/${variant.slug}`);
     }
+  };
+
+  const handleTabClick = (g) => {
+    if (g.id === group?.id) return;
+    if (g.representativeSlug) router.push(`/browse/${g.representativeSlug}`);
   };
 
   return (
@@ -67,17 +115,49 @@ export default function VariantSelector({ productId, currentSku }) {
           textTransform: 'uppercase', color: '#6b5c40',
           fontFamily: "var(--font-stencil, 'Barlow Condensed', monospace)",
         }}>
-          {data?.group?.displayName ?? 'Options'}
+          {hasTabs ? extractBaseName(group?.displayName) : (group?.displayName ?? 'Options')}
         </span>
         <span style={{
           fontSize: 11, color: '#9a8870', background: '#ede8de',
           padding: '2px 8px', borderRadius: 10,
         }}>
-          {variants.length} options
+          {sortedVariants.length} options
         </span>
       </div>
 
-      {/* Cards */}
+      {/* Gauge / sibling tabs */}
+      {hasTabs && (
+        <div style={{
+          display: 'flex', gap: 6, padding: '8px 10px',
+          borderBottom: `1px solid ${BORDER}`, background: '#fff',
+          flexWrap: 'wrap',
+        }}>
+          {allGroups.map(g => {
+            const isActive = g.id === group?.id;
+            return (
+              <button
+                key={g.id}
+                onClick={() => handleTabClick(g)}
+                style={{
+                  padding: '5px 14px',
+                  borderRadius: 20,
+                  border: `1.5px solid ${isActive ? GOLD : BORDER}`,
+                  background: isActive ? GOLD : '#fff',
+                  color: isActive ? '#fff' : '#6b5c40',
+                  fontSize: 12, fontWeight: 700, letterSpacing: '0.04em',
+                  cursor: isActive ? 'default' : 'pointer',
+                  transition: 'all 0.15s',
+                  fontFamily: "var(--font-stencil, 'Barlow Condensed', monospace)",
+                }}
+              >
+                {extractGaugeTab(g.displayName)}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Variant cards */}
       <div style={{ padding: '10px 10px 4px', display: 'flex', flexDirection: 'column', gap: 6 }}>
         {displayVariants.map(v => (
           <VariantCard

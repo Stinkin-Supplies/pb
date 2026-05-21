@@ -13,7 +13,7 @@ export async function GET(
 
   try {
     const groupRow = await db.query(`
-      SELECT cvg.id as group_id, cvg.display_name
+      SELECT cvg.id as group_id, cvg.display_name, cvg.source_vendor, cvg.family_key
       FROM catalog_variant_groups cvg
       JOIN catalog_variant_members cvm ON cvm.group_id = cvg.id
       WHERE cvm.product_id = $1
@@ -23,12 +23,10 @@ export async function GET(
       return NextResponse.json({ hasVariants: false, variants: [] });
     }
 
-    const { group_id, display_name } = groupRow.rows[0];
+    const { group_id, display_name, source_vendor, family_key } = groupRow.rows[0];
 
-    // DISTINCT ON (option_1_value) deduplicates PU catalog entries that have
-    // identical names but different vendor_skus (same physical product, two rows).
-    // Within each label, prefer: in-stock > lower price > lower id.
-    // Image falls back to cu.image_url when catalog_media has no entry (PU products).
+    // DISTINCT ON deduplicates PU products with identical names but different vendor_skus.
+    // Image falls back to cu.image_url (LeMans CDN) when catalog_media has no entry.
     const siblings = await db.query(`
       SELECT DISTINCT ON (COALESCE(cvm.option_1_value, cu.id::text))
         cu.id,
@@ -78,11 +76,39 @@ export async function GET(
         cu.id ASC
     `, [group_id]);
 
+    // Find sibling groups — linked by family_key (explicit, cross-vendor)
+    // or by base name prefix (auto, same vendor).
+    const baseName = display_name.replace(/\s*-\s*[^-]+$/, '').trim();
+    const siblingRows = await db.query(`
+      SELECT DISTINCT ON (cvg.id)
+        cvg.id,
+        cvg.display_name,
+        cu.slug AS representative_slug
+      FROM catalog_variant_groups cvg
+      JOIN catalog_variant_members cvm ON cvm.group_id = cvg.id
+      JOIN catalog_unified cu ON cu.id = cvm.product_id
+      WHERE cvg.id != $1
+        AND cvm.sort_order = 0
+        AND (
+          ($4::text IS NOT NULL AND cvg.family_key = $4)
+          OR ($4::text IS NULL AND cvg.source_vendor = $2 AND cvg.display_name ILIKE $3)
+        )
+      ORDER BY cvg.id, cvg.display_name
+      LIMIT 10
+    `, [group_id, source_vendor, `${baseName}%`, family_key ?? null]);
+
+    const siblingGroups = siblingRows.rows.map(r => ({
+      id: r.id,
+      displayName: r.display_name,
+      representativeSlug: r.representative_slug,
+    }));
+
     return NextResponse.json({
       hasVariants: true,
       group: { id: group_id, displayName: display_name },
       currentProductId: id,
       variants: siblings.rows,
+      siblingGroups: siblingGroups.length > 0 ? siblingGroups : undefined,
     });
 
   } catch (e) {

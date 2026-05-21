@@ -485,3 +485,30 @@ npx vercel --prod
 # Git
 git add -A && git commit -m "message" && git push
 ```
+
+---
+
+## TWENTY-SIXTH PASS ADDITIONS (May 21, 2026)
+
+### catalog_variant_groups.family_key
+New TEXT column linking related groups across vendors.
+```sql
+ALTER TABLE catalog_variant_groups ADD COLUMN IF NOT EXISTS family_key TEXT;
+CREATE INDEX IF NOT EXISTS idx_cvg_family_key ON catalog_variant_groups(family_key) WHERE family_key IS NOT NULL;
+```
+Current values:
+- `namz-wire-spool-100ft` → ids 8680, 8681, 8686, 8687 (PU 18g, PU 20g, WPS 18g, WPS 20g)
+- `namz-wire-spool-25ft-gxl` → ids 8682, 8683, 8684, 8685 (Namz GXL 10g/12g/14g/16g)
+
+### Fulfillment Routing — Architecture (Deferred)
+To be built when cart work begins:
+1. `cross_vendor_products (id, sku_a, vendor_a, sku_b, vendor_b, match_method)` — links same physical product across vendors. Bootstrap via OEM number matching.
+2. `resolve_cart_fulfillment(cart_items int[]) RETURNS TABLE(product_id, vendor, sku, cost)` — picks optimal vendor per line item. Logic: in-stock → consolidate shipments → maximize margin.
+3. Wire into CartContext at checkout. `pick_fulfillment()` already exists from earlier sprint.
+
+### DB State After Twenty-Sixth Pass
+- `catalog_fitment_v2`: 1,442,872 rows (PU 1,339,680 + VTWIN 19,934 + existing)
+- `catalog_variant_groups`: 2,901 groups
+- `catalog_variant_members`: 19,557 members
+- `catalog_unified.variant_group_id`: 19,557 tagged
+- Era columns: 13,773 products tagged

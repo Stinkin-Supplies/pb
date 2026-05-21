@@ -94,20 +94,19 @@ async function main() {
   // Everything else (lever sets, seats, springs, rotors) is fitment-specific
   // even without fitment rows in catalog_fitment_v2.
   const WHITELIST_CONDITIONS = `(
-    (lower(brand) LIKE '%namz%' AND lower(name) LIKE '%wire spool%')
-    OR (lower(name) LIKE '%wire loom%')
-    OR (lower(name) LIKE '%wire conduit%')
-    OR (lower(category) = 'electrical' AND lower(name) LIKE '%spool%')
+    lower(name) LIKE '%wire spool%'
+    OR lower(name) LIKE '%wire loom%'
+    OR lower(name) LIKE '%wire conduit%'
   )`;
 
-  const groups = await q(`
+  // Fetch groups and their members as paired rows (not separate arrays)
+  // so name and id are always correctly associated
+  const groupMeta = await q(`
     SELECT
       source_vendor,
       regexp_replace(name, ' - [^-]+$', '') AS base_name,
       brand,
-      COUNT(*) AS cnt,
-      array_agg(id ORDER BY id) AS product_ids,
-      array_agg(name ORDER BY name) AS names
+      COUNT(*) AS cnt
     FROM catalog_unified
     WHERE source_vendor IN ('PU', 'VTWIN')
       AND is_active = true
@@ -117,6 +116,23 @@ async function main() {
     HAVING COUNT(*) > 1
     ORDER BY cnt DESC
   `);
+
+  // For each group, fetch members as paired (id, name) rows
+  const groups = await Promise.all(groupMeta.map(async g => {
+    const members = await q(`
+      SELECT id, name FROM catalog_unified
+      WHERE source_vendor = $1
+        AND brand = $2
+        AND regexp_replace(name, ' - [^-]+$', '') = $3
+        AND is_active = true
+      ORDER BY name
+    `, [g.source_vendor, g.brand, g.base_name]);
+    return {
+      ...g,
+      product_ids: members.map(m => m.id),
+      names: members.map(m => m.name),
+    };
+  }));
 
   console.log(`Found ${groups.length} PU/VTWIN variant groups`);
   console.log(`Total products to group: ${groups.reduce((s, g) => s + parseInt(g.cnt), 0)}`);
@@ -163,12 +179,18 @@ async function main() {
   const axisStats = {};
 
   for (const g of groups) {
-    // Create group (no wps_product_id for PU/VTWIN)
-    const [grp] = await q(`
+    // Check for existing group before inserting to prevent duplicates on re-run
+    const existing = await q(`
+      SELECT id FROM catalog_variant_groups
+      WHERE display_name = $1 AND source_vendor = $2 AND wps_product_id IS NULL
+      LIMIT 1
+    `, [g.base_name, g.source_vendor]);
+
+    const grp = existing[0] ?? (await q(`
       INSERT INTO catalog_variant_groups (display_name, source_vendor)
       VALUES ($1, $2)
       RETURNING id
-    `, [g.base_name, g.source_vendor]);
+    `, [g.base_name, g.source_vendor]))[0];
     groupsCreated++;
 
     // Extract the raw variant suffix (everything after base_name + ' - ')

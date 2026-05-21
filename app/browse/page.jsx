@@ -45,7 +45,7 @@ function ProductCard({ product, index }) {
       transition={{ delay: index * 0.03, type: "spring", stiffness: 300, damping: 24 }}
       style={{ position: "relative" }}
     >
-      <Link href={`/browse/${product.slug}`} style={{ textDecoration: "none", display: "block" }}>
+      <Link href={`/browse/${product.slug}`} style={{ textDecoration: "none", display: "block" }} onClick={() => sessionStorage.setItem('browse_scroll', window.scrollY)}>
         <motion.div
           whileHover={{ y: -4, borderColor: GOLD, boxShadow: `0 8px 32px rgba(184,146,42,0.15)` }}
           transition={{ type: "spring", stiffness: 400, damping: 25 }}
@@ -67,6 +67,8 @@ function ProductCard({ product, index }) {
                 No Image
               </div>
             )}
+
+
             {!product.in_stock && (
               <div style={{ position: "absolute", top: 8, right: 8, background: "rgba(255,255,255,0.9)", border: "1px solid #ddd", fontFamily: "var(--font-stencil, monospace)", fontSize: "8px", letterSpacing: "1px", color: "#999", padding: "3px 7px", textTransform: "uppercase" }}>
                 Out of Stock
@@ -75,13 +77,7 @@ function ProductCard({ product, index }) {
             {product.oem_numbers?.length > 0 ? (
               <div style={{ position: "absolute", top: 8, left: 0 }}>
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 22" width={72} height={22} style={{ display: "block" }}>
-                  <defs>
-                    <linearGradient id="oem-grad" x1="0%" y1="0%" x2="0%" y2="100%">
-                      <stop offset="0%"   stopColor="#ffd700" />
-                      <stop offset="50%"  stopColor="#c8a800" />
-                      <stop offset="100%" stopColor="#a88800" />
-                    </linearGradient>
-                  </defs>
+                  <defs><linearGradient id="oem-grad" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stopColor="#ffd700" /><stop offset="50%" stopColor="#c8a800" /><stop offset="100%" stopColor="#a88800" /></linearGradient></defs>
                   <path d="M6,2 L66,2 L72,11 L66,20 L6,20 L0,11 Z" fill="rgba(0,0,0,0.15)" transform="translate(1,1.5)" />
                   <path d="M6,2 L66,2 L72,11 L66,20 L6,20 L0,11 Z" fill="url(#oem-grad)" />
                   <path d="M8,5 L64,5 L69,11 L64,17 L8,17 L3,11 Z" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="0.75" />
@@ -89,12 +85,17 @@ function ProductCard({ product, index }) {
                 </svg>
               </div>
             ) : product.is_harley_fitment ? (
-              <div style={{ position: "absolute", top: 8, left: 8, background: `rgba(184,146,42,0.1)`, border: `1px solid rgba(184,146,42,0.4)`, fontFamily: "var(--font-stencil, monospace)", fontSize: "8px", letterSpacing: "1px", color: GOLD, padding: "3px 7px", textTransform: "uppercase" }}>
+              <div style={{ position: "absolute", top: 8, left: 8, background: "rgba(184,146,42,0.1)", border: "1px solid rgba(184,146,42,0.4)", fontFamily: "var(--font-stencil, monospace)", fontSize: "8px", letterSpacing: "1px", color: GOLD, padding: "3px 7px", textTransform: "uppercase" }}>
                 HD Fit
               </div>
             ) : null}
+            {product.variant_count > 1 && (
+              <div style={{ position: "absolute", bottom: 8, left: 8, display: "flex", alignItems: "center", gap: 4, background: GOLD, border: "1.5px solid rgba(0,0,0,0.25)", borderRadius: 3, padding: "3px 8px" }}>
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><circle cx="2" cy="2" r="1.5" fill="#1a1000"/><circle cx="6" cy="2" r="1.5" fill="#1a1000" opacity="0.7"/><circle cx="2" cy="6" r="1.5" fill="#1a1000" opacity="0.7"/><circle cx="6" cy="6" r="1.5" fill="#1a1000" opacity="0.4"/></svg>
+                <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "8px", letterSpacing: "1px", color: "#1a1000", textTransform: "uppercase" }}>{product.variant_count} options</span>
+              </div>
+            )}
           </div>
-
           {/* Info */}
           <div style={{ padding: "12px 14px 16px", borderTop: `1px solid rgba(184,146,42,0.2)` }}>
             <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "8px", letterSpacing: "2px", color: GOLD, textTransform: "uppercase", marginBottom: "4px" }}>
@@ -126,6 +127,12 @@ function ProductCard({ product, index }) {
 function BrowsePageInner() {
   const searchParams = useSearchParams();
 
+  // Restore scroll position and filter state when navigating back
+  useEffect(() => {
+    const saved = sessionStorage.getItem('browse_scroll');
+    if (saved) { window.scrollTo(0, parseInt(saved)); sessionStorage.removeItem('browse_scroll'); }
+  }, []);
+
   const [products, setProducts]   = useState([]);
   const [total, setTotal]         = useState(0);
   const [facets, setFacets]       = useState({ categories: [], brands: [], priceRange: { min: 0, max: 0 } });
@@ -134,19 +141,19 @@ function BrowsePageInner() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [filters, setFilters] = useState({
-    era:         searchParams.get("era")       || null,
-    family:      searchParams.get("family")    || null,
-    model:       searchParams.get("model")     || null,
-    modelCodes:  null,
-    year:        searchParams.get("year") ? parseInt(searchParams.get("year")) : null,
-    category:    searchParams.get("category")  || null,
-    subcategory: null,
-    brand:       searchParams.get("brand")     || null,
-    q:           searchParams.get("q")         || null,
-    in_stock:    false,
-    min_price:   null,
-    max_price:   null,
-    sort:        "relevance",
+    era:         searchParams.get("era")         || null,
+    family:      searchParams.get("family")      || null,
+    model:       searchParams.get("model")       || null,
+    modelCodes:  searchParams.getAll("model_code").length > 0 ? searchParams.getAll("model_code") : null,
+    year:        searchParams.get("year")        ? parseInt(searchParams.get("year")) : null,
+    category:    searchParams.get("category")    || null,
+    subcategory: searchParams.get("subcategory") || null,
+    brand:       searchParams.get("brand")       || null,
+    q:           searchParams.get("q")           || null,
+    in_stock:    searchParams.get("in_stock")    === "true",
+    min_price:   searchParams.get("min_price")   ? parseFloat(searchParams.get("min_price")) : null,
+    max_price:   searchParams.get("max_price")   ? parseFloat(searchParams.get("max_price")) : null,
+    sort:        searchParams.get("sort")        || "relevance",
   });
 
   // ── Listen for BottomNav hamburger event ─────────────────────
@@ -188,9 +195,28 @@ function BrowsePageInner() {
 
   useEffect(() => { fetchProducts(filters, page); }, [filters, page, fetchProducts]);
 
+
+
   function handleFilterChange(updates) {
-    setFilters(f => ({ ...f, ...updates }));
+    const next = { ...filters, ...updates };
+    setFilters(next);
     setPage(1);
+    const p = new URLSearchParams();
+    if (next.era)         p.set("era",         next.era);
+    if (next.family)      p.set("family",       next.family);
+    if (next.model)       p.set("model",        next.model);
+    if (next.modelCodes)  next.modelCodes.forEach(c => p.append("model_code", c));
+    if (next.year)        p.set("year",         next.year);
+    if (next.category)    p.set("category",     next.category);
+    if (next.subcategory) p.set("subcategory",  next.subcategory);
+    if (next.brand)       p.set("brand",        next.brand);
+    if (next.q)           p.set("q",            next.q);
+    if (next.in_stock)    p.set("in_stock",     "true");
+    if (next.min_price)   p.set("min_price",    next.min_price);
+    if (next.max_price)   p.set("max_price",    next.max_price);
+    if (next.sort && next.sort !== "relevance") p.set("sort", next.sort);
+    const qs = p.toString();
+    window.history.replaceState(null, "", qs ? `/browse?${qs}` : "/browse");
   }
 
   const activeCount = [filters.family, filters.model, filters.era, filters.category, filters.brand, filters.min_price, filters.max_price, filters.in_stock].filter(Boolean).length;
