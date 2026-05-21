@@ -76,7 +76,8 @@ export default async function ProductDetailPage({ params }) {
         cu.weight    AS unified_weight,
         cu.height_in,
         cu.length_in,
-        cu.width_in
+        cu.width_in,
+        cu.id        AS unified_id
       FROM public.catalog_products cp
       INNER JOIN public.catalog_unified cu ON cu.sku = cp.sku
       WHERE cp.slug = $1
@@ -140,7 +141,8 @@ export default async function ProductDetailPage({ params }) {
           cu.weight    AS unified_weight,
           cu.height_in,
           cu.length_in,
-          cu.width_in
+          cu.width_in,
+          cu.id        AS unified_id
         FROM public.catalog_unified cu
         LEFT JOIN public.catalog_products cp ON cp.sku = cu.sku
         WHERE cu.slug = $1
@@ -284,7 +286,7 @@ function normalizeProductRow(row) {
   const primaryImage = gallery[0] ?? null;
 
   return {
-    id:              row.id,
+    id:              row.unified_id ?? row.id,
     slug:            row.slug,
     name:            row.name,
     brand:           row.brand       ?? "Unknown",
