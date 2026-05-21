@@ -1,44 +1,22 @@
 #!/usr/bin/env node
 /**
  * promote_pu_fitment.cjs
+ * pu_fitment_expanded → catalog_fitment_v2
  *
- * Promotes pu_fitment_expanded → catalog_fitment_v2
- *
- * Source pipeline:
- *   pu_fitment_scrape CSV → ingest_pu_fitment_scrape.cjs
- *     → pu_fitment         (13,913 SKU rows, raw)
- *     → pu_fitment_parsed  (393K rows, per-model)
- *     → pu_fitment_expanded (1.64M rows, per-model-year, has model_year_id FK)
- *
- * This script:
- *   1. Introspects pu_fitment_expanded columns (auto-detects SKU column name)
- *   2. Joins pu_fitment_expanded → catalog_unified on SKU
- *   3. Inserts (product_id, model_year_id) into catalog_fitment_v2 source='PU'
- *   4. Backfills is_harley_fitment on matched PU products
- *
- * Run:
- *   node scripts/ingest/promote_pu_fitment.cjs [--dry]
- *
- * After:
- *   node scripts/ingest/build_variant_groups.cjs
- *   [ERA BACKFILL SQL from MasterRef]
- *   node scripts/ingest/index_unified.js --recreate
+ * harley_model_years: id, model_id, year
+ * harley_models:      id, model_code (assumed)
+ * Join path: pfe.model_code → harley_models.model_code → harley_model_years.model_id
  */
-
 'use strict';
 const { Pool } = require('pg');
 
 const DRY        = process.argv.includes('--dry');
-const BATCH_SIZE = 10000;
+const BATCH_SIZE = 10_000;
 
 const pool = new Pool({
-  host: '5.161.100.126',
-  port: 5432,
-  database: 'stinkin_catalog',
-  user: 'catalog_app',
-  password: 'smelly',
-  ssl: false,
-  max: 3,
+  host: '5.161.100.126', port: 5432,
+  database: 'stinkin_catalog', user: 'catalog_app', password: 'smelly',
+  ssl: false, max: 3,
 });
 
 async function main() {
@@ -49,120 +27,147 @@ async function main() {
     console.log(DRY ? '  [DRY RUN]' : '  [LIVE]');
     console.log('=================================================\n');
 
-    // 1. Introspect pu_fitment_expanded columns
-    const { rows: cols } = await db.query(`
+    // ── Introspect pu_fitment_expanded
+    const { rows: colRows } = await db.query(`
       SELECT column_name FROM information_schema.columns
-      WHERE table_name = 'pu_fitment_expanded'
-      ORDER BY ordinal_position
+      WHERE table_name = 'pu_fitment_expanded' ORDER BY ordinal_position
     `);
-    const colNames = cols.map(c => c.column_name);
-    console.log('pu_fitment_expanded columns:', colNames.join(', '));
+    const cols = colRows.map(r => r.column_name);
+    console.log('pu_fitment_expanded columns:', cols.join(', '));
 
-    const skuCol = colNames.includes('sku')         ? 'sku'
-                 : colNames.includes('vendor_sku')   ? 'vendor_sku'
-                 : colNames.includes('part_number')  ? 'part_number'
-                 : null;
-    if (!skuCol) throw new Error('Cannot find SKU column in pu_fitment_expanded. Cols: ' + colNames.join(', '));
-    if (!colNames.includes('model_year_id')) throw new Error('pu_fitment_expanded has no model_year_id column. Re-run ingest_pu_fitment_scrape.cjs');
+    const skuCol = ['sku','vendor_sku','part_number','part_no'].find(c => cols.includes(c));
+    if (!skuCol)               throw new Error('Cannot find SKU column. Cols: ' + cols.join(', '));
+    if (!cols.includes('year'))        throw new Error("Need 'year' column");
+    if (!cols.includes('model_code'))  throw new Error("Need 'model_code' column");
 
-    console.log(`SKU column: ${skuCol}`);
+    // ── Verify harley_models has model_code
+    const { rows: hmCols } = await db.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'harley_models' ORDER BY ordinal_position
+    `);
+    const hmColNames = hmCols.map(r => r.column_name);
+    console.log('harley_models columns:', hmColNames.join(', '));
 
-    // 2. Row counts
+    const modelJoinCol = ['model_code','code','slug','name'].find(c => hmColNames.includes(c));
+    if (!modelJoinCol) throw new Error('Cannot find join column on harley_models. Cols: ' + hmColNames.join(', '));
+    console.log(`✅ Join path: pfe.model_code → harley_models.${modelJoinCol} → harley_model_years.model_id\n`);
+
+    // ── Row counts
     const { rows: [src] } = await db.query('SELECT COUNT(*) AS cnt FROM pu_fitment_expanded');
-    console.log(`\npu_fitment_expanded:          ${parseInt(src.cnt).toLocaleString()}`);
+    const { rows: [tot] } = await db.query('SELECT COUNT(*) AS cnt FROM catalog_fitment_v2');
+    console.log(`pu_fitment_expanded rows:       ${parseInt(src.cnt).toLocaleString()}`);
+    console.log(`catalog_fitment_v2 total (now): ${parseInt(tot.cnt).toLocaleString()}`);
 
-    const { rows: [ex] } = await db.query(`SELECT COUNT(*) AS cnt FROM catalog_fitment_v2 WHERE source = 'PU'`);
-    console.log(`catalog_fitment_v2 PU (existing): ${parseInt(ex.cnt).toLocaleString()}`);
-
-    const { rows: [tot] } = await db.query(`SELECT COUNT(*) AS cnt FROM catalog_fitment_v2`);
-    console.log(`catalog_fitment_v2 total:     ${parseInt(tot.cnt).toLocaleString()}`);
-
-    // 3. Estimate match count
+    // ── Estimate matchable pairs
     const { rows: [mc] } = await db.query(`
-      SELECT COUNT(*) AS cnt
-      FROM (
-        SELECT DISTINCT cu.id AS product_id, pfe.model_year_id
+      SELECT COUNT(*) AS cnt FROM (
+        SELECT DISTINCT cu.id AS product_id, hmy.id AS model_year_id
         FROM pu_fitment_expanded pfe
+        JOIN harley_models hm  ON hm.${modelJoinCol} = pfe.model_code
+        JOIN harley_model_years hmy ON hmy.model_id = hm.id AND hmy.year = pfe.year::int
         JOIN catalog_unified cu
-          ON (cu.vendor_sku = 'PU-' || UPPER(pfe.${skuCol})
-           OR cu.vendor_sku = 'PU-' || pfe.${skuCol}
-           OR cu.vendor_sku = pfe.${skuCol})
-        WHERE cu.source_vendor = 'PU'
-          AND pfe.model_year_id IS NOT NULL
+          ON replace(cu.sku, '-', '') = replace(pfe.${skuCol}, '-', '')
+         AND cu.source_vendor = 'PU'
       ) sub
     `);
-    console.log(`\nMatchable (product_id, model_year_id) pairs: ${parseInt(mc.cnt).toLocaleString()}`);
+    const matchable = parseInt(mc.cnt);
+    console.log(`\nMatchable (product_id, model_year_id) pairs: ${matchable.toLocaleString()}`);
+
+    // ── Sample
+    const { rows: sample } = await db.query(`
+      SELECT pfe.${skuCol} AS sku, pfe.year, pfe.model_code,
+             hm.id AS model_id, hmy.id AS model_year_id, cu.id AS product_id
+      FROM pu_fitment_expanded pfe
+      JOIN harley_models hm  ON hm.${modelJoinCol} = pfe.model_code
+      JOIN harley_model_years hmy ON hmy.model_id = hm.id AND hmy.year = pfe.year::int
+      JOIN catalog_unified cu
+        ON replace(cu.sku, '-', '') = replace(pfe.${skuCol}, '-', '')
+       AND cu.source_vendor = 'PU'
+      LIMIT 5
+    `);
+    console.log('\nSample matched rows:');
+    sample.forEach(r => console.log(' ', JSON.stringify(r)));
 
     if (DRY) {
-      console.log('\n[DRY] Would delete existing PU rows and re-insert. No changes made.');
+      console.log('\n[DRY RUN] No changes made. Re-run without --dry to promote.');
       return;
     }
+    if (matchable === 0) {
+      console.error('\n❌ 0 matchable pairs — aborting. Check sample output above.');
+      process.exit(1);
+    }
 
-    // 4. Delete old PU rows
-    console.log('\nDeleting existing PU rows...');
-    const del = await db.query(`DELETE FROM catalog_fitment_v2 WHERE source = 'PU'`);
-    console.log(`  Deleted: ${del.rowCount.toLocaleString()}`);
+    // ── Delete existing PU fitment rows
+    console.log('\nDeleting existing PU fitment rows...');
+    const { rowCount: delCount } = await db.query(`
+      DELETE FROM catalog_fitment_v2
+      WHERE product_id IN (SELECT id FROM catalog_unified WHERE source_vendor = 'PU')
+    `);
+    console.log(`  Deleted: ${delCount.toLocaleString()}`);
 
-    // 5. Batch insert
-    console.log('\nInserting...');
-    let totalInserted = 0;
-    let offset        = 0;
-    let batchNum      = 0;
-    const expected    = parseInt(mc.cnt);
+    // ── Build temp table
+    console.log('Building temp table...');
+    await db.query(`
+      CREATE TEMP TABLE _pu_promote AS
+      SELECT DISTINCT cu.id AS product_id, hmy.id AS model_year_id
+      FROM pu_fitment_expanded pfe
+      JOIN harley_models hm  ON hm.${modelJoinCol} = pfe.model_code
+      JOIN harley_model_years hmy ON hmy.model_id = hm.id AND hmy.year = pfe.year::int
+      JOIN catalog_unified cu
+        ON replace(cu.sku, '-', '') = replace(pfe.${skuCol}, '-', '')
+       AND cu.source_vendor = 'PU'
+    `);
+    const { rows: [tmpCnt] } = await db.query('SELECT COUNT(*) AS cnt FROM _pu_promote');
+    const total = parseInt(tmpCnt.cnt);
+    console.log(`  ${total.toLocaleString()} pairs ready`);
 
-    while (true) {
-      batchNum++;
-      const res = await db.query(`
-        INSERT INTO catalog_fitment_v2 (product_id, model_year_id, source)
-        SELECT DISTINCT cu.id, pfe.model_year_id, 'PU'
-        FROM pu_fitment_expanded pfe
-        JOIN catalog_unified cu
-          ON (cu.vendor_sku = 'PU-' || UPPER(pfe.${skuCol})
-           OR cu.vendor_sku = 'PU-' || pfe.${skuCol}
-           OR cu.vendor_sku = pfe.${skuCol})
-        WHERE cu.source_vendor = 'PU'
-          AND pfe.model_year_id IS NOT NULL
-        ON CONFLICT (product_id, model_year_id) DO NOTHING
+    // ── Batch insert
+    console.log('Inserting in batches...');
+    let inserted = 0, offset = 0, batch = 0;
+    while (offset < total) {
+      batch++;
+      const { rowCount } = await db.query(`
+        INSERT INTO catalog_fitment_v2 (product_id, model_year_id)
+        SELECT product_id, model_year_id FROM _pu_promote
+        ORDER BY product_id, model_year_id
         LIMIT ${BATCH_SIZE} OFFSET ${offset}
+        ON CONFLICT DO NOTHING
       `);
-
-      if (res.rowCount === 0) break;
-      totalInserted += res.rowCount;
-      offset        += BATCH_SIZE;
-      const pct      = expected > 0 ? Math.min(100, Math.round((totalInserted / expected) * 100)) : '?';
-      process.stdout.write(`\r  Batch ${batchNum}: ${totalInserted.toLocaleString()} inserted (${pct}%)`);
-      if (offset > expected * 2 + BATCH_SIZE) break; // safety
+      inserted += rowCount;
+      offset   += BATCH_SIZE;
+      const pct = Math.min(100, Math.round((offset / total) * 100));
+      process.stdout.write(`\r  Batch ${batch}: ${inserted.toLocaleString()} inserted (${pct}%)`);
     }
     console.log();
 
-    // 6. Final counts
-    const { rows: [fp] } = await db.query(`SELECT COUNT(*) AS cnt FROM catalog_fitment_v2 WHERE source = 'PU'`);
-    const { rows: [ft] } = await db.query(`SELECT COUNT(*) AS cnt FROM catalog_fitment_v2`);
+    // ── Final counts
+    const { rows: [fp] } = await db.query(`
+      SELECT COUNT(*) AS cnt FROM catalog_fitment_v2
+      WHERE product_id IN (SELECT id FROM catalog_unified WHERE source_vendor = 'PU')
+    `);
+    const { rows: [ft] } = await db.query('SELECT COUNT(*) AS cnt FROM catalog_fitment_v2');
     console.log(`\ncatalog_fitment_v2 PU after:  ${parseInt(fp.cnt).toLocaleString()}`);
     console.log(`catalog_fitment_v2 total:     ${parseInt(ft.cnt).toLocaleString()}`);
 
-    // 7. Backfill is_harley_fitment
-    console.log('\nBackfilling is_harley_fitment on matched PU products...');
-    const bf = await db.query(`
-      UPDATE catalog_unified cu
-      SET is_harley_fitment = true
+    // ── Backfill is_harley_fitment
+    console.log('\nBackfilling is_harley_fitment...');
+    const { rowCount: bf } = await db.query(`
+      UPDATE catalog_unified SET is_harley_fitment = true
       WHERE source_vendor = 'PU'
-        AND is_harley_fitment IS NOT TRUE
-        AND EXISTS (
-          SELECT 1 FROM catalog_fitment_v2 cfv
-          WHERE cfv.product_id = cu.id AND cfv.source = 'PU'
-        )
+        AND (is_harley_fitment IS NULL OR is_harley_fitment = false)
+        AND EXISTS (SELECT 1 FROM catalog_fitment_v2 cf WHERE cf.product_id = id)
     `);
-    console.log(`  Backfilled: ${bf.rowCount.toLocaleString()} products`);
+    console.log(`  Backfilled: ${bf.toLocaleString()} products`);
 
     console.log(`
 =================================================
   ✅ DONE
 =================================================
 Next steps:
-  1. node scripts/ingest/build_variant_groups.cjs
-  2. Run ERA BACKFILL SQL (see MasterRef ERA BACKFILL SQL section)
-  3. node scripts/ingest/index_unified.js --recreate
+  1. node scripts/ingest/ingest_vtwin_fitment.cjs --dry
+  2. node scripts/ingest/build_variant_groups.cjs
+  3. Run ERA BACKFILL SQL (see MasterRef)
+  4. node scripts/ingest/index_unified.js --recreate
 `);
 
   } catch (err) {

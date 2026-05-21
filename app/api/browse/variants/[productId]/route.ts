@@ -25,8 +25,12 @@ export async function GET(
 
     const { group_id, display_name } = groupRow.rows[0];
 
+    // DISTINCT ON (option_1_value) deduplicates PU catalog entries that have
+    // identical names but different vendor_skus (same physical product, two rows).
+    // Within each label, prefer: in-stock > lower price > lower id.
+    // Image falls back to cu.image_url when catalog_media has no entry (PU products).
     const siblings = await db.query(`
-      SELECT
+      SELECT DISTINCT ON (COALESCE(cvm.option_1_value, cu.id::text))
         cu.id,
         cu.sku,
         cu.name,
@@ -56,15 +60,22 @@ export async function GET(
            ) sub),
           '[]'::json
         ) AS fitment_by_family,
-        (SELECT cm.url FROM catalog_media cm
-         WHERE cm.product_id = cu.id
-         ORDER BY cm.priority ASC, cm.id ASC LIMIT 1) AS image_url,
+        COALESCE(
+          (SELECT cm.url FROM catalog_media cm
+           WHERE cm.product_id = cu.id
+           ORDER BY cm.priority ASC, cm.id ASC LIMIT 1),
+          cu.image_url
+        ) AS image_url,
         cu.oem_numbers
       FROM catalog_variant_members cvm
       JOIN catalog_unified cu ON cu.id = cvm.product_id
       LEFT JOIN vendor_offers vo ON vo.catalog_product_id = cu.id
       WHERE cvm.group_id = $1
-      ORDER BY cvm.sort_order, cu.msrp
+      ORDER BY
+        COALESCE(cvm.option_1_value, cu.id::text),
+        (COALESCE(vo.total_qty, 0) > 0) DESC,
+        COALESCE(vo.msrp, cu.msrp) ASC,
+        cu.id ASC
     `, [group_id]);
 
     return NextResponse.json({

@@ -51,6 +51,8 @@ export interface CatalogProduct {
   is_harley_fitment: boolean;
   features: string[];
   oem_numbers: string[];
+  variant_group_id: number | null;
+  variant_count: number;
 }
 
 export interface ProductDetail extends CatalogProduct {
@@ -341,11 +343,11 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
     conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
   const sortMap: Record<string, string> = {
-    relevance:  "cu.in_stock DESC, cu.name ASC",
-    price_asc:  "cu.computed_price ASC NULLS LAST",
-    price_desc: "cu.computed_price DESC NULLS LAST",
-    name_asc:   "cu.name ASC",
-    newest:     "cu.id DESC",
+    relevance:  "in_stock DESC, name ASC",
+    price_asc:  "computed_price ASC NULLS LAST",
+    price_desc: "computed_price DESC NULLS LAST",
+    name_asc:   "name ASC",
+    newest:     "id DESC",
   };
   const orderBy = sortMap[sort] ?? "cu.id DESC";
   const offset = (page - 1) * perPage;
@@ -359,32 +361,42 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
   const offsetParam = p++;
   params.push(perPage, offset);
 
-  const baseQuery = `
-    SELECT DISTINCT
-      cu.id, cu.sku, cu.slug, cu.name, cu.brand,
-      cu.category, cu.subcategory, cu.source_vendor,
-      cu.computed_price, cu.msrp, cu.map_price,
-      cu.image_url, cu.image_urls, cu.in_stock, cu.stock_quantity,
-      cu.is_harley_fitment, cu.features, cu.oem_numbers
-    FROM catalog_unified cu
-    ${fitmentJoin}
-    ${where}
+  // Variant dedup: DISTINCT ON picks one SKU per group (in-stock + lowest price first).
+  // Two-level query: DISTINCT ON cannot use window functions, so variant_count
+  // is added via a separate GROUP BY subquery joined in the outer level.
+  const dataQuery = `
+    SELECT d.*, COALESCE(vc.variant_count, 1) AS variant_count
+    FROM (
+      SELECT DISTINCT ON (COALESCE(cu.variant_group_id::text, 'u' || cu.id::text))
+        cu.id, cu.sku, cu.slug, cu.name, cu.brand,
+        cu.category, cu.subcategory, cu.source_vendor,
+        cu.computed_price, cu.msrp, cu.map_price,
+        cu.image_url, cu.image_urls, cu.in_stock, cu.stock_quantity,
+        cu.is_harley_fitment, cu.features, cu.oem_numbers,
+        cu.variant_group_id
+      FROM catalog_unified cu
+      ${fitmentJoin}
+      ${where}
+      ORDER BY COALESCE(cu.variant_group_id::text, 'u' || cu.id::text),
+               cu.in_stock DESC,
+               cu.computed_price ASC NULLS LAST
+    ) d
+    LEFT JOIN (
+      SELECT variant_group_id, COUNT(*) AS variant_count
+      FROM catalog_unified
+      WHERE variant_group_id IS NOT NULL AND is_active = true
+      GROUP BY variant_group_id
+    ) vc ON vc.variant_group_id = d.variant_group_id
     ORDER BY ${orderBy}
     LIMIT $${limitParam} OFFSET $${offsetParam}
   `;
-
-  // FIX 4: Removed the vendor_rank CTE from relevance sort. It was
-  // deduplicating by vendor rather than by product, producing result counts
-  // that didn't match the COUNT(DISTINCT cu.id) total used for pagination.
-  // DISTINCT in the SELECT already handles multi-row joins correctly.
-  const dataQuery = baseQuery;
 
   const facetBase = `FROM catalog_unified cu ${fitmentJoin} ${where}`;
 
   const [dataRes, countRes, catRes, brandRes, priceRes, subCatRes] = await Promise.all([
     pool.query(dataQuery, params),
     pool.query(
-      `SELECT COUNT(DISTINCT cu.id) AS total FROM catalog_unified cu ${fitmentJoin} ${where}`,
+      `SELECT COUNT(DISTINCT COALESCE(cu.variant_group_id::text, 'u' || cu.id::text)) AS total FROM catalog_unified cu ${fitmentJoin} ${where}`,
       facetParams
     ),
     pool.query(

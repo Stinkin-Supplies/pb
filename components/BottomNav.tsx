@@ -17,8 +17,6 @@ export default function BottomNav() {
 
   const onBrowse = pathname === "/browse" || pathname.startsWith("/browse/");
 
-  // On /browse the left slot is a filter toggle — fires window event
-  // so the browse page's FilterSidebar picks it up without prop drilling
   const handleFilterToggle = () => {
     window.dispatchEvent(new CustomEvent("stinkin:filterToggle"));
   };
@@ -27,7 +25,7 @@ export default function BottomNav() {
     <>
       <div style={{ height: 0 }} />
 
-      {/* Search popup — not shown when on browse (hamburger is filter there) */}
+      {/* Search popup */}
       <AnimatePresence>
         {open && !onBrowse && (
           <>
@@ -99,32 +97,42 @@ export default function BottomNav() {
         padding: "0 24px",
       }}>
 
-        {/* Left slot */}
-        {onBrowse ? (
-          // On /browse: filter toggle button (mobile only — hidden on desktop via CSS)
-          <button
-            onClick={handleFilterToggle}
-            className="browse-filter-btn"
-            aria-label="Open filters"
-            style={{
-              background: "none", border: "none", cursor: "pointer",
-              display: "flex", flexDirection: "column", gap: 5,
-              padding: "6px 2px", alignItems: "flex-start",
-            }}
+        {/* Left slot — always HOME on desktop; on mobile /browse shows hamburger instead */}
+        <div style={{ position: "relative", minWidth: 48 }}>
+          {/* HOME — always visible on desktop; hidden on mobile when onBrowse */}
+          <a
+            href="/"
+            className={onBrowse ? "left-home left-home--browse" : "left-home"}
+            style={{ textDecoration: "none" }}
           >
-            <span style={{ display: "block", width: 22, height: 2, background: "#666", borderRadius: 1 }} />
-            <span style={{ display: "block", width: 14, height: 2, background: "#666", borderRadius: 1 }} />
-            <span style={{ display: "block", width: 22, height: 2, background: "#666", borderRadius: 1 }} />
-          </button>
-        ) : (
-          <a href="/" style={{ textDecoration: "none" }}>
             <span style={{
               fontFamily: "var(--font-sailor, serif)", fontSize: 22, fontWeight: 700,
-              letterSpacing: "0.07em", color: pathname === "/" ? "#c9a84c" : "#666",
+              letterSpacing: "0.07em",
+              color: pathname === "/" ? "#c9a84c" : "#666",
               transition: "color 0.15s",
             }}>HOME</span>
           </a>
-        )}
+
+          {/* Hamburger — only visible on mobile when onBrowse */}
+          {onBrowse && (
+            <button
+              onClick={handleFilterToggle}
+              className="browse-filter-btn"
+              aria-label="Open filters"
+              style={{
+                background: "none", border: "none", cursor: "pointer",
+                display: "flex", flexDirection: "column", gap: 5,
+                padding: "6px 2px", alignItems: "flex-start",
+                position: "absolute", top: "50%", left: 0,
+                transform: "translateY(-50%)",
+              }}
+            >
+              <span style={{ display: "block", width: 22, height: 2, background: "#aaa", borderRadius: 1 }} />
+              <span style={{ display: "block", width: 14, height: 2, background: "#aaa", borderRadius: 1 }} />
+              <span style={{ display: "block", width: 22, height: 2, background: "#aaa", borderRadius: 1 }} />
+            </button>
+          )}
+        </div>
 
         {/* Center: search orb */}
         <button
@@ -166,10 +174,15 @@ export default function BottomNav() {
       </nav>
 
       <style>{`
-        /* On desktop ≥769px, hide the hamburger in the bottom nav on browse
-           (desktop has the persistent sidebar) */
+        /* Desktop ≥769px on /browse: show HOME, hide hamburger */
         @media (min-width: 769px) {
-          .browse-filter-btn { display: none !important; }
+          .browse-filter-btn    { display: none !important; }
+          .left-home--browse    { display: inline !important; }
+        }
+        /* Mobile <769px on /browse: hide HOME, show hamburger */
+        @media (max-width: 768px) {
+          .left-home--browse    { display: none !important; }
+          .browse-filter-btn    { display: flex !important; }
         }
       `}</style>
     </>

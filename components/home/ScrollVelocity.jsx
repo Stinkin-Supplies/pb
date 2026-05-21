@@ -97,8 +97,8 @@ export default function ScrollVelocity({
           /* tall enough for 2 rows of max font (140px each) + gap + padding */
           min-height: 340px;
           padding: 32px 0;
-          margin-top: 60px;
-          margin-bottom: 60px;
+          margin-top: 0;
+          margin-bottom: 0;
           z-index: 2;
           pointer-events: none;
           display: flex;
@@ -156,8 +156,8 @@ export default function ScrollVelocity({
         @media (max-width: 768px) {
           .scroll-velocity-band {
             min-height: 260px;
-            margin-top: 120px;
-            margin-bottom: 16px;
+            margin-top: 0;
+            margin-bottom: 0;
             padding: 20px 0;
             gap: 6px;
           }
@@ -167,7 +167,7 @@ export default function ScrollVelocity({
         @media (max-width: 480px) {
           .scroll-velocity-band {
             min-height: 200px;
-            margin-top: 108px;
+            margin-top: 0;
             gap: 4px;
           }
           .sv-row { font-size: clamp(44px, 13vw, 72px); }

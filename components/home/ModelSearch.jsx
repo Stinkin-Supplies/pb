@@ -379,7 +379,7 @@ export default function ModelSearch() {
           width: '100%', height: '100%',
           minHeight: 220,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: '2rem 2.2rem',
+          padding: 'clamp(1rem, 4vw, 2rem) clamp(1rem, 4vw, 2.2rem)',
           boxSizing: 'border-box',
           position: 'relative',
         }}
@@ -407,9 +407,9 @@ export default function ModelSearch() {
             <div style={{ flex: 1, height: 1, background: GOLD, opacity: 0.3 }} />
             <span style={{
               fontFamily: "'New Sailor', serif",
-              fontSize: 57, fontWeight: 600, letterSpacing: '0.28em',
+              fontSize: 'clamp(18px, 4.5vw, 52px)', fontWeight: 600, letterSpacing: '0.18em',
               textTransform: 'uppercase', color: GOLD, opacity: 0.6,
-              whiteSpace: 'nowrap',
+              whiteSpace: 'normal', textAlign: 'center',
             }}>
               What are you riding?
             </span>
