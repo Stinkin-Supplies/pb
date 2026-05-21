@@ -12,6 +12,7 @@ import {
   IS_GROUPS_COLLECTION,
   DEFAULT_SEARCH_PARAMS,
   buildFilters,
+  VARIANT_GROUP_FIELD,
 } from "@/lib/typesense/client";
 
 function normalizeFacets(facetCounts: any[]) {
@@ -99,6 +100,9 @@ function normalizeDoc(doc: any) {
     warehouseNv:  doc.warehouse_nv ?? 0,
     warehouseNc:  doc.warehouse_nc ?? 0,
 
+    // Variant grouping
+    variant_group_id: doc.variant_group_id ?? null,
+
     // Content
     description:  doc.description ?? null,
     features:     doc.features    ?? [],
@@ -154,24 +158,61 @@ export async function GET(req: NextRequest) {
         ...DEFAULT_SEARCH_PARAMS,
         q,
         ...(filterBy ? { filter_by: filterBy } : {}),
-        sort_by:  sortBy,
+        sort_by:     sortBy,
         page,
-        per_page: perPage,
+        per_page:    perPage,
+        // Group by variant_group_id — variant groups collapse to 1 card each.
+        // group_limit matches per_page so the ungrouped catch-all group
+        // (documents with no variant_group_id) returns a full page of results.
+        group_by:    VARIANT_GROUP_FIELD,
+        group_limit: perPage,
       } as any);
 
-    const products = (results.hits ?? []).map((h: any) => normalizeDoc(h.document));
+    // Slice final array to per_page since the ungrouped expansion can overshoot
+    const rawHits: any[] = [];
+
+    if (results.grouped_hits) {
+      for (const g of results.grouped_hits) {
+        const hasRealGroup = g.group_key && g.group_key.length > 0 && g.group_key[0] !== "";
+        if (hasRealGroup) {
+          // Variant group — take only the best representative (hits[0])
+          const hit = g.hits?.[0];
+          if (hit) {
+            hit._group_count = g.found;
+            rawHits.push(hit);
+          }
+        } else {
+          // Ungrouped products — expand all hits, no variant badge
+          for (const hit of g.hits ?? []) {
+            hit._group_count = null;
+            rawHits.push(hit);
+          }
+        }
+      }
+    } else {
+      rawHits.push(...(results.hits ?? []));
+    }
+
+    const products = rawHits.slice(0, perPage).map((h: any) => ({
+      ...normalizeDoc(h.document),
+      variant_count: h._group_count ?? null,
+    }));
     const facets   = normalizeFacets(results.facet_counts ?? []);
+
+    // found_docs = total individual documents matched; found = total groups
+    // Use found_docs for pagination total so page count is accurate
+    const totalFound = results.found_docs ?? results.found ?? 0;
 
     return NextResponse.json({
       hits:       products,
-      found:      results.found,
+      found:      totalFound,
       page:       results.page,
       raw_facets: results.facet_counts ?? [],
       query_time: results.search_time_ms,
       collection: COLLECTION,
       // Legacy keys SearchClient.jsx reads
       products,
-      total:      results.found,
+      total:      totalFound,
       facets: {
         categories: facets.categories,
         brands:     facets.brands,

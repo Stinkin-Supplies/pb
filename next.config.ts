@@ -1,6 +1,23 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  async redirects() {
+    return [
+      // /search → /browse, preserving q param
+      {
+        source: "/search",
+        missing: [{ type: "query", key: "q" }],
+        destination: "/browse",
+        permanent: false,
+      },
+      {
+        source: "/search",
+        has: [{ type: "query", key: "q", value: "(?<q>.*)" }],
+        destination: "/browse?q=:q",
+        permanent: false,
+      },
+    ];
+  },
   images: {
     remotePatterns: [
       // ── WPS CDN ──────────────────────────────────────────────
@@ -48,10 +65,9 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "**.supabase.co",
       },
-
       {
-        protocol: 'https',
-        hostname: 'img.logo.dev',
+        protocol: "https",
+        hostname: "img.logo.dev",
       },
     ],
     localPatterns: [

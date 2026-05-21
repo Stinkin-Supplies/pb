@@ -21,6 +21,12 @@
  */
 
 import { Pool } from "pg";
+import {
+  typesenseClient,
+  COLLECTION,
+  DEFAULT_SEARCH_PARAMS,
+  VARIANT_GROUP_FIELD,
+} from "@/lib/typesense/client";
 
 const pool = new Pool({
   connectionString:
@@ -174,6 +180,44 @@ export async function getFamilyProductCounts(): Promise<Record<string, number>> 
   return result;
 }
 
+/**
+ * Hit Typesense with a text query and return ranked product IDs.
+ * Used by browseProducts when `search` is present so browse gets
+ * Typesense relevance scoring instead of postgres ILIKE.
+ * Returns { ids, total } where ids are ordered by Typesense rank.
+ */
+async function searchProductIds(
+  q: string,
+  page: number,
+  perPage: number,
+  extraFilters?: string
+): Promise<{ ids: number[]; total: number }> {
+  try {
+    const results = await typesenseClient
+      .collections(COLLECTION)
+      .documents()
+      .search({
+        ...DEFAULT_SEARCH_PARAMS,
+        q,
+        page,
+        per_page: perPage * 3, // fetch extra to account for variant dedup in postgres
+        // Don't group here — postgres handles variant dedup
+        ...(extraFilters ? { filter_by: extraFilters } : {}),
+        // Only return id field — we fetch full data from postgres
+        include_fields: "id",
+      } as any);
+
+    const ids = (results.hits ?? [])
+      .map((h: any) => parseInt(h.document.id))
+      .filter((id: number) => !isNaN(id));
+
+    return { ids, total: results.found ?? 0 };
+  } catch (err) {
+    console.error("[browse] Typesense search failed, falling back to ILIKE:", err);
+    return { ids: [], total: 0 };
+  }
+}
+
 export async function browseProducts(filters: BrowseFilters): Promise<BrowseResult> {
   const {
     eraSlug,
@@ -322,13 +366,28 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
   if (inStock) {
     conditions.push(`cu.in_stock = true`);
   }
+  // ── Text search via Typesense ─────────────────────────────────
+  // When `search` is present, hit Typesense first to get relevance-ranked IDs,
+  // then filter postgres to those IDs. Falls back to ILIKE if Typesense fails.
+  let typesenseIds: number[] | null = null;
+  let typesenseTotal: number | null = null;
+
   if (search) {
-    const likeParam = p++;
-    const exactParam = p++;
-    conditions.push(
-      `(cu.name ILIKE $${likeParam} OR cu.brand ILIKE $${likeParam} OR cu.sku ILIKE $${likeParam} OR $${exactParam}::text = ANY(cu.oem_numbers))`
-    );
-    params.push(`%${search}%`, search);
+    const { ids, total } = await searchProductIds(search, page, perPage);
+    if (ids.length > 0) {
+      typesenseIds = ids;
+      typesenseTotal = total;
+      conditions.push(`cu.id = ANY($${p++}::int[])`);
+      params.push(ids);
+    } else {
+      // Typesense returned nothing or failed — fall back to ILIKE
+      const likeParam = p++;
+      const exactParam = p++;
+      conditions.push(
+        `(cu.name ILIKE $${likeParam} OR cu.brand ILIKE $${likeParam} OR cu.sku ILIKE $${likeParam} OR $${exactParam}::text = ANY(cu.oem_numbers))`
+      );
+      params.push(`%${search}%`, search);
+    }
   }
   if (minPrice != null) {
     conditions.push(`cu.computed_price >= $${p++}`);
@@ -349,7 +408,13 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
     name_asc:   "name ASC",
     newest:     "id DESC",
   };
-  const orderBy = sortMap[sort] ?? "cu.id DESC";
+
+  // When using Typesense IDs, preserve Typesense's relevance rank by sorting
+  // postgres results in the same ID order using array_position.
+  const orderBy = typesenseIds && sort === "relevance"
+    ? `array_position($${p++}::int[], d.id), d.in_stock DESC`
+    : (sortMap[sort] ?? "cu.id DESC");
+  if (typesenseIds && sort === "relevance") params.push(typesenseIds);
   const offset = (page - 1) * perPage;
 
   // FIX 3: Snapshot facet params BEFORE pushing LIMIT/OFFSET.
@@ -419,7 +484,7 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
 
   return {
     products: dataRes.rows,
-    total: parseInt(countRes.rows[0]?.total ?? "0"),
+    total: typesenseTotal ?? parseInt(countRes.rows[0]?.total ?? "0"),
     page,
     perPage,
     facets: {

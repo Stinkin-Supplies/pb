@@ -32,19 +32,28 @@ export const typesenseClient = new Typesense.Client({
 export const COLLECTION = process.env.TYPESENSE_COLLECTION || "products";
 export const IS_GROUPS_COLLECTION = COLLECTION === "product_groups";
 
+// Field name used for variant deduplication via Typesense group_by
+export const VARIANT_GROUP_FIELD = "variant_group_id";
+
 // ── Default search params ─────────────────────────────────────────────────────
 // NOTE: Do NOT include filter_by here — route.ts sets it via buildFilters().
 export const DEFAULT_SEARCH_PARAMS = {
-  // Only fields confirmed present in the products collection schema
-  query_by:         "name,brand,sku,oem_part_number,description,features",
-  // Weights: name + brand highest, sku/oem exact match important, description/features lower
-  query_by_weights: "10,8,6,6,3,2",
+  // description/features excluded from query_by — long text causes false-positive
+  // matches (e.g. "wire" matching an oil filter whose description mentions
+  // "wire harness routing"). Name + brand + SKU/OEM is precise enough.
+  query_by:         "name,brand,sku,oem_part_number",
+  query_by_weights: "10,6,5,5",
+
   // Facets: all confirmed present in schema
-  facet_by:         "brand,category,in_stock,source_vendor,is_harley_fitment,fitment_hd_families",
-  // Sort: sort_priority first (curated), then in-stock qty, then text relevance
-  sort_by:          "sort_priority:desc,stock_quantity:desc,_text_match:desc",
-  per_page:         24,
-  num_typos:        2,
+  facet_by: "brand,category,in_stock,source_vendor,is_harley_fitment,fitment_hd_families",
+
+  // CRITICAL: _text_match MUST be first in sort_by.
+  // If sort_priority or stock_quantity lead, Typesense ignores query relevance
+  // and returns high-priority/high-stock products regardless of what was searched.
+  sort_by: "_text_match:desc,sort_priority:desc,stock_quantity:desc",
+
+  per_page: 24,
+  num_typos: 2,
   highlight_fields: "name,brand",
 };
 

@@ -10,6 +10,7 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { getProductImage } from "@/lib/getProductImage";
 import { ERAS, getEra } from "@/lib/eras/config";
+import FilterSidebar from "@/components/browse/FilterSidebar";
 
 const PER_PAGE = 48;
 
@@ -107,7 +108,17 @@ function ProductCard({ product, index, accent }) {
                 letterSpacing: 1, color: "#2a2a2a", padding: "3px 7px", textTransform: "uppercase",
               }}>Out of Stock</div>
             )}
-            {product.is_harley_fitment && (
+            {product.oem_numbers?.length > 0 ? (
+              <div style={{ position: "absolute", top: 8, left: 0 }}>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 22" width={72} height={22} style={{ display: "block" }}>
+                  <defs><linearGradient id="oem-grad-e" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stopColor="#ffd700"/><stop offset="50%" stopColor="#c8a800"/><stop offset="100%" stopColor="#a88800"/></linearGradient></defs>
+                  <path d="M6,2 L66,2 L72,11 L66,20 L6,20 L0,11 Z" fill="rgba(0,0,0,0.15)" transform="translate(1,1.5)"/>
+                  <path d="M6,2 L66,2 L72,11 L66,20 L6,20 L0,11 Z" fill="url(#oem-grad-e)"/>
+                  <path d="M8,5 L64,5 L69,11 L64,17 L8,17 L3,11 Z" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="0.75"/>
+                  <text x="36" y="15" textAnchor="middle" fontFamily="'Barlow Condensed','Arial Narrow',sans-serif" fontWeight="700" fontSize="9" letterSpacing="1.5" fill="rgba(0,0,0,0.75)">OEM</text>
+                </svg>
+              </div>
+            ) : product.is_harley_fitment ? (
               <div style={{
                 position: "absolute", top: 8, left: 8,
                 background: "#ffffff",
@@ -115,6 +126,17 @@ function ProductCard({ product, index, accent }) {
                 fontFamily: "var(--font-stencil, monospace)", fontSize: 8,
                 letterSpacing: 1, color: "#2a2a2a", padding: "3px 7px", textTransform: "uppercase",
               }}>HD Fit</div>
+            ) : null}
+            {product.variant_count > 1 && (
+              <div style={{
+                position: "absolute", bottom: 8, left: 8,
+                display: "flex", alignItems: "center", gap: 4,
+                background: "#b8922a", border: "1.5px solid rgba(0,0,0,0.25)",
+                borderRadius: 3, padding: "3px 8px",
+              }}>
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><circle cx="2" cy="2" r="1.5" fill="#1a1000"/><circle cx="6" cy="2" r="1.5" fill="#1a1000" opacity="0.7"/><circle cx="2" cy="6" r="1.5" fill="#1a1000" opacity="0.7"/><circle cx="6" cy="6" r="1.5" fill="#1a1000" opacity="0.4"/></svg>
+                <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 8, letterSpacing: 1, color: "#1a1000", textTransform: "uppercase" }}>{product.variant_count} options</span>
+              </div>
             )}
           </div>
 
@@ -135,7 +157,7 @@ function ProductCard({ product, index, accent }) {
               <div style={{
                 fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
                 fontSize: 20, letterSpacing: 1, color: "#1d1d1d",
-              }}>{fmt(product.computed_price ? Number(product.computed_price) : null)}</div>
+              }}>{fmt(product.computed_price ? Number(product.computed_price) : product.msrp ? Number(product.msrp) : null)}</div>
               <motion.button
                 whileHover={{ scale: 1.08, background: "#2a2a2a", color: "#ffffff" }}
                 whileTap={{ scale: 0.93 }}
@@ -154,272 +176,6 @@ function ProductCard({ product, index, accent }) {
   );
 }
 
-// ─── Side Panel ───────────────────────────────────────────────────────────────
-
-function SidePanel({ open, onClose, filters, onChange, facets, accent }) {
-  const [openSections, setOpenSections] = useState({
-    category: true, brand: false, price: false,
-  });
-
-  function toggle(k) { setOpenSections(s => ({ ...s, [k]: !s[k] })); }
-
-  const labelStyle = {
-    fontFamily: "var(--font-stencil, 'Share Tech Mono', monospace)",
-    fontSize: 8, letterSpacing: "0.2em", textTransform: "uppercase",
-    color: "#555", display: "block", marginBottom: 12,
-  };
-
-  const sectionHeaderStyle = (active) => ({
-    display: "flex", alignItems: "center", justifyContent: "space-between",
-    width: "100%", background: "none", border: "none",
-    borderBottom: "1px solid #1c1c1c", padding: "12px 0",
-    cursor: "pointer",
-    fontFamily: "var(--font-stencil, monospace)",
-    fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase",
-    color: active ? accent : "#555",
-    transition: "color 0.15s",
-  });
-
-  return (
-    <AnimatePresence>
-      {open && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            style={{
-              position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)",
-              zIndex: 100, backdropFilter: "blur(2px)",
-            }}
-          />
-
-          {/* Panel */}
-          <motion.div
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ type: "spring", stiffness: 340, damping: 34 }}
-            style={{
-              position: "fixed", top: 0, right: 0, bottom: 0,
-              width: 320, background: "#080808",
-              borderLeft: "1px solid #1c1c1c",
-              zIndex: 101, overflowY: "auto",
-              display: "flex", flexDirection: "column",
-            }}
-          >
-            {/* Panel header */}
-            <div style={{
-              padding: "20px 24px",
-              borderBottom: "1px solid #1c1c1c",
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-              position: "sticky", top: 0, background: "#080808", zIndex: 1,
-            }}>
-              <span style={{
-                fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
-                fontSize: 22, letterSpacing: "0.08em", color: "#e0d8cc",
-              }}>FILTERS</span>
-              <button onClick={onClose} style={{
-                background: "none", border: "1px solid #222",
-                color: "#555", cursor: "pointer", width: 32, height: 32,
-                fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center",
-                transition: "border-color 0.15s, color 0.15s",
-              }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = accent; e.currentTarget.style.color = accent; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = "#222"; e.currentTarget.style.color = "#555"; }}
-              >✕</button>
-            </div>
-
-            <div style={{ padding: "0 24px 40px", flex: 1 }}>
-
-              {/* In Stock */}
-              <div style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "16px 0", borderBottom: "1px solid #1c1c1c",
-              }}>
-                <span style={{
-                  fontFamily: "var(--font-stencil, monospace)", fontSize: 9,
-                  letterSpacing: "0.18em", textTransform: "uppercase", color: "#666",
-                }}>In Stock Only</span>
-                <motion.button
-                  onClick={() => onChange({ in_stock: !filters.in_stock })}
-                  animate={{ background: filters.in_stock ? accent : "#1a1a1a" }}
-                  transition={{ duration: 0.2 }}
-                  style={{ width: 38, height: 22, borderRadius: 11, border: "none", cursor: "pointer", position: "relative" }}
-                >
-                  <motion.div
-                    animate={{ x: filters.in_stock ? 18 : 2 }}
-                    style={{ position: "absolute", top: 3, width: 16, height: 16, borderRadius: "50%", background: "#080808" }}
-                  />
-                </motion.button>
-              </div>
-
-              {/* Category */}
-              <div>
-                <button style={sectionHeaderStyle(openSections.category)} onClick={() => toggle("category")}>
-                  <span>Category</span>
-                  <span style={{ fontSize: 10, color: "#333" }}>{openSections.category ? "▲" : "▼"}</span>
-                </button>
-                <AnimatePresence>
-                  {openSections.category && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      style={{ overflow: "hidden" }}
-                    >
-                      <div style={{ paddingTop: 8, paddingBottom: 8 }}>
-                        {(facets.categories ?? []).map(cat => {
-                          const active = filters.category === cat.name;
-                          return (
-                            <button
-                              key={cat.name}
-                              onClick={() => onChange({ category: active ? null : cat.name })}
-                              style={{
-                                display: "flex", alignItems: "center",
-                                width: "100%", background: "none", border: "none",
-                                padding: "6px 0", cursor: "pointer", gap: 10,
-                              }}
-                            >
-                              <div style={{
-                                width: 10, height: 10, flexShrink: 0,
-                                border: `1px solid ${active ? accent : "#2a2a2a"}`,
-                                background: active ? accent : "transparent",
-                                transition: "all 0.15s",
-                              }} />
-                              <span style={{
-                                fontFamily: "var(--font-stencil, monospace)",
-                                fontSize: 10, letterSpacing: "0.06em",
-                                color: active ? "#e0d8cc" : "#666",
-                                textTransform: "uppercase", textAlign: "left",
-                                transition: "color 0.15s",
-                              }}>{cat.name}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* Brand */}
-              <div>
-                <button style={sectionHeaderStyle(openSections.brand)} onClick={() => toggle("brand")}>
-                  <span>Brand</span>
-                  <span style={{ fontSize: 10, color: "#333" }}>{openSections.brand ? "▲" : "▼"}</span>
-                </button>
-                <AnimatePresence>
-                  {openSections.brand && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      style={{ overflow: "hidden" }}
-                    >
-                      <div style={{ paddingTop: 8, paddingBottom: 8, maxHeight: 280, overflowY: "auto" }}>
-                        {(facets.brands ?? []).slice(0, 30).map(b => {
-                          const active = filters.brand === b.name;
-                          return (
-                            <button
-                              key={b.name}
-                              onClick={() => onChange({ brand: active ? null : b.name })}
-                              style={{
-                                display: "flex", alignItems: "center", justifyContent: "space-between",
-                                width: "100%", background: "none", border: "none",
-                                padding: "5px 0", cursor: "pointer", gap: 8,
-                              }}
-                            >
-                              <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
-                                <div style={{
-                                  width: 10, height: 10, flexShrink: 0,
-                                  border: `1px solid ${active ? accent : "#2a2a2a"}`,
-                                  background: active ? accent : "transparent",
-                                  transition: "all 0.15s",
-                                }} />
-                                <span style={{
-                                  fontFamily: "var(--font-stencil, monospace)",
-                                  fontSize: 10, color: active ? "#e0d8cc" : "#555",
-                                  textTransform: "uppercase", letterSpacing: "0.05em",
-                                  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                                  transition: "color 0.15s",
-                                }}>{b.name}</span>
-                              </div>
-                              <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 8, color: "#333", flexShrink: 0 }}>
-                                {b.count?.toLocaleString()}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* Price */}
-              <div>
-                <button style={sectionHeaderStyle(openSections.price)} onClick={() => toggle("price")}>
-                  <span>Price</span>
-                  <span style={{ fontSize: 10, color: "#333" }}>{openSections.price ? "▲" : "▼"}</span>
-                </button>
-                <AnimatePresence>
-                  {openSections.price && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      style={{ overflow: "hidden" }}
-                    >
-                      <div style={{ paddingTop: 12, paddingBottom: 12, display: "flex", gap: 8 }}>
-                        {["min_price", "max_price"].map((k, i) => (
-                          <input
-                            key={k}
-                            type="number"
-                            placeholder={i === 0 ? "Min" : "Max"}
-                            value={filters[k] ?? ""}
-                            onChange={e => onChange({ [k]: e.target.value || null })}
-                            style={{
-                              flex: 1, background: "#111", border: "1px solid #222",
-                              color: "#c4c0bc", fontFamily: "var(--font-stencil, monospace)",
-                              fontSize: 11, padding: "7px 10px", outline: "none",
-                            }}
-                          />
-                        ))}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* Clear all */}
-              {(filters.category || filters.brand || filters.min_price || filters.max_price || filters.in_stock) && (
-                <motion.button
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  onClick={() => onChange({ category: null, brand: null, min_price: null, max_price: null, in_stock: false })}
-                  style={{
-                    marginTop: 24, width: "100%", background: "none",
-                    border: `1px solid #2a2a2a`, color: "#555",
-                    fontFamily: "var(--font-stencil, monospace)", fontSize: 9,
-                    letterSpacing: "0.18em", textTransform: "uppercase",
-                    padding: "10px 0", cursor: "pointer", transition: "all 0.15s",
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = "#444"; e.currentTarget.style.color = "#888"; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = "#2a2a2a"; e.currentTarget.style.color = "#555"; }}
-                >
-                  Clear All Filters
-                </motion.button>
-              )}
-            </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
-  );
-}
 
 
 // ─── Vintage Fallback ─────────────────────────────────────────────────────────
@@ -767,12 +523,27 @@ export default function EraPage({ params }) {
   const [panelOpen, setPanelOpen] = useState(false);
   const [sort, setSort]           = useState("relevance");
 
+  // Listen for BottomNav hamburger event (same as browse page)
+  useEffect(() => {
+    const handler = () => setPanelOpen(o => !o);
+    window.addEventListener("stinkin:filterToggle", handler);
+    return () => window.removeEventListener("stinkin:filterToggle", handler);
+  }, []);
+
+  // FilterSidebar expects the full browse filter shape.
+  // `era` is locked to this page's slug — never overwritten by sidebar changes.
   const [filters, setFilters] = useState({
-    category:  null,
-    brand:     null,
-    in_stock:  false,
-    min_price: null,
-    max_price: null,
+    family:      null,
+    model:       null,
+    modelCodes:  null,
+    era:         slug,   // locked — this is the era page
+    category:    null,
+    subcategory: null,
+    brand:       null,
+    in_stock:    false,
+    min_price:   null,
+    max_price:   null,
+    sort:        "relevance",
   });
 
   const fetchProducts = useCallback(async (f, pg, s) => {
@@ -786,16 +557,14 @@ export default function EraPage({ params }) {
       // for vintage eras (0 fitment rows) and had wrong family name mismatches.
       params.set("era", slug);
 
-      // Category filter from live catalog facets
-      if (f.category) {
-        params.set("category", f.category);
-      }
+      if (f.category)    params.set("category",    f.category);
+      if (f.subcategory) params.set("subcategory", f.subcategory);
 
       if (f.brand)     params.set("brand",     f.brand);
       if (f.in_stock)  params.set("in_stock",  "true");
       if (f.min_price) params.set("min_price", f.min_price);
       if (f.max_price) params.set("max_price", f.max_price);
-      params.set("sort",     s);
+      params.set("sort",     f.sort ?? s ?? "relevance");
       params.set("page",     pg);
       params.set("per_page", PER_PAGE);
 
@@ -814,7 +583,8 @@ export default function EraPage({ params }) {
   }, [filters, page, sort, fetchProducts]);
 
   function handleFilterChange(updates) {
-    setFilters(f => ({ ...f, ...updates }));
+    // Always keep era locked to this page's slug
+    setFilters(f => ({ ...f, ...updates, era: slug }));
     setPage(1);
   }
 
@@ -858,23 +628,32 @@ export default function EraPage({ params }) {
         onChange={category => handleFilterChange({ category })}
       />
 
-      {/* Side panel */}
-      <SidePanel
+      {/* Mobile bottom sheet filter */}
+      <FilterSidebar
+        facets={facets}
+        filters={filters}
+        onChange={updates => handleFilterChange(updates)}
         open={panelOpen}
         onClose={() => setPanelOpen(false)}
-        filters={filters}
-        onChange={updates => { handleFilterChange(updates); }}
-        facets={facets}
-        accent={"#c9a84c"}
+        mobileSheet={true}
       />
 
-      {/* Product grid */}
-      <div style={{
-        padding: "0",
-        maxWidth: 1400,
-        margin: "0 auto",
-        background: "#080808",
-      }}>
+      {/* Product grid — desktop uses sidebar layout */}
+      <div style={{ display: "flex", maxWidth: 1400, margin: "0 auto" }}>
+
+        {/* Desktop sticky sidebar */}
+        <div className="era-desktop-sidebar">
+          <FilterSidebar
+            facets={facets}
+            filters={filters}
+            onChange={updates => handleFilterChange(updates)}
+            open={false}
+            onClose={() => {}}
+            mobileSheet={false}
+          />
+        </div>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
         {loading ? (
           <div style={{
             display: "grid",
@@ -954,7 +733,8 @@ export default function EraPage({ params }) {
             </div>
           </>
         )}
-      </div>
+        </div>{/* flex: 1 inner */}
+      </div>{/* flex layout wrapper */}
 
       <style>{`
         @font-face {
@@ -966,7 +746,9 @@ export default function EraPage({ params }) {
           from { background-position: -600px 0; }
           to   { background-position:  600px 0; }
         }
+        .era-desktop-sidebar { display: block; }
         @media (max-width: 768px) {
+          .era-desktop-sidebar { display: none !important; }
           .era-grid { grid-template-columns: repeat(2, 1fr) !important; }
           .era-hero-padding { padding: 32px 20px 24px !important; }
           .era-nav-padding { padding: 0 20px !important; }

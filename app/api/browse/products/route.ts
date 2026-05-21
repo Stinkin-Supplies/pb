@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
       maxPrice:     p.get("max_price")   ? parseFloat(p.get("max_price")!) : undefined,
       page:         p.get("page")        ? parseInt(p.get("page")!)        : 1,
       perPage:      p.get("per_page")    ? parseInt(p.get("per_page")!)    : 48,
-      sort:         (p.get("sort") as BrowseFilters["sort"]) || "newest",
+      sort:         (p.get("sort") as BrowseFilters["sort"]) || (p.get("q") ? "relevance" : "newest"),
     };
 
     const result = await browseProducts(filters);

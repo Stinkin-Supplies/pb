@@ -1,321 +1,32 @@
 "use client";
 // ============================================================
 // app/search/SearchClient.jsx
-// Updated: collapsible sidebar sections, HD fitment filter,
-//          mobile slide-in drawer
+// Matches browse page aesthetic: cream/white bg, gold accents,
+// light cards, same typography, framer-motion animations.
 // ============================================================
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useCartSafe } from "@/components/CartContext";
+import { getProductImage } from "@/lib/getProductImage";
 
-const css = `
-  *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
-  body { background:#0a0909; color:#f0ebe3; font-family:var(--font-stencil),sans-serif; }
-  ::-webkit-scrollbar { width:4px; } ::-webkit-scrollbar-thumb { background:#e8621a; }
-  @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
-  @keyframes drawerIn { from{transform:translateX(-100%)} to{transform:translateX(0)} }
-  @keyframes backdropIn { from{opacity:0} to{opacity:1} }
+// ── Design tokens (match browse/page.jsx exactly) ─────────────
+const GOLD   = "#b8922a";
+const CREAM  = "#faf7f2";
+const CREAM2 = "#f2ede4";
+const DARK   = "#0a0909";
 
-  /* SEARCH HERO */
-  .search-hero { background:#111010;border-bottom:1px solid #2a2828;padding:32px 24px 28px; }
-  .search-hero-inner { max-width:760px;margin:0 auto; }
-  .search-eyebrow { font-family:var(--font-stencil),monospace;font-size:9px;color:#e8621a;letter-spacing:0.25em;margin-bottom:10px; }
-  .search-bar-wrap { position:relative;display:flex;align-items:center;gap:0; }
-  .search-input {
-    flex:1;height:54px;
-    background:#1a1919;border:1px solid #2a2828;border-right:none;
-    color:#f0ebe3;font-family:var(--font-stencil),sans-serif;
-    font-size:20px;font-weight:600;letter-spacing:0.03em;
-    padding:0 20px;outline:none;border-radius:2px 0 0 2px;
-    transition:border-color 0.2s;
-  }
-  .search-input:focus { border-color:#e8621a; }
-  .search-input::placeholder { color:#3a3838; }
-  .search-btn {
-    height:54px;width:64px;flex-shrink:0;
-    background:#e8621a;border:none;
-    color:#0a0909;font-size:22px;
-    border-radius:0 2px 2px 0;cursor:pointer;
-    transition:background 0.2s;display:flex;align-items:center;justify-content:center;
-  }
-  .search-btn:hover { background:#c94f0f; }
-  .search-clear {
-    position:absolute;right:72px;
-    background:none;border:none;color:#8a8784;
-    font-size:18px;cursor:pointer;padding:0;
-    transition:color 0.15s;
-  }
-  .search-clear:hover { color:#f0ebe3; }
+// ── Constants ─────────────────────────────────────────────────
+const POPULAR     = ["exhaust", "air cleaner", "handlebars", "seat", "wheels", "shocks", "battery", "footpegs", "helmet", "tires"];
+const CATEGORIES  = ["Exhaust", "Air Cleaners", "Handlebars & Controls", "Seats & Sissy Bars", "Wheels & Tires", "Suspension", "Lighting", "Engine & Transmission", "Electrical", "Footpegs & Floorboards", "Brakes", "Fuel Systems", "Body & Fenders", "Apparel & Helmets"];
+const DEBOUNCE_MS = 350;
 
-  /* POPULAR SEARCHES */
-  .popular-wrap { margin-top:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap; }
-  .popular-label { font-family:var(--font-stencil),monospace;font-size:9px;color:#8a8784;letter-spacing:0.15em; }
-  .popular-chip {
-    font-family:var(--font-stencil),monospace;font-size:9px;
-    color:#8a8784;letter-spacing:0.1em;
-    border:1px solid #2a2828;border-radius:2px;
-    padding:3px 9px;cursor:pointer;transition:all 0.15s;
-    background:transparent;
-  }
-  .popular-chip:hover { border-color:#e8621a;color:#e8621a; }
-
-  /* TOOLBAR */
-  .search-toolbar {
-    background:#0a0909;border-bottom:1px solid #2a2828;
-    padding:10px 24px;
-    display:flex;align-items:center;justify-content:space-between;
-    flex-wrap:wrap;gap:8px;
-  }
-  .result-count { font-family:var(--font-stencil),monospace;font-size:10px;color:#8a8784;letter-spacing:0.12em; }
-  .result-count span { color:#e8621a; }
-  .sort-select { background:#1a1919;border:1px solid #2a2828;color:#f0ebe3;font-family:var(--font-stencil),sans-serif;font-size:13px;padding:5px 9px;border-radius:2px;outline:none; }
-
-  /* Mobile filter button — hidden on desktop */
-  .mobile-filter-btn {
-    display:none;
-    align-items:center;gap:6px;
-    font-family:var(--font-stencil),monospace;font-size:9px;letter-spacing:0.14em;
-    background:#1a1919;border:1px solid #2a2828;color:#c4c0bc;
-    padding:6px 12px;border-radius:2px;cursor:pointer;
-    transition:all 0.15s;
-  }
-  .mobile-filter-btn:hover { border-color:#e8621a;color:#e8621a; }
-  .mobile-filter-btn .filter-badge {
-    background:#e8621a;color:#0a0909;
-    font-size:8px;font-weight:700;
-    border-radius:50%;width:14px;height:14px;
-    display:flex;align-items:center;justify-content:center;
-  }
-
-  /* LAYOUT */
-  .search-body { max-width:1200px;margin:0 auto;padding:24px; }
-  .shop-layout {
-    display: grid;
-    grid-template-columns: 215px 1fr;
-  }
-
-  /* ── SIDEBAR (shared styles — desktop + drawer) ── */
-  .shop-sidebar {
-    background:#111010;
-    border-right:1px solid #2a2828;
-    overflow-y:auto;
-    max-height:calc(100vh - 100px);
-    position:sticky;
-    top:54px;
-    align-self:start;
-  }
-
-  /* Collapsible section header */
-  .sidebar-section-header {
-    font-family:var(--font-stencil),monospace;
-    font-size:9px;color:#e8621a;letter-spacing:0.2em;
-    padding:12px 14px 10px;
-    display:flex;align-items:center;justify-content:space-between;
-    cursor:pointer;user-select:none;
-    transition:color 0.15s;
-  }
-  .sidebar-section-header:hover { color:#f0ebe3; }
-  .sidebar-section-chevron {
-    font-size:8px;color:#8a8784;
-    transition:transform 0.2s;
-    flex-shrink:0;
-  }
-  .sidebar-section-chevron.open { transform:rotate(180deg); }
-  .sidebar-section-body {
-    padding:0 10px 14px;
-    border-bottom:1px solid #1a1919;
-    overflow:hidden;
-  }
-  .sidebar-section-body.collapsed { display:none; }
-
-  .sidebar-row {
-    display:flex; align-items:center; justify-content:space-between;
-    padding:5px 6px; border-radius:2px; cursor:pointer;
-    transition:background 0.15s;
-  }
-  .sidebar-row:hover { background:rgba(232,98,26,0.05); }
-  .sidebar-row-inner {
-    display:flex; align-items:center; gap:7px; min-width:0;
-  }
-  .sidebar-check {
-    width:12px; height:12px; border-radius:2px; flex-shrink:0;
-    border:1px solid #3a3838; display:flex; align-items:center;
-    justify-content:center; font-size:8px; color:#0a0909;
-    transition:all 0.15s;
-  }
-  .sidebar-check.on { border-color:#e8621a; background:#e8621a; }
-  .sidebar-label {
-    font-size:12px; font-weight:500; color:#c4c0bc;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-  }
-  .facet-count {
-    font-family:var(--font-stencil),monospace; font-size:8px; color:#8a8784;
-    background:#1a1919; border:1px solid #2a2828;
-    padding:1px 5px; border-radius:1px;
-    min-width:32px; text-align:center; transition:color 0.2s;
-  }
-  .facet-count.dim { color:#3a3838; }
-
-  /* Price + year inputs */
-  .price-input {
-    background:#1a1919; border:1px solid #2a2828; color:#f0ebe3;
-    font-family:var(--font-stencil),sans-serif; font-size:13px;
-    padding:6px 9px; border-radius:2px; outline:none; width:100%;
-    transition:border-color 0.15s;
-  }
-  .price-input:focus { border-color:rgba(232,98,26,0.4); }
-  .price-input::placeholder { color:#3a3838; }
-
-  /* HD Fitment year inputs */
-  .year-input {
-    background:#1a1919; border:1px solid #2a2828; color:#f0ebe3;
-    font-family:var(--font-stencil),monospace; font-size:12px; letter-spacing:0.05em;
-    padding:5px 8px; border-radius:2px; outline:none; width:100%;
-    transition:border-color 0.15s;
-  }
-  .year-input:focus { border-color:rgba(232,98,26,0.4); }
-  .year-input::placeholder { color:#3a3838; }
-
-  /* Apply / Clear buttons */
-  .sidebar-apply-btn {
-    width:100%; background:#e8621a; border:none; color:#0a0909;
-    font-family:var(--font-caesar),sans-serif; font-size:14px; letter-spacing:0.08em;
-    padding:7px; border-radius:2px; cursor:pointer; transition:background 0.15s;
-  }
-  .sidebar-apply-btn:hover { background:#c94f0f; }
-  .sidebar-clear-btn {
-    width:100%; background:transparent; border:1px solid #2a2828; color:#8a8784;
-    font-family:var(--font-stencil),monospace; font-size:8px; letter-spacing:0.12em;
-    padding:6px; border-radius:2px; cursor:pointer; transition:all 0.15s;
-    margin-top:6px;
-  }
-  .sidebar-clear-btn:hover { border-color:#e8621a;color:#e8621a; }
-
-  /* Active filter dot on section header */
-  .sidebar-active-dot {
-    width:5px;height:5px;border-radius:50%;
-    background:#e8621a;flex-shrink:0;
-    box-shadow:0 0 4px #e8621a;
-  }
-
-  /* ── MOBILE DRAWER ── */
-  .drawer-backdrop {
-    display:none;
-    position:fixed;inset:0;z-index:200;
-    background:rgba(0,0,0,0.7);
-    animation:backdropIn 0.2s ease;
-  }
-  .drawer-backdrop.open { display:block; }
-  .drawer-panel {
-    position:fixed;top:0;left:0;bottom:0;
-    width:280px;z-index:201;
-    background:#111010;border-right:1px solid #2a2828;
-    display:flex;flex-direction:column;
-    animation:drawerIn 0.25s ease;
-  }
-  .drawer-header {
-    display:flex;align-items:center;justify-content:space-between;
-    padding:14px 16px;border-bottom:1px solid #2a2828;
-    flex-shrink:0;
-  }
-  .drawer-title {
-    font-family:var(--font-stencil),monospace;
-    font-size:10px;color:#e8621a;letter-spacing:0.2em;
-  }
-  .drawer-close {
-    background:none;border:none;color:#8a8784;
-    font-size:18px;cursor:pointer;padding:0;
-    transition:color 0.15s;line-height:1;
-  }
-  .drawer-close:hover { color:#f0ebe3; }
-  .drawer-body {
-    flex:1;overflow-y:auto;
-  }
-  .drawer-footer {
-    padding:14px 16px;border-top:1px solid #2a2828;flex-shrink:0;
-  }
-
-  /* CHIP / active filters bar */
-  .chip {
-    font-family:var(--font-stencil),monospace;font-size:8px;
-    background:rgba(232,98,26,0.1); border:1px solid rgba(232,98,26,0.25);
-    border-radius:2px; padding:2px 8px; color:#e8621a;
-    letter-spacing:0.1em; cursor:pointer; user-select:none; transition:all 0.15s;
-  }
-  .chip:hover { background:rgba(232,98,26,0.18); }
-
-  /* PAGINATION */
-  .page-btn {
-    font-family:var(--font-stencil),monospace; font-size:10px; letter-spacing:0.08em;
-    background:#111010; border:1px solid #2a2828; color:#8a8784;
-    padding:7px 13px; border-radius:2px; cursor:pointer;
-    transition:all 0.15s; min-width:36px; text-align:center;
-  }
-  .page-btn:hover:not(:disabled) { border-color:#e8621a; color:#e8621a; }
-  .page-btn.active { background:#e8621a; border-color:#e8621a; color:#0a0909; }
-  .page-btn:disabled { opacity:0.3; cursor:default; }
-
-  /* PRODUCT GRID */
-  .shop-main { padding:18px 20px; }
-  .product-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-  }
-
-  /* PRODUCT CARD */
-  .s-card { background:#111010;border:1px solid #2a2828;border-radius:2px;overflow:hidden;cursor:pointer;transition:all 0.22s;animation:fadeUp 0.25s ease both; }
-  .s-card:hover { border-color:rgba(232,98,26,0.4);transform:translateY(-3px);box-shadow:0 10px 32px rgba(0,0,0,0.45); }
-  .s-card-img { width:100%;aspect-ratio:1/1;background:#ffffff;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden; }
-  .s-card-img::before { content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(232,98,26,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(232,98,26,0.04) 1px,transparent 1px);background-size:16px 16px; }
-  .s-badge { position:absolute;top:7px;left:7px;font-family:var(--font-stencil),monospace;font-size:8px;font-weight:700;letter-spacing:0.1em;padding:2px 6px;border-radius:1px; }
-  .s-badge.sale { background:#b91c1c;color:#fff; }
-  .s-badge.new  { background:#c9a84c;color:#0a0909; }
-  .s-oos { position:absolute;bottom:7px;left:7px;font-family:var(--font-stencil),monospace;font-size:7px;color:#8a8784;background:rgba(0,0,0,0.65);padding:2px 6px;border-radius:1px; }
-  .s-card-body { padding:11px 13px; }
-  .s-brand { font-family:var(--font-stencil),monospace;font-size:9px;color:#e8621a;letter-spacing:0.14em;margin-bottom:3px; }
-  .s-name { font-size:13px;font-weight:700;color:#f0ebe3;line-height:1.3;margin-bottom:4px; }
-  .s-highlight { background:rgba(232,98,26,0.15);color:#e8621a;border-radius:1px;padding:0 2px; }
-  .s-cat { font-family:var(--font-stencil),monospace;font-size:8px;color:#8a8784;letter-spacing:0.1em;margin-bottom:8px; }
-  .s-footer { display:flex;justify-content:space-between;align-items:center; }
-  .s-price { font-family:var(--font-caesar),sans-serif;font-size:20px;color:#f0ebe3;letter-spacing:0.04em; }
-  .s-was { font-size:11px;color:#8a8784;text-decoration:line-through;font-family:var(--font-stencil),sans-serif;display:block;margin-bottom:1px; }
-  .s-add { background:#e8621a;border:none;color:#0a0909;font-family:var(--font-caesar),sans-serif;font-size:13px;letter-spacing:0.1em;padding:5px 12px;border-radius:2px;cursor:pointer;transition:background 0.2s; }
-  .s-add:hover { background:#c94f0f; }
-  .s-add:disabled { background:#2a2828;color:#8a8784;cursor:not-allowed; }
-
-  /* EMPTY / ZERO STATE */
-  .search-empty { padding:80px 20px;text-align:center; }
-  .search-empty-title { font-family:var(--font-caesar),sans-serif;font-size:32px;letter-spacing:0.05em;color:#3a3838;margin-bottom:8px; }
-  .search-empty-sub { font-family:var(--font-stencil),monospace;font-size:9px;color:#8a8784;letter-spacing:0.14em;margin-bottom:24px; }
-  .search-suggestions { display:flex;gap:8px;flex-wrap:wrap;justify-content:center; }
-
-  /* LANDING (no query) */
-  .search-landing { max-width:1200px;margin:0 auto;padding:32px 24px; }
-  .landing-section-title { font-family:var(--font-caesar),sans-serif;font-size:28px;letter-spacing:0.05em;color:#f0ebe3;margin-bottom:16px;border-bottom:1px solid #2a2828;padding-bottom:10px; }
-  .landing-section-title span { color:#e8621a; }
-  .cat-pills { display:flex;flex-wrap:wrap;gap:8px;margin-bottom:36px; }
-  .cat-pill { background:#111010;border:1px solid #2a2828;border-radius:2px;padding:10px 18px;cursor:pointer;transition:all 0.2s;font-family:var(--font-caesar),sans-serif;font-size:16px;letter-spacing:0.07em;color:#8a8784; }
-  .cat-pill:hover { border-color:#e8621a;color:#f0ebe3;background:rgba(232,98,26,0.05); }
-
-  /* ── RESPONSIVE ── */
-  @media (max-width:700px) {
-    .shop-layout { grid-template-columns:1fr; }
-    /* Desktop sidebar hidden on mobile — drawer replaces it */
-    .shop-sidebar { display:none; }
-    .shop-main { padding:12px 16px; }
-    .mobile-filter-btn { display:flex; }
-  }
-  @media (min-width:701px) {
-    .drawer-backdrop { display:none !important; }
-  }
-  @media (min-width:768px) {
-    .product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  }
-  @media (min-width:1024px) {
-    .product-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  }
-`;
+const SORT_OPTIONS = [
+  { value: "relevance",  label: "Relevance" },
+  { value: "price-asc",  label: "Price ↑" },
+  { value: "price-desc", label: "Price ↓" },
+  { value: "name-asc",   label: "A → Z" },
+];
 
 // ── Helpers ───────────────────────────────────────────────────
 function highlight(text, query) {
@@ -325,7 +36,9 @@ function highlight(text, query) {
   return (
     <>
       {text.slice(0, idx)}
-      <mark className="s-highlight">{text.slice(idx, idx + query.length)}</mark>
+      <mark style={{ background: `rgba(184,146,42,0.18)`, color: GOLD, borderRadius: 1, padding: "0 2px" }}>
+        {text.slice(idx, idx + query.length)}
+      </mark>
       {text.slice(idx + query.length)}
     </>
   );
@@ -335,57 +48,95 @@ function highlight(text, query) {
 function SidebarSection({ label, active, defaultOpen = true, children }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div>
+    <div style={{ borderBottom: `1px solid rgba(184,146,42,0.15)` }}>
       <div
-        className="sidebar-section-header"
         onClick={() => setOpen(o => !o)}
+        style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "11px 14px 10px", cursor: "pointer", userSelect: "none",
+        }}
       >
-        <div style={{ display:"flex", alignItems:"center", gap:7 }}>
-          {label}
-          {active && <span className="sidebar-active-dot" />}
+        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+          <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "9px", letterSpacing: "0.2em", color: GOLD, textTransform: "uppercase" }}>
+            {label}
+          </span>
+          {active && (
+            <span style={{ width: 5, height: 5, borderRadius: "50%", background: GOLD, flexShrink: 0, display: "inline-block" }} />
+          )}
         </div>
-        <span className={`sidebar-section-chevron ${open ? "open" : ""}`}>▾</span>
+        <span style={{ fontSize: 8, color: "#bbb", transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s", display: "inline-block" }}>▾</span>
       </div>
-      <div className={`sidebar-section-body ${open ? "" : "collapsed"}`}>
-        {children}
-      </div>
+      {open && (
+        <div style={{ padding: "0 10px 14px" }}>
+          {children}
+        </div>
+      )}
     </div>
   );
 }
 
-// ── Facet list with show-more ─────────────────────────────────
+// ── Facet list ────────────────────────────────────────────────
 function FacetList({ items, selected, loading, onSelect }) {
   const [showAll, setShowAll] = useState(false);
   const visible = showAll ? items : items.slice(0, 10);
-  const hasMore = items.length > 10;
 
   if (items.length === 0 && loading) {
-    return Array.from({ length: 5 }).map((_, i) => (
-      <div key={i} style={{ display:"flex", justifyContent:"space-between", padding:"5px 6px", marginBottom:2, gap:8 }}>
-        <div style={{ height:10, flex:1, background:"#1a1919", borderRadius:2 }} />
-        <div style={{ height:10, width:28, background:"#1a1919", borderRadius:2 }} />
-      </div>
-    ));
+    return (
+      <>
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "5px 4px", gap: 8, marginBottom: 2 }}>
+            <div style={{ height: 10, flex: 1, background: CREAM2, borderRadius: 2 }} />
+            <div style={{ height: 10, width: 28, background: CREAM2, borderRadius: 2 }} />
+          </div>
+        ))}
+      </>
+    );
   }
 
   return (
     <>
-      {visible.map((item) => {
+      {visible.map(item => {
         const on = selected === item.name;
         return (
-          <div key={item.name} className="sidebar-row" onClick={() => onSelect(item.name)}>
-            <div className="sidebar-row-inner">
-              <div className={`sidebar-check ${on ? "on" : ""}`}>{on ? "✓" : ""}</div>
-              <span className="sidebar-label">{item.name}</span>
+          <div
+            key={item.name}
+            onClick={() => onSelect(item.name)}
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "5px 6px", borderRadius: 2, cursor: "pointer",
+              background: on ? `rgba(184,146,42,0.08)` : "transparent",
+              transition: "background 0.15s",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+              <div style={{
+                width: 12, height: 12, borderRadius: 2, flexShrink: 0,
+                border: `1px solid ${on ? GOLD : "#ccc"}`,
+                background: on ? GOLD : "transparent",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 8, color: "#fff", transition: "all 0.15s",
+              }}>
+                {on ? "✓" : ""}
+              </div>
+              <span style={{ fontSize: 12, color: on ? DARK : "#555", fontWeight: on ? 600 : 400, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", transition: "color 0.15s" }}>
+                {item.name}
+              </span>
             </div>
-            <span className={`facet-count ${loading ? "dim" : ""}`}>{item.count.toLocaleString()}</span>
+            <span style={{
+              fontFamily: "var(--font-stencil, monospace)", fontSize: 9, color: loading ? "#ddd" : "#aaa",
+              background: CREAM2, border: `1px solid rgba(184,146,42,0.2)`,
+              padding: "1px 5px", borderRadius: 1, minWidth: 28, textAlign: "center",
+              transition: "color 0.2s",
+            }}>
+              {item.count.toLocaleString()}
+            </span>
           </div>
         );
       })}
-      {hasMore && (
+      {items.length > 10 && (
         <button
           onClick={() => setShowAll(s => !s)}
-          style={{ fontFamily:"var(--font-stencil),monospace", fontSize:8, color:"#8a8784", letterSpacing:"0.1em", background:"none", border:"none", cursor:"pointer", marginTop:6, padding:"0 6px" }}
+          style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 8, color: GOLD, letterSpacing: "0.1em", background: "none", border: "none", cursor: "pointer", marginTop: 6, padding: "0 6px" }}
         >
           {showAll ? "SHOW LESS ▴" : `+${items.length - 10} MORE ▾`}
         </button>
@@ -399,155 +150,130 @@ function Toggle({ on, onChange }) {
   return (
     <div
       onClick={() => onChange(!on)}
-      style={{ width:32, height:18, borderRadius:9, background:on ? "#e8621a" : "#2a2828", position:"relative", cursor:"pointer", transition:"background 0.2s", flexShrink:0 }}
+      style={{ width: 32, height: 18, borderRadius: 9, background: on ? GOLD : "#ddd", position: "relative", cursor: "pointer", transition: "background 0.2s", flexShrink: 0 }}
     >
-      <div style={{ position:"absolute", top:2, left:on ? 14 : 2, width:14, height:14, borderRadius:"50%", background:"#f0ebe3", transition:"left 0.2s" }} />
+      <div style={{ position: "absolute", top: 2, left: on ? 14 : 2, width: 14, height: 14, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} />
     </div>
   );
 }
 
-// ── HD Fitment filter panel ───────────────────────────────────
+// ── HD Fitment filter ─────────────────────────────────────────
 function FitmentFilter({ hdFamilies, filters, loading, onFamilySelect, onYearApply, onClear }) {
   const [yearFrom, setYearFrom] = useState(filters.yearStart ? String(filters.yearStart) : "");
   const [yearTo,   setYearTo]   = useState(filters.yearEnd   ? String(filters.yearEnd)   : "");
 
-  // keep local inputs in sync if parent clears
   useEffect(() => {
     setYearFrom(filters.yearStart ? String(filters.yearStart) : "");
     setYearTo(filters.yearEnd ? String(filters.yearEnd) : "");
   }, [filters.yearStart, filters.yearEnd]);
 
   const applyYears = () => {
-    onYearApply(
-      yearFrom ? parseInt(yearFrom) : null,
-      yearTo   ? parseInt(yearTo)   : null,
-    );
+    onYearApply(yearFrom ? parseInt(yearFrom) : null, yearTo ? parseInt(yearTo) : null);
   };
 
-  const hasAny = filters.hdFamily || filters.yearStart || filters.yearEnd;
+  const inputStyle = {
+    background: "#fff", border: `1px solid rgba(184,146,42,0.3)`, color: DARK,
+    fontFamily: "var(--font-stencil, monospace)", fontSize: 12, letterSpacing: "0.05em",
+    padding: "6px 8px", borderRadius: 2, outline: "none", width: "100%",
+    transition: "border-color 0.15s",
+  };
 
   return (
     <>
-      {/* Family facet list */}
       {hdFamilies.length > 0 && (
-        <FacetList
-          items={hdFamilies}
-          selected={filters.hdFamily}
-          loading={loading}
-          onSelect={val => onFamilySelect("hdFamily", val)}
-        />
+        <FacetList items={hdFamilies} selected={filters.hdFamily} loading={loading} onSelect={val => onFamilySelect("hdFamily", val)} />
       )}
       {hdFamilies.length === 0 && !loading && (
-        <div style={{ fontFamily:"var(--font-stencil),monospace", fontSize:9, color:"#3a3838", letterSpacing:"0.08em", padding:"4px 6px 8px" }}>
+        <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 9, color: "#bbb", letterSpacing: "0.08em", padding: "4px 6px 8px" }}>
           SEARCH TO SEE FAMILIES
         </div>
       )}
-
-      {/* Year range */}
-      <div style={{ marginTop:10 }}>
-        <div style={{ fontFamily:"var(--font-stencil),monospace", fontSize:8, color:"#8a8784", letterSpacing:"0.12em", marginBottom:6, paddingLeft:2 }}>
+      <div style={{ marginTop: 10 }}>
+        <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 8, color: "#aaa", letterSpacing: "0.12em", marginBottom: 6, paddingLeft: 2 }}>
           YEAR RANGE
         </div>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6, marginBottom:8 }}>
-          <input
-            className="year-input"
-            placeholder="FROM"
-            type="number"
-            min="1903" max="2030"
-            value={yearFrom}
-            onChange={e => setYearFrom(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && applyYears()}
-          />
-          <input
-            className="year-input"
-            placeholder="TO"
-            type="number"
-            min="1903" max="2030"
-            value={yearTo}
-            onChange={e => setYearTo(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && applyYears()}
-          />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 8 }}>
+          <input style={inputStyle} placeholder="FROM" type="number" min="1903" max="2030" value={yearFrom}
+            onChange={e => setYearFrom(e.target.value)} onKeyDown={e => e.key === "Enter" && applyYears()} />
+          <input style={inputStyle} placeholder="TO"   type="number" min="1903" max="2030" value={yearTo}
+            onChange={e => setYearTo(e.target.value)}   onKeyDown={e => e.key === "Enter" && applyYears()} />
         </div>
-        <button className="sidebar-apply-btn" onClick={applyYears}>APPLY</button>
-        {hasAny && (
-          <button className="sidebar-clear-btn" onClick={onClear}>CLEAR FITMENT</button>
+        <button
+          onClick={applyYears}
+          style={{ width: "100%", background: GOLD, border: "none", color: "#fff", fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)", fontSize: 14, letterSpacing: "0.08em", padding: 7, borderRadius: 2, cursor: "pointer", transition: "background 0.15s" }}
+        >
+          APPLY
+        </button>
+        {(filters.hdFamily || filters.yearStart || filters.yearEnd) && (
+          <button
+            onClick={onClear}
+            style={{ width: "100%", background: "transparent", border: `1px solid rgba(184,146,42,0.3)`, color: "#aaa", fontFamily: "var(--font-stencil, monospace)", fontSize: 8, letterSpacing: "0.12em", padding: 6, borderRadius: 2, cursor: "pointer", marginTop: 6, transition: "all 0.15s" }}
+          >
+            CLEAR FITMENT
+          </button>
         )}
       </div>
     </>
   );
 }
 
-// ── The full sidebar contents (reused in desktop + drawer) ────
+// ── Full sidebar contents (desktop + drawer) ──────────────────
 function SidebarContents({ facets, filters, loading, setFilters, minInput, setMinInput, maxInput, setMaxInput, applyPrice }) {
-  const handleFamilySelect = (key, val) => {
-    // toggle family selection
-    setFilters(prev => ({ ...prev, hdFamily: prev.hdFamily === val ? null : val }));
+  const inputStyle = {
+    background: "#fff", border: `1px solid rgba(184,146,42,0.3)`, color: DARK,
+    fontFamily: "var(--font-stencil, monospace)", fontSize: 13,
+    padding: "6px 9px", borderRadius: 2, outline: "none", width: "100%",
+    transition: "border-color 0.15s",
   };
-
-  const handleYearApply = (from, to) => {
-    setFilters(prev => ({ ...prev, yearStart: from, yearEnd: to }));
-  };
-
-  const clearFitment = () => {
-    setFilters(prev => ({ ...prev, hdFamily: null, yearStart: null, yearEnd: null }));
-  };
-
-  const categoryActive = !!filters.category;
-  const brandActive    = !!filters.brand;
-  const priceActive    = filters.minPrice != null || filters.maxPrice != null;
-  const fitmentActive  = !!filters.hdFamily || !!filters.yearStart || !!filters.yearEnd;
 
   return (
     <>
-      <SidebarSection label="CATEGORY" active={categoryActive}>
+      <SidebarSection label="Category" active={!!filters.category}>
         <FacetList
-          items={facets.categories}
-          selected={filters.category}
-          loading={loading}
+          items={facets.categories} selected={filters.category} loading={loading}
           onSelect={val => setFilters(prev => ({ ...prev, category: prev.category === val ? null : val }))}
         />
       </SidebarSection>
 
-      <SidebarSection label="BRAND" active={brandActive}>
+      <SidebarSection label="Brand" active={!!filters.brand}>
         <FacetList
-          items={facets.brands}
-          selected={filters.brand}
-          loading={loading}
+          items={facets.brands} selected={filters.brand} loading={loading}
           onSelect={val => setFilters(prev => ({ ...prev, brand: prev.brand === val ? null : val }))}
         />
       </SidebarSection>
 
-      <SidebarSection label="HD FITMENT" active={fitmentActive} defaultOpen={false}>
+      <SidebarSection label="HD Fitment" active={!!(filters.hdFamily || filters.yearStart || filters.yearEnd)} defaultOpen={false}>
         <FitmentFilter
-          hdFamilies={facets.hdFamilies ?? []}
-          filters={filters}
-          loading={loading}
-          onFamilySelect={handleFamilySelect}
-          onYearApply={handleYearApply}
-          onClear={clearFitment}
+          hdFamilies={facets.hdFamilies ?? []} filters={filters} loading={loading}
+          onFamilySelect={(key, val) => setFilters(prev => ({ ...prev, hdFamily: prev.hdFamily === val ? null : val }))}
+          onYearApply={(from, to) => setFilters(prev => ({ ...prev, yearStart: from, yearEnd: to }))}
+          onClear={() => setFilters(prev => ({ ...prev, hdFamily: null, yearStart: null, yearEnd: null }))}
         />
       </SidebarSection>
 
-      <SidebarSection label="PRICE RANGE" active={priceActive}>
+      <SidebarSection label="Price Range" active={filters.minPrice != null || filters.maxPrice != null}>
         {facets.priceRange?.max > 0 && (
-          <div style={{ fontFamily:"var(--font-stencil),monospace", fontSize:8, color:"#8a8784", letterSpacing:"0.08em", marginBottom:8 }}>
+          <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 8, color: "#aaa", letterSpacing: "0.08em", marginBottom: 8 }}>
             ${Math.floor(facets.priceRange.min).toLocaleString()} – ${Math.ceil(facets.priceRange.max).toLocaleString()}
           </div>
         )}
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6, marginBottom:8 }}>
-          <input className="price-input" placeholder="Min $" type="number" value={minInput}
-            onChange={e => setMinInput(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && applyPrice()} />
-          <input className="price-input" placeholder="Max $" type="number" value={maxInput}
-            onChange={e => setMaxInput(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && applyPrice()} />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 8 }}>
+          <input style={inputStyle} placeholder="Min $" type="number" value={minInput}
+            onChange={e => setMinInput(e.target.value)} onKeyDown={e => e.key === "Enter" && applyPrice()} />
+          <input style={inputStyle} placeholder="Max $" type="number" value={maxInput}
+            onChange={e => setMaxInput(e.target.value)} onKeyDown={e => e.key === "Enter" && applyPrice()} />
         </div>
-        <button className="sidebar-apply-btn" onClick={applyPrice}>APPLY</button>
+        <button
+          onClick={applyPrice}
+          style={{ width: "100%", background: GOLD, border: "none", color: "#fff", fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)", fontSize: 14, letterSpacing: "0.08em", padding: 7, borderRadius: 2, cursor: "pointer" }}
+        >
+          APPLY
+        </button>
       </SidebarSection>
 
-      <SidebarSection label="AVAILABILITY" active={filters.inStock}>
-        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"2px 4px" }}>
-          <span style={{ fontSize:13, fontWeight:500, color:"#c4c0bc" }}>In Stock Only</span>
+      <SidebarSection label="Availability" active={filters.inStock}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "2px 4px" }}>
+          <span style={{ fontSize: 13, color: "#555" }}>In Stock Only</span>
           <Toggle on={filters.inStock} onChange={val => setFilters(prev => ({ ...prev, inStock: val }))} />
         </div>
       </SidebarSection>
@@ -555,50 +281,126 @@ function SidebarContents({ facets, filters, loading, setFilters, minInput, setMi
   );
 }
 
-// ── Result card ───────────────────────────────────────────────
+// ── Product card (matches browse/page.jsx ProductCard) ────────
 function ResultCard({ p, i, query, onAdd }) {
-  const M = s => ({ fontFamily:"var(--font-stencil),monospace", ...s });
-  const img = p.image ?? (Array.isArray(p.images) && p.images.length > 0 ? p.images[0] : null);
+  const [imgErr, setImgErr] = useState(false);
+  const imageSrc = getProductImage({
+    image:  p.image  ?? null,
+    images: Array.isArray(p.images) ? p.images : [],
+    brand:  p.brand,
+  });
+
   return (
-    <div
-      className="s-card"
-      style={{ animationDelay:`${Math.min(i,12) * 0.03}s`, opacity: p.inStock ? 1 : 0.55 }}
-      onClick={() => window.location.href = `/browse/${p.slug}`}
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: Math.min(i, 12) * 0.03, type: "spring", stiffness: 300, damping: 24 }}
+      style={{ opacity: p.inStock ? 1 : 0.6 }}
     >
-      <div className="s-card-img">
-        {img
-          ? <img src={img} alt={p.name} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-          : <span style={M({fontSize:8, color:"#3a3838", letterSpacing:"0.1em", position:"relative", zIndex:1})}>NO IMAGE</span>
-        }
-        {p.badge && <span className={`s-badge ${p.badge}`}>{p.badge.toUpperCase()}</span>}
-        {!p.inStock && <span className="s-oos">OUT OF STOCK</span>}
-      </div>
-      <div className="s-card-body">
-        <div className="s-brand">{p.brand}</div>
-        <div className="s-name">{highlight(p.name, query)}</div>
-        <div className="s-cat">{p.category}</div>
-        <div className="s-footer">
-          <div>
-            {p.was && <span className="s-was">${p.was.toFixed(2)}</span>}
-            <span className="s-price">${p.price.toFixed(2)}</span>
-          </div>
-          <button
-            className="s-add"
-            disabled={!p.inStock}
-            onClick={e => { e.stopPropagation(); if (p.inStock) onAdd(); }}
-          >
-            {p.inStock ? "ADD" : "OOS"}
-          </button>
+      <motion.div
+        whileHover={{ y: -4, borderColor: GOLD, boxShadow: `0 8px 32px rgba(184,146,42,0.15)` }}
+        transition={{ type: "spring", stiffness: 400, damping: 25 }}
+        onClick={() => window.location.href = `/browse/${p.slug}`}
+        style={{ background: "#fff", border: `1px solid rgba(184,146,42,0.35)`, overflow: "hidden", cursor: "pointer" }}
+      >
+        {/* Image */}
+        <div style={{ aspectRatio: "1", background: CREAM, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", position: "relative" }}>
+          {imageSrc && !imgErr ? (
+            <img
+              src={imageSrc} alt={p.name} onError={() => setImgErr(true)}
+              style={{ width: "100%", height: "100%", objectFit: "contain", padding: 10 }}
+            />
+          ) : (
+            <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 9, letterSpacing: 2, color: "#ccc", textTransform: "uppercase" }}>
+              No Image
+            </div>
+          )}
+
+          {/* OEM badge */}
+          {p.oem_numbers?.length > 0 ? (
+            <div style={{ position: "absolute", top: 8, left: 0 }}>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 22" width={72} height={22} style={{ display: "block" }}>
+                <defs><linearGradient id="oem-grad-s" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stopColor="#ffd700"/><stop offset="50%" stopColor="#c8a800"/><stop offset="100%" stopColor="#a88800"/></linearGradient></defs>
+                <path d="M6,2 L66,2 L72,11 L66,20 L6,20 L0,11 Z" fill="rgba(0,0,0,0.15)" transform="translate(1,1.5)"/>
+                <path d="M6,2 L66,2 L72,11 L66,20 L6,20 L0,11 Z" fill="url(#oem-grad-s)"/>
+                <path d="M8,5 L64,5 L69,11 L64,17 L8,17 L3,11 Z" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="0.75"/>
+                <text x="36" y="15" textAnchor="middle" fontFamily="'Barlow Condensed','Arial Narrow',sans-serif" fontWeight="700" fontSize="9" letterSpacing="1.5" fill="rgba(0,0,0,0.75)">OEM</text>
+              </svg>
+            </div>
+          ) : p.is_harley_fitment ? (
+            <div style={{ position: "absolute", top: 8, left: 8, background: "rgba(184,146,42,0.1)", border: `1px solid rgba(184,146,42,0.4)`, fontFamily: "var(--font-stencil, monospace)", fontSize: 8, letterSpacing: 1, color: GOLD, padding: "3px 7px", textTransform: "uppercase" }}>
+              HD Fit
+            </div>
+          ) : null}
+
+          {/* Out of stock */}
+          {!p.inStock && (
+            <div style={{ position: "absolute", top: 8, right: 8, background: "rgba(255,255,255,0.9)", border: "1px solid #ddd", fontFamily: "var(--font-stencil, monospace)", fontSize: 8, letterSpacing: 1, color: "#999", padding: "3px 7px", textTransform: "uppercase" }}>
+              Out of Stock
+            </div>
+          )}
+
+          {/* Variants badge */}
+          {p.variant_count > 1 && (
+            <div style={{ position: "absolute", bottom: 8, left: 8, display: "flex", alignItems: "center", gap: 4, background: GOLD, border: "1.5px solid rgba(0,0,0,0.25)", borderRadius: 3, padding: "3px 8px" }}>
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><circle cx="2" cy="2" r="1.5" fill="#1a1000"/><circle cx="6" cy="2" r="1.5" fill="#1a1000" opacity="0.7"/><circle cx="2" cy="6" r="1.5" fill="#1a1000" opacity="0.7"/><circle cx="6" cy="6" r="1.5" fill="#1a1000" opacity="0.4"/></svg>
+              <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 8, letterSpacing: 1, color: "#1a1000", textTransform: "uppercase" }}>{p.variant_count} options</span>
+            </div>
+          )}
         </div>
-      </div>
-    </div>
+
+        {/* Info */}
+        <div style={{ padding: "12px 14px 16px", borderTop: `1px solid rgba(184,146,42,0.2)` }}>
+          <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 8, letterSpacing: 2, color: GOLD, textTransform: "uppercase", marginBottom: 4 }}>
+            {p.brand}
+          </div>
+          <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 12, color: "#2a2018", lineHeight: 1.3, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.5px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+            {highlight(p.name, query)}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div>
+              {p.was && <span style={{ fontSize: 11, color: "#aaa", textDecoration: "line-through", display: "block", marginBottom: 1 }}>${p.was.toFixed(2)}</span>}
+              <span style={{ fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)", fontSize: 20, letterSpacing: 1, color: DARK }}>
+                ${p.price?.toFixed(2) ?? "—"}
+              </span>
+            </div>
+            <motion.button
+              whileHover={{ scale: 1.05, background: GOLD, color: "#fff" }}
+              whileTap={{ scale: 0.95 }}
+              onClick={e => { e.stopPropagation(); if (p.inStock) onAdd(); }}
+              disabled={!p.inStock}
+              style={{ background: p.inStock ? CREAM2 : "#f5f5f5", border: `1px solid ${p.inStock ? "rgba(184,146,42,0.3)" : "#ddd"}`, color: p.inStock ? GOLD : "#ccc", width: 30, height: 30, fontSize: 18, cursor: p.inStock ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s, color 0.15s" }}
+            >
+              +
+            </motion.button>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
-// ── Constants ─────────────────────────────────────────────────
-const POPULAR    = ["exhaust", "air cleaner", "handlebars", "seat", "wheels", "shocks", "battery", "footpegs", "helmet", "tires"];
-const CATEGORIES = ["Street","ATV","Common Parts","MX / Off-Road","Watercraft","Scooter","Drag Specialties","Moose ATV"];
-const DEBOUNCE_MS = 350;
+// ── Pagination button (matches browse/page.jsx PagBtn) ────────
+function PagBtn({ onClick, disabled, active, children }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        background: active ? GOLD : "#fff",
+        border: `1px solid ${active ? GOLD : "rgba(184,146,42,0.3)"}`,
+        color: active ? "#fff" : disabled ? "#ccc" : DARK,
+        fontFamily: "var(--font-stencil, monospace)",
+        fontSize: "10px", padding: "7px 12px",
+        cursor: disabled ? "default" : "pointer",
+        minWidth: 36, letterSpacing: "1px",
+        transition: "background 0.15s, border-color 0.15s, color 0.15s",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
 
 // ── Main component ────────────────────────────────────────────
 export default function SearchClient({ initialQuery = "" }) {
@@ -609,33 +411,27 @@ export default function SearchClient({ initialQuery = "" }) {
   const [total,        setTotal]        = useState(0);
   const [loading,      setLoading]      = useState(false);
   const [facets,       setFacets]       = useState({ categories: [], brands: [], hdFamilies: [], priceRange: { min: 0, max: 0 } });
-  const [filters,      setFilters]      = useState({
-    category: null, brand: null,
-    minPrice: null, maxPrice: null,
-    inStock: false,
-    // HD fitment
-    hdFamily: null, yearStart: null, yearEnd: null,
-  });
+  const [filters,      setFilters]      = useState({ category: null, brand: null, minPrice: null, maxPrice: null, inStock: false, hdFamily: null, yearStart: null, yearEnd: null });
   const [minInput,     setMinInput]     = useState("");
   const [maxInput,     setMaxInput]     = useState("");
   const [saleProducts, setSaleProducts] = useState([]);
   const [drawerOpen,   setDrawerOpen]   = useState(false);
+  const [page,         setPage]         = useState(1);
+
+  const PER_PAGE = 48;
 
   const inputRef = useRef(null);
   const abortRef = useRef(null);
   const { addItem } = useCartSafe();
 
-  // Focus on mount
   useEffect(() => { inputRef.current?.focus(); }, []);
 
-  // Lock body scroll when drawer open
   useEffect(() => {
     if (drawerOpen) document.body.style.overflow = "hidden";
     else document.body.style.overflow = "";
     return () => { document.body.style.overflow = ""; };
   }, [drawerOpen]);
 
-  // Sale products for landing
   useEffect(() => {
     fetch("/api/search?q=*&per_page=8&sort=relevance&closeout=true")
       .then(r => r.json())
@@ -648,10 +444,10 @@ export default function SearchClient({ initialQuery = "" }) {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     setFilters({
-      category:  params.get("category") || null,
-      brand:     params.get("brand")    || null,
-      minPrice:  params.get("minPrice") ? Number(params.get("minPrice")) : null,
-      maxPrice:  params.get("maxPrice") ? Number(params.get("maxPrice")) : null,
+      category:  params.get("category")  || null,
+      brand:     params.get("brand")     || null,
+      minPrice:  params.get("minPrice")  ? Number(params.get("minPrice"))       : null,
+      maxPrice:  params.get("maxPrice")  ? Number(params.get("maxPrice"))       : null,
       inStock:   params.get("inStock") === "true",
       hdFamily:  params.get("hd_family") || null,
       yearStart: params.get("year_start") ? parseInt(params.get("year_start")) : null,
@@ -661,8 +457,7 @@ export default function SearchClient({ initialQuery = "" }) {
     setMaxInput(params.get("maxPrice") ?? "");
   }, []);
 
-  // Debounced search — sends all active filters to the API
-  const fetchResults = useCallback(async (q, s) => {
+  const fetchResults = useCallback(async (q, s, pg = 1) => {
     if (!q.trim()) { setResults([]); setTotal(0); return; }
     if (abortRef.current) abortRef.current.abort();
     abortRef.current = new AbortController();
@@ -670,16 +465,17 @@ export default function SearchClient({ initialQuery = "" }) {
     try {
       const params = new URLSearchParams({
         search:   q,
-        pageSize: "48",
-        ...(filters.category  && { category:    filters.category }),
-        ...(filters.brand     && { brand:        filters.brand }),
-        ...(filters.minPrice  != null && { minPrice:    String(filters.minPrice) }),
-        ...(filters.maxPrice  != null && { maxPrice:    String(filters.maxPrice) }),
-        ...(filters.inStock   && { inStock:      "true" }),
-        ...(filters.hdFamily  && { hd_family:    filters.hdFamily }),
-        ...(filters.yearStart && { year_start:   String(filters.yearStart) }),
-        ...(filters.yearEnd   && { year_end:     String(filters.yearEnd) }),
-        ...(s !== "relevance" && { sort:         s }),
+        page:     String(pg),
+        per_page: String(PER_PAGE),
+        ...(filters.category  && { category:  filters.category }),
+        ...(filters.brand     && { brand:     filters.brand }),
+        ...(filters.minPrice  != null && { minPrice:  String(filters.minPrice) }),
+        ...(filters.maxPrice  != null && { maxPrice:  String(filters.maxPrice) }),
+        ...(filters.inStock   && { inStock:   "true" }),
+        ...(filters.hdFamily  && { hd_family: filters.hdFamily }),
+        ...(filters.yearStart && { year_start: String(filters.yearStart) }),
+        ...(filters.yearEnd   && { year_end:   String(filters.yearEnd) }),
+        ...(s !== "relevance" && { sort:       s }),
       });
       const res  = await fetch(`/api/search?${params}`, { signal: abortRef.current.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -695,22 +491,17 @@ export default function SearchClient({ initialQuery = "" }) {
   }, [filters]);
 
   useEffect(() => {
-    const t = setTimeout(() => fetchResults(query, sort), DEBOUNCE_MS);
+    const t = setTimeout(() => fetchResults(query, sort, page), DEBOUNCE_MS);
     return () => clearTimeout(t);
-  }, [query, sort, filters, fetchResults]);
+  }, [query, sort, filters, page, fetchResults]);
 
   const doSearch = (q) => {
-    setQuery(q); setInput(q);
-    const url = q ? `/search?q=${encodeURIComponent(q)}` : "/search";
-    window.history.replaceState(null, "", url);
+    setQuery(q); setInput(q); setPage(1);
+    window.history.replaceState(null, "", q ? `/search?q=${encodeURIComponent(q)}` : "/search");
   };
 
   const applyPrice = useCallback(() => {
-    setFilters(prev => ({
-      ...prev,
-      minPrice: minInput ? Number(minInput) : null,
-      maxPrice: maxInput ? Number(maxInput) : null,
-    }));
+    setFilters(prev => ({ ...prev, minPrice: minInput ? Number(minInput) : null, maxPrice: maxInput ? Number(maxInput) : null }));
   }, [minInput, maxInput]);
 
   const clearAll = useCallback(() => {
@@ -718,7 +509,6 @@ export default function SearchClient({ initialQuery = "" }) {
     setMinInput(""); setMaxInput("");
   }, []);
 
-  // Active filter chips
   const chips = [
     filters.category  && { key: "category",  label: filters.category },
     filters.brand     && { key: "brand",      label: filters.brand },
@@ -743,152 +533,208 @@ export default function SearchClient({ initialQuery = "" }) {
     }
   };
 
-  const handleSubmit = (e) => { e.preventDefault(); doSearch(input.trim()); };
-
-  const M = s => ({ fontFamily:"var(--font-stencil),monospace", ...s });
-  const B = s => ({ fontFamily:"var(--font-caesar),sans-serif",  ...s });
-
-  // Shared sidebar props
-  const sidebarProps = { facets, filters, loading, setFilters, minInput, setMinInput, maxInput, setMaxInput, applyPrice };
-
+  const sidebarProps = { facets, filters, loading, setFilters: (updater) => { setFilters(updater); setPage(1); }, minInput, setMinInput, maxInput, setMaxInput, applyPrice };
   const activeFilterCount = chips.length;
+  const totalPages = Math.ceil(total / PER_PAGE);
 
   return (
-    <div style={{ background:"#0a0909", minHeight:"100vh", color:"#f0ebe3", fontFamily:"var(--font-stencil),sans-serif" }}>
-      <style>{css}</style>
-      <NavBar activePage="search" />
+    <div style={{ background: CREAM, minHeight: "100vh", color: DARK }}>
 
       {/* ── SEARCH HERO ── */}
-      <div className="search-hero">
-        <div className="search-hero-inner">
-          <div className="search-eyebrow">SEARCH 500K+ PARTS</div>
-          <form onSubmit={handleSubmit} className="search-bar-wrap">
+      <div style={{ background: "#fff", borderBottom: `1px solid rgba(184,146,42,0.2)`, padding: "28px 24px 24px" }}>
+        <div style={{ maxWidth: 760, margin: "0 auto" }}>
+          <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 9, color: GOLD, letterSpacing: "0.25em", marginBottom: 10, textTransform: "uppercase" }}>
+            SEARCH 500K+ PARTS
+          </div>
+          <form onSubmit={e => { e.preventDefault(); doSearch(input.trim()); }} style={{ position: "relative", display: "flex", alignItems: "center" }}>
             <input
               ref={inputRef}
-              className="search-input"
               type="text"
               placeholder="Search parts, brands, categories..."
               value={input}
               onChange={e => { setInput(e.target.value); doSearch(e.target.value); }}
+              style={{
+                flex: 1, height: 54,
+                background: "#fff", border: `1px solid rgba(184,146,42,0.4)`, borderRight: "none",
+                color: DARK, fontFamily: "var(--font-stencil, monospace)",
+                fontSize: 20, fontWeight: 600, letterSpacing: "0.03em",
+                padding: "0 20px", outline: "none", borderRadius: "2px 0 0 2px",
+                transition: "border-color 0.2s",
+              }}
             />
             {input && (
-              <button type="button" className="search-clear"
-                onClick={() => { setInput(""); doSearch(""); inputRef.current?.focus(); }}>✕</button>
+              <button
+                type="button"
+                onClick={() => { setInput(""); doSearch(""); inputRef.current?.focus(); }}
+                style={{ position: "absolute", right: 68, background: "none", border: "none", color: "#bbb", fontSize: 16, cursor: "pointer", padding: 0, lineHeight: 1, transition: "color 0.15s" }}
+              >
+                ✕
+              </button>
             )}
-            <button type="submit" className="search-btn">🔍</button>
+            <button
+              type="submit"
+              style={{ height: 54, width: 64, flexShrink: 0, background: GOLD, border: "none", color: "#fff", fontSize: 20, borderRadius: "0 2px 2px 0", cursor: "pointer", transition: "background 0.2s", display: "flex", alignItems: "center", justifyContent: "center" }}
+            >
+              🔍
+            </button>
           </form>
+
           {!query && (
-            <div className="popular-wrap">
-              <span className="popular-label">POPULAR:</span>
+            <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 9, color: "#aaa", letterSpacing: "0.15em" }}>POPULAR:</span>
               {POPULAR.map(p => (
-                <button key={p} className="popular-chip" onClick={() => doSearch(p)}>{p}</button>
+                <button
+                  key={p}
+                  onClick={() => doSearch(p)}
+                  style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 9, color: "#888", letterSpacing: "0.1em", border: `1px solid rgba(184,146,42,0.25)`, borderRadius: 2, padding: "3px 9px", cursor: "pointer", background: "transparent", transition: "all 0.15s" }}
+                >
+                  {p}
+                </button>
               ))}
             </div>
           )}
         </div>
       </div>
 
-      {/* ── RESULTS ── */}
       {query ? (
         <>
-          {/* Toolbar */}
-          <div className="search-toolbar">
-            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-              {/* Mobile: filter button */}
-              <button className="mobile-filter-btn" onClick={() => setDrawerOpen(true)}>
-                ⇌ FILTERS
-                {activeFilterCount > 0 && (
-                  <span className="filter-badge">{activeFilterCount}</span>
-                )}
+          {/* ── TOOLBAR ── */}
+          <div style={{ background: "#fff", borderBottom: `1px solid rgba(184,146,42,0.15)`, padding: "10px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              {/* Mobile filter button */}
+              <button
+                className="mobile-filter-btn"
+                onClick={() => setDrawerOpen(true)}
+                style={{ display: "none" }}
+              >
+                ⇌ FILTERS {activeFilterCount > 0 && <span style={{ background: GOLD, color: "#fff", fontSize: 8, fontWeight: 700, borderRadius: "50%", width: 14, height: 14, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{activeFilterCount}</span>}
               </button>
-              <span className="result-count">
+              <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 10, color: "#aaa", letterSpacing: "0.12em", textTransform: "uppercase" }}>
                 {loading
-                  ? <span style={M({color:"#3a3838"})}>SEARCHING…</span>
-                  : <><span>{total.toLocaleString()}</span> RESULTS FOR "{query.toUpperCase()}"</>
+                  ? <span style={{ color: "#ccc" }}>SEARCHING…</span>
+                  : <><span style={{ color: GOLD }}>{total.toLocaleString()}</span> RESULTS FOR "{query.toUpperCase()}"</>
                 }
               </span>
             </div>
-            <select className="sort-select" value={sort} onChange={e => setSort(e.target.value)}>
-              <option value="relevance">Relevance</option>
-              <option value="price-asc">Price: Low→High</option>
-              <option value="price-desc">Price: High→Low</option>
-              <option value="name-asc">A → Z</option>
+            <select
+              value={sort}
+              onChange={e => { setSort(e.target.value); setPage(1); }}
+              style={{ background: "#fff", border: `1px solid rgba(184,146,42,0.3)`, color: DARK, fontFamily: "var(--font-stencil, monospace)", fontSize: 9, letterSpacing: "1px", padding: "7px 10px", outline: "none", textTransform: "uppercase", cursor: "pointer" }}
+            >
+              {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
 
-          <div className="shop-layout">
-            {/* ── DESKTOP SIDEBAR ── */}
-            <aside className="shop-sidebar">
+          {/* ── LAYOUT ── */}
+          <div style={{ display: "flex", maxWidth: 1200, margin: "0 auto" }}>
+
+            {/* Desktop sidebar */}
+            <aside className="search-desktop-sidebar" style={{ width: 215, flexShrink: 0, background: "#fff", borderRight: `1px solid rgba(184,146,42,0.15)`, overflowY: "auto", maxHeight: "calc(100vh - 110px)", position: "sticky", top: 0, alignSelf: "start" }}>
               <SidebarContents {...sidebarProps} />
             </aside>
 
-            <div className="shop-main">
+            {/* Results */}
+            <div style={{ flex: 1, padding: "16px 16px 120px", minWidth: 0 }}>
+
               {/* Active filter chips */}
               {chips.length > 0 && (
-                <div style={{ display:"flex", alignItems:"center", gap:7, flexWrap:"wrap", marginBottom:14 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap", marginBottom: 14 }}>
                   {chips.map(f => (
-                    <span key={f.key} className="chip" onClick={() => removeChip(f.key)}>
+                    <span
+                      key={f.key}
+                      onClick={() => removeChip(f.key)}
+                      style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 8, background: `rgba(184,146,42,0.1)`, border: `1px solid rgba(184,146,42,0.25)`, borderRadius: 2, padding: "2px 8px", color: GOLD, letterSpacing: "0.1em", cursor: "pointer", userSelect: "none", transition: "all 0.15s" }}
+                    >
                       {f.label} ×
                     </span>
                   ))}
                   <button
                     onClick={clearAll}
-                    style={M({ fontSize:8, letterSpacing:"0.1em", color:"#8a8784", background:"none", border:"none", cursor:"pointer" })}
+                    style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 8, letterSpacing: "0.1em", color: "#aaa", background: "none", border: "none", cursor: "pointer" }}
                   >
                     CLEAR ALL
                   </button>
                 </div>
               )}
 
-              {/* Results */}
+              {/* Grid */}
               {loading ? (
-                <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))", gap:12 }}>
-                  {Array.from({length:8}).map((_,i) => (
-                    <div key={i} className="s-card" style={{opacity:0.4}}>
-                      <div className="s-card-img"/>
-                      <div className="s-card-body">
-                        <div style={{height:8, background:"#2a2828", borderRadius:2, marginBottom:8, width:"60%"}}/>
-                        <div style={{height:12, background:"#2a2828", borderRadius:2, marginBottom:8}}/>
-                        <div style={{height:8, background:"#2a2828", borderRadius:2, width:"40%"}}/>
-                      </div>
-                    </div>
+                <div className="product-grid">
+                  {Array.from({ length: 12 }).map((_, i) => (
+                    <div key={i} style={{ aspectRatio: "0.8", background: `linear-gradient(90deg, #f0ebe3 25%, ${CREAM} 50%, #f0ebe3 75%)`, backgroundSize: "600px 100%", animation: "shimmer 1.4s infinite" }} />
                   ))}
                 </div>
               ) : results.length === 0 ? (
-                <div className="search-empty">
-                  <div className="search-empty-title">NO RESULTS FOR "{query.toUpperCase()}"</div>
-                  <div className="search-empty-sub">TRY A DIFFERENT SEARCH TERM OR BROWSE BY CATEGORY</div>
-                  <div className="search-suggestions">
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 400, gap: 16 }}>
+                  <div style={{ fontSize: 48 }}>🔧</div>
+                  <div style={{ fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)", fontSize: 28, letterSpacing: 2, color: "#bbb" }}>
+                    NO RESULTS FOR "{query.toUpperCase()}"
+                  </div>
+                  <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 9, color: "#ccc", textTransform: "uppercase", letterSpacing: 1 }}>
+                    TRY A DIFFERENT SEARCH TERM OR BROWSE BY CATEGORY
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginTop: 8 }}>
                     {POPULAR.map(p => (
-                      <button key={p} className="popular-chip" onClick={() => doSearch(p)}>{p}</button>
+                      <button key={p} onClick={() => doSearch(p)}
+                        style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 9, color: "#888", border: `1px solid rgba(184,146,42,0.25)`, borderRadius: 2, padding: "3px 9px", cursor: "pointer", background: "transparent" }}>
+                        {p}
+                      </button>
                     ))}
                   </div>
                 </div>
               ) : (
-                <div className={results.length ? "product-grid" : ""}>
-                  {results.map((p, i) => (
-                    <ResultCard key={p.id} p={p} i={i} query={query} onAdd={() => addItem(p)} />
-                  ))}
-                </div>
+                <>
+                  <div className="product-grid">
+                    {results.map((p, i) => (
+                      <ResultCard key={p.id} p={p} i={i} query={query} onAdd={() => addItem(p)} />
+                    ))}
+                  </div>
+
+                  {/* ── PAGINATION ── */}
+                  {totalPages > 1 && (
+                    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginTop: 40, flexWrap: "wrap", paddingBottom: 24 }}>
+                      <PagBtn onClick={() => { setPage(p => Math.max(1, p - 1)); window.scrollTo(0, 0); }} disabled={page === 1}>← Prev</PagBtn>
+                      {Array.from({ length: Math.min(7, totalPages) }, (_, i) => {
+                        const pg = page <= 4
+                          ? i + 1
+                          : page >= totalPages - 3
+                            ? totalPages - 6 + i
+                            : page - 3 + i;
+                        if (pg < 1 || pg > totalPages) return null;
+                        return (
+                          <PagBtn key={pg} onClick={() => { setPage(pg); window.scrollTo(0, 0); }} active={pg === page}>{pg}</PagBtn>
+                        );
+                      })}
+                      <PagBtn onClick={() => { setPage(p => Math.min(totalPages, p + 1)); window.scrollTo(0, 0); }} disabled={page === totalPages}>Next →</PagBtn>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
         </>
       ) : (
         /* ── LANDING ── */
-        <div className="search-landing">
-          <div className="landing-section-title">BROWSE BY <span>CATEGORY</span></div>
-          <div className="cat-pills">
+        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "32px 24px" }}>
+          <div style={{ fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)", fontSize: 28, letterSpacing: "0.05em", color: DARK, marginBottom: 16, borderBottom: `1px solid rgba(184,146,42,0.2)`, paddingBottom: 10 }}>
+            BROWSE BY <span style={{ color: GOLD }}>CATEGORY</span>
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 36 }}>
             {CATEGORIES.map(c => (
-              <div key={c} className="cat-pill"
-                onClick={() => window.location.href = `/browse?category=${encodeURIComponent(c)}`}>
+              <button
+                key={c}
+                onClick={() => window.location.href = `/browse?category=${encodeURIComponent(c)}`}
+                style={{ background: "#fff", border: `1px solid rgba(184,146,42,0.3)`, borderRadius: 2, padding: "10px 18px", cursor: "pointer", fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)", fontSize: 16, letterSpacing: "0.07em", color: "#888", transition: "all 0.2s" }}
+              >
                 {c}
-              </div>
+              </button>
             ))}
           </div>
           {saleProducts.length > 0 && (
             <>
-              <div className="landing-section-title">ON <span>SALE NOW</span></div>
+              <div style={{ fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)", fontSize: 28, letterSpacing: "0.05em", color: DARK, marginBottom: 16, borderBottom: `1px solid rgba(184,146,42,0.2)`, paddingBottom: 10 }}>
+                ON <span style={{ color: GOLD }}>SALE NOW</span>
+              </div>
               <div className="product-grid">
                 {saleProducts.map((p, i) => (
                   <ResultCard key={p.id} p={p} i={i} query="" onAdd={() => addItem(p)} />
@@ -900,25 +746,67 @@ export default function SearchClient({ initialQuery = "" }) {
       )}
 
       {/* ── MOBILE DRAWER ── */}
-      <div className={`drawer-backdrop ${drawerOpen ? "open" : ""}`} onClick={() => setDrawerOpen(false)} />
-      {drawerOpen && (
-        <div className="drawer-panel">
-          <div className="drawer-header">
-            <span className="drawer-title">FILTERS {activeFilterCount > 0 ? `(${activeFilterCount})` : ""}</span>
-            <button className="drawer-close" onClick={() => setDrawerOpen(false)}>✕</button>
-          </div>
-          <div className="drawer-body">
-            <SidebarContents {...sidebarProps} />
-          </div>
-          {activeFilterCount > 0 && (
-            <div className="drawer-footer">
-              <button className="sidebar-clear-btn" onClick={() => { clearAll(); setDrawerOpen(false); }}>
-                CLEAR ALL FILTERS
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+      <AnimatePresence>
+        {drawerOpen && (
+          <>
+            <motion.div
+              key="backdrop"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setDrawerOpen(false)}
+              style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.5)" }}
+            />
+            <motion.div
+              key="drawer"
+              initial={{ x: "-100%" }} animate={{ x: 0 }} exit={{ x: "-100%" }}
+              transition={{ type: "spring", stiffness: 320, damping: 32 }}
+              style={{ position: "fixed", top: 0, left: 0, bottom: 0, width: 280, zIndex: 201, background: "#fff", borderRight: `1px solid rgba(184,146,42,0.2)`, display: "flex", flexDirection: "column" }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", borderBottom: `1px solid rgba(184,146,42,0.15)`, flexShrink: 0 }}>
+                <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 10, color: GOLD, letterSpacing: "0.2em", textTransform: "uppercase" }}>
+                  FILTERS {activeFilterCount > 0 ? `(${activeFilterCount})` : ""}
+                </span>
+                <button onClick={() => setDrawerOpen(false)} style={{ background: "none", border: "none", color: "#aaa", fontSize: 18, cursor: "pointer", padding: 0, lineHeight: 1 }}>✕</button>
+              </div>
+              <div style={{ flex: 1, overflowY: "auto" }}>
+                <SidebarContents {...sidebarProps} />
+              </div>
+              {activeFilterCount > 0 && (
+                <div style={{ padding: "14px 16px", borderTop: `1px solid rgba(184,146,42,0.15)`, flexShrink: 0 }}>
+                  <button
+                    onClick={() => { clearAll(); setDrawerOpen(false); }}
+                    style={{ width: "100%", background: "transparent", border: `1px solid rgba(184,146,42,0.3)`, color: "#aaa", fontFamily: "var(--font-stencil, monospace)", fontSize: 8, letterSpacing: "0.12em", padding: 8, borderRadius: 2, cursor: "pointer" }}
+                  >
+                    CLEAR ALL FILTERS
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      <style>{`
+        @keyframes shimmer {
+          from { background-position: -600px 0; }
+          to   { background-position:  600px 0; }
+        }
+        * { box-sizing: border-box; }
+        .product-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 12px;
+        }
+        .search-desktop-sidebar { display: block !important; }
+        .mobile-filter-btn { display: none !important; }
+        @media (max-width: 768px) {
+          .search-desktop-sidebar { display: none !important; }
+          .mobile-filter-btn { display: flex !important; }
+          .product-grid { grid-template-columns: repeat(2, 1fr) !important; }
+        }
+        @media (min-width: 768px) and (max-width: 1024px) {
+          .product-grid { grid-template-columns: repeat(3, 1fr) !important; }
+        }
+      `}</style>
     </div>
   );
 }

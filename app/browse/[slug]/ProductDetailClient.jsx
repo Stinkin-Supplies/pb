@@ -8,7 +8,7 @@ import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import VariantSelector from "@/components/browse/VariantSelector";
-import NavBar from "@/components/NavBar";
+
 
 // ── Theme ─────────────────────────────────────────────────────
 const GOLD   = "#b8922a";
@@ -435,7 +435,7 @@ export default function ProductDetailClient({ product, fitment = [], relatedProd
 
   return (
     <div style={{ background: CREAM, minHeight: "100vh" }}>
-      <NavBar activePage="shop" />
+      
 
       {/* Breadcrumb */}
       <div style={{

@@ -49,6 +49,7 @@ const SCHEMA = {
     { name: 'source_vendor',     type: 'string',   facet: true },
     { name: 'product_code',      type: 'string',   facet: true, optional: true },
     { name: 'slug',              type: 'string',   optional: true },
+    { name: 'variant_group_id', type: 'int32',    optional: true, facet: true },
 
     // Content
     { name: 'name',              type: 'string' },
@@ -153,6 +154,7 @@ function transform(row) {
     source_vendor:    row.source_vendor || '',
     product_code:     row.product_code || undefined,
     slug:             row.slug || undefined,
+    variant_group_id: row.variant_group_id ? parseInt(row.variant_group_id) : undefined,
 
     name:             row.name,
     description:      row.description || undefined,
