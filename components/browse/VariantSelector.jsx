@@ -10,26 +10,28 @@ const DARK   = '#2a1f0e';
 const CREAM  = '#fdfaf5';
 const CREAM2 = '#f5f0e8';
 const FONT   = "var(--font-stencil, 'Barlow Condensed', monospace)";
+const SIZE_ORDER = ['XS','SM','MD','LG','XL','2X','3X','4X','5X'];
 
 export default function VariantSelector({ productId, currentSku }) {
   const router = useRouter();
-  const [data, setData]       = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [selOpt1, setSelOpt1] = useState(null);
-  const [selOpt2, setSelOpt2] = useState(null);
+  const [data, setData]         = useState(null);
+  const [loading, setLoading]   = useState(true);
+  const [selOpt1, setSelOpt1]   = useState(null);
+  const [selOpt2, setSelOpt2]   = useState(null);
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
+    if (!productId) return;
+    setLoading(true);
     fetch(`/api/browse/variants/${productId}`)
       .then(r => r.json())
       .then(d => {
         setData(d);
-        // Pre-select current product's options
-        if (d.variants) {
+        if (d.variants?.length) {
           const current = d.variants.find(v => v.id === productId);
           if (current) {
-            setSelOpt1(current.option_1_value);
-            setSelOpt2(current.option_2_value);
+            setSelOpt1(current.option_1_value ?? null);
+            setSelOpt2(current.option_2_value ?? null);
           }
         }
         setLoading(false);
@@ -38,72 +40,86 @@ export default function VariantSelector({ productId, currentSku }) {
   }, [productId]);
 
   if (loading) return <VariantSkeleton />;
-  if (!data?.hasVariants || data.variants.length <= 1) return null;
+  if (!data?.hasVariants || !data.variants?.length || data.variants.length <= 1) return null;
 
-  const { variants } = data;
+  const { variants, group } = data;
   const isTwoAxis = variants.some(v => v.option_2_value);
 
   if (isTwoAxis) {
-    return <TwoAxisSelector
-      variants={variants}
-      productId={productId}
-      selOpt1={selOpt1}
-      selOpt2={selOpt2}
-      setSelOpt1={setSelOpt1}
-      setSelOpt2={setSelOpt2}
-      router={router}
-    />;
+    return (
+      <TwoAxisSelector
+        variants={variants}
+        group={group}
+        productId={productId}
+        selOpt1={selOpt1}
+        selOpt2={selOpt2}
+        setSelOpt1={setSelOpt1}
+        setSelOpt2={setSelOpt2}
+        router={router}
+      />
+    );
   }
 
-  return <SingleAxisSelector
-    variants={variants}
-    productId={productId}
-    expanded={expanded}
-    setExpanded={setExpanded}
-    router={router}
-  />;
+  return (
+    <SingleAxisSelector
+      variants={variants}
+      group={group}
+      productId={productId}
+      expanded={expanded}
+      setExpanded={setExpanded}
+      router={router}
+    />
+  );
 }
 
 // ── Two-axis: Color + Size pills ──────────────────────────────
-function TwoAxisSelector({ variants, productId, selOpt1, selOpt2, setSelOpt1, setSelOpt2, router }) {
-  // Unique sorted option values
+function TwoAxisSelector({ variants, group, productId, selOpt1, selOpt2, setSelOpt1, setSelOpt2, router }) {
+  const [navigating, setNavigating] = useState(false);
+
   const colors = [...new Set(variants.map(v => v.option_1_value).filter(Boolean))].sort();
   const sizes  = [...new Set(variants.map(v => v.option_2_value).filter(Boolean))]
-    .sort((a, b) => SIZE_ORDER.indexOf(a) - SIZE_ORDER.indexOf(b));
+    .sort((a, b) => {
+      const ai = SIZE_ORDER.indexOf(a);
+      const bi = SIZE_ORDER.indexOf(b);
+      if (ai !== -1 && bi !== -1) return ai - bi;
+      if (ai !== -1) return -1;
+      if (bi !== -1) return 1;
+      return a.localeCompare(b);
+    });
 
   const opt1Label = variants.find(v => v.option_1_name)?.option_1_name ?? 'Color';
   const opt2Label = variants.find(v => v.option_2_name)?.option_2_name ?? 'Size';
 
-  // Find variant matching current selection
-  const match = variants.find(v => v.option_1_value === selOpt1 && v.option_2_value === selOpt2);
-  // Check which combos are available
-  const isAvailable = (o1, o2) => variants.some(v => v.option_1_value === o1 && v.option_2_value === o2);
-  const hasStock    = (o1, o2) => variants.some(v => v.option_1_value === o1 && v.option_2_value === o2 && v.stock_qty > 0);
+  const match        = variants.find(v => v.option_1_value === selOpt1 && v.option_2_value === selOpt2);
+  const isAvailable  = (o1, o2) => variants.some(v => v.option_1_value === o1 && v.option_2_value === o2);
+  const hasStock     = (o1, o2) => variants.some(v => v.option_1_value === o1 && v.option_2_value === o2 && v.stock_qty > 0);
 
   const handleSelect = (o1, o2) => {
     setSelOpt1(o1);
     setSelOpt2(o2);
     const target = variants.find(v => v.option_1_value === o1 && v.option_2_value === o2);
     if (target?.slug && target.id !== productId) {
+      setNavigating(true);
       router.push(`/browse/${target.slug}`);
     }
   };
 
   return (
     <div style={{ margin: '16px 0', border: `1px solid ${BORDER}`, borderRadius: 8, overflow: 'hidden', background: CREAM }}>
+      {/* Header */}
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         padding: '10px 14px', background: CREAM2, borderBottom: `1px solid ${BORDER}`,
       }}>
         <span style={{ fontFamily: FONT, fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6b5c40' }}>
-          {data?.group?.displayName ?? 'Options'}
+          {group?.displayName ?? 'Options'}
         </span>
         <span style={{ fontSize: 11, color: '#9a8870', background: '#ede8de', padding: '2px 8px', borderRadius: 10 }}>
           {variants.length} variants
         </span>
       </div>
 
-      <div style={{ padding: '14px 14px 10px' }}>
+      <div style={{ padding: '14px 14px 10px', opacity: navigating ? 0.6 : 1, transition: 'opacity 0.15s' }}>
         {/* Option 1 — Color */}
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontFamily: FONT, fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9a8870', marginBottom: 8 }}>
@@ -115,9 +131,12 @@ function TwoAxisSelector({ variants, productId, selOpt1, selOpt2, setSelOpt1, se
               const available = sizes.some(s => isAvailable(color, s));
               const inStock   = sizes.some(s => hasStock(color, s));
               return (
-                <button key={color} onClick={() => handleSelect(color, selOpt2 ?? sizes[0])}
+                <button
+                  key={color}
+                  onClick={() => available && handleSelect(color, selOpt2 ?? sizes[0])}
                   style={{
-                    padding: '6px 12px', borderRadius: 4, cursor: available ? 'pointer' : 'not-allowed',
+                    padding: '6px 12px', borderRadius: 4,
+                    cursor: available ? 'pointer' : 'not-allowed',
                     fontFamily: FONT, fontSize: 11, fontWeight: active ? 700 : 400,
                     border: `1.5px solid ${active ? GOLD : BORDER}`,
                     background: active ? '#fffbf0' : '#fff',
@@ -126,7 +145,8 @@ function TwoAxisSelector({ variants, productId, selOpt1, selOpt2, setSelOpt1, se
                     opacity: available ? 1 : 0.5,
                     transition: 'all 0.15s',
                     position: 'relative',
-                  }}>
+                  }}
+                >
                   {color}
                   {!inStock && available && (
                     <span style={{ position: 'absolute', top: 2, right: 3, width: 5, height: 5, borderRadius: '50%', background: '#e0a060' }} />
@@ -148,7 +168,9 @@ function TwoAxisSelector({ variants, productId, selOpt1, selOpt2, setSelOpt1, se
               const available = isAvailable(selOpt1, size);
               const inStock   = hasStock(selOpt1, size);
               return (
-                <button key={size} onClick={() => available && handleSelect(selOpt1, size)}
+                <button
+                  key={size}
+                  onClick={() => available && handleSelect(selOpt1, size)}
                   style={{
                     width: 48, height: 36, borderRadius: 4,
                     cursor: available ? 'pointer' : 'not-allowed',
@@ -159,7 +181,8 @@ function TwoAxisSelector({ variants, productId, selOpt1, selOpt2, setSelOpt1, se
                     boxShadow: active ? `0 0 0 2px ${GOLD}33` : 'none',
                     transition: 'all 0.15s',
                     textDecoration: !available ? 'line-through' : 'none',
-                  }}>
+                  }}
+                >
                   {size}
                 </button>
               );
@@ -167,7 +190,7 @@ function TwoAxisSelector({ variants, productId, selOpt1, selOpt2, setSelOpt1, se
           </div>
         </div>
 
-        {/* Selected variant info */}
+        {/* Selected variant info row */}
         {match && (
           <div style={{
             marginTop: 14, paddingTop: 12, borderTop: `1px solid ${BORDER}`,
@@ -192,8 +215,8 @@ function TwoAxisSelector({ variants, productId, selOpt1, selOpt2, setSelOpt1, se
 }
 
 // ── Single-axis: fitment / measurement / finish list ──────────
-function SingleAxisSelector({ variants, productId, expanded, setExpanded, router }) {
-  const [selected, setSelected] = useState(productId);
+function SingleAxisSelector({ variants, group, productId, expanded, setExpanded, router }) {
+  const [navigating, setNavigating] = useState(false);
 
   const sortedVariants = [...variants].sort((a, b) => {
     if (a.id === productId) return -1;
@@ -203,35 +226,38 @@ function SingleAxisSelector({ variants, productId, expanded, setExpanded, router
     return (parseFloat(a.offer_price) || 0) - (parseFloat(b.offer_price) || 0);
   });
 
-  const SHOW_INITIAL = 4;
+  const SHOW_INITIAL    = 4;
   const displayVariants = expanded ? sortedVariants : sortedVariants.slice(0, SHOW_INITIAL);
-  const hasMore = sortedVariants.length > SHOW_INITIAL;
+  const hasMore         = sortedVariants.length > SHOW_INITIAL;
 
   const handleSelect = (variant) => {
-    setSelected(variant.id);
-    if (variant.slug && variant.id !== productId) {
+    if (variant.id === productId) return;
+    if (variant.slug) {
+      setNavigating(true);
       router.push(`/browse/${variant.slug}`);
     }
   };
 
   return (
     <div style={{ margin: '16px 0', border: `1px solid ${BORDER}`, borderRadius: 8, overflow: 'hidden', background: CREAM }}>
+      {/* Header */}
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         padding: '10px 14px', background: CREAM2, borderBottom: `1px solid ${BORDER}`,
       }}>
         <span style={{ fontFamily: FONT, fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6b5c40' }}>
-          Other options in this line
+          {group?.displayName ? `${group.displayName}` : 'Other options in this line'}
         </span>
         <span style={{ fontSize: 11, color: '#9a8870', background: '#ede8de', padding: '2px 8px', borderRadius: 10 }}>
           {variants.length} options
         </span>
       </div>
 
-      <div style={{ padding: '10px 10px 4px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ padding: '10px 10px 4px', display: 'flex', flexDirection: 'column', gap: 6, opacity: navigating ? 0.6 : 1, transition: 'opacity 0.2s' }}>
         {displayVariants.map(v => (
-          <VariantRow key={v.id} variant={v}
-            isSelected={v.id === selected}
+          <VariantRow
+            key={v.id}
+            variant={v}
             isCurrent={v.id === productId}
             onSelect={() => handleSelect(v)}
           />
@@ -239,44 +265,58 @@ function SingleAxisSelector({ variants, productId, expanded, setExpanded, router
       </div>
 
       {hasMore && (
-        <button onClick={() => setExpanded(e => !e)} style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-          width: '100%', padding: '9px 10px', background: 'none', border: 'none',
-          borderTop: `1px solid ${BORDER}`, color: '#8b7355', fontSize: 12,
-          fontFamily: FONT, fontWeight: 600, cursor: 'pointer',
-        }}>
-          {expanded ? <>Show less <Chevron up /></> : <>Show {sortedVariants.length - SHOW_INITIAL} more <Chevron /></>}
+        <button
+          onClick={() => setExpanded(e => !e)}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            width: '100%', padding: '9px 10px', background: 'none', border: 'none',
+            borderTop: `1px solid ${BORDER}`, color: '#8b7355', fontSize: 12,
+            fontFamily: FONT, fontWeight: 600, cursor: 'pointer',
+          }}
+        >
+          {expanded
+            ? <>Show less <Chevron up /></>
+            : <>Show {sortedVariants.length - SHOW_INITIAL} more <Chevron /></>
+          }
         </button>
       )}
     </div>
   );
 }
 
-function VariantRow({ variant, isSelected, isCurrent, onSelect }) {
+function VariantRow({ variant, isCurrent, onSelect }) {
   const [hovered, setHovered] = useState(false);
   const inStock = variant.stock_qty > 0;
   const price   = variant.offer_price || variant.msrp;
-  const active  = isSelected || isCurrent;
   const label   = variant.option_1_value || variant.name || variant.sku;
 
   return (
-    <button onClick={onSelect}
+    <button
+      onClick={onSelect}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       title={variant.name}
+      disabled={isCurrent}
       style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        padding: '9px 12px', width: '100%', textAlign: 'left', cursor: 'pointer',
-        border: `1px solid ${active || hovered ? GOLD : BORDER}`,
+        padding: '9px 12px', width: '100%', textAlign: 'left',
+        cursor: isCurrent ? 'default' : 'pointer',
+        border: `1px solid ${isCurrent || hovered ? GOLD : BORDER}`,
         borderRadius: 6,
-        background: active ? '#fffbf0' : hovered ? '#fffdf8' : 'white',
-        boxShadow: active ? `0 0 0 2px ${GOLD}33` : 'none',
-        opacity: inStock ? 1 : 0.6,
+        background: isCurrent ? '#fffbf0' : hovered ? '#fffdf8' : 'white',
+        boxShadow: isCurrent ? `0 0 0 2px ${GOLD}33` : 'none',
+        opacity: inStock ? 1 : 0.65,
         transition: 'all 0.15s',
-      }}>
+      }}
+    >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flex: 1 }}>
         <div style={{ fontFamily: FONT, fontSize: 13, fontWeight: 600, color: DARK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {label}
+          {isCurrent && (
+            <span style={{ marginLeft: 8, fontSize: 9, color: GOLD, fontWeight: 700, letterSpacing: '0.05em' }}>
+              ← HERE
+            </span>
+          )}
         </div>
         <div style={{ fontSize: 11, color: '#9a8870', fontFamily: 'monospace' }}>{variant.sku}</div>
       </div>
@@ -310,5 +350,3 @@ function VariantSkeleton() {
     </div>
   );
 }
-
-const SIZE_ORDER = ['XS','SM','MD','LG','XL','2X','3X','4X','5X'];

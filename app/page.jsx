@@ -1,351 +1,403 @@
-'use client';
+"use client";
 
-import SmokeBackground from '@/components/home/SmokeBackground';
-import ModelSearch     from '@/components/home/ModelSearch';
-import EraCarousel     from '@/components/home/EraCarousel';
-import VideoHero       from '@/components/home/VideoHero';
-import ScrollVelocity  from '@/components/home/ScrollVelocity';
-import EraKineticTile  from '@/components/home/EraKineticTile';
-import { BrandRolodex } from '@/components/home/BrandRolodex';
-import Link from 'next/link';
+/**
+ * app/browse/page.jsx
+ * Mobile-first: sidebar is always-visible on desktop (≥769px).
+ * On mobile: sidebar is hidden, filter opens as bottom sheet triggered by
+ * floating pill button OR the BottomNav hamburger (via 'stinkin:filterToggle' window event).
+ */
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
-export default function HomePage() {
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
+import { getProductImage } from "@/lib/getProductImage";
+import FilterSidebar from "@/components/browse/FilterSidebar";
+
+const GOLD     = "#b8922a";
+const CREAM    = "#faf7f2";
+const CREAM2   = "#f2ede4";
+const DARK     = "#0a0909";
+const PER_PAGE = 48;
+
+const SORT_OPTIONS = [
+  { value: "relevance",  label: "Relevance" },
+  { value: "price_asc",  label: "Price ↑" },
+  { value: "price_desc", label: "Price ↓" },
+  { value: "name_asc",   label: "A → Z" },
+  { value: "newest",     label: "Newest" },
+];
+
+// ─── Product Card ─────────────────────────────────────────────────────────────
+
+function ProductCard({ product, index }) {
+  const [imgErr, setImgErr] = useState(false);
+  const imageSrc = getProductImage({
+    image: product.image_url ?? null,
+    images: product.image_urls ?? [],
+    brand: product.brand,
+  });
+
   return (
-    <>
-      <SmokeBackground />
-      <main>
-        <VideoHero />
-        <ScrollVelocity />
-        <div className="tile-inner tile-inner--search">
-          <ModelSearch />
-        </div>
-        <div className="bento-page">
-
-        {/* ── Kinetic "SHOP BY ERA" heading tile — links to /era */}
-        <EraKineticTile />
-
-        {/* ── Era 3D Carousel — full width */}
-        <section
-          className="tile tile-eras"
-          style={{ '--delay': '160ms' }}
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.03, type: "spring", stiffness: 300, damping: 24 }}
+      style={{ position: "relative" }}
+    >
+      <Link href={`/browse/${product.slug}`} style={{ textDecoration: "none", display: "block" }}>
+        <motion.div
+          whileHover={{ y: -4, borderColor: GOLD, boxShadow: `0 8px 32px rgba(184,146,42,0.15)` }}
+          transition={{ type: "spring", stiffness: 400, damping: 25 }}
+          style={{ background: "#ffffff", border: `1px solid rgba(184,146,42,0.35)`, overflow: "hidden" }}
         >
-          <EraCarousel />
-        </section>
-
-        {/* ── Category tile */}
-        <section className="tile tile-category" style={{ '--delay': '240ms' }}>
-          <div className="tile-inner tile-inner--center">
-            <div className="placeholder-icon">⚙️</div>
-            <h3 className="tile-heading tile-heading--sm">Browse by Category</h3>
-            <p className="tile-sub">Engine · Suspension · Electrical · Exhaust</p>
-            <Link href="/browse?category=all" className="tile-btn">Explore Categories</Link>
+          {/* Image */}
+          <div style={{
+            aspectRatio: "1", background: CREAM,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            overflow: "hidden", position: "relative",
+          }}>
+            {imageSrc && !imgErr ? (
+              <img
+                src={imageSrc} alt={product.name} onError={() => setImgErr(true)}
+                style={{ width: "100%", height: "100%", objectFit: "contain", padding: "10px" }}
+              />
+            ) : (
+              <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "9px", letterSpacing: "2px", color: "#ccc", textTransform: "uppercase" }}>
+                No Image
+              </div>
+            )}
+            {!product.in_stock && (
+              <div style={{ position: "absolute", top: 8, right: 8, background: "rgba(255,255,255,0.9)", border: "1px solid #ddd", fontFamily: "var(--font-stencil, monospace)", fontSize: "8px", letterSpacing: "1px", color: "#999", padding: "3px 7px", textTransform: "uppercase" }}>
+                Out of Stock
+              </div>
+            )}
+            {product.oem_numbers?.length > 0 ? (
+              <div style={{ position: "absolute", top: 8, left: 0 }}>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 22" width={72} height={22} style={{ display: "block" }}>
+                  <defs>
+                    <linearGradient id="oem-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%"   stopColor="#ffd700" />
+                      <stop offset="50%"  stopColor="#c8a800" />
+                      <stop offset="100%" stopColor="#a88800" />
+                    </linearGradient>
+                  </defs>
+                  <path d="M6,2 L66,2 L72,11 L66,20 L6,20 L0,11 Z" fill="rgba(0,0,0,0.15)" transform="translate(1,1.5)" />
+                  <path d="M6,2 L66,2 L72,11 L66,20 L6,20 L0,11 Z" fill="url(#oem-grad)" />
+                  <path d="M8,5 L64,5 L69,11 L64,17 L8,17 L3,11 Z" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="0.75" />
+                  <text x="36" y="15" textAnchor="middle" fontFamily="'Barlow Condensed','Arial Narrow',sans-serif" fontWeight="700" fontSize="9" letterSpacing="1.5" fill="rgba(0,0,0,0.75)">OEM</text>
+                </svg>
+              </div>
+            ) : product.is_harley_fitment ? (
+              <div style={{ position: "absolute", top: 8, left: 8, background: `rgba(184,146,42,0.1)`, border: `1px solid rgba(184,146,42,0.4)`, fontFamily: "var(--font-stencil, monospace)", fontSize: "8px", letterSpacing: "1px", color: GOLD, padding: "3px 7px", textTransform: "uppercase" }}>
+                HD Fit
+              </div>
+            ) : null}
           </div>
-        </section>
 
-        {/* ── Model tile */}
-        <section className="tile tile-model" style={{ '--delay': '300ms' }}>
-          <div className="tile-inner tile-inner--center">
-            <div className="placeholder-icon">🏍</div>
-            <h3 className="tile-heading tile-heading--sm">Shop by Model</h3>
-            <p className="tile-sub">Sportster · Softail · Dyna · Touring · FX</p>
-            <Link href="/browse" className="tile-btn">Pick Your Model</Link>
+          {/* Info */}
+          <div style={{ padding: "12px 14px 16px", borderTop: `1px solid rgba(184,146,42,0.2)` }}>
+            <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "8px", letterSpacing: "2px", color: GOLD, textTransform: "uppercase", marginBottom: "4px" }}>
+              {product.brand}
+            </div>
+            <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "12px", color: "#2a2018", lineHeight: 1.3, marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.5px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+              {product.name}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)", fontSize: "20px", letterSpacing: "1px", color: DARK }}>
+                {product.computed_price ? `$${Number(product.computed_price).toFixed(2)}` : "—"}
+              </div>
+              <motion.button
+                whileHover={{ scale: 1.05, background: GOLD, color: "#fff" }}
+                whileTap={{ scale: 0.95 }}
+                onClick={e => e.preventDefault()}
+                style={{ background: CREAM2, border: `1px solid rgba(184,146,42,0.3)`, color: GOLD, width: 30, height: 30, fontSize: "18px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s, color 0.15s" }}
+              >+</motion.button>
+            </div>
           </div>
-        </section>
+        </motion.div>
+      </Link>
+    </motion.div>
+  );
+}
 
-        {/* ── Deals tile */}
-        <section className="tile tile-deals" style={{ '--delay': '360ms' }}>
-          <div className="tile-inner tile-inner--center">
-            <p className="tile-eyebrow tile-eyebrow--gold">Limited time</p>
-            <h3 className="tile-heading tile-heading--sm">Current Deals</h3>
-            <p className="tile-sub">NOS &amp; aftermarket at unbeatable prices</p>
-            <Link href="/browse?deals=true" className="tile-btn tile-btn--gold">Shop Deals</Link>
-          </div>
-        </section>
+// ─── Main Browse Page ─────────────────────────────────────────────────────────
 
+function BrowsePageInner() {
+  const searchParams = useSearchParams();
+
+  const [products, setProducts]   = useState([]);
+  const [total, setTotal]         = useState(0);
+  const [facets, setFacets]       = useState({ categories: [], brands: [], priceRange: { min: 0, max: 0 } });
+  const [loading, setLoading]     = useState(true);
+  const [page, setPage]           = useState(1);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const [filters, setFilters] = useState({
+    era:         searchParams.get("era")       || null,
+    family:      searchParams.get("family")    || null,
+    model:       searchParams.get("model")     || null,
+    modelCodes:  null,
+    year:        searchParams.get("year") ? parseInt(searchParams.get("year")) : null,
+    category:    searchParams.get("category")  || null,
+    subcategory: null,
+    brand:       searchParams.get("brand")     || null,
+    q:           searchParams.get("q")         || null,
+    in_stock:    false,
+    min_price:   null,
+    max_price:   null,
+    sort:        "relevance",
+  });
+
+  // ── Listen for BottomNav hamburger event ─────────────────────
+  useEffect(() => {
+    const handler = () => setSidebarOpen(o => !o);
+    window.addEventListener("stinkin:filterToggle", handler);
+    return () => window.removeEventListener("stinkin:filterToggle", handler);
+  }, []);
+
+  const fetchProducts = useCallback(async (f, pg) => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (f.era)         params.set("era",         f.era);
+      if (f.family)      params.set("family",       f.family);
+      if (f.modelCodes)  f.modelCodes.forEach(c => params.append("model_code", c));
+      if (f.model)       params.set("model",        f.model);
+      if (f.year)        params.set("year",         f.year);
+      if (f.category)    params.set("category",     f.category);
+      if (f.subcategory) params.set("subcategory",  f.subcategory);
+      if (f.brand)       params.set("brand",        f.brand);
+      if (f.q)           params.set("q",            f.q);
+      if (f.in_stock)    params.set("in_stock",     "true");
+      if (f.min_price)   params.set("min_price",    f.min_price);
+      if (f.max_price)   params.set("max_price",    f.max_price);
+      params.set("sort",     f.sort);
+      params.set("page",     pg);
+      params.set("per_page", PER_PAGE);
+
+      const res  = await fetch(`/api/browse/products?${params.toString()}`);
+      const data = await res.json();
+      setProducts(data.products ?? []);
+      setTotal(data.total ?? 0);
+      setFacets(data.facets ?? { categories: [], brands: [], priceRange: { min: 0, max: 0 } });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchProducts(filters, page); }, [filters, page, fetchProducts]);
+
+  function handleFilterChange(updates) {
+    setFilters(f => ({ ...f, ...updates }));
+    setPage(1);
+  }
+
+  const activeCount = [filters.family, filters.model, filters.era, filters.category, filters.brand, filters.min_price, filters.max_price, filters.in_stock].filter(Boolean).length;
+  const totalPages  = Math.ceil(total / PER_PAGE);
+  const contextLabel = filters.family
+    ? [filters.family, filters.model, filters.year].filter(Boolean).join(" / ")
+    : filters.q ? `"${filters.q}"` : filters.category || "All Parts";
+
+  return (
+    <div style={{ background: CREAM, color: DARK, minHeight: "100vh" }}>
+
+      {/* ── Layout ── */}
+      <div style={{ display: "flex", minHeight: "100vh", position: "relative" }}>
+
+        {/* Desktop sidebar — hidden on mobile via CSS */}
+        <div className="desktop-sidebar">
+          <FilterSidebar
+            facets={facets}
+            filters={filters}
+            onChange={handleFilterChange}
+            open={false}
+            onClose={() => {}}
+            mobileSheet={false}
+          />
         </div>
 
-        <BrandRolodex />
+        {/* Mobile bottom sheet — rendered via FilterSidebar when sidebarOpen */}
+        <div className="mobile-only">
+          <FilterSidebar
+            facets={facets}
+            filters={filters}
+            onChange={handleFilterChange}
+            open={sidebarOpen}
+            onClose={() => setSidebarOpen(false)}
+            mobileSheet={true}
+          />
+        </div>
 
-      </main>
+        {/* ── Product grid ── */}
+        <div style={{ flex: 1, padding: "16px 16px 120px", minWidth: 0 }}>
+
+          {/* Sort + count bar */}
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            marginBottom: 16, gap: 12, flexWrap: "wrap",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "9px", letterSpacing: "1px", color: "#bbb", textTransform: "uppercase" }}>
+                {total.toLocaleString()} parts
+              </span>
+              {/* Active filter chip */}
+              {activeCount > 0 && (
+                <div style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(184,146,42,0.1)", border: `1px solid rgba(184,146,42,0.25)`, padding: "3px 8px" }}>
+                  <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "9px", letterSpacing: "1px", color: GOLD, textTransform: "uppercase" }}>
+                    {contextLabel}
+                  </span>
+                  <button
+                    onClick={() => handleFilterChange({ family: null, model: null, year: null, era: null, category: null, brand: null, min_price: null, max_price: null, in_stock: false, subcategory: null, modelCodes: null, q: null })}
+                    style={{ background: "none", border: "none", color: GOLD, cursor: "pointer", fontSize: "13px", lineHeight: 1, padding: 0 }}
+                  >×</button>
+                </div>
+              )}
+            </div>
+            <select
+              value={filters.sort}
+              onChange={e => handleFilterChange({ sort: e.target.value })}
+              style={{ background: "#fff", border: `1px solid rgba(184,146,42,0.3)`, color: DARK, fontFamily: "var(--font-stencil, monospace)", fontSize: "9px", letterSpacing: "1px", padding: "7px 10px", outline: "none", textTransform: "uppercase", cursor: "pointer" }}
+            >
+              {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+
+          {loading ? (
+            <div className="product-grid">
+              {Array.from({ length: 12 }).map((_, i) => (
+                <div key={i} style={{ aspectRatio: "0.8", background: "linear-gradient(90deg, #f0ebe3 25%, #faf7f2 50%, #f0ebe3 75%)", backgroundSize: "600px 100%", animation: "shimmer 1.4s infinite" }} />
+              ))}
+            </div>
+          ) : products.length === 0 ? (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 400, gap: "16px", color: "#ccc" }}>
+              <div style={{ fontSize: "48px" }}>🔧</div>
+              <div style={{ fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)", fontSize: "28px", letterSpacing: "2px", color: "#bbb" }}>No Parts Found</div>
+              <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "11px", color: "#ccc", textTransform: "uppercase", letterSpacing: "1px" }}>Try adjusting your filters</div>
+            </div>
+          ) : (
+            <>
+              <div className="product-grid">
+                {products.map((p, i) => <ProductCard key={p.id} product={p} index={i} />)}
+              </div>
+
+              {totalPages > 1 && (
+                <div style={{ display: "flex", justifyContent: "center", gap: "6px", marginTop: "48px", flexWrap: "wrap" }}>
+                  <PagBtn onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>← Prev</PagBtn>
+                  {Array.from({ length: Math.min(7, totalPages) }, (_, i) => {
+                    const pg = page <= 4 ? i + 1 : page >= totalPages - 3 ? totalPages - 6 + i : page - 3 + i;
+                    if (pg < 1 || pg > totalPages) return null;
+                    return (
+                      <PagBtn key={pg} onClick={() => setPage(pg)} active={pg === page}>{pg}</PagBtn>
+                    );
+                  })}
+                  <PagBtn onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next →</PagBtn>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ── Floating filter pill — mobile only, sits above bottom nav ── */}
+      <div className="mobile-filter-pill">
+        <motion.button
+          whileTap={{ scale: 0.94 }}
+          onClick={() => setSidebarOpen(o => !o)}
+          style={{
+            display: "flex", alignItems: "center", gap: 8,
+            background: sidebarOpen ? DARK : "#fff",
+            border: `1.5px solid ${GOLD}`,
+            color: sidebarOpen ? "#fff" : DARK,
+            fontFamily: "var(--font-stencil, monospace)",
+            fontSize: "10px", letterSpacing: "2px", textTransform: "uppercase",
+            padding: "10px 20px", cursor: "pointer",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.18)",
+            borderRadius: 999,
+            transition: "background 0.15s, color 0.15s",
+          }}
+        >
+          {/* Hamburger lines */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 3.5, width: 14 }}>
+            {[0,1,2].map(i => (
+              <span key={i} style={{
+                display: "block", height: 1.5, background: sidebarOpen ? "#fff" : GOLD,
+                borderRadius: 1,
+                width: i === 1 ? 10 : 14,
+                transition: "background 0.15s, width 0.15s",
+              }} />
+            ))}
+          </div>
+          FILTER
+          {activeCount > 0 && (
+            <span style={{ background: GOLD, color: "#fff", width: 18, height: 18, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700 }}>
+              {activeCount}
+            </span>
+          )}
+        </motion.button>
+      </div>
 
       <style>{`
-        /* ── Reset & base */
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #080808; }
-
-        /* ── Tokens */
-        :root {
-          --gold:       #C9A84C;
-          --gold-light: #E2C06A;
-          --gold-dim:   #8B6914;
-          --black:      #0A0A0A;
-          --surface:    #111111;
-          --surface-2:  #1A1A1A;
-          --surface-3:  #222222;
-          --border:     rgba(201,168,76,0.18);
-          --border-dim: rgba(255,255,255,0.07);
-          --white:      #F5F0E8;
-          --text-dim:   rgba(245,240,232,0.5);
-          --radius:     16px;
-          --radius-sm:  10px;
-          --gap:        14px;
-          --font-display: 'Barlow Condensed', sans-serif;
-          --font-mono:    'Share Tech Mono', monospace;
+        @keyframes shimmer {
+          from { background-position: -600px 0; }
+          to   { background-position:  600px 0; }
         }
+        * { box-sizing: border-box; }
 
-        /* ── Page shell */
-        .bento-page {
-          min-height: 100vh;
-          background: transparent;
-          padding: 0 48px var(--gap);
+        .product-grid {
           display: grid;
-          grid-template-columns: 1fr 1fr 1fr;
-          grid-template-rows: auto auto auto;
-          grid-template-areas:
-            "erahead erahead erahead"
-            "eras    eras    eras"
-            "cat     model   deals";
-          gap: var(--gap);
-          max-width: 1400px;
-          margin: 0 auto;
-          font-family: var(--font-display);
-          position: relative;
-          z-index: 2;
-        }
-
-        /* ── Tile base */
-        .tile {
-          background: rgba(14,14,14,0.82);
-          backdrop-filter: blur(4px);
-          -webkit-backdrop-filter: blur(4px);
-          border: 1px solid var(--border-dim);
-          border-radius: var(--radius);
-          overflow: visible;
-          position: relative;
-          isolation: isolate;
-          opacity: 0;
-          transform: translateY(20px);
-          animation: tileIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) var(--delay, 0ms) forwards;
-          transition: border-color 0.25s, transform 0.25s;
-        }
-        .tile:hover {
-          border-color: var(--border);
-          transform: translateY(-2px) scale(1.003);
-        }
-
-        @keyframes tileIn {
-          to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* ── Grid placement */
-        .tile-video       { grid-area: video;   min-height: 220px; }
-        .tile-era-kinetic { grid-area: erahead; min-height: 120px; }
-        .tile-eras        { grid-area: eras;    min-height: 580px; overflow: hidden; }
-        .tile-category    { grid-area: cat;     min-height: 200px; }
-        .tile-model       { grid-area: model;   min-height: 200px; }
-        .tile-deals       { grid-area: deals;   min-height: 200px; background: var(--surface-2); }
-
-        /* ── Era kinetic tile shell */
-        .tile-era-kinetic {
-          text-decoration: none;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: transparent;
-          border-color: rgba(201,168,76,0.28);
-          overflow: hidden;
-        }
-        .era-kinetic-wrap {
-          position: relative;
-          width: 100%;
-          text-align: center;
-          padding: 14px 20px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 0;
-        }
-
-        /* ── Tile inner */
-        .tile-inner {
-          padding: 32px 36px;
-          height: 100%;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          gap: 10px;
-        }
-        .tile-inner--search {
-          align-items: center;
-          justify-content: center;
-          width: 100%;
-          box-sizing: border-box;
-          font-family: 'New Sailor', serif;
-          text-align: center;
-          padding: 0 48px 14px;
-          max-width: 1400px;
-          margin: 0 auto;
-        }
-        .tile-inner--center {
-          align-items: center;
-          text-align: center;
-        }
-        .tile-inner--eras {
-          padding: 24px 0 24px 36px;
-          gap: 8px;
-        }
-
-        /* ── Typography */
-        .tile-eyebrow {
-          font-family: var(--font-mono);
-          font-size: 11px;
-          letter-spacing: 0.15em;
-          text-transform: uppercase;
-          color: var(--text-dim);
-        }
-        .tile-eyebrow--gold { color: var(--gold); }
-
-        .tile-heading {
-          font-family: var(--font-display);
-          font-size: clamp(26px, 3vw, 38px);
-          font-weight: 700;
-          line-height: 1.05;
-          letter-spacing: 0.02em;
-          text-transform: uppercase;
-          color: var(--white);
-        }
-        .tile-heading--sm { font-size: clamp(18px, 2vw, 24px); }
-
-        .tile-sub {
-          font-size: 13px;
-          color: var(--text-dim);
-          letter-spacing: 0.04em;
-          line-height: 1.5;
-        }
-
-        .placeholder-icon { font-size: 32px; margin-bottom: 4px; }
-
-        /* ── CTA buttons */
-        .tile-btn {
-          display: inline-block;
-          margin-top: 8px;
-          padding: 10px 24px;
-          border: 1px solid var(--border-dim);
-          border-radius: var(--radius-sm);
-          font-family: var(--font-mono);
-          font-size: 12px;
-          letter-spacing: 0.12em;
-          text-transform: uppercase;
-          color: var(--white);
-          text-decoration: none;
-          transition: background 0.2s, border-color 0.2s, color 0.2s;
-        }
-        .tile-btn:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.2); }
-        .tile-btn--gold {
-          background: var(--gold);
-          border-color: var(--gold);
-          color: var(--black);
-          font-weight: 700;
-        }
-        .tile-btn--gold:hover { background: var(--gold-light); border-color: var(--gold-light); }
-
-        /* ── Video placeholder */
-        .video-placeholder {
-          width: 100%;
-          height: 100%;
-          min-height: 220px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          gap: 14px;
-          background: linear-gradient(135deg, var(--surface-2) 0%, var(--surface-3) 100%);
-          cursor: pointer;
-        }
-        .play-ring {
-          width: 64px; height: 64px;
-          border-radius: 50%;
-          border: 2px solid var(--gold);
-          display: flex; align-items: center; justify-content: center;
-          color: var(--gold);
-          transition: transform 0.25s, background 0.25s;
-        }
-        .tile-video:hover .play-ring {
-          transform: scale(1.12);
-          background: rgba(201,168,76,0.1);
-        }
-        .video-label {
-          font-family: var(--font-mono);
-          font-size: 11px;
-          letter-spacing: 0.14em;
-          text-transform: uppercase;
-          color: var(--text-dim);
-        }
-
-        /* ── Deals tile gold accent line */
-        .tile-deals::before {
-          content: '';
-          position: absolute;
-          top: 0; left: 0; right: 0;
-          height: 2px;
-          background: linear-gradient(90deg, transparent, var(--gold), transparent);
-        }
-
-        /* ── Year Select + Modal */
-        .model-search-wrap {
-          display: flex;
-          align-items: center;
+          grid-template-columns: repeat(4, 1fr);
           gap: 12px;
-          margin-top: 12px;
-          max-width: 400px;
-        }
-        .year-select-row {
-          flex: 1;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          background: var(--surface-2);
-          border: 1px solid var(--border-dim);
-          border-radius: var(--radius-sm);
-          padding: 0 14px;
         }
 
-        /* ── Mobile */
+        /* Desktop: sidebar visible, pill hidden */
+        .desktop-sidebar { display: block; }
+        .mobile-only     { display: none;  }
+        .mobile-filter-pill {
+          display: none;
+          position: fixed;
+          bottom: 86px;
+          left: 50%;
+          transform: translateX(-50%);
+          z-index: 200;
+        }
+
         @media (max-width: 768px) {
-          .bento-page {
-            grid-template-columns: 1fr 1fr;
-            grid-template-areas:
-              "erahead erahead"
-              "eras    eras"
-              "cat     model"
-              "deals   deals";
-            padding-top: 0;
-            padding-left: 16px;
-            padding-right: 16px;
-          }
-          .tile-inner { padding: 24px 22px; }
-          .tile-inner--search { padding: 0 16px 14px; }
-          .tile-inner--eras { padding: 20px 0 20px 22px; }
-          .tile-era-kinetic { min-height: 100px; }
-          .float-nav { padding: 8px 14px 8px 12px; gap: 16px; }
-          .nav-links { gap: 2px; }
-          .nav-links a { font-size: 11px; padding: 5px 8px; }
-        }
-
-        @media (max-width: 480px) {
-          .bento-page {
-            grid-template-columns: 1fr;
-            grid-template-areas:
-              "erahead"
-              "eras"
-              "cat"
-              "model"
-              "deals";
-          }
-          .nav-links a:not(:first-child):not(:last-child) { display: none; }
+          .desktop-sidebar    { display: none !important; }
+          .mobile-only        { display: block !important; }
+          .mobile-filter-pill { display: block !important; }
+          .product-grid       { grid-template-columns: repeat(2, 1fr) !important; }
         }
       `}</style>
-    </>
+    </div>
+  );
+}
+
+function PagBtn({ onClick, disabled, active, children }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        background: active ? GOLD : "#fff",
+        border: `1px solid ${active ? GOLD : "rgba(184,146,42,0.3)"}`,
+        color: active ? "#fff" : disabled ? "#ccc" : DARK,
+        fontFamily: "var(--font-stencil, monospace)",
+        fontSize: "10px", padding: "7px 12px", cursor: disabled ? "default" : "pointer",
+        minWidth: 36, letterSpacing: "1px",
+      }}
+    >{children}</button>
+  );
+}
+
+export default function BrowsePage() {
+  return (
+    <Suspense fallback={
+      <div style={{ background: CREAM, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "9px", letterSpacing: "3px", color: "#bbb", textTransform: "uppercase" }}>Loading…</div>
+      </div>
+    }>
+      <BrowsePageInner />
+    </Suspense>
   );
 }

@@ -4,7 +4,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-
 const SEARCH_OPTIONS = [
   { label: "ERA",    href: "/era"       },
   { label: "MODEL",  href: "/modelshop" },
@@ -16,12 +15,21 @@ export default function BottomNav() {
   const router   = useRouter();
   const [open, setOpen] = useState(false);
 
+  const onBrowse = pathname === "/browse" || pathname.startsWith("/browse/");
+
+  // On /browse the left slot is a filter toggle — fires window event
+  // so the browse page's FilterSidebar picks it up without prop drilling
+  const handleFilterToggle = () => {
+    window.dispatchEvent(new CustomEvent("stinkin:filterToggle"));
+  };
+
   return (
     <>
       <div style={{ height: 0 }} />
 
+      {/* Search popup — not shown when on browse (hamburger is filter there) */}
       <AnimatePresence>
-        {open && (
+        {open && !onBrowse && (
           <>
             <motion.div
               key="backdrop"
@@ -58,18 +66,11 @@ export default function BottomNav() {
                   transition={{ delay: i * 0.05 }}
                   onClick={() => { setOpen(false); router.push(opt.href); }}
                   style={{
-                    background: "transparent",
-                    border: "none",
-                    cursor: "pointer",
-                    fontFamily: "var(--font-sailor, serif)",
-                    fontSize: 30,
-                    fontWeight: 700,
-                    letterSpacing: "0.06em",
-                    color: "#080706",
-                    lineHeight: 1.35,
-                    padding: "0",
-                    width: "100%",
-                    textAlign: "center",
+                    background: "transparent", border: "none", cursor: "pointer",
+                    fontFamily: "var(--font-sailor, serif)", fontSize: 30,
+                    fontWeight: 700, letterSpacing: "0.06em",
+                    color: "#080706", lineHeight: 1.35,
+                    padding: "0", width: "100%", textAlign: "center",
                   }}
                 >
                   {opt.label}
@@ -98,26 +99,38 @@ export default function BottomNav() {
         padding: "0 24px",
       }}>
 
-        <a href="/" style={{ textDecoration: "none" }}>
-          <span style={{
-            fontFamily: "var(--font-sailor, serif)",
-            fontSize: 22,
-            fontWeight: 700,
-            letterSpacing: "0.07em",
-            color: pathname === "/" ? "#c9a84c" : "#666",
-            transition: "color 0.15s",
-          }}>
-            HOME
-          </span>
-        </a>
+        {/* Left slot */}
+        {onBrowse ? (
+          // On /browse: filter toggle button (mobile only — hidden on desktop via CSS)
+          <button
+            onClick={handleFilterToggle}
+            className="browse-filter-btn"
+            aria-label="Open filters"
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              display: "flex", flexDirection: "column", gap: 5,
+              padding: "6px 2px", alignItems: "flex-start",
+            }}
+          >
+            <span style={{ display: "block", width: 22, height: 2, background: "#666", borderRadius: 1 }} />
+            <span style={{ display: "block", width: 14, height: 2, background: "#666", borderRadius: 1 }} />
+            <span style={{ display: "block", width: 22, height: 2, background: "#666", borderRadius: 1 }} />
+          </button>
+        ) : (
+          <a href="/" style={{ textDecoration: "none" }}>
+            <span style={{
+              fontFamily: "var(--font-sailor, serif)", fontSize: 22, fontWeight: 700,
+              letterSpacing: "0.07em", color: pathname === "/" ? "#c9a84c" : "#666",
+              transition: "color 0.15s",
+            }}>HOME</span>
+          </a>
+        )}
 
+        {/* Center: search orb */}
         <button
-          onClick={() => setOpen(p => !p)}
+          onClick={() => !onBrowse && setOpen(p => !p)}
           style={{
-            width: 50,
-            height: 50,
-            borderRadius: "50%",
-            marginTop: -20,
+            width: 50, height: 50, borderRadius: "50%", marginTop: -20,
             flexShrink: 0,
             background: "radial-gradient(circle at 35% 30%, #f0d060, #c9a84c 55%, #7a5510)",
             border: "2px solid #080706",
@@ -128,30 +141,37 @@ export default function BottomNav() {
               : "0 4px 14px rgba(0,0,0,0.85), inset 0 1px 0 rgba(255,235,120,0.5)",
             transform: open ? "translateY(-2px) rotate(10deg)" : "none",
             transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
+            cursor: onBrowse ? "default" : "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
             color: "#3a2800",
+            opacity: onBrowse ? 0.7 : 1,
           }}
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
         </button>
 
+        {/* Right: GARAGE */}
         <a href="/garage" style={{ textDecoration: "none" }}>
           <span style={{
-            fontFamily: "var(--font-sailor, serif)",
-            fontSize: 22,
-            fontWeight: 700,
+            fontFamily: "var(--font-sailor, serif)", fontSize: 22, fontWeight: 700,
             letterSpacing: "0.07em",
             color: pathname.startsWith("/garage") ? "#c9a84c" : "#666",
             transition: "color 0.15s",
-          }}>
-            GARAGE
-          </span>
+          }}>GARAGE</span>
         </a>
 
       </nav>
+
+      <style>{`
+        /* On desktop ≥769px, hide the hamburger in the bottom nav on browse
+           (desktop has the persistent sidebar) */
+        @media (min-width: 769px) {
+          .browse-filter-btn { display: none !important; }
+        }
+      `}</style>
     </>
   );
 }
