@@ -25,8 +25,8 @@ const ERA_COVERAGE = {
   "ironhead-sportster": "full",
   "chopper":            "full",
   "flathead":           "limited",
-  "knucklehead":        "limited",
-  "panhead":            "limited",
+  "knucklehead":        "pending",
+  "panhead":            "pending",
 };
 
 function getEraCoverage(slug) {
@@ -637,33 +637,6 @@ function ActiveTag({ label, onRemove, accent }) {
   );
 }
 
-const CATEGORY_LABELS = {
-  'ENGINE GROUP':                     'Engine',
-  'HANDLEBAR-CONTROLS-MIRRORS GROUP': 'Controls & Bars',
-  'BRAKING GROUP':                    'Brakes',
-  'ELECTRICAL SYSTEM GROUP':          'Electrical',
-  'CARBURETION-FUEL GROUP':           'Carb / Fuel',
-  'TRANSMISSION-CLUTCH GROUP':        'Transmission',
-  'SEATING GROUP':                    'Seats',
-  'WHEEL AND RIM GROUP':              'Tires & Wheels',
-  'LIGHTING-LICENSE GROUP':           'Lighting',
-  'HARDWARE GROUP':                   'Hardware',
-  'FOOT CONTROLS GROUP':              'Foot Controls',
-  'EXHAUST GROUP':                    'Exhaust',
-  'FRAME AND BODY GROUP':             'Frame & Body',
-  'MEDIA PRODUCTS GROUP':             'Swag',
-  'HELMET AND SHIELD GROUP':          'Helmets',
-  'SUSPENSION GROUP-FRONT':           'Suspension Front',
-  'TANK GROUP-GAS AND OIL':           'Tanks',
-  'DRIVE TRAIN GROUP':                'Drive Train',
-  'SECURITY-COVERS-SHELTERS GROUP':   'Luggage & Covers',
-  'WINDSHIELD-FAIRING GROUP':         'Windshield',
-  'INSTRUMENT GROUP':                 'Gauges',
-  'SUSPENSION GROUP-REAR':            'Suspension Rear',
-  'COMMON MISC GROUP':                'General',
-  'TOOLS GROUP':                      'Tools',
-};
-
 // ─── Category Tab Bar ────────────────────────────────────────────────────────
 
 function CategoryTabBar({ categories, active, onChange }) {
@@ -673,73 +646,9 @@ function CategoryTabBar({ categories, active, onChange }) {
   const ALL = { name: null, label: "All Parts", count: null };
   const tabs = [ALL, ...(categories ?? []).filter(cat => cat.name != null).map(cat => ({
     name: cat.name,
-    label: CATEGORY_LABELS[cat.name] ?? cat.name,
+    label: cat.name,
     count: cat.count ?? null,
-  })).sort((a, b) => a.label.localeCompare(b.label))];
-
-  // Split into two rows — first row gets ceil(n/2), second gets the rest
-  const mid = Math.ceil(tabs.length / 2);
-  const row1 = tabs.slice(0, mid);
-  const row2 = tabs.slice(mid);
-
-  function TabButton({ cat }) {
-    const isActive = active === cat.name;
-    return (
-      <motion.button
-        key={cat.name ?? "__all__"}
-        onClick={() => onChange(cat.name)}
-        whileHover={!isActive ? { y: -2 } : {}}
-        transition={{ type: "spring", stiffness: 340, damping: 28 }}
-        style={{
-          flexShrink: 0,
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-          padding: 0,
-          position: "relative",
-        }}
-      >
-        <div style={{
-          padding: "7px 16px",
-          position: "relative",
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          whiteSpace: "nowrap",
-          background: GOLD,
-          borderTop: isActive ? `2px solid #f0d870` : `2px solid #8a6820`,
-          borderRight: `1px solid #8a6820`,
-          borderLeft: `1px solid #8a6820`,
-          borderBottom: "none",
-          boxShadow: isActive
-            ? "inset 0 -2px 8px rgba(0,0,0,0.3)"
-            : "inset 0 -3px 6px rgba(0,0,0,0.4)",
-        }}>
-          {isActive && (
-            <div style={{
-              position: "absolute", bottom: -2,
-              left: 0, right: 0, height: 3,
-              background: GOLD, zIndex: 2,
-            }} />
-          )}
-          <span style={{
-            fontFamily: "var(--font-stencil, 'Share Tech Mono', monospace)",
-            fontSize: 10, letterSpacing: "0.12em",
-            textTransform: "uppercase", lineHeight: 1,
-            color: BLACK, fontWeight: isActive ? 700 : 500,
-            position: "relative", zIndex: 1,
-          }}>{cat.label}</span>
-          {cat.count != null && (
-            <span style={{
-              fontFamily: "monospace", fontSize: 8,
-              color: "rgba(8,7,6,0.4)",
-              position: "relative", zIndex: 1,
-            }}>{cat.count}</span>
-          )}
-        </div>
-      </motion.button>
-    );
-  }
+  }))];
 
   return (
     <div style={{
@@ -748,19 +657,96 @@ function CategoryTabBar({ categories, active, onChange }) {
       position: "sticky",
       top: 0,
       zIndex: 40,
+      overflow: "hidden",
       backgroundImage: "repeating-linear-gradient(-45deg, transparent, transparent 8px, rgba(201,168,76,0.025) 8px, rgba(201,168,76,0.025) 9px)",
     }}>
-      <div style={{ maxWidth: 1400, margin: "0 auto", padding: "6px 24px 0" }}>
-        {/* Row 1 */}
-        <div style={{ display: "flex", gap: 3, marginBottom: 3, flexWrap: "nowrap", overflowX: "auto", scrollbarWidth: "none" }}>
-          {row1.map(cat => <TabButton key={cat.name ?? "__all__"} cat={cat} />)}
-        </div>
-        {/* Row 2 */}
-        {row2.length > 0 && (
-          <div style={{ display: "flex", gap: 3, flexWrap: "nowrap", overflowX: "auto", scrollbarWidth: "none" }}>
-            {row2.map(cat => <TabButton key={cat.name ?? "__all__"} cat={cat} />)}
-          </div>
-        )}
+      <div style={{
+        maxWidth: 1400,
+        margin: "0 auto",
+        padding: "8px 32px 0",
+        display: "flex",
+        alignItems: "flex-end",
+        gap: 4,
+        overflowX: "auto",
+        scrollbarWidth: "none",
+        msOverflowStyle: "none",
+        perspective: "800px",
+        perspectiveOrigin: "50% 100%",
+      }}>
+        {tabs.map((cat) => {
+          const isActive = active === cat.name;
+          return (
+            <motion.button
+              key={cat.name ?? "__all__"}
+              onClick={() => onChange(cat.name)}
+              whileHover={!isActive ? { y: -3 } : {}}
+              transition={{ type: "spring", stiffness: 340, damping: 28 }}
+              style={{
+                flexShrink: 0,
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                padding: 0,
+                transformOrigin: "bottom center",
+                position: "relative",
+                opacity: 1,
+              }}
+            >
+              <div style={{
+                padding: "9px 20px 9px",
+                position: "relative",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                whiteSpace: "nowrap",
+                background: GOLD,
+                borderTop: isActive ? `2px solid #f0d870` : `2px solid #8a6820`,
+                borderRight: `1px solid #8a6820`,
+                borderLeft: `1px solid #8a6820`,
+                borderBottom: "none",
+                boxShadow: isActive
+                  ? "inset 0 -2px 8px rgba(0,0,0,0.3), 0 -2px 0 rgba(255,220,100,0.2)"
+                  : "inset 0 -3px 6px rgba(0,0,0,0.4)",
+              }}>
+                {/* Bottom seal for active — merges tab into bar area */}
+                {isActive && (
+                  <div style={{
+                    position: "absolute",
+                    bottom: -3,
+                    left: 0, right: 0,
+                    height: 4,
+                    background: GOLD,
+                    zIndex: 2,
+                  }} />
+                )}
+                <span style={{
+                  fontFamily: "var(--font-stencil, 'Share Tech Mono', monospace)",
+                  fontSize: 11,
+                  letterSpacing: "0.14em",
+                  textTransform: "uppercase",
+                  lineHeight: 1,
+                  color: BLACK,
+                  fontWeight: isActive ? 700 : 500,
+                  position: "relative",
+                  zIndex: 1,
+                }}>
+                  {cat.label}
+                </span>
+                {cat.count != null && (
+                  <span style={{
+                    fontFamily: "monospace",
+                    fontSize: 9,
+                    color: "rgba(8,7,6,0.45)",
+                    position: "relative",
+                    zIndex: 1,
+                  }}>
+                    {cat.count}
+                  </span>
+                )}
+              </div>
+            </motion.button>
+          );
+        })}
       </div>
     </div>
   );
@@ -887,7 +873,7 @@ export default function EraPage({ params }) {
         padding: "0",
         maxWidth: 1400,
         margin: "0 auto",
-        background: "#fff",
+        background: "#080808",
       }}>
         {loading ? (
           <div style={{
@@ -934,7 +920,7 @@ export default function EraPage({ params }) {
           )
         ) : (
           <>
-            <div style={{ padding: "0 40px 40px", background: "#fff", marginTop: 0 }}>
+            <div style={{ padding: "24px 40px", background: "#fff" }}>
             {coverage === "limited" && <LimitedBanner era={era} />}
             <div style={{
               display: "grid",
