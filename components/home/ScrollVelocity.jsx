@@ -94,8 +94,9 @@ export default function ScrollVelocity({
         .scroll-velocity-band {
           position: relative;
           width: 100%;
-          min-height: 210px;
-          padding: 50px 0;
+          /* tall enough for 2 rows of max font (140px each) + gap + padding */
+          min-height: 340px;
+          padding: 32px 0;
           margin-top: 60px;
           margin-bottom: 60px;
           z-index: 2;
@@ -103,6 +104,7 @@ export default function ScrollVelocity({
           display: flex;
           flex-direction: column;
           justify-content: center;
+          gap: 8px;
           -webkit-mask-image: linear-gradient(
             to right,
             transparent 0%,
@@ -129,20 +131,21 @@ export default function ScrollVelocity({
           display: inline-flex;
           white-space: nowrap;
           font-family: 'New Sailor', 'Barlow Condensed', sans-serif;
-          font-size: clamp(56px, 8.2vw, 112px);
+          /* bumped max from 112px → 140px */
+          font-size: clamp(72px, 10vw, 140px);
           font-weight: 700;
           line-height: 1;
           letter-spacing: 0.02em;
           text-transform: uppercase;
-          color: #F5F0E8;
+          color: #1a1610;
           will-change: transform;
         }
 
         .sv-row--dim {
           color: transparent;
-          -webkit-text-stroke: 1px rgba(201, 168, 76, 0.55);
-          text-stroke: 1px rgba(201, 168, 76, 0.55);
-          margin-top: 4px;
+          -webkit-text-stroke: 1.5px rgba(201, 168, 76, 0.85);
+          text-stroke: 1.5px rgba(201, 168, 76, 0.85);
+          margin-top: 0;
         }
 
         .sv-chunk {
@@ -152,20 +155,22 @@ export default function ScrollVelocity({
 
         @media (max-width: 768px) {
           .scroll-velocity-band {
-            min-height: 170px;
+            min-height: 260px;
             margin-top: 120px;
             margin-bottom: 16px;
-            padding: 10px 0;
+            padding: 20px 0;
+            gap: 6px;
           }
-          .sv-row { font-size: clamp(44px, 10vw, 82px); }
+          .sv-row { font-size: clamp(56px, 12vw, 100px); }
         }
 
         @media (max-width: 480px) {
           .scroll-velocity-band {
-            min-height: 140px;
+            min-height: 200px;
             margin-top: 108px;
+            gap: 4px;
           }
-          .sv-row { font-size: clamp(36px, 11vw, 64px); }
+          .sv-row { font-size: clamp(44px, 13vw, 72px); }
         }
 
         @media (prefers-reduced-motion: reduce) {

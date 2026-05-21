@@ -1,6 +1,6 @@
 'use client';
 
-import SmokeBackground from '@/components/home/SmokeBackground';
+// SmokeBackground removed — replaced with cream grid overlay
 import ModelSearch     from '@/components/home/ModelSearch';
 import EraCarousel     from '@/components/home/EraCarousel';
 import VideoHero       from '@/components/home/VideoHero';
@@ -9,11 +9,9 @@ import EraKineticTile  from '@/components/home/EraKineticTile';
 import { BrandRolodex } from '@/components/home/BrandRolodex';
 import Link from 'next/link';
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
 export default function HomePage() {
   return (
     <>
-      <SmokeBackground />
       <main>
         <VideoHero />
         <ScrollVelocity />
@@ -22,57 +20,67 @@ export default function HomePage() {
         </div>
         <div className="bento-page">
 
-        {/* ── Kinetic "SHOP BY ERA" heading tile — links to /era */}
-        <EraKineticTile />
+          {/* ── Kinetic "SHOP BY ERA" heading tile */}
+          <EraKineticTile />
 
-        {/* ── Era 3D Carousel — full width */}
-        <section
-          className="tile tile-eras"
-          style={{ '--delay': '160ms' }}
-        >
-          <EraCarousel />
-        </section>
+          {/* ── Era 3D Carousel — full width */}
+          <section className="tile tile-eras" style={{ '--delay': '160ms' }}>
+            <EraCarousel />
+          </section>
 
-        {/* ── Category tile */}
-        <section className="tile tile-category" style={{ '--delay': '240ms' }}>
-          <div className="tile-inner tile-inner--center">
-            <div className="placeholder-icon">⚙️</div>
-            <h3 className="tile-heading tile-heading--sm">Browse by Category</h3>
-            <p className="tile-sub">Engine · Suspension · Electrical · Exhaust</p>
-            <Link href="/browse?category=all" className="tile-btn">Explore Categories</Link>
-          </div>
-        </section>
+          {/* ── Category tile */}
+          <section className="tile tile-category" style={{ '--delay': '240ms' }}>
+            <div className="tile-inner tile-inner--center">
+              <div className="placeholder-icon">⚙️</div>
+              <h3 className="tile-heading tile-heading--sm">Browse by Category</h3>
+              <p className="tile-sub">Engine · Suspension · Electrical · Exhaust</p>
+              <Link href="/browse?category=all" className="tile-btn">Explore Categories</Link>
+            </div>
+          </section>
 
-        {/* ── Model tile */}
-        <section className="tile tile-model" style={{ '--delay': '300ms' }}>
-          <div className="tile-inner tile-inner--center">
-            <div className="placeholder-icon">🏍</div>
-            <h3 className="tile-heading tile-heading--sm">Shop by Model</h3>
-            <p className="tile-sub">Sportster · Softail · Dyna · Touring · FX</p>
-            <Link href="/browse" className="tile-btn">Pick Your Model</Link>
-          </div>
-        </section>
+          {/* ── Model tile */}
+          <section className="tile tile-model" style={{ '--delay': '300ms' }}>
+            <div className="tile-inner tile-inner--center">
+              <div className="placeholder-icon">🏍</div>
+              <h3 className="tile-heading tile-heading--sm">Shop by Model</h3>
+              <p className="tile-sub">Sportster · Softail · Dyna · Touring · FX</p>
+              <Link href="/browse" className="tile-btn">Pick Your Model</Link>
+            </div>
+          </section>
 
-        {/* ── Deals tile */}
-        <section className="tile tile-deals" style={{ '--delay': '360ms' }}>
-          <div className="tile-inner tile-inner--center">
-            <p className="tile-eyebrow tile-eyebrow--gold">Limited time</p>
-            <h3 className="tile-heading tile-heading--sm">Current Deals</h3>
-            <p className="tile-sub">NOS &amp; aftermarket at unbeatable prices</p>
-            <Link href="/browse?deals=true" className="tile-btn tile-btn--gold">Shop Deals</Link>
-          </div>
-        </section>
+          {/* ── Deals tile */}
+          <section className="tile tile-deals" style={{ '--delay': '360ms' }}>
+            <div className="tile-inner tile-inner--center">
+              <p className="tile-eyebrow tile-eyebrow--gold">Limited time</p>
+              <h3 className="tile-heading tile-heading--sm">Current Deals</h3>
+              <p className="tile-sub">NOS &amp; aftermarket at unbeatable prices</p>
+              <Link href="/browse?deals=true" className="tile-btn tile-btn--gold">Shop Deals</Link>
+            </div>
+          </section>
 
         </div>
 
         <BrandRolodex />
-
       </main>
 
       <style>{`
         /* ── Reset & base */
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #080808; }
+        body { background: #F5F0E8; }
+
+        /* ── Cream grid background */
+        body::before {
+          content: '';
+          position: fixed;
+          inset: 0;
+          z-index: 0;
+          background-image:
+            linear-gradient(rgba(180,165,130,0.55) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(180,165,130,0.55) 1px, transparent 1px);
+          background-size: 40px 40px;
+          background-color: #F5F0E8;
+          pointer-events: none;
+        }
 
         /* ── Tokens */
         :root {
@@ -116,7 +124,7 @@ export default function HomePage() {
 
         /* ── Tile base */
         .tile {
-          background: rgba(14,14,14,0.82);
+          background: rgba(14,14,14,0.90);
           backdrop-filter: blur(4px);
           -webkit-backdrop-filter: blur(4px);
           border: 1px solid var(--border-dim);
@@ -141,20 +149,42 @@ export default function HomePage() {
         /* ── Grid placement */
         .tile-video       { grid-area: video;   min-height: 220px; }
         .tile-era-kinetic { grid-area: erahead; min-height: 120px; }
-        .tile-eras        { grid-area: eras;    min-height: 580px; overflow: hidden; }
         .tile-category    { grid-area: cat;     min-height: 200px; }
         .tile-model       { grid-area: model;   min-height: 200px; }
         .tile-deals       { grid-area: deals;   min-height: 200px; background: var(--surface-2); }
 
-        /* ── Era kinetic tile shell */
-        .tile-era-kinetic {
+        /* ── Era carousel tile — transparent, no border, tall, overflow visible */
+        .tile-eras {
+          grid-area: eras;
+          min-height: 780px;      /* bigger cards need more height */
+          background: transparent !important;
+          backdrop-filter: none !important;
+          -webkit-backdrop-filter: none !important;
+          border: none !important;
+          box-shadow: none !important;
+          overflow: visible !important;
+          margin-top: -20px;      /* bleed up into era heading */
+          z-index: 1;
+        }
+        .tile-eras:hover {
+          transform: none;        /* disable the base tile hover lift */
+          border-color: transparent !important;
+        }
+
+        /* ── Era kinetic tile shell — fully ghost */
+        .tile.tile-era-kinetic {
           text-decoration: none;
           display: flex;
           align-items: center;
           justify-content: center;
-          background: transparent;
-          border-color: rgba(201,168,76,0.28);
-          overflow: hidden;
+          background: transparent !important;
+          backdrop-filter: none !important;
+          -webkit-backdrop-filter: none !important;
+          border: none !important;
+          box-shadow: none !important;
+          overflow: visible;
+          z-index: 10;
+          pointer-events: none;
         }
         .era-kinetic-wrap {
           position: relative;
@@ -165,6 +195,7 @@ export default function HomePage() {
           flex-direction: column;
           align-items: center;
           gap: 0;
+          pointer-events: auto;
         }
 
         /* ── Tile inner */
@@ -190,10 +221,6 @@ export default function HomePage() {
         .tile-inner--center {
           align-items: center;
           text-align: center;
-        }
-        .tile-inner--eras {
-          padding: 24px 0 24px 36px;
-          gap: 8px;
         }
 
         /* ── Typography */
@@ -250,39 +277,6 @@ export default function HomePage() {
         }
         .tile-btn--gold:hover { background: var(--gold-light); border-color: var(--gold-light); }
 
-        /* ── Video placeholder */
-        .video-placeholder {
-          width: 100%;
-          height: 100%;
-          min-height: 220px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          gap: 14px;
-          background: linear-gradient(135deg, var(--surface-2) 0%, var(--surface-3) 100%);
-          cursor: pointer;
-        }
-        .play-ring {
-          width: 64px; height: 64px;
-          border-radius: 50%;
-          border: 2px solid var(--gold);
-          display: flex; align-items: center; justify-content: center;
-          color: var(--gold);
-          transition: transform 0.25s, background 0.25s;
-        }
-        .tile-video:hover .play-ring {
-          transform: scale(1.12);
-          background: rgba(201,168,76,0.1);
-        }
-        .video-label {
-          font-family: var(--font-mono);
-          font-size: 11px;
-          letter-spacing: 0.14em;
-          text-transform: uppercase;
-          color: var(--text-dim);
-        }
-
         /* ── Deals tile gold accent line */
         .tile-deals::before {
           content: '';
@@ -324,13 +318,10 @@ export default function HomePage() {
             padding-left: 16px;
             padding-right: 16px;
           }
+          .tile-eras { min-height: 620px; }
           .tile-inner { padding: 24px 22px; }
           .tile-inner--search { padding: 0 16px 14px; }
-          .tile-inner--eras { padding: 20px 0 20px 22px; }
           .tile-era-kinetic { min-height: 100px; }
-          .float-nav { padding: 8px 14px 8px 12px; gap: 16px; }
-          .nav-links { gap: 2px; }
-          .nav-links a { font-size: 11px; padding: 5px 8px; }
         }
 
         @media (max-width: 480px) {
@@ -343,7 +334,7 @@ export default function HomePage() {
               "model"
               "deals";
           }
-          .nav-links a:not(:first-child):not(:last-child) { display: none; }
+          .tile-eras { min-height: 520px; }
         }
       `}</style>
     </>
