@@ -409,17 +409,19 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
     newest:     "id DESC",
   };
 
-  // When using Typesense IDs, preserve Typesense's relevance rank by sorting
-  // postgres results in the same ID order using array_position.
+  const offset = (page - 1) * perPage;
+
+  // Snapshot facet params BEFORE pushing array_position IDs or LIMIT/OFFSET.
+  // Facet queries only reference the WHERE-clause params ($1..$N here).
+  // array_position and pagination params must not bleed into facets.
+  const facetParams = [...params];
+
+  // When using Typesense IDs, preserve Typesense's relevance rank.
+  // This push MUST come after facetParams is snapshotted.
   const orderBy = typesenseIds && sort === "relevance"
     ? `array_position($${p++}::int[], d.id), d.in_stock DESC`
     : (sortMap[sort] ?? "cu.id DESC");
   if (typesenseIds && sort === "relevance") params.push(typesenseIds);
-  const offset = (page - 1) * perPage;
-
-  // FIX 3: Snapshot facet params BEFORE pushing LIMIT/OFFSET.
-  // This is always correct regardless of sort branch.
-  const facetParams = [...params];
 
   // Now push pagination params
   const limitParam = p++;

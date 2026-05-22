@@ -139,6 +139,7 @@ function BrowsePageInner() {
   const [loading, setLoading]     = useState(true);
   const [page, setPage]           = useState(1);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [searchInput, setSearchInput] = useState(searchParams.get("q") || "");
 
   const [filters, setFilters] = useState({
     era:         searchParams.get("era")         || null,
@@ -162,6 +163,16 @@ function BrowsePageInner() {
     window.addEventListener("stinkin:filterToggle", handler);
     return () => window.removeEventListener("stinkin:filterToggle", handler);
   }, []);
+
+  // ── Debounce search input → filters.q ────────────────────────
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const trimmed = searchInput.trim() || null;
+      if (trimmed !== filters.q) handleFilterChange({ q: trimmed });
+    }, 300);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchInput]);
 
   const fetchProducts = useCallback(async (f, pg) => {
     setLoading(true);
@@ -257,6 +268,47 @@ function BrowsePageInner() {
 
         {/* ── Product grid ── */}
         <div style={{ flex: 1, padding: "16px 16px 120px", minWidth: 0 }}>
+
+          {/* ── Search bar ── */}
+          <div style={{
+            display: "flex", alignItems: "center",
+            background: "#fff",
+            border: `1.5px solid ${searchInput ? GOLD : "rgba(184,146,42,0.3)"}`,
+            marginBottom: 16,
+            transition: "border-color 0.15s",
+          }}>
+            {/* Icon */}
+            <span style={{ display: "flex", alignItems: "center", padding: "0 12px", color: "rgba(184,146,42,0.6)", flexShrink: 0 }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="22" y2="22"/>
+              </svg>
+            </span>
+            <input
+              type="search"
+              value={searchInput}
+              onChange={e => setSearchInput(e.target.value)}
+              onKeyDown={e => e.key === "Escape" && setSearchInput("")}
+              placeholder="SEARCH PARTS, OEM NUMBERS, BRANDS…"
+              style={{
+                flex: 1, border: "none", outline: "none", background: "transparent",
+                fontFamily: "var(--font-stencil, monospace)",
+                fontSize: "10px", letterSpacing: "1.5px", color: DARK,
+                padding: "13px 0", textTransform: "uppercase",
+                WebkitAppearance: "none",
+              }}
+            />
+            {searchInput && (
+              <button
+                onClick={() => setSearchInput("")}
+                style={{ display: "flex", alignItems: "center", padding: "0 14px", background: "none", border: "none", cursor: "pointer", color: "#bbb", flexShrink: 0 }}
+                aria-label="Clear search"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            )}
+          </div>
 
           {/* Sort + count bar */}
           <div style={{
@@ -369,6 +421,12 @@ function BrowsePageInner() {
           to   { background-position:  600px 0; }
         }
         * { box-sizing: border-box; }
+
+        input[type="search"]::-webkit-search-decoration,
+        input[type="search"]::-webkit-search-cancel-button,
+        input[type="search"]::-webkit-search-results-button,
+        input[type="search"]::-webkit-search-results-decoration { display: none; }
+        input[type="search"]::placeholder { color: rgba(184,146,42,0.4); }
 
         .product-grid {
           display: grid;

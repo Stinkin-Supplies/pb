@@ -269,13 +269,15 @@ function normalizeProductRow(row) {
   const rawWas = row.msrp != null ? Number(row.msrp) : null;
   const was    = rawWas != null && rawWas > price ? rawWas : null;
 
-  // Build gallery from catalog_media images, then supplement with image_urls from PU enrichment
+  // Build gallery from catalog_media images, then supplement with image_urls from PU enrichment.
+  // Do NOT rewrite http:// -> https:// here — proxyImageUrl detects http:// URLs and routes
+  // them through /api/img. Rewriting first breaks that check (LeMans CDN is http-only).
   const mediaImages = Array.isArray(row.images) && row.images.length > 0
-    ? row.images.map(u => u?.replace('http://', 'https://')).filter(Boolean)
-    : row.image ? [row.image.replace('http://', 'https://')] : [];
+    ? row.images.filter(Boolean)
+    : row.image ? [row.image] : [];
 
   const enrichedImages = Array.isArray(row.image_urls)
-    ? row.image_urls.map(u => u?.replace('http://', 'https://')).filter(Boolean)
+    ? row.image_urls.filter(Boolean)
     : [];
 
   // Merge: media images first, then any additional from image_urls not already present
