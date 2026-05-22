@@ -22,7 +22,11 @@ const fmt = (n) => (n != null ? `$${Number(n).toFixed(2)}` : null);
 
 function proxyImg(src) {
   if (!src) return null;
-  if (src.includes("lemansnet.com")) return `/api/img?u=${encodeURIComponent(src)}`;
+  if (src.startsWith('/api/img') || src.startsWith('/api/image-proxy')) return src;
+  if (src.endsWith('.zip')) return null;
+  if (src.includes('lemansnet.com') || src.startsWith('http://')) {
+    return `/api/img?u=${encodeURIComponent(src)}`;
+  }
   return src;
 }
 
@@ -271,7 +275,7 @@ function FitmentTable({ fitment }) {
 // ── Product Modal ─────────────────────────────────────────────
 function ProductModal({ product, fitment, onClose }) {
   const [tab, setTab] = useState("description");
-  const gallery = Array.isArray(product.gallery) ? product.gallery.filter(Boolean) : [];
+  const gallery = Array.isArray(product.gallery) ? product.gallery.filter(Boolean).map(proxyImg).filter(Boolean) : [];
   const tabs = [
     { key: "description", label: "Description" },
     ...(product.features?.length ? [{ key: "features", label: "Features" }] : []),
@@ -413,7 +417,7 @@ export default function ProductDetailClient({ product, fitment = [], relatedProd
   const [modalProduct, setModalProduct] = useState(null);
   const [cartToast, setCartToast]       = useState(false);
 
-  const gallery = Array.isArray(product.gallery) ? product.gallery.filter(Boolean) : [];
+  const gallery = Array.isArray(product.gallery) ? product.gallery.filter(Boolean).map(proxyImg).filter(Boolean) : [];
 
   const featuresRaw    = Array.isArray(product.features) ? product.features.filter(Boolean) : [];
   const featuresIsHtml = featuresRaw.length === 1 && /<[a-z][^>]*>/i.test(featuresRaw[0] ?? "");

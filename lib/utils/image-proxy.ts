@@ -1,10 +1,17 @@
 export function proxyImageUrl(url: string | null | undefined): string | null {
   if (!url) return null;
+  // Already proxied
   if (url.startsWith('/api/img') || url.startsWith('/api/image-proxy')) return url;
-  if (url.startsWith('http://asset.lemansnet.com/z/') || url.startsWith('https://asset.lemansnet.com/z/')) {
+  // Skip zip files — no image to proxy
+  if (url.endsWith('.zip')) return null;
+  // Proxy ALL LeMans CDN URLs regardless of path structure
+  if (url.includes('lemansnet.com')) {
     return `/api/img?u=${encodeURIComponent(url)}`;
   }
-  if (url.endsWith('.zip')) return null;
+  // Proxy any other http:// image (mixed content breaks on https sites)
+  if (url.startsWith('http://')) {
+    return `/api/img?u=${encodeURIComponent(url)}`;
+  }
   return url;
 }
 

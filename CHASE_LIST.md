@@ -1,6 +1,6 @@
 # STINKIN' SUPPLIES
 ## CHASE LIST
-**Last Updated: May 21, 2026 — Twenty-Sixth Pass**
+**Last Updated: May 22, 2026 — Twenty-Seventh Pass**
 
 ---
 
@@ -9,9 +9,21 @@
 | # | Task | Notes |
 |---|------|-------|
 | 1 | Fix PU product images | `ProductDetailClient.jsx` gallery not running `cu.image_url` through `proxyImg()`. LeMans URLs need `/api/img?u=` proxy. |
-| 2 | `node scripts/ingest/index_unified.js --recreate` | Reindex after variant_group_id changes |
-| 3 | WPS fitment files | Follow up with rep — pending since April 30 |
-| 4 | Verify filter bottom sheet end-to-end on mobile | subcategory + modelCodes params flowing through API |
+| 2 | Verify filter bottom sheet end-to-end on mobile | subcategory + modelCodes params flowing through API |
+| 3 | git commit everything | WPS fitment scripts + large uncommitted changeset from May 21 |
+
+---
+
+## ✅ DONE MAY 22 — TWENTY-SEVENTH PASS
+
+| Area | What Was Done |
+|------|---------------|
+| WPS vehicle master | Loaded 44,709 rows into wps_vehicles table from 1779424242-1856360.csv |
+| import_wps_fitment.mjs | New script — paginates taxonomyterms/196/items?include=vehicles, resolves vehicle IDs, stores JSONB in wps_catalog.fitment. 5,810 items with Harley fitment |
+| promote_wps_fitment.cjs | New script — promotes wps_catalog.fitment harley_vehicles[] → catalog_fitment_v2. 702,633 rows inserted |
+| catalog_fitment_v2 | Now at 2,147,352 rows (up from 1,442,872) |
+| Era backfill | Re-run post WPS promote. 18,793 products tagged (up from 13,773) |
+| Typesense | Reindexed — 90,276 docs, 0 errors |
 
 ---
 
@@ -33,21 +45,7 @@
 | Browse variants badge | Gold pill badge "26 OPTIONS" on grouped product cards |
 | BottomNav | Desktop HOME restored on /browse pages |
 | Home page | Cream grid background, EraKineticTile text fix, ScrollVelocity color + size fix, ModelSearch mobile overflow fix |
-| Fulfillment routing | Architecture discussed — deferred to future sprint (cross_vendor_products table + resolve_cart_fulfillment()) |
-
----
-
-## ✅ DONE MAY 21 — TWENTY-FIFTH PASS
-
-| Area | What Was Done |
-|------|---------------|
-| ProductDetailClient redesign | Sticky gallery, price+stock on same row, cart above fold, compact trust badges, fitment year dedup fixed |
-| VariantSelector fixes | data scope bug fixed, navigation loading state, current-item ← HERE label |
-| BottomNav filter toggle | Hamburger on /browse fires stinkin:filterToggle event |
-| Browse page mobile-first | Event listener, desktop-sidebar/mobile-only split, floating filter pill |
-| FilterSidebar bottom sheet | mobileSheet prop, spring animation, drag handle, body scroll lock |
-| promote_pu_fitment.cjs | New script written (had join bugs fixed in 26th pass) |
-| ingest_vtwin_fitment.cjs | New script written (had join bugs fixed in 26th pass) |
+| Fulfillment routing | Architecture discussed — deferred to future sprint |
 
 ---
 
@@ -56,8 +54,7 @@
 | Task | Notes |
 |------|-------|
 | Fix PU product images | Gallery not proxying LeMans CDN URLs. Most PU products show "No Image" on PDP |
-| Typesense reindex | variant_group_id changes not reflected yet |
-| WPS fitment files | Pending from rep since April 30 |
+| git commit everything | Large uncommitted changeset from May 21 + WPS fitment scripts from May 22 |
 
 ---
 
@@ -65,11 +62,11 @@
 
 | Task | Notes |
 |------|-------|
-| Fulfillment routing | cross_vendor_products table + resolve_cart_fulfillment() + cart integration. See HANDOFF for architecture |
+| WPS fitment unresolved models | 19,810 vehicle records didn't match harley_model_years — chase model name mismatches |
+| Fulfillment routing | cross_vendor_products table + resolve_cart_fulfillment() + cart integration |
 | Cart wiring | CartContext / addItem is placeholder only |
 | Verify filter bottom sheet on mobile | subcategory + modelCodes params |
 | WPS API enrichment | Test features+blocks hit rate on HardDrive products |
-| WPS vehicle scopes | Request vehicle:read + vehiclemodel:read from WPS |
 | model_alias_map additions | Road King, Street Glide, Fat Boy, Night Train, Dyna Wide Glide |
 | Browse/Brand tabs | Data ready, UI unbuilt |
 | Cron jobs | Hold until stable |

@@ -12,6 +12,10 @@ function toTitleCase(str) {
   return str.replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
 }
 
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 const ATTRIBUTE_RULES = [
   // OVERSIZE/UNDERSIZE engine measurements: +0.001, +0.020, STD, OS, US
   // Must be exactly 3-4 decimal places to avoid matching "+10" cable extensions
@@ -154,6 +158,8 @@ async function main() {
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_variant_members_product ON catalog_variant_members(product_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_variant_members_group   ON catalog_variant_members(group_id)`);
+  await pool.query(`ALTER TABLE catalog_variant_groups ADD COLUMN IF NOT EXISTS family_key TEXT`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_variant_groups_family_key ON catalog_variant_groups(family_key) WHERE family_key IS NOT NULL`);
   console.log('\nTables ready');
 
   // Fetch product display names from WPS API
@@ -232,6 +238,128 @@ async function main() {
   await pool.query(`ALTER TABLE catalog_unified ADD COLUMN IF NOT EXISTS variant_group_id INTEGER REFERENCES catalog_variant_groups(id)`);
   await pool.query(`UPDATE catalog_unified cu SET variant_group_id = cvm.group_id FROM catalog_variant_members cvm WHERE cvm.product_id = cu.id`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_cu_variant_group ON catalog_unified(variant_group_id) WHERE variant_group_id IS NOT NULL`);
+
+  // ── NAME-BASED GROUPING — PU + VTWIN ─────────────────────────────────────────
+  // WPS groups via wps_product_id (above). PU and VTWIN have no product ID,
+  // so we group by stripping the variant attribute from the name and matching
+  // on (base_name, brand, source_vendor, category).
+  //
+  // Strategy:
+  //   1. For each PU/VTWIN product, extract the variant attribute from the name.
+  //   2. Strip that attribute to get a "base name".
+  //   3. Group products sharing the same (base_name, brand, source_vendor, category).
+  //   4. Only create groups where 2+ members exist AND all share the same axis.
+
+  console.log('\n── Name-based grouping for PU + VTWIN ──');
+
+  const nonWpsProducts = await q(`
+    SELECT cu.id, cu.name, cu.brand, cu.source_vendor, cu.category, cu.slug
+    FROM catalog_unified cu
+    WHERE cu.source_vendor IN ('PU', 'VTWIN')
+      AND cu.is_active = true
+      AND cu.variant_group_id IS NULL
+    ORDER BY cu.brand, cu.name
+  `);
+
+  console.log(`  ${nonWpsProducts.length} ungrouped PU/VTWIN products to scan`);
+
+  // Build base-name groups
+  const nameGroups = new Map(); // key → [product, ...]
+
+  for (const row of nonWpsProducts) {
+    const attr = extractAttribute(row.name);
+    if (!attr) continue; // no variant attribute found — skip
+
+    // Strip the attribute value from the name to get base name.
+    // Handle patterns like:
+    //   "Name - Color - Model/Suffix"  → "Name"
+    //   "Name Color"                   → "Name"
+    //   "Name - Color"                 → "Name"
+    let baseName = row.name;
+
+    // Split on " - " and remove segments that match the attribute value
+    const segments = baseName.split(/\s*-\s*/);
+    const attrValLower = attr.value.toLowerCase();
+    const filtered = segments.filter(s => s.trim().toLowerCase() !== attrValLower);
+    if (filtered.length < segments.length) {
+      // Successfully removed a segment
+      baseName = filtered.join(' - ').trim();
+    } else {
+      // Attribute value wasn't its own segment — try stripping suffix
+      baseName = baseName.replace(new RegExp(`\\s+${escapeRegex(attr.value)}\\s*$`, 'i'), '').trim();
+    }
+    // Strip trailing dashes/spaces
+    baseName = baseName.replace(/\s*-\s*$/, '').trim();
+
+    if (!baseName || baseName.length < 4) continue;
+    if (baseName === row.name) continue; // nothing was stripped
+
+    const key = `${row.source_vendor}|${row.brand}|${row.category}|${baseName.toLowerCase()}`;
+    if (!nameGroups.has(key)) nameGroups.set(key, { baseName, brand: row.brand, source_vendor: row.source_vendor, category: row.category, members: [] });
+    nameGroups.get(key).members.push({ ...row, attr });
+  }
+
+  // Filter to groups with 2+ members sharing the same axis
+  let nameGroupsInserted = 0, nameMembersInserted = 0;
+
+  for (const [key, group] of nameGroups) {
+    if (group.members.length < 2) continue;
+
+    const axes = group.members.map(m => m.attr.name);
+    const dominantAxis = axes[0];
+    if (!axes.every(a => a === dominantAxis)) continue; // mixed axes — skip
+
+    // Check if ALL members are already grouped — if so skip entirely.
+    // If only SOME are grouped (e.g. duplicate SKUs), still create the group
+    // for the ungrouped ones.
+    const ids = group.members.map(m => m.id);
+    const alreadyGrouped = await q(
+      `SELECT id FROM catalog_unified WHERE id = ANY($1::int[]) AND variant_group_id IS NOT NULL`,
+      [ids]
+    );
+    if (alreadyGrouped.length === ids.length) continue; // all already grouped
+
+    // Deduplicate members by product_id — keeps first occurrence (lowest idx)
+    const seenIds = new Set();
+    const uniqueMembers = group.members.filter(m => {
+      if (seenIds.has(m.id)) return false;
+      seenIds.add(m.id);
+      return true;
+    });
+    if (uniqueMembers.length < 2) continue;
+
+    // Insert group
+    const displayName = group.baseName;
+    const [grp] = await q(`
+      INSERT INTO catalog_variant_groups (wps_product_id, display_name, source_vendor)
+      VALUES (NULL, $1, $2)
+      RETURNING id
+    `, [displayName, group.source_vendor]);
+    nameGroupsInserted++;
+
+    for (let idx = 0; idx < uniqueMembers.length; idx++) {
+      const m = uniqueMembers[idx];
+      await q(`
+        INSERT INTO catalog_variant_members
+          (group_id, product_id, option_1_name, option_1_value, sort_order)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (group_id, product_id) DO NOTHING
+      `, [grp.id, m.id, m.attr.name, m.attr.value, idx]);
+      nameMembersInserted++;
+    }
+  }
+
+  // Back-fill variant_group_id for new members
+  await pool.query(`
+    UPDATE catalog_unified cu
+    SET variant_group_id = cvm.group_id
+    FROM catalog_variant_members cvm
+    WHERE cvm.product_id = cu.id
+      AND cu.variant_group_id IS NULL
+  `);
+
+  console.log(`  Name-based groups inserted: ${nameGroupsInserted}`);
+  console.log(`  Name-based members inserted: ${nameMembersInserted}`);
 
   console.log(`\n═══ COMPLETE ═══`);
   console.log(`  Axis breakdown:`, axisStats);

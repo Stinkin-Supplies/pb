@@ -1,7 +1,7 @@
 # Stinkin' Supplies — Master Reference
-**Last Updated:** May 21, 2026 (Twenty-Fifth Pass)
+**Last Updated:** May 22, 2026 (Twenty-Seventh Pass)
 **Database:** Hetzner Postgres — stinkin_catalog
-**Status:** Catalog stable ✅ | Variants live ✅ | Era pages live ✅ | Fitment promote pending ⚠️ | Mobile filter bottom sheet live ✅
+**Status:** Catalog stable ✅ | Variants live ✅ | Era pages live ✅ | WPS fitment live ✅ | Typesense current ✅
 
 ---
 
@@ -13,17 +13,19 @@
 | — WPS | 22,278 | ✅ wps_product_id backfilled |
 | — PU | 36,684 | ✅ Enriched |
 | — VTWIN | 37,749 | ✅ Categories cleaned |
-| Typesense | 90,276 docs | ✅ Current — era columns live |
-| catalog_fitment_v2 | ~1.54M rows | ⚠️ PU + VTWIN promotes pending |
+| Typesense | 90,276 docs | ✅ Reindexed May 22 |
+| catalog_fitment_v2 | 2,147,352 rows | ✅ WPS promoted May 22 |
+| wps_catalog.fitment | 5,810 items with Harley fitment | ✅ May 22 |
+| wps_vehicles | 44,709 rows | ✅ Loaded May 22 |
 | oem_fitment | 379,899 rows | ✅ All families |
 | catalog_media | 32,718 rows | ✅ FK → catalog_unified |
 | vendor_offers | 22,278 rows | ✅ Rebuilt May 20 |
 | pu_fitment | 13,913 rows | ✅ |
 | pu_fitment_parsed | 393,202 rows | ✅ |
-| pu_fitment_expanded | 1,640,065 rows | ✅ Ready to promote |
-| catalog_variant_groups | 2,887 | ✅ |
-| catalog_variant_members | 19,464 | ✅ |
-| era_* columns | Backfilled May 20 | ⚠️ Re-run after fitment promotes |
+| pu_fitment_expanded | 1,640,065 rows | ✅ Promoted |
+| catalog_variant_groups | 2,901 | ✅ |
+| catalog_variant_members | 19,557 | ✅ |
+| era_* columns | 18,793 products tagged | ✅ Re-run May 22 post WPS promote |
 | harley_models | 299 | ✅ |
 | harley_model_years | ~2,230 | ✅ |
 
@@ -126,25 +128,37 @@ node scripts/ingest/promote_pu_fitment.cjs
 # → inserts pu_fitment_expanded into catalog_fitment_v2 (source='PU')
 
 # Step 11: VTwin fitment
-node scripts/ingest/ingest_vtwin_fitment.cjs --dry  # check strategy + match count
+node scripts/ingest/ingest_vtwin_fitment.cjs --dry
 node scripts/ingest/ingest_vtwin_fitment.cjs
 # → vtwin_oem_crossref → catalog_fitment_v2 (source='VTWIN')
 
-# Step 12: vendor_offers
+# Step 12: WPS fitment
+node scripts/ingest/import_wps_fitment.mjs
+# → wps_vehicles table (44,709 rows from CSV), wps_catalog.fitment JSONB
+# CSV source: scripts/data/wps/1779424242-1856360.csv
+# Uses taxonomyterms/196 (Hard Drive) API — no vehicle:read scope needed
+# Stores raw_vehicle_ids + vehicles + harley_vehicles per item
+
+node scripts/ingest/promote_wps_fitment.cjs
+# → wps_catalog.fitment -> harley_vehicles[] → catalog_fitment_v2 (fitment_source='wps')
+# Join: wps_catalog.sku → catalog_unified.vendor_sku
+# 702,633 rows inserted (May 22). 19,810 unresolved (model name mismatches)
+
+# Step 13: vendor_offers
 node scripts/ingest/populate_wps_vendor_offers.cjs
 
-# Step 13: WPS product IDs (for variant grouping)
+# Step 14: WPS product IDs (for variant grouping)
 node scripts/ingest/backfill_wps_product_ids.cjs
 # → wps_catalog.wps_product_id + wps_item_id
 
-# Step 14: Variant groups
+# Step 15: Variant groups
 node scripts/ingest/build_variant_groups.cjs
 # → catalog_variant_groups, catalog_variant_members
 
-# Step 15: Era column backfill (SQL — run after fitment is populated)
+# Step 16: Era column backfill (SQL — run after fitment is populated)
 # See ERA BACKFILL SQL below
 
-# Step 16: Typesense reindex
+# Step 17: Typesense reindex
 node scripts/ingest/index_unified.js --recreate
 ```
 
@@ -179,7 +193,7 @@ Use year-based mapping for panhead (1948–1965). TC and Evo use Touring/Softail
 ### Tables
 ```
 catalog_variant_groups
-  id, wps_product_id, display_name, source_vendor
+  id, wps_product_id, display_name, source_vendor, family_key
 
 catalog_variant_members
   id, group_id, product_id, option_1_name, option_1_value, option_2_name, option_2_value, sort_order
@@ -194,6 +208,10 @@ wps_catalog.wps_item_id           → WPS internal item ID
 - **Two-axis**: option_1 = Color, option_2 = Size — auto-split when value ends in XS/SM/MD/LG/XL/2X/3X/4X/5X
 - 70 groups have identical names (cables) — option_1_value null until WPS fitment files arrive
 - Re-run `build_variant_groups.cjs` after each new fitment import to refresh labels
+
+### family_key Values
+- `namz-wire-spool-100ft` → ids 8680, 8681, 8686, 8687 (PU 18g, PU 20g, WPS 18g, WPS 20g)
+- `namz-wire-spool-25ft-gxl` → ids 8682, 8683, 8684, 8685 (Namz GXL 10g/12g/14g/16g)
 
 ### API
 `GET /api/browse/variants/[productId]`
@@ -303,18 +321,65 @@ DELETE FROM catalog_variant_members WHERE product_id NOT IN (SELECT id FROM cata
 
 | Slug | Coverage | Products | Notes |
 |------|----------|----------|-------|
-| milwaukee-8 | full | 3,815 | ✅ Backfilled — re-run after fitment promotes |
-| twin-cam | full | 8,165 | ✅ Backfilled — re-run after fitment promotes |
-| evolution | full | 5,026 | ✅ Backfilled — re-run after fitment promotes |
-| evo-sportster | full | 1,642 | ✅ Backfilled — re-run after fitment promotes |
-| shovelhead | full | 1,031 | ✅ Backfilled — re-run after fitment promotes |
-| ironhead-sportster | full | 1,091 | ✅ Backfilled — re-run after fitment promotes |
-| chopper | full | 2,002 | ✅ Backfilled — re-run after fitment promotes |
+| milwaukee-8 | full | — | ✅ Re-tagged May 22 post WPS promote |
+| twin-cam | full | — | ✅ Re-tagged May 22 |
+| evolution | full | — | ✅ Re-tagged May 22 |
+| evo-sportster | full | — | ✅ Re-tagged May 22 |
+| shovelhead | full | — | ✅ Re-tagged May 22 |
+| ironhead-sportster | full | — | ✅ Re-tagged May 22 |
+| chopper | full | — | ✅ Re-tagged May 22 |
 | flathead | limited | 26 | LimitedBanner shown. flathead.webp missing |
 | knucklehead | limited | 26 | LimitedBanner shown |
 | panhead | limited | 587 | LimitedBanner shown. Year-range mapped 1948–1965 |
 
-ERA_COVERAGE map in `app/era/[slug]/page.jsx` — knucklehead/panhead marked "pending" in file but show "limited" in data.
+18,793 products total tagged across all era columns (up from 13,773).
+ERA_COVERAGE map in `app/era/[slug]/page.jsx`.
+
+---
+
+## WPS FITMENT PIPELINE (new May 22)
+
+### Data Flow
+```
+WPS API taxonomyterms/196/items?include=vehicles
+  → wps_catalog.fitment (JSONB)
+  → promote_wps_fitment.cjs
+  → catalog_fitment_v2 (fitment_source = 'wps')
+```
+
+### Key Files
+| File | Location | Purpose |
+|------|----------|---------|
+| import_wps_fitment.mjs | scripts/ingest/ | Fetches fitment from WPS API, stores in wps_catalog.fitment |
+| promote_wps_fitment.cjs | scripts/ingest/ | Promotes harley_vehicles from wps_catalog.fitment → catalog_fitment_v2 |
+| 1779424242-1856360.csv | scripts/data/wps/ | WPS vehicle master (44,709 vehicles, 1,291 Harley rows) |
+
+### wps_catalog.fitment JSONB Structure
+```json
+{
+  "raw_vehicle_ids": [1616, 1617, ...],
+  "vehicles": [{ "vehicle_id": 1616, "year": 1999, "make": "Harley Davidson", "model": "FLHR Road King", ... }],
+  "harley_vehicles": [{ ... }]
+}
+```
+
+### wps_vehicles Table
+```
+vehicle_id, vehicle_type, year_id, year, make_id, make, model_id, model
+44,709 rows — all WPS vehicle makes (Harley, Honda, Kawasaki, etc.)
+Harley Davidson make_id = 22
+```
+
+### Join Pattern
+```
+wps_catalog.sku → catalog_unified.vendor_sku  (NOT cu.sku — WPS rows have WPS- prefix)
+```
+
+### Stats (May 22)
+- 5,810 wps_catalog items with Harley fitment in JSONB
+- 702,633 rows inserted into catalog_fitment_v2
+- 27,342 skipped (already covered by other sources)
+- 19,810 unresolved vehicle records (model name mismatches — not yet chased)
 
 ---
 
@@ -360,9 +425,11 @@ Unique constraint: `(catalog_product_id, vendor_code)`
 | ingest_pu_fitment_scrape.cjs | Individual inserts slow | ~12+ hrs for 1.67M rows — batch TBD |
 | variants route.ts | db.end() on shared pool | Removed — getCatalogDb() is shared, never call end() |
 | build_variant_groups.cjs | brand_name doesn't exist | Use `brand` column — auto-detected now |
-| WPS API single item lookup | Expects integer ID not SKU string | Use filter[sku]= batch endpoint instead |
+| WPS API single item lookup | Expects integer ID not SKU string | Use taxonomyterms/196/items?include=vehicles instead |
 | promote_pu_fitment.cjs | Column names vary | Auto-introspects — detects sku/vendor_sku/part_number |
 | ingest_vtwin_fitment.cjs | Crossref structure unknown | Auto-detects Strategy A (year+model) or B (OEM cross-ref) |
+| promote_wps_fitment.cjs | vendor_item_id / wps_item_id don't exist on cu | Join on vendor_sku = wc.sku |
+| import_wps_fitment.mjs | vehicle:read scope 403 | Use taxonomyterms/196 items endpoint — no vehicle scope needed |
 
 ---
 
@@ -371,22 +438,23 @@ Unique constraint: `(catalog_product_id, vendor_code)`
 | Table | Rows | Notes |
 |-------|------|-------|
 | catalog_unified | 96,711 | 90,276 active — rebuilt May 20 |
-| catalog_fitment_v2 | ~1.54M | ⚠️ PU + VTWIN promotes pending |
+| catalog_fitment_v2 | 2,147,352 | ✅ WPS promoted May 22 |
 | oem_fitment | 379,899 | ✅ All families |
 | catalog_products | 146,989 | Legacy — no longer used in pipeline |
 | pu_catalog | 36,684 | ✅ Fully enriched |
 | pu_brand_enrichment | 93,585 | ✅ |
-| wps_catalog | 22,278 | ✅ + wps_product_id, wps_item_id columns |
+| wps_catalog | 22,278 | ✅ + wps_product_id, wps_item_id, fitment columns |
+| wps_vehicles | 44,709 | ✅ Loaded May 22 from WPS vehicle master CSV |
 | vtwin_catalog | 37,749 | ✅ oem_numbers consolidated |
-| vtwin_oem_crossref | 12,278 | ⚠️ Promote script ready, not yet run |
+| vtwin_oem_crossref | 12,278 | ✅ Promoted |
 | catalog_media | 32,718 | ✅ FK → catalog_unified |
 | vendor_offers | 22,278 | ✅ Rebuilt May 20 |
 | pu_fitment | 13,913 | ✅ |
 | pu_fitment_parsed | 393,202 | ✅ |
-| pu_fitment_expanded | 1,640,065 | ✅ Ready to promote |
+| pu_fitment_expanded | 1,640,065 | ✅ Promoted |
 | catalog_oem_crossref | ~14,819 | ✅ |
-| catalog_variant_groups | 2,887 | ✅ |
-| catalog_variant_members | 19,464 | ✅ |
+| catalog_variant_groups | 2,901 | ✅ |
+| catalog_variant_members | 19,557 | ✅ |
 | harley_models | 299 | ✅ DO NOT bulk modify |
 | harley_model_years | ~2,230 | ✅ DO NOT MODIFY |
 | harley_families | 17 | ✅ DO NOT MODIFY — no slug column |
@@ -409,7 +477,9 @@ Unique constraint: `(catalog_product_id, vendor_code)`
 | catalog_unified WPS join | Join on vendor_sku not sku — WPS rows have WPS- prefix in sku |
 | harddrive_catalog boolean | Use IS NOT FALSE — `= true` gives 0 results |
 | getCatalogDb() | Returns shared pool — NEVER call db.end() in API routes |
-| WPS API item lookup | filter[sku]= batch works; /items/{sku} 500s (expects integer ID) |
+| WPS API item lookup | Use taxonomyterms/196/items?include=vehicles — /items/{sku} expects integer ID |
+| WPS vehicle scope | vehicle:read scope NOT needed — vehicles come via include= on items endpoint |
+| WPS fitment join | wps_catalog.sku → catalog_unified.vendor_sku (not cu.sku, not cu.wps_item_id) |
 | WPS attributes | No cable length attribute — length only in name for Indian cables |
 | Variant labels (cables) | 70 groups identical-named — labels populate after WPS fitment files |
 | catalog_unified.brand | Column is `brand` not `brand_name` (brand_name doesn't exist) |
@@ -420,7 +490,7 @@ Unique constraint: `(catalog_product_id, vendor_code)`
 | macOS sed -i | Requires empty string arg: sed -i '' 's/old/new/' file |
 | styled-jsx in App Router | Not supported — use inline styles throughout |
 | VTWIN source_vendor | Must be uppercase 'VTWIN' |
-| era_* columns | Backfilled May 20 — re-run ERA BACKFILL SQL after each fitment update |
+| era_* columns | Re-run ERA BACKFILL SQL after each fitment update |
 | catalog_variants | Does NOT exist — replaced by catalog_variant_members |
 | CartContext / addItem | Placeholder only — not wired to real cart |
 | VTwin categories | GROUP suffix stripped May 20 — old category map is stale |
@@ -466,6 +536,10 @@ node scripts/ingest/promote_pu_fitment.cjs
 node scripts/ingest/ingest_vtwin_fitment.cjs --dry
 node scripts/ingest/ingest_vtwin_fitment.cjs
 
+# WPS fitment
+node scripts/ingest/import_wps_fitment.mjs
+node scripts/ingest/promote_wps_fitment.cjs
+
 # vendor_offers
 node scripts/ingest/populate_wps_vendor_offers.cjs --dry
 node scripts/ingest/populate_wps_vendor_offers.cjs
@@ -488,27 +562,27 @@ git add -A && git commit -m "message" && git push
 
 ---
 
-## TWENTY-SIXTH PASS ADDITIONS (May 21, 2026)
+## TWENTY-SEVENTH PASS ADDITIONS (May 22, 2026)
 
-### catalog_variant_groups.family_key
-New TEXT column linking related groups across vendors.
-```sql
-ALTER TABLE catalog_variant_groups ADD COLUMN IF NOT EXISTS family_key TEXT;
-CREATE INDEX IF NOT EXISTS idx_cvg_family_key ON catalog_variant_groups(family_key) WHERE family_key IS NOT NULL;
-```
-Current values:
-- `namz-wire-spool-100ft` → ids 8680, 8681, 8686, 8687 (PU 18g, PU 20g, WPS 18g, WPS 20g)
-- `namz-wire-spool-25ft-gxl` → ids 8682, 8683, 8684, 8685 (Namz GXL 10g/12g/14g/16g)
+### WPS Fitment Pipeline — Live
+Full WPS fitment pipeline built and run:
+- `wps_vehicles` table created (44,709 rows from vehicle master CSV)
+- `wps_catalog.fitment` JSONB column populated — 5,810 items with Harley vehicle data
+- `wps_catalog.fitment_updated_at` timestamp column added
+- `promote_wps_fitment.cjs` — promotes harley_vehicles[] to catalog_fitment_v2
+- 702,633 fitment rows inserted, 27,342 skipped as dupes
+- Era backfill re-run: 18,793 products tagged (up from 13,773)
+- Typesense reindexed: 90,276 docs, 0 errors
 
-### Fulfillment Routing — Architecture (Deferred)
-To be built when cart work begins:
-1. `cross_vendor_products (id, sku_a, vendor_a, sku_b, vendor_b, match_method)` — links same physical product across vendors. Bootstrap via OEM number matching.
-2. `resolve_cart_fulfillment(cart_items int[]) RETURNS TABLE(product_id, vendor, sku, cost)` — picks optimal vendor per line item. Logic: in-stock → consolidate shipments → maximize margin.
-3. Wire into CartContext at checkout. `pick_fulfillment()` already exists from earlier sprint.
+### catalog_fitment_v2 Source Breakdown (May 22)
+- Total: 2,147,352 rows
+- WPS (fitment_source='wps'): 704,480
+- PU + VTwin + OEM + JW Boon: stored with NULL fitment_source (~1,442,872)
+- oem_crossref: 554
 
-### DB State After Twenty-Sixth Pass
-- `catalog_fitment_v2`: 1,442,872 rows (PU 1,339,680 + VTWIN 19,934 + existing)
-- `catalog_variant_groups`: 2,901 groups
-- `catalog_variant_members`: 19,557 members
-- `catalog_unified.variant_group_id`: 19,557 tagged
-- Era columns: 13,773 products tagged
+### DB State After Twenty-Seventh Pass
+- `catalog_fitment_v2`: 2,147,352 rows
+- `wps_vehicles`: 44,709 rows
+- `wps_catalog.fitment`: 5,810 items populated
+- Era columns: 18,793 products tagged
+- Typesense: 90,276 docs current

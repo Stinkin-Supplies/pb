@@ -172,18 +172,16 @@ export async function GET(req: NextRequest) {
     const rawHits: any[] = [];
 
     if (results.grouped_hits) {
-      for (const g of results.grouped_hits) {
+      for (const g of (results.grouped_hits as any[])) {
         const hasRealGroup = g.group_key && g.group_key.length > 0 && g.group_key[0] !== "";
         if (hasRealGroup) {
-          // Variant group — take only the best representative (hits[0])
-          const hit = g.hits?.[0];
+          const hit: any = g.hits?.[0];
           if (hit) {
             hit._group_count = g.found;
             rawHits.push(hit);
           }
         } else {
-          // Ungrouped products — expand all hits, no variant badge
-          for (const hit of g.hits ?? []) {
+          for (const hit of (g.hits ?? []) as any[]) {
             hit._group_count = null;
             rawHits.push(hit);
           }

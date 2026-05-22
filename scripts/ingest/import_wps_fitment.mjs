@@ -1,190 +1,210 @@
-/**
- * import_wps_fitment.mjs
- * ─────────────────────────────────────────────────────────────────────────────
- * Builds catalog_fitment_v2 rows from the WPS cross-fitment file.
- *
- * Source: wps-cross-fitment.csv  (OEM#, WPS#, Vendor, Vend#)
- *
- * Join path:
- *   wps-cross-fitment.csv  (OEM# = H-D OEM part number)
- *     → hd_parts_data_clean.csv  (oem_part_number → year + model string)
- *       → harley_model_years  (year + model_code → id)
- *         → catalog_unified  (WPS SKU = "WPS-{WPS#}" in sku, or WPS# in oem_numbers)
- *           → catalog_fitment_v2  (product_id + model_year_id)
- *
- * WPS products in catalog_unified have sku = "WPS-{wps_number}" (dashes intact).
- *
- * Usage:
- *   node import_wps_fitment.mjs            # dry run
- *   node import_wps_fitment.mjs --live      # writes to DB
- * ─────────────────────────────────────────────────────────────────────────────
- */
+#!/usr/bin/env node
+// scripts/ingest/import_wps_fitment.mjs
+// Paginates taxonomyterms/196/items?include=vehicles (Hard Drive catalog)
+// Resolves vehicle_ids against wps_vehicles table
+// Stores fitment JSONB on wps_catalog
 
-import path from "path";
-import { createReadStream } from "fs";
-import { parse } from "csv-parse";
-import pg from "pg";
+import pg from 'pg';
+import fs from 'fs';
+import { parse } from 'csv-parse/sync';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 const { Pool } = pg;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const LIVE     = process.argv.includes("--live");
-const DATA_DIR = path.resolve("scripts/data");
-const BATCH_SZ = 500;
-
-const WPS_CSV      = path.join(DATA_DIR, "wps-cross-fitment.csv");
-const HD_PARTS_CSV = path.join(DATA_DIR, "hd_parts_data_clean.csv");
+const WPS_TOKEN  = 'eceGqPuosZVzZeZ74vBIWUqNwPbG1aP2YUL24fBO';
+const WPS_BASE   = 'https://api.wps-inc.com';
+const CSV_PATH   = path.join(__dirname, '../data/wps/1779424242-1856360.csv');
+const PAGE_SIZE  = 50;
+const DELAY_MS   = 150;
 
 const pool = new Pool({
-  connectionString:
-    process.env.CATALOG_DATABASE_URL ||
-    "postgresql://catalog_app:smelly@5.161.100.126:5432/stinkin_catalog",
+  host: '2a01:4ff:f0:fa6f::1',
+  port: 5432,
+  user: 'catalog_app',
+  password: 'smelly',
+  database: 'stinkin_catalog',
 });
 
-function readCsv(filePath) {
-  return new Promise((resolve, reject) => {
-    const rows = [];
-    createReadStream(filePath)
-      .pipe(parse({ columns: true, skip_empty_lines: true, trim: true }))
-      .on("data", (row) => rows.push(row))
-      .on("end",  () => resolve(rows))
-      .on("error", reject);
-  });
-}
+// ── Load wps_vehicles CSV into DB ─────────────────────────────────────────────
 
-function extractModelCode(modelStr) {
-  const first = String(modelStr).split(/\s+/)[0];
-  return first.replace(/-I$/, "").replace(/I$/, (m, _offset, str) =>
-    str.length > 3 ? "" : m
-  );
-}
-
-const GENERIC_ALIAS = {
-  SPORTSTER: "XLH",
-  SIDECAR:   "TLE",
-};
-
-async function main() {
-  console.log(`Mode: ${LIVE ? "LIVE" : "DRY RUN"}`);
-
-  const [wpsRows, hdRows] = await Promise.all([
-    readCsv(WPS_CSV),
-    readCsv(HD_PARTS_CSV),
-  ]);
-  console.log(`  WPS cross-fitment rows: ${wpsRows.length.toLocaleString()}`);
-  console.log(`  HD parts data rows:     ${hdRows.length.toLocaleString()}`);
-
-  // Build OEM → year/model_code map from hd_parts_data
-  console.log("\nBuilding OEM → year/model_code map …");
-  const oemToYearModel = new Map();
-  for (const row of hdRows) {
-    const oem = String(row.oem_part_number ?? "").trim();
-    if (!oem) continue;
-    const year = parseInt(row.year);
-    if (isNaN(year)) continue;
-    let mc = extractModelCode(row.model);
-    mc = GENERIC_ALIAS[mc] ?? mc;
-    if (!mc) continue;
-    if (!oemToYearModel.has(oem)) oemToYearModel.set(oem, new Set());
-    oemToYearModel.get(oem).add(`${year}|${mc}`);
-  }
-
-  // Load harley_model_years
-  console.log("Loading harley_model_years …");
-  const { rows: hmyRows } = await pool.query(`
-    SELECT hmy.id, hmy.year, hm.model_code
-    FROM harley_model_years hmy
-    JOIN harley_models hm ON hm.id = hmy.model_id
-  `);
-  const ymToId = new Map();
-  for (const r of hmyRows) ymToId.set(`${r.year}|${r.model_code}`, r.id);
-
-  // Load WPS products — source_vendor = 'WPS', match on vendor_sku directly
-  console.log("Loading WPS products from catalog_unified …");
-  const { rows: wpsProducts } = await pool.query(`
-    SELECT id, vendor_sku
-    FROM catalog_unified
-    WHERE source_vendor = 'WPS'
+async function loadVehiclesTable(client) {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS wps_vehicles (
+      vehicle_id   INTEGER PRIMARY KEY,
+      vehicle_type VARCHAR(50),
+      year_id      INTEGER,
+      year         SMALLINT,
+      make_id      INTEGER,
+      make         VARCHAR(100),
+      model_id     INTEGER,
+      model        VARCHAR(255)
+    );
+    CREATE INDEX IF NOT EXISTS idx_wps_vehicles_make ON wps_vehicles (make);
+    CREATE INDEX IF NOT EXISTS idx_wps_vehicles_year ON wps_vehicles (year);
   `);
 
-  // vendor_sku = "133-3015" which matches WPS# in the crossref directly
-  const wpsNumToProductIds = new Map();
-  for (const p of wpsProducts) {
-    const vk = String(p.vendor_sku ?? "").trim();
-    if (!vk) continue;
-    if (!wpsNumToProductIds.has(vk)) wpsNumToProductIds.set(vk, new Set());
-    wpsNumToProductIds.get(vk).add(p.id);
-  }
-  console.log(`  WPS products indexed: ${wpsProducts.length.toLocaleString()}`);
-
-  // Resolve fitment pairs
-  console.log("\nResolving fitment pairs …");
-  const fitmentPairs = new Set();
-  let matched = 0, noHdData = 0, noProduct = 0, noYearModel = 0;
-
-  for (const row of wpsRows) {
-    const oem    = String(row["OEM#"] ?? "").trim();
-    const wpsNum = String(row["WPS#"] ?? "").trim();
-    if (!oem || !wpsNum) continue;
-
-    const yearModels = oemToYearModel.get(oem);
-    if (!yearModels || yearModels.size === 0) { noHdData++; continue; }
-
-    const productIds = wpsNumToProductIds.get(wpsNum);
-    if (!productIds || productIds.size === 0) { noProduct++; continue; }
-
-    let resolvedAny = false;
-    for (const ym of yearModels) {
-      const hmyId = ymToId.get(ym);
-      if (!hmyId) { noYearModel++; continue; }
-      for (const pid of productIds) {
-        fitmentPairs.add(`${pid}|${hmyId}`);
-        resolvedAny = true;
-      }
-    }
-    if (resolvedAny) matched++;
-  }
-
-  console.log(`  Matched WPS OEM entries:      ${matched.toLocaleString()}`);
-  console.log(`  No hd_parts_data entry:       ${noHdData.toLocaleString()}`);
-  console.log(`  No catalog_unified product:   ${noProduct.toLocaleString()}`);
-  console.log(`  No harley_model_years entry:  ${noYearModel.toLocaleString()}`);
-  console.log(`  Total fitment pairs:          ${fitmentPairs.size.toLocaleString()}`);
-
-  if (!LIVE) {
-    console.log("\nDry run complete. Pass --live to write to DB.");
-    await pool.end();
+  const { rows: [{ count }] } = await client.query('SELECT COUNT(*) FROM wps_vehicles');
+  if (parseInt(count) > 0) {
+    console.log(`wps_vehicles already loaded (${count} rows) — skipping CSV import.`);
     return;
   }
 
-  console.log("\nInserting into catalog_fitment_v2 …");
-  const pairs = [...fitmentPairs].map((s) => {
-    const [pid, hmyId] = s.split("|").map(Number);
-    return { pid, hmyId };
-  });
+  console.log('Loading wps_vehicles from CSV...');
+  const raw  = fs.readFileSync(CSV_PATH, 'utf8');
+  const rows = parse(raw, { columns: true, skip_empty_lines: true });
 
-  let inserted = 0, skipped = 0;
-  for (let i = 0; i < pairs.length; i += BATCH_SZ) {
-    const batch  = pairs.slice(i, i + BATCH_SZ);
-    const values = batch.map((_, j) => `($${j * 2 + 1}, $${j * 2 + 2})`).join(", ");
-    const flat   = batch.flatMap((b) => [b.pid, b.hmyId]);
-    const res = await pool.query(
-      `INSERT INTO catalog_fitment_v2 (product_id, model_year_id)
-       VALUES ${values}
-       ON CONFLICT (product_id, model_year_id) DO NOTHING`,
-      flat
+  const BATCH = 1000;
+  let inserted = 0;
+  for (let i = 0; i < rows.length; i += BATCH) {
+    const batch = rows.slice(i, i + BATCH);
+    const vals  = batch.map((_, j) => {
+      const b = j * 8;
+      return `($${b+1},$${b+2},$${b+3},$${b+4},$${b+5},$${b+6},$${b+7},$${b+8})`;
+    }).join(',');
+    const params = batch.flatMap(r => [
+      parseInt(r.vehicle_id), r.vehicle_type || null,
+      parseInt(r.year_id),    parseInt(r.year),
+      parseInt(r.make_id),    r.make  || null,
+      parseInt(r.model_id),   r.model || null,
+    ]);
+    await client.query(
+      `INSERT INTO wps_vehicles
+         (vehicle_id,vehicle_type,year_id,year,make_id,make,model_id,model)
+       VALUES ${vals} ON CONFLICT (vehicle_id) DO NOTHING`,
+      params
     );
-    inserted += res.rowCount ?? 0;
-    skipped  += batch.length - (res.rowCount ?? 0);
-    if (i % 5000 === 0) process.stdout.write(`  … ${i.toLocaleString()} / ${pairs.length.toLocaleString()}\r`);
+    inserted += batch.length;
+    process.stdout.write(`\r  ${inserted}/${rows.length} rows`);
   }
-
-  console.log(`\n  Inserted: ${inserted.toLocaleString()}`);
-  console.log(`  Skipped:  ${skipped.toLocaleString()}`);
-
-  const { rows: total } = await pool.query(`SELECT COUNT(*) AS n FROM catalog_fitment_v2`);
-  console.log(`\n  catalog_fitment_v2 total rows now: ${total[0].n}`);
-  await pool.end();
-  console.log("Done.");
+  console.log(`\n  Done — ${inserted} vehicles loaded.`);
 }
 
-main().catch((err) => { console.error(err); process.exit(1); });
+// ── Ensure fitment columns exist on wps_catalog ───────────────────────────────
+
+async function ensureColumns(client) {
+  await client.query(`
+    ALTER TABLE wps_catalog
+      ADD COLUMN IF NOT EXISTS fitment            JSONB,
+      ADD COLUMN IF NOT EXISTS fitment_updated_at TIMESTAMP WITH TIME ZONE;
+    CREATE INDEX IF NOT EXISTS idx_wps_catalog_fitment
+      ON wps_catalog USING GIN (fitment);
+  `);
+}
+
+// ── Fetch one page of Hard Drive items with vehicles included ─────────────────
+
+async function fetchPage(cursor) {
+  const cursorParam = cursor ? `&page%5Bcursor%5D=${cursor}` : '';
+  const url = `${WPS_BASE}/taxonomyterms/196/items?include=vehicles&page%5Bsize%5D=${PAGE_SIZE}${cursorParam}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${WPS_TOKEN}` },
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+async function run() {
+  const client = await pool.connect();
+  try {
+    await loadVehiclesTable(client);
+    await ensureColumns(client);
+
+    // Build in-memory lookup: vehicle_id → {year, make, model, vehicle_type}
+    console.log('\nBuilding vehicle lookup map...');
+    const { rows: vrows } = await client.query(
+      `SELECT vehicle_id, year, make, model, vehicle_type FROM wps_vehicles`
+    );
+    const vehicleMap = new Map(vrows.map(v => [v.vehicle_id, v]));
+    console.log(`  ${vehicleMap.size} vehicles in lookup.`);
+
+    // Build lookup: supplier_product_id → wps_catalog.id
+    const { rows: catRows } = await client.query(
+      `SELECT id, supplier_item_id FROM wps_catalog WHERE supplier_item_id IS NOT NULL`
+    );
+    const catalogMap = new Map(catRows.map(r => [r.supplier_item_id, r.id]));
+    console.log(`  ${catalogMap.size} wps_catalog items with supplier_item_id.`);
+
+    let cursor     = null;
+    let totalItems = 0;
+    let matched    = 0;
+    let withVeh    = 0;
+    let page       = 0;
+
+    console.log('\nPaginating Hard Drive items from WPS API...');
+
+    do {
+      const json = await fetchPage(cursor);
+      const items = json.data ?? [];
+      cursor = json.meta?.cursor?.next ?? null;
+      page++;
+
+      for (const item of items) {
+        totalItems++;
+        const catalogId = catalogMap.get(item.supplier_product_id);
+        if (!catalogId) continue;
+        matched++;
+
+        // Resolve vehicle_ids → full records, filter Harley only
+        const rawVehicles = item.vehicles?.data ?? [];
+        const resolved = rawVehicles
+          .map(v => vehicleMap.get(v.id))
+          .filter(Boolean);
+
+        const harley = resolved.filter(v =>
+          v.make?.toLowerCase().includes('harley')
+        );
+
+        const fitment = {
+          raw_vehicle_ids:  rawVehicles.map(v => v.id),
+          vehicles:         resolved,
+          harley_vehicles:  harley,
+        };
+
+        await client.query(
+          `UPDATE wps_catalog
+           SET fitment = $1::jsonb, fitment_updated_at = NOW()
+           WHERE id = $2`,
+          [JSON.stringify(fitment), catalogId]
+        );
+
+        if (harley.length > 0) withVeh++;
+      }
+
+      process.stdout.write(
+        `\r  Page ${page} | ${totalItems} API items | ${matched} matched | ${withVeh} with Harley fitment`
+      );
+
+      if (cursor) await new Promise(r => setTimeout(r, DELAY_MS));
+
+    } while (cursor);
+
+    console.log('\n\n── Summary ──────────────────────────────');
+    console.log(`  API items seen       : ${totalItems}`);
+    console.log(`  Matched in catalog   : ${matched}`);
+    console.log(`  With Harley fitment  : ${withVeh}`);
+
+    const { rows: [s] } = await client.query(`
+      SELECT
+        COUNT(*) FILTER (WHERE fitment IS NOT NULL
+          AND jsonb_array_length(fitment->'harley_vehicles') > 0) AS harley,
+        COUNT(*) FILTER (WHERE fitment = '[]'::jsonb
+          OR (fitment IS NOT NULL
+          AND jsonb_array_length(fitment->'harley_vehicles') = 0)) AS no_harley,
+        COUNT(*) FILTER (WHERE fitment IS NULL)                    AS not_fetched
+      FROM wps_catalog
+    `);
+    console.log(`  DB — with Harley     : ${s.harley}`);
+    console.log(`  DB — no Harley veh   : ${s.no_harley}`);
+    console.log(`  DB — not fetched     : ${s.not_fetched}`);
+
+  } finally {
+    client.release();
+    await pool.end();
+  }
+}
+
+run().catch(err => { console.error('Fatal:', err); process.exit(1); });
