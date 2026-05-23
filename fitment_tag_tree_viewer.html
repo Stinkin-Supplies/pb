@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stinkin' Supplies — Fitment Tag Tree</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800;900&family=Barlow:wght@300;400;500;600&display=swap');
+
+  :root {
+    --cream:    #faf7f2;
+    --cream2:   #f0ebe0;
+    --gold:     #b8922a;
+    --gold-lt:  #d4a84b;
+    --brown:    #2a1f0e;
+    --brown2:   #3d2e14;
+    --text:     #1a1208;
+    --muted:    #7a6a4a;
+    --border:   #d9cdb0;
+    --era-tc:   #5c4a1e;
+    --era-m8:   #1e3d5c;
+    --era-evo:  #1e5c2a;
+    --era-iron: #5c1e1e;
+    --era-sh:   #5c3d1e;
+    --era-pan:  #3d1e5c;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Barlow', sans-serif;
+    background: var(--cream);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── LAYOUT ──────────────────────────────── */
+  .shell {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    grid-template-rows: auto 1fr;
+    min-height: 100vh;
+  }
+
+  header {
+    grid-column: 1/-1;
+    background: var(--brown);
+    color: var(--gold);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border-bottom: 3px solid var(--gold);
+  }
+  header .logo {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--cream);
+  }
+  header .logo span { color: var(--gold); }
+  header .subtitle {
+    font-size: 12px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  /* ── LEFT PANEL ──────────────────────────── */
+  .left {
+    background: var(--brown2);
+    padding: 0;
+    overflow-y: auto;
+    border-right: 2px solid var(--gold);
+    position: sticky;
+    top: 0;
+    height: calc(100vh - 55px);
+  }
+
+  .search-box {
+    padding: 12px;
+    background: var(--brown);
+    border-bottom: 1px solid rgba(184,146,42,0.3);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .search-box input {
+    width: 100%;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(184,146,42,0.4);
+    color: var(--cream);
+    padding: 7px 12px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 14px;
+    letter-spacing: 0.5px;
+    outline: none;
+    border-radius: 2px;
+  }
+  .search-box input::placeholder { color: var(--muted); }
+  .search-box input:focus { border-color: var(--gold); }
+
+  .nav-section { border-bottom: 1px solid rgba(255,255,255,0.06); }
+
+  .nav-family {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--gold);
+    padding: 10px 14px 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    user-select: none;
+  }
+  .nav-family:hover { background: rgba(184,146,42,0.08); }
+  .nav-family .arrow { font-size: 9px; transition: transform 0.2s; }
+  .nav-family.open .arrow { transform: rotate(90deg); }
+
+  .nav-models { display: none; }
+  .nav-models.open { display: block; }
+
+  .nav-model {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    color: var(--cream2);
+    padding: 6px 14px 6px 24px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    transition: background 0.15s;
+  }
+  .nav-model:hover { background: rgba(255,255,255,0.05); }
+  .nav-model.active { background: var(--gold); color: var(--brown); }
+  .nav-model .badge {
+    font-size: 10px;
+    background: rgba(255,255,255,0.12);
+    color: rgba(255,255,255,0.5);
+    padding: 1px 5px;
+    border-radius: 8px;
+    font-weight: 400;
+    flex-shrink: 0;
+  }
+  .nav-model.active .badge { background: rgba(0,0,0,0.2); color: var(--brown); }
+
+  /* ── RIGHT PANEL ─────────────────────────── */
+  .right {
+    overflow-y: auto;
+    padding: 0;
+    background: var(--cream);
+  }
+
+  .panel-header {
+    background: var(--cream2);
+    border-bottom: 2px solid var(--border);
+    padding: 16px 24px;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .panel-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--brown);
+    line-height: 1;
+  }
+  .panel-sub {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+  .cat-filter {
+    background: white;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 7px 12px;
+    font-family: 'Barlow', sans-serif;
+    font-size: 13px;
+    outline: none;
+    border-radius: 2px;
+    min-width: 220px;
+  }
+  .cat-filter:focus { border-color: var(--gold); }
+
+  .content {
+    padding: 20px 24px 40px;
+  }
+
+  /* ── CATEGORY BLOCKS ─────────────────────── */
+  .cat-block {
+    margin-bottom: 12px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+    background: white;
+  }
+
+  .cat-head {
+    background: var(--cream2);
+    padding: 10px 14px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--brown);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    user-select: none;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+  .cat-head:hover { background: #e8e0d0; }
+  .cat-head .count {
+    font-size: 11px;
+    background: var(--gold);
+    color: white;
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+  }
+  .cat-head .cat-arrow { font-size: 10px; color: var(--muted); transition: transform 0.2s; }
+  .cat-head.open .cat-arrow { transform: rotate(90deg); }
+
+  .cat-rows { display: none; }
+  .cat-rows.open { display: block; }
+
+  /* ── FITMENT ROW ─────────────────────────── */
+  .fit-row {
+    display: grid;
+    grid-template-columns: 130px 120px 1fr auto;
+    gap: 0;
+    padding: 8px 14px;
+    border-bottom: 1px solid #f0ebe0;
+    align-items: center;
+    font-size: 13px;
+    transition: background 0.1s;
+  }
+  .fit-row:last-child { border-bottom: none; }
+  .fit-row:hover { background: #fdfaf5; }
+
+  .fit-years {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--brown);
+    letter-spacing: 0.3px;
+  }
+
+  .fit-vendor-sku {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    letter-spacing: 0.3px;
+  }
+  .fit-vendor-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #bbb;
+    display: block;
+    line-height: 1;
+    margin-bottom: 1px;
+  }
+
+  .fit-oems {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 0 12px;
+  }
+  .fit-oem-tag {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    background: var(--cream2);
+    color: var(--brown);
+    border: 1px solid var(--border);
+    padding: 2px 6px;
+    border-radius: 2px;
+    letter-spacing: 0.3px;
+  }
+  .fit-oem-tag.no-oem {
+    color: #ccc;
+    border-color: #eee;
+    font-weight: 400;
+    font-style: italic;
+  }
+
+  .fit-eras {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    justify-content: flex-end;
+    min-width: 100px;
+  }
+  .era-chip {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+  .era-twin_cam    { background: rgba(92,74,30,0.12); color: var(--era-tc); }
+  .era-milwaukee8  { background: rgba(30,61,92,0.12); color: var(--era-m8); }
+  .era-evolution   { background: rgba(30,92,42,0.12); color: var(--era-evo); }
+  .era-ironhead    { background: rgba(92,30,30,0.12); color: var(--era-iron); }
+  .era-shovelhead  { background: rgba(92,61,30,0.12); color: var(--era-sh); }
+  .era-panhead     { background: rgba(61,30,92,0.12); color: var(--era-pan); }
+  .era-evo_sportster { background: rgba(30,92,42,0.1); color: #2a6633; }
+  .era-chopper     { background: rgba(92,30,92,0.1); color: #5c1a5c; }
+  .era-knucklehead { background: rgba(150,100,20,0.12); color: #7a5010; }
+  .era-flathead    { background: rgba(80,80,80,0.12); color: #444; }
+  .era-unknown     { background: rgba(0,0,0,0.05); color: #888; }
+
+  .cat-rows-header {
+    display: grid;
+    grid-template-columns: 130px 120px 1fr auto;
+    padding: 5px 14px;
+    background: #f7f3ec;
+    border-bottom: 1px solid var(--border);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* ── EMPTY / LOADING STATES ──────────────── */
+  .empty {
+    padding: 60px 24px;
+    text-align: center;
+    color: var(--muted);
+  }
+  .empty .icon { font-size: 48px; margin-bottom: 12px; }
+  .empty h3 { font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--brown); }
+  .empty p { margin-top: 6px; font-size: 13px; }
+
+  .drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: 6px;
+    padding: 40px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    margin: 40px 24px;
+  }
+  .drop-zone:hover, .drop-zone.drag-over { border-color: var(--gold); background: rgba(184,146,42,0.04); }
+  .drop-zone h3 { font-family: 'Barlow Condensed', sans-serif; font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--brown); margin-bottom: 8px; }
+  .drop-zone p { font-size: 13px; color: var(--muted); }
+  .drop-zone input { display: none; }
+  .load-btn {
+    margin-top: 14px;
+    background: var(--gold);
+    color: white;
+    border: none;
+    padding: 9px 20px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 2px;
+  }
+  .load-btn:hover { background: var(--gold-lt); }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--gold); }
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <header>
+    <div>
+      <div class="logo">Stinkin' <span>Supplies</span></div>
+      <div class="subtitle">Fitment Tag Tree</div>
+    </div>
+  </header>
+
+  <nav class="left" id="nav">
+    <div class="search-box">
+      <input type="text" id="modelSearch" placeholder="Search models…" oninput="filterModels(this.value)">
+    </div>
+    <div id="navTree"></div>
+  </nav>
+
+  <main class="right" id="main">
+    <div id="mainContent">
+      <div class="drop-zone" id="dropZone">
+        <h3>Load Fitment Data</h3>
+        <p>Run <code>node generate_fitment_tag_tree.cjs &gt; fitment_tag_tree.json</code> from your project, then drop the JSON here.</p>
+        <br>
+        <input type="file" id="fileInput" accept=".json">
+        <button class="load-btn" onclick="document.getElementById('fileInput').click()">Choose JSON File</button>
+        <p style="margin-top:10px; font-size:12px; color:#aaa">Or drag & drop fitment_tag_tree.json here</p>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+let DATA = null;
+let currentFamily = null;
+let currentModel = null;
+
+// ── FILE LOADING ──────────────────────────────────────────────────────────────
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) readFile(file);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) readFile(fileInput.files[0]); });
+
+function readFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      DATA = JSON.parse(e.target.result);
+      buildNav();
+      showEmpty('Select a model from the left panel');
+    } catch(err) {
+      alert('Failed to parse JSON: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ── NAV TREE ──────────────────────────────────────────────────────────────────
+function buildNav() {
+  const container = document.getElementById('navTree');
+  container.innerHTML = '';
+
+  for (const family of Object.keys(DATA).sort()) {
+    const models = DATA[family];
+    const section = document.createElement('div');
+    section.className = 'nav-section';
+    section.dataset.family = family;
+
+    const familyEl = document.createElement('div');
+    familyEl.className = 'nav-family';
+    familyEl.innerHTML = `<span>${family}</span><span class="arrow">▶</span>`;
+    familyEl.addEventListener('click', () => {
+      familyEl.classList.toggle('open');
+      modelsEl.classList.toggle('open');
+    });
+
+    const modelsEl = document.createElement('div');
+    modelsEl.className = 'nav-models';
+
+    for (const mc of Object.keys(models).sort()) {
+      const { model_name, categories } = models[mc];
+      const catCount = Object.keys(categories).length;
+      const modelEl = document.createElement('div');
+      modelEl.className = 'nav-model';
+      modelEl.dataset.family = family;
+      modelEl.dataset.mc = mc;
+      modelEl.innerHTML = `
+        <span>${mc} <span style="font-weight:400;opacity:0.6;font-size:11px;">${model_name}</span></span>
+        <span class="badge">${catCount}</span>
+      `;
+      modelEl.addEventListener('click', () => selectModel(family, mc, modelEl));
+      modelsEl.appendChild(modelEl);
+    }
+
+    section.appendChild(familyEl);
+    section.appendChild(modelsEl);
+    container.appendChild(section);
+  }
+}
+
+function filterModels(q) {
+  const lower = q.toLowerCase();
+  document.querySelectorAll('.nav-section').forEach(section => {
+    let any = false;
+    section.querySelectorAll('.nav-model').forEach(el => {
+      const text = el.textContent.toLowerCase();
+      const match = !q || text.includes(lower);
+      el.style.display = match ? '' : 'none';
+      if (match) any = true;
+    });
+    section.style.display = any ? '' : 'none';
+    if (q && any) {
+      section.querySelector('.nav-family').classList.add('open');
+      section.querySelector('.nav-models').classList.add('open');
+    }
+  });
+}
+
+function selectModel(family, mc, el) {
+  // Deactivate old
+  document.querySelectorAll('.nav-model.active').forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+  currentFamily = family;
+  currentModel = mc;
+  renderModel(family, mc);
+}
+
+// ── RENDER RIGHT PANEL ────────────────────────────────────────────────────────
+function renderModel(family, mc) {
+  const { model_name, categories } = DATA[family][mc];
+  const main = document.getElementById('mainContent');
+
+  const catKeys = Object.keys(categories).sort();
+
+  main.innerHTML = `
+    <div class="panel-header">
+      <div>
+        <div class="panel-title">${mc}</div>
+        <div class="panel-sub">${family} · ${model_name} · ${catKeys.length} categories</div>
+      </div>
+      <input class="cat-filter" id="catSearch" type="text" placeholder="Filter categories…" oninput="filterCats(this.value)">
+    </div>
+    <div class="content" id="catContent"></div>
+  `;
+
+  const content = document.getElementById('catContent');
+  for (const tag of catKeys) {
+    const entries = categories[tag];
+    if (!entries || !entries.length) continue;
+
+    const block = document.createElement('div');
+    block.className = 'cat-block';
+    block.dataset.tag = tag.toLowerCase();
+
+    const head = document.createElement('div');
+    head.className = 'cat-head';
+    head.innerHTML = `
+      <span>${tag}</span>
+      <span style="display:flex;align-items:center;gap:8px;">
+        <span class="count">${entries.length}</span>
+        <span class="cat-arrow">▶</span>
+      </span>
+    `;
+    head.addEventListener('click', () => {
+      head.classList.toggle('open');
+      rows.classList.toggle('open');
+    });
+
+    const rows = document.createElement('div');
+    rows.className = 'cat-rows';
+
+    // Column header
+    const hdr = document.createElement('div');
+    hdr.className = 'cat-rows-header';
+    hdr.innerHTML = '<span>Years</span><span>Vendor SKU</span><span style="padding-left:12px">HD OEM Part #</span><span>Era</span>';
+    rows.appendChild(hdr);
+
+    for (const entry of entries) {
+      const row = document.createElement('div');
+      row.className = 'fit-row';
+
+      const oems = (entry.hd_oem || []).slice(0, 8);
+      const eras = entry.era || [];
+      const vsku = entry.vendor_sku || null;
+      const vsrc = entry.source_vendor || null;
+
+      row.innerHTML = `
+        <div class="fit-years">${entry.years || '—'}</div>
+        <div class="fit-vendor-sku">
+          ${vsku ? `<span class="fit-vendor-label">${vsrc || 'vendor'}</span>${vsku}` : '<span style="color:#ccc">—</span>'}
+        </div>
+        <div class="fit-oems">
+          ${oems.length
+            ? oems.map(o => `<span class="fit-oem-tag">${o}</span>`).join('')
+            : '<span class="fit-oem-tag no-oem">no OEM match</span>'
+          }
+        </div>
+        <div class="fit-eras">${eras.length ? eras.map(e => `<span class="era-chip era-${e}">${e.replace('_',' ')}</span>`).join('') : '<span class="era-chip era-unknown">—</span>'}</div>
+      `;
+      rows.appendChild(row);
+    }
+
+    block.appendChild(head);
+    block.appendChild(rows);
+    content.appendChild(block);
+  }
+}
+
+function filterCats(q) {
+  const lower = q.toLowerCase();
+  document.querySelectorAll('.cat-block').forEach(el => {
+    const match = !q || el.dataset.tag.includes(lower);
+    el.style.display = match ? '' : 'none';
+  });
+}
+
+function showEmpty(msg) {
+  document.getElementById('mainContent').innerHTML = `
+    <div class="empty">
+      <div class="icon">🔩</div>
+      <h3>No model selected</h3>
+      <p>${msg}</p>
+    </div>
+  `;
+}
+</script>
+</body>
+</html>

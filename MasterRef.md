@@ -1,7 +1,7 @@
 # Stinkin' Supplies — Master Reference
-**Last Updated:** May 22, 2026 (Twenty-Seventh Pass)
+**Last Updated:** May 23, 2026 (Twenty-Eighth Pass — Addendum)
 **Database:** Hetzner Postgres — stinkin_catalog
-**Status:** Catalog stable ✅ | Variants live ✅ | Era pages live ✅ | WPS fitment live ✅ | Typesense current ✅
+**Status:** Catalog stable ✅ | Variants live ✅ | Era pages live ✅ | WPS fitment live ✅ | Typesense current ✅ | OEM crossref rebuilt ✅
 
 ---
 
@@ -13,19 +13,23 @@
 | — WPS | 22,278 | ✅ wps_product_id backfilled |
 | — PU | 36,684 | ✅ Enriched |
 | — VTWIN | 37,749 | ✅ Categories cleaned |
-| Typesense | 90,276 docs | ✅ Reindexed May 22 |
-| catalog_fitment_v2 | 2,147,352 rows | ✅ WPS promoted May 22 |
+| catalog_unified in_fatbook | 32,577 | ✅ Updated May 23 |
+| catalog_unified in_oldbook | 17,049 | ✅ Updated May 23 |
+| catalog_unified oem_numbers[] | 33,890 products | ✅ Rebuilt May 23 from crossref |
+| Typesense | 90,276 docs | ✅ Reindexed May 23 |
+| catalog_fitment_v2 | 2,245,762 rows | ✅ WPS gap fix May 23 (+98,410 rows) |
 | wps_catalog.fitment | 5,810 items with Harley fitment | ✅ May 22 |
 | wps_vehicles | 44,709 rows | ✅ Loaded May 22 |
 | oem_fitment | 379,899 rows | ✅ All families |
+| catalog_oem_crossref | 55,122 rows | ✅ +fatbook_page + oldbook_page May 23 |
 | catalog_media | 32,718 rows | ✅ FK → catalog_unified |
 | vendor_offers | 22,278 rows | ✅ Rebuilt May 20 |
 | pu_fitment | 13,913 rows | ✅ |
 | pu_fitment_parsed | 393,202 rows | ✅ |
 | pu_fitment_expanded | 1,640,065 rows | ✅ Promoted |
 | catalog_variant_groups | 2,901 | ✅ |
-| catalog_variant_members | 19,557 | ✅ |
-| era_* columns | 18,793 products tagged | ✅ Re-run May 22 post WPS promote |
+| catalog_variant_members | 19,460 | ✅ 97 bad rows purged May 23 |
+| era_* columns | 17,808 products tagged | ✅ Re-run May 23 with corrected era→family mapping |
 | harley_models | 299 | ✅ |
 | harley_model_years | ~2,230 | ✅ |
 
@@ -50,6 +54,7 @@ Vercel env:        CATALOG_DATABASE_URL
 ⚠️ Next.js 15+: params in route handlers is Promise — always await params.
 ⚠️ Use getCatalogDb() from @/lib/db/catalog in all new API routes.
 ⚠️ getCatalogDb() returns a SHARED POOL — never call db.end() in API routes.
+⚠️ pg Client with IPv6: pass { host, user, password, database } object — never a URL string.
 
 ---
 
@@ -155,10 +160,29 @@ node scripts/ingest/backfill_wps_product_ids.cjs
 node scripts/ingest/build_variant_groups.cjs
 # → catalog_variant_groups, catalog_variant_members
 
-# Step 16: Era column backfill (SQL — run after fitment is populated)
+# Step 16: FatBook / OldBook crossref
+node scripts/ingest/import_fatbook_crossref.cjs scripts/ingest/fatbookcrossref.txt
+node scripts/ingest/import_oldbook_crossref.cjs scripts/ingest/oldbookcrossref.txt
+# → catalog_oem_crossref (fatbook_page, oldbook_page columns)
+# → catalog_unified in_fatbook / in_oldbook flags
+
+# Step 17: OEM numbers rebuild
+psql "postgresql://catalog_app:smelly@[2a01:4ff:f0:fa6f::1]/stinkin_catalog" -c "
+UPDATE catalog_unified cu
+SET oem_numbers = (
+  SELECT array_agg(DISTINCT xr.oem_number ORDER BY xr.oem_number)
+  FROM catalog_oem_crossref xr WHERE xr.sku = cu.sku
+)
+WHERE EXISTS (SELECT 1 FROM catalog_oem_crossref xr WHERE xr.sku = cu.sku);
+UPDATE catalog_unified SET oem_numbers = NULL
+WHERE (oem_numbers IS NOT NULL AND oem_numbers != '{}')
+  AND NOT EXISTS (SELECT 1 FROM catalog_oem_crossref xr WHERE xr.sku = catalog_unified.sku);
+"
+
+# Step 18: Era column backfill (SQL — run after fitment is populated)
 # See ERA BACKFILL SQL below
 
-# Step 17: Typesense reindex
+# Step 19: Typesense reindex
 node scripts/ingest/index_unified.js --recreate
 ```
 
@@ -176,238 +200,38 @@ UPDATE catalog_unified cu SET
   era_shovelhead    = EXISTS(SELECT 1 FROM catalog_fitment_v2 cfv JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id JOIN harley_models hm ON hm.id = hmy.model_id WHERE cfv.product_id = cu.id AND hm.family_id = 19),
   era_ironhead      = EXISTS(SELECT 1 FROM catalog_fitment_v2 cfv JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id JOIN harley_models hm ON hm.id = hmy.model_id WHERE cfv.product_id = cu.id AND hm.family_id = 3 AND hmy.year <= 1985),
   era_evo_sportster = EXISTS(SELECT 1 FROM catalog_fitment_v2 cfv JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id JOIN harley_models hm ON hm.id = hmy.model_id WHERE cfv.product_id = cu.id AND hm.family_id = 3 AND hmy.year BETWEEN 1986 AND 2003),
-  era_evolution     = EXISTS(SELECT 1 FROM catalog_fitment_v2 cfv JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id JOIN harley_models hm ON hm.id = hmy.model_id WHERE cfv.product_id = cu.id AND hm.family_id IN (35,4,7,10) AND hmy.year BETWEEN 1984 AND 1999),
-  era_twin_cam      = EXISTS(SELECT 1 FROM catalog_fitment_v2 cfv JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id JOIN harley_models hm ON hm.id = hmy.model_id WHERE cfv.product_id = cu.id AND hm.family_id IN (35,4,7,10) AND hmy.year BETWEEN 1999 AND 2017),
-  era_milwaukee8    = EXISTS(SELECT 1 FROM catalog_fitment_v2 cfv JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id JOIN harley_models hm ON hm.id = hmy.model_id WHERE cfv.product_id = cu.id AND hm.family_id IN (35,7,8) AND hmy.year >= 2017),
-  era_chopper       = EXISTS(SELECT 1 FROM catalog_fitment_v2 cfv JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id JOIN harley_models hm ON hm.id = hmy.model_id WHERE cfv.product_id = cu.id AND hm.family_id IN (10,19) AND hmy.year BETWEEN 1966 AND 1986)
-WHERE cu.id IN (SELECT DISTINCT product_id FROM catalog_fitment_v2);
-```
-
-⚠️ Families 18 (Panhead), 21 (Twin Cam), 22 (Evolution) have 0 fitment rows in catalog_fitment_v2.
-Use year-based mapping for panhead (1948–1965). TC and Evo use Touring/Softail/Dyna year ranges.
-
----
-
-## VARIANT SYSTEM
-
-### Tables
-```
-catalog_variant_groups
-  id, wps_product_id, display_name, source_vendor, family_key
-
-catalog_variant_members
-  id, group_id, product_id, option_1_name, option_1_value, option_2_name, option_2_value, sort_order
-
-catalog_unified.variant_group_id  → FK to catalog_variant_groups(id)
-wps_catalog.wps_product_id        → WPS internal product grouping ID
-wps_catalog.wps_item_id           → WPS internal item ID
-```
-
-### Option Logic
-- **Single-axis**: option_1_name/value only — fitment, measurement, finish, size when no color split
-- **Two-axis**: option_1 = Color, option_2 = Size — auto-split when value ends in XS/SM/MD/LG/XL/2X/3X/4X/5X
-- 70 groups have identical names (cables) — option_1_value null until WPS fitment files arrive
-- Re-run `build_variant_groups.cjs` after each new fitment import to refresh labels
-
-### family_key Values
-- `namz-wire-spool-100ft` → ids 8680, 8681, 8686, 8687 (PU 18g, PU 20g, WPS 18g, WPS 20g)
-- `namz-wire-spool-25ft-gxl` → ids 8682, 8683, 8684, 8685 (Namz GXL 10g/12g/14g/16g)
-
-### API
-`GET /api/browse/variants/[productId]`
-Returns: `{ hasVariants, group, currentProductId, variants[] }`
-
-### UI Component
-`components/browse/VariantSelector.jsx`
-- Auto-detects two-axis vs single-axis from presence of option_2_value
-- Two-axis: color pill row + size pill row, cross-availability check
-- Single-axis: scrollable list of variant rows with price + stock
-- `group` prop passed explicitly to both selector modes (data scope bug fixed May 21)
-- Navigation loading state: 60% opacity while route changes
-- Current item shows `← HERE` label, is non-clickable
-- Renders null when hasVariants: false (no overhead for non-variant products)
-
----
-
-## BROWSE PAGE — MOBILE FILTER ARCHITECTURE
-
-### Event Bridge
-BottomNav hamburger (on /browse only) fires:
-```js
-window.dispatchEvent(new CustomEvent("stinkin:filterToggle"))
-```
-Browse page listens:
-```js
-useEffect(() => {
-  const handler = () => setSidebarOpen(o => !o);
-  window.addEventListener("stinkin:filterToggle", handler);
-  return () => window.removeEventListener("stinkin:filterToggle", handler);
-}, []);
-```
-
-### Render Split
-```
-<div className="desktop-sidebar">     // display:none on ≤768px
-  <FilterSidebar mobileSheet={false} />   // sticky left column
-</div>
-<div className="mobile-only">         // display:none on ≥769px
-  <FilterSidebar mobileSheet={true} open={sidebarOpen} />  // bottom sheet
-</div>
-```
-
-### Floating Pill Button
-Fixed at `bottom: 86px`, centered, mobile only. Shows FILTER + active count badge.
-Both the pill and the BottomNav hamburger toggle the same `sidebarOpen` state.
-
-### FilterSidebar Bottom Sheet (mobileSheet=true)
-- Spring animation: `y: "100%" → 0`
-- `borderRadius: "16px 16px 0 0"`
-- Max height 82vh, scrollable content
-- Drag handle, × close button, "Show Results" button pinned at bottom
-- Body scroll locked while open
-- `FilterContent` sub-component shared between desktop and mobile — no duplication
-
----
-
-## CATALOG_UNIFIED REBUILD PROCEDURE
-
-```sql
--- BEFORE running merge_catalog_unified.js:
-DROP VIEW IF EXISTS v_catalog_fitment;
-ALTER TABLE IF EXISTS catalog_fitment_v2 DROP CONSTRAINT IF EXISTS catalog_fitment_v2_product_id_fkey;
-ALTER TABLE IF EXISTS product_fitment_year_model DROP CONSTRAINT IF EXISTS product_fitment_year_model_unified_id_fkey;
-ALTER TABLE IF EXISTS vendor_offers DROP CONSTRAINT IF EXISTS vendor_offers_catalog_product_id_fkey;
-ALTER TABLE IF EXISTS catalog_media DROP CONSTRAINT IF EXISTS catalog_media_product_id_fkey;
-ALTER TABLE IF EXISTS catalog_variant_members DROP CONSTRAINT IF EXISTS catalog_variant_members_product_id_fkey;
-
--- AFTER full pipeline:
-DELETE FROM catalog_fitment_v2 WHERE product_id NOT IN (SELECT id FROM catalog_unified);
-DELETE FROM vendor_offers WHERE catalog_product_id NOT IN (SELECT id FROM catalog_unified);
-DELETE FROM catalog_media WHERE product_id NOT IN (SELECT id FROM catalog_unified);
-DELETE FROM catalog_variant_members WHERE product_id NOT IN (SELECT id FROM catalog_unified);
-
--- Re-add constraints, re-run backfill_wps_product_ids.cjs + build_variant_groups.cjs
+  era_evolution     = EXISTS(SELECT 1 FROM catalog_fitment_v2 cfv JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id JOIN harley_models hm ON hm.id = hmy.model_id WHERE cfv.product_id = cu.id AND hmy.year BETWEEN 1984 AND 1999 AND hm.family_id IN (SELECT id FROM harley_families WHERE name IN ('Touring','Softail','Dyna','FXR','Evolution'))),
+  era_twin_cam      = EXISTS(SELECT 1 FROM catalog_fitment_v2 cfv JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id JOIN harley_models hm ON hm.id = hmy.model_id WHERE cfv.product_id = cu.id AND hmy.year BETWEEN 1999 AND 2017 AND hm.family_id IN (SELECT id FROM harley_families WHERE name IN ('Touring','Softail','Dyna'))),
+  era_milwaukee8    = EXISTS(SELECT 1 FROM catalog_fitment_v2 cfv JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id JOIN harley_models hm ON hm.id = hmy.model_id WHERE cfv.product_id = cu.id AND hmy.year >= 2017 AND hm.family_id IN (SELECT id FROM harley_families WHERE name IN ('Touring','Softail','Trike'))),
+  era_chopper       = EXISTS(SELECT 1 FROM catalog_fitment_v2 cfv JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id JOIN harley_models hm ON hm.id = hmy.model_id WHERE cfv.product_id = cu.id AND hm.family_id IN (SELECT id FROM harley_families WHERE name IN ('FXR','Dyna','Softail')));
 ```
 
 ---
 
-## CATEGORY MAP (cleaned — no GROUP suffix)
+## CATALOG_OEM_CROSSREF SCHEMA
 
-| DB Value | Display Label |
-|----------|---------------|
-| ENGINE | Engine |
-| HANDLEBAR-CONTROLS-MIRRORS | Controls & Bars |
-| BRAKING | Brakes |
-| ELECTRICAL SYSTEM | Electrical |
-| CARBURETION-FUEL | Carb / Fuel |
-| TRANSMISSION-CLUTCH | Transmission |
-| SEATING | Seats |
-| WHEEL AND RIM | Tires & Wheels |
-| LIGHTING-LICENSE | Lighting |
-| HARDWARE | Hardware |
-| FOOT CONTROLS | Foot Controls |
-| EXHAUST | Exhaust |
-| FRAME AND BODY | Frame & Body |
-| MEDIA PRODUCTS | Swag |
-| SUSPENSION | Suspension |
-| TANK | Tanks |
-| DRIVE TRAIN | Drive Train |
-| COMMON MISC | General |
-| TOOLS | Tools |
+| Column | Type | Notes |
+|--------|------|-------|
+| id | serial PK | |
+| sku | TEXT | Normalized DS part number (no dashes) |
+| oem_number | TEXT | HD OEM part number |
+| oem_manufacturer | TEXT | 'HD' for all FatBook/OldBook rows |
+| fatbook_page | INTEGER | FatBook page reference |
+| oldbook_page | INTEGER | OldBook page reference |
+| page_reference | TEXT | Legacy |
+| source | TEXT | 'fatbook_crossref' or 'oldbook_crossref' |
+| source_file | TEXT | |
+| created_at | TIMESTAMP | |
+
+Unique constraint: `(sku, oem_number, oem_manufacturer)`
+
+Crossref files:
+- `scripts/ingest/fatbookcrossref.txt` — 3,948 rows, 3,354 distinct DS SKUs
+- `scripts/ingest/oldbookcrossref.txt` — source: `1779569140000_oldbook_crossref.txt`
 
 ---
 
-## ERA COVERAGE TIERS
-
-| Slug | Coverage | Products | Notes |
-|------|----------|----------|-------|
-| milwaukee-8 | full | — | ✅ Re-tagged May 22 post WPS promote |
-| twin-cam | full | — | ✅ Re-tagged May 22 |
-| evolution | full | — | ✅ Re-tagged May 22 |
-| evo-sportster | full | — | ✅ Re-tagged May 22 |
-| shovelhead | full | — | ✅ Re-tagged May 22 |
-| ironhead-sportster | full | — | ✅ Re-tagged May 22 |
-| chopper | full | — | ✅ Re-tagged May 22 |
-| flathead | limited | 26 | LimitedBanner shown. flathead.webp missing |
-| knucklehead | limited | 26 | LimitedBanner shown |
-| panhead | limited | 587 | LimitedBanner shown. Year-range mapped 1948–1965 |
-
-18,793 products total tagged across all era columns (up from 13,773).
-ERA_COVERAGE map in `app/era/[slug]/page.jsx`.
-
----
-
-## WPS FITMENT PIPELINE (new May 22)
-
-### Data Flow
-```
-WPS API taxonomyterms/196/items?include=vehicles
-  → wps_catalog.fitment (JSONB)
-  → promote_wps_fitment.cjs
-  → catalog_fitment_v2 (fitment_source = 'wps')
-```
-
-### Key Files
-| File | Location | Purpose |
-|------|----------|---------|
-| import_wps_fitment.mjs | scripts/ingest/ | Fetches fitment from WPS API, stores in wps_catalog.fitment |
-| promote_wps_fitment.cjs | scripts/ingest/ | Promotes harley_vehicles from wps_catalog.fitment → catalog_fitment_v2 |
-| 1779424242-1856360.csv | scripts/data/wps/ | WPS vehicle master (44,709 vehicles, 1,291 Harley rows) |
-
-### wps_catalog.fitment JSONB Structure
-```json
-{
-  "raw_vehicle_ids": [1616, 1617, ...],
-  "vehicles": [{ "vehicle_id": 1616, "year": 1999, "make": "Harley Davidson", "model": "FLHR Road King", ... }],
-  "harley_vehicles": [{ ... }]
-}
-```
-
-### wps_vehicles Table
-```
-vehicle_id, vehicle_type, year_id, year, make_id, make, model_id, model
-44,709 rows — all WPS vehicle makes (Harley, Honda, Kawasaki, etc.)
-Harley Davidson make_id = 22
-```
-
-### Join Pattern
-```
-wps_catalog.sku → catalog_unified.vendor_sku  (NOT cu.sku — WPS rows have WPS- prefix)
-```
-
-### Stats (May 22)
-- 5,810 wps_catalog items with Harley fitment in JSONB
-- 702,633 rows inserted into catalog_fitment_v2
-- 27,342 skipped (already covered by other sources)
-- 19,810 unresolved vehicle records (model name mismatches — not yet chased)
-
----
-
-## VENDOR_OFFERS SCHEMA
-
-```
-catalog_product_id  → catalog_unified(id)
-vendor_code         → 'WPS'
-vendor_part_number  → wps_catalog.sku (original WPS sku, no prefix)
-wholesale_cost      → wps_catalog.dealer_price
-msrp                → wps_catalog.list_price
-map_price           → wps_catalog.map_price
-id_qty              → warehouse_boise
-ca_qty              → warehouse_fresno
-pa_qty              → warehouse_elizabethtown
-in_qty              → warehouse_ashley
-tx_qty              → warehouse_midlothian
-ga_qty              → warehouse_jessup
-nv_qty              → warehouse_midway
-nc_qty, wi_qty, ny_qty → 0
-total_qty           → sum of all warehouse qtys
-```
-
-Unique constraint: `(catalog_product_id, vendor_code)`
-
----
-
-## KNOWN SCRIPT ISSUES & FIXES
+## KNOWN SCRIPT ISSUES / FIXES APPLIED
 
 | Script | Issue | Fix Applied |
 |--------|-------|-------------|
@@ -430,6 +254,8 @@ Unique constraint: `(catalog_product_id, vendor_code)`
 | ingest_vtwin_fitment.cjs | Crossref structure unknown | Auto-detects Strategy A (year+model) or B (OEM cross-ref) |
 | promote_wps_fitment.cjs | vendor_item_id / wps_item_id don't exist on cu | Join on vendor_sku = wc.sku |
 | import_wps_fitment.mjs | vehicle:read scope 403 | Use taxonomyterms/196 items endpoint — no vehicle scope needed |
+| import_fatbook_crossref.cjs | pg Client IPv6 URL string fails | Pass { host, user, password, database } object |
+| import_fatbook_crossref.cjs | ON CONFLICT duplicate source rows | DISTINCT ON (sku, oem_number) before upsert |
 
 ---
 
@@ -438,7 +264,7 @@ Unique constraint: `(catalog_product_id, vendor_code)`
 | Table | Rows | Notes |
 |-------|------|-------|
 | catalog_unified | 96,711 | 90,276 active — rebuilt May 20 |
-| catalog_fitment_v2 | 2,147,352 | ✅ WPS promoted May 22 |
+| catalog_fitment_v2 | 2,245,762 | ✅ WPS gap fix May 23 |
 | oem_fitment | 379,899 | ✅ All families |
 | catalog_products | 146,989 | Legacy — no longer used in pipeline |
 | pu_catalog | 36,684 | ✅ Fully enriched |
@@ -452,9 +278,9 @@ Unique constraint: `(catalog_product_id, vendor_code)`
 | pu_fitment | 13,913 | ✅ |
 | pu_fitment_parsed | 393,202 | ✅ |
 | pu_fitment_expanded | 1,640,065 | ✅ Promoted |
-| catalog_oem_crossref | ~14,819 | ✅ |
+| catalog_oem_crossref | 55,122 | ✅ +fatbook_page +oldbook_page May 23 |
 | catalog_variant_groups | 2,901 | ✅ |
-| catalog_variant_members | 19,557 | ✅ |
+| catalog_variant_members | 19,460 | ✅ 97 bad rows purged May 23 |
 | harley_models | 299 | ✅ DO NOT bulk modify |
 | harley_model_years | ~2,230 | ✅ DO NOT MODIFY |
 | harley_families | 17 | ✅ DO NOT MODIFY — no slug column |
@@ -472,6 +298,7 @@ Unique constraint: `(catalog_product_id, vendor_code)`
 |-------|----------|
 | IPv6 on Vercel | Never use 2a01:4ff — use CATALOG_DATABASE_URL |
 | psql IPv6 | Quote URL: psql 'postgresql://...' |
+| pg Client IPv6 | Pass { host, user, password, database } object — never a URL string |
 | Next.js 15 params | params is Promise in route handlers — await before destructuring |
 | catalog_unified rebuild | Use merge_catalog_unified.js — not merge_vendors.js (legacy) |
 | catalog_unified WPS join | Join on vendor_sku not sku — WPS rows have WPS- prefix in sku |
@@ -496,6 +323,8 @@ Unique constraint: `(catalog_product_id, vendor_code)`
 | VTwin categories | GROUP suffix stripped May 20 — old category map is stale |
 | FilterSidebar mobileSheet | Pass mobileSheet={true} for bottom sheet, mobileSheet={false} for desktop sidebar |
 | BottomNav filter event | On /browse, hamburger fires `stinkin:filterToggle` — browse page must have listener |
+| catalog_oem_crossref unique key | (sku, oem_number, oem_manufacturer) — always include oem_manufacturer='HD' on insert |
+| oem_numbers[] on catalog_unified | Rebuilt from catalog_oem_crossref — do NOT populate from any other source |
 
 ---
 
@@ -550,6 +379,16 @@ node scripts/ingest/backfill_wps_product_ids.cjs
 node scripts/ingest/build_variant_groups.cjs --dry
 node scripts/ingest/build_variant_groups.cjs
 
+# FatBook / OldBook crossref
+node scripts/ingest/import_fatbook_crossref.cjs scripts/ingest/fatbookcrossref.txt
+node scripts/ingest/import_oldbook_crossref.cjs scripts/ingest/oldbookcrossref.txt
+
+# OEM numbers rebuild (run after crossref import)
+psql "postgresql://catalog_app:smelly@[2a01:4ff:f0:fa6f::1]/stinkin_catalog" -c "
+UPDATE catalog_unified cu SET oem_numbers = (SELECT array_agg(DISTINCT xr.oem_number ORDER BY xr.oem_number) FROM catalog_oem_crossref xr WHERE xr.sku = cu.sku) WHERE EXISTS (SELECT 1 FROM catalog_oem_crossref xr WHERE xr.sku = cu.sku);
+UPDATE catalog_unified SET oem_numbers = NULL WHERE (oem_numbers IS NOT NULL AND oem_numbers != '{}') AND NOT EXISTS (SELECT 1 FROM catalog_oem_crossref xr WHERE xr.sku = catalog_unified.sku);
+"
+
 # Typesense
 node scripts/ingest/index_unified.js --recreate
 
@@ -559,6 +398,24 @@ npx vercel --prod
 # Git
 git add -A && git commit -m "message" && git push
 ```
+
+---
+
+## TWENTY-EIGHTH PASS ADDITIONS (May 23, 2026) — ADDENDUM
+
+### FatBook + OldBook Crossref — Live
+- `import_fatbook_crossref.cjs` — OEM→DS part number crossref from FatBook index
+- `import_oldbook_crossref.cjs` — OEM→DS part number crossref from OldBook index
+- `fatbook_page` + `oldbook_page` columns added to `catalog_oem_crossref`
+- 55,122 total crossref rows, 3,940 with FatBook pages, 2,643 with OldBook pages
+- `catalog_unified.oem_numbers[]` fully rebuilt — 33,890 products with verified OEM arrays
+- 14,936 stale/incorrect OEM entries cleared
+
+### catalog_oem_crossref State (May 23)
+- Total rows: 55,122
+- With fatbook_page: 3,940
+- With oldbook_page: 2,643
+- Source breakdown: fatbook_crossref + oldbook_crossref + prior imports
 
 ---
 
@@ -574,15 +431,8 @@ Full WPS fitment pipeline built and run:
 - Era backfill re-run: 18,793 products tagged (up from 13,773)
 - Typesense reindexed: 90,276 docs, 0 errors
 
-### catalog_fitment_v2 Source Breakdown (May 22)
-- Total: 2,147,352 rows
+### catalog_fitment_v2 Source Breakdown (May 23)
+- Total: 2,245,762 rows
 - WPS (fitment_source='wps'): 704,480
-- PU + VTwin + OEM + JW Boon: stored with NULL fitment_source (~1,442,872)
+- PU + VTwin + OEM + JW Boon: stored with NULL fitment_source (~1,541,282)
 - oem_crossref: 554
-
-### DB State After Twenty-Seventh Pass
-- `catalog_fitment_v2`: 2,147,352 rows
-- `wps_vehicles`: 44,709 rows
-- `wps_catalog.fitment`: 5,810 items populated
-- Era columns: 18,793 products tagged
-- Typesense: 90,276 docs current

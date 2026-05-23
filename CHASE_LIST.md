@@ -1,6 +1,6 @@
 # STINKIN' SUPPLIES
 ## CHASE LIST
-**Last Updated: May 22, 2026 — Twenty-Seventh Pass**
+**Last Updated: May 23, 2026 — Twenty-Eighth Pass (Addendum)**
 
 ---
 
@@ -8,9 +8,40 @@
 
 | # | Task | Notes |
 |---|------|-------|
-| 1 | Fix PU product images | `ProductDetailClient.jsx` gallery not running `cu.image_url` through `proxyImg()`. LeMans URLs need `/api/img?u=` proxy. |
-| 2 | Verify filter bottom sheet end-to-end on mobile | subcategory + modelCodes params flowing through API |
-| 3 | git commit everything | WPS fitment scripts + large uncommitted changeset from May 21 |
+| 1 | Verify VTwin images load | Deploy `app/api/img/route.ts` fix. Test on `/browse/1000cc-piston-ring-set-050-oversize-msc689413-v` |
+| 2 | Wire OEM numbers to PDP | `catalog_unified.oem_numbers[]` is rebuilt and correct — display on product detail page |
+| 3 | Verify filter bottom sheet on mobile | subcategory + modelCodes params flowing through API end-to-end |
+
+---
+
+## ✅ DONE MAY 23 — TWENTY-EIGHTH PASS (ADDENDUM)
+
+| Area | What Was Done |
+|------|---------------|
+| FatBook crossref import | `import_fatbook_crossref.cjs` — 3,940 rows into catalog_oem_crossref, fatbook_page column added, 95.5% match rate |
+| OldBook crossref import | `import_oldbook_crossref.cjs` — 2,643 rows into catalog_oem_crossref, oldbook_page column added, 96.1% match rate |
+| oem_numbers[] full rebuild | Wiped incorrect data, rebuilt from catalog_oem_crossref — 33,890 products have verified OEM arrays |
+
+---
+
+## ✅ DONE MAY 23 — TWENTY-EIGHTH PASS
+
+| Area | What Was Done |
+|------|---------------|
+| Browse search bar | Added inline to `app/browse/page.jsx` — debounced, feeds existing Typesense pipeline |
+| browse.ts facet 500 fix | `facetParams` snapshot moved before `array_position` push — fixed 500 on all search queries |
+| PDP image proxy fix | Removed `http→https` rewrite in `normalizeProductRow` — LeMans URLs now proxied correctly |
+| Image proxy VTwin support | Expanded ALLOWED_HOSTS, added `isPlainImage` check for non-ZIP vendors |
+| Variant sibling ILIKE bug | Removed name-prefix fallback — siblings only via explicit `family_key` |
+| Piston ring `family_key` | Set `vtwin-1000cc-piston-ring-set` on groups 13242–13246 |
+| Cross-vendor variant purge | 97 VTWIN products removed from WPS groups — both verify counts = 0 |
+| build_variant_groups.cjs | 3 vendor guards added — won't recreate cross-vendor contamination on re-run |
+| Admin retheme | layout.jsx + ProductManager.jsx — cream/gold/stencil to match site aesthetic |
+| ProductManager upgrades | Native scroll virtualization, inline cell editing, expanded EditModal (5 tabs), Fitment Data tab |
+| WPS fitment gap fix | SPLIT_PART model_code match — +98,410 rows, catalog_fitment_v2 now 2,245,762 |
+| Era backfill remapped | Correct family→era mapping using year ranges — 17,808 products tagged |
+| Next.js 15 param fixes | `await searchParams`, `await params`, `defaultValue` on selects |
+| Typesense reindex | 90,276 docs, 0 errors, 4m 59s |
 
 ---
 
@@ -49,23 +80,12 @@
 
 ---
 
-## 🔴 HIGH PRIORITY
-
-| Task | Notes |
-|------|-------|
-| Fix PU product images | Gallery not proxying LeMans CDN URLs. Most PU products show "No Image" on PDP |
-| git commit everything | Large uncommitted changeset from May 21 + WPS fitment scripts from May 22 |
-
----
-
 ## 🔵 LOW PRIORITY / FUTURE
 
 | Task | Notes |
 |------|-------|
-| WPS fitment unresolved models | 19,810 vehicle records didn't match harley_model_years — chase model name mismatches |
 | Fulfillment routing | cross_vendor_products table + resolve_cart_fulfillment() + cart integration |
 | Cart wiring | CartContext / addItem is placeholder only |
-| Verify filter bottom sheet on mobile | subcategory + modelCodes params |
 | WPS API enrichment | Test features+blocks hit rate on HardDrive products |
 | model_alias_map additions | Road King, Street Glide, Fat Boy, Night Train, Dyna Wide Glide |
 | Browse/Brand tabs | Data ready, UI unbuilt |
@@ -76,3 +96,4 @@
 | Expand build_pu_variant_groups whitelist | Add grips, mirrors, pegs once confirmed as color/size variants |
 | catalog_unified category map | Display labels still show old GROUP suffix |
 | harley_families slug column | No slug column — derived via CASE. Consider adding |
+| Hard Drive book crossref | Same pattern as FatBook/OldBook — import when file available |

@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stinkin' Supplies — OEM Cross Reference</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@300;400;500;600&family=Share+Tech+Mono&display=swap');
+
+  :root {
+    --cream:   #faf7f2;
+    --cream2:  #f0ebe0;
+    --gold:    #b8922a;
+    --gold-lt: #d4a84b;
+    --brown:   #2a1f0e;
+    --brown2:  #3d2e14;
+    --text:    #1a1208;
+    --muted:   #7a6a4a;
+    --border:  #d9cdb0;
+    --vtwin:   #1a4a2e;
+    --vtwin-bg:#e8f5ee;
+    --wps:     #1a2e4a;
+    --wps-bg:  #e8eef5;
+    --pu:      #4a1a1a;
+    --pu-bg:   #f5e8e8;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Barlow', sans-serif;
+    background: var(--cream);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ─────────────────────────────── */
+  header {
+    background: var(--brown);
+    color: var(--gold);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 3px solid var(--gold);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 20px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--cream);
+  }
+  .logo span { color: var(--gold); }
+  .logo-sub {
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .stats {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 13px;
+    color: var(--muted);
+    letter-spacing: 0.5px;
+    text-align: right;
+  }
+  .stats strong { color: var(--gold); }
+
+  /* ── SEARCH BAR ─────────────────────────── */
+  .search-bar {
+    background: var(--cream2);
+    border-bottom: 2px solid var(--border);
+    padding: 12px 24px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .search-bar input {
+    flex: 1;
+    background: white;
+    border: 1.5px solid var(--border);
+    color: var(--text);
+    padding: 9px 14px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 14px;
+    outline: none;
+    border-radius: 2px;
+    letter-spacing: 0.5px;
+  }
+  .search-bar input:focus { border-color: var(--gold); }
+  .search-bar input::placeholder { color: #bbb; font-family: 'Barlow', sans-serif; font-style: italic; }
+  .filter-select {
+    background: white;
+    border: 1.5px solid var(--border);
+    color: var(--text);
+    padding: 9px 12px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    outline: none;
+    border-radius: 2px;
+    cursor: pointer;
+  }
+  .filter-select:focus { border-color: var(--gold); }
+  .result-count {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 13px;
+    color: var(--muted);
+    white-space: nowrap;
+    letter-spacing: 0.5px;
+    min-width: 90px;
+    text-align: right;
+  }
+
+  /* ── TABLE ──────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto;
+    padding: 20px 24px 60px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  thead tr {
+    background: var(--brown);
+    color: var(--gold);
+  }
+  th {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 10px 12px;
+    text-align: left;
+    white-space: nowrap;
+    border-right: 1px solid rgba(255,255,255,0.08);
+    cursor: pointer;
+    user-select: none;
+  }
+  th:hover { background: var(--brown2); }
+  th.sort-asc::after  { content: ' ▲'; font-size: 9px; }
+  th.sort-desc::after { content: ' ▼'; font-size: 9px; }
+
+  tbody tr {
+    border-bottom: 1px solid var(--cream2);
+    transition: background 0.1s;
+  }
+  tbody tr:hover { background: #fdfaf5; }
+  tbody tr:last-child { border-bottom: none; }
+
+  td {
+    padding: 8px 12px;
+    vertical-align: top;
+    border-right: 1px solid var(--cream2);
+  }
+  td:last-child { border-right: none; }
+
+  /* OEM number cell */
+  .oem-cell {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--brown);
+    white-space: nowrap;
+    letter-spacing: 0.5px;
+  }
+
+  /* Description */
+  .desc-cell {
+    font-size: 12px;
+    color: var(--text);
+    max-width: 220px;
+  }
+  .cat-badge {
+    display: inline-block;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    background: var(--cream2);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 1px 5px;
+    border-radius: 2px;
+    margin-top: 3px;
+  }
+
+  /* Vendor SKU cells */
+  .sku-cell { white-space: nowrap; }
+  .sku-tag {
+    display: inline-block;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 2px;
+    margin: 1px 2px 1px 0;
+    white-space: nowrap;
+  }
+  .sku-vtwin { background: var(--vtwin-bg); color: var(--vtwin); border: 1px solid rgba(26,74,46,0.2); }
+  .sku-wps   { background: var(--wps-bg);   color: var(--wps);   border: 1px solid rgba(26,46,74,0.2); }
+  .sku-pu    { background: var(--pu-bg);    color: var(--pu);    border: 1px solid rgba(74,26,26,0.2); }
+  .sku-none  { color: #ccc; font-style: italic; font-family: 'Barlow', sans-serif; font-size: 11px; }
+
+  /* Fitment cell */
+  .fit-cell { max-width: 280px; }
+  .fit-entry {
+    font-size: 11px;
+    line-height: 1.6;
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+    flex-wrap: wrap;
+    margin-bottom: 2px;
+  }
+  .fit-model {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 12px;
+    color: var(--brown);
+    white-space: nowrap;
+  }
+  .fit-years {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .fit-more {
+    font-size: 10px;
+    color: var(--gold);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+  }
+  .fit-more:hover { text-decoration: underline; }
+
+  /* ── LOAD ZONE ───────────────────────────── */
+  .drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: 6px;
+    padding: 60px 40px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    margin: 40px auto;
+    max-width: 560px;
+    text-align: center;
+  }
+  .drop-zone:hover, .drop-zone.drag-over { border-color: var(--gold); background: rgba(184,146,42,0.04); }
+  .drop-zone h3 {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 20px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 1px;
+    color: var(--brown); margin-bottom: 8px;
+  }
+  .drop-zone p { font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .drop-zone code {
+    background: var(--cream2); padding: 2px 6px;
+    border-radius: 2px; font-size: 12px; color: var(--brown);
+  }
+  .load-btn {
+    margin-top: 16px;
+    background: var(--gold); color: white; border: none;
+    padding: 10px 24px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700; font-size: 14px;
+    letter-spacing: 1px; text-transform: uppercase;
+    cursor: pointer; border-radius: 2px; display: inline-block;
+  }
+  .load-btn:hover { background: var(--gold-lt); }
+
+  /* ── EMPTY ───────────────────────────────── */
+  .no-results {
+    text-align: center; padding: 40px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 18px; color: var(--muted);
+    letter-spacing: 0.5px;
+  }
+
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--gold); }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">Stinkin' <span>Supplies</span></div>
+    <div class="logo-sub">OEM Cross Reference</div>
+  </div>
+  <div class="stats" id="headerStats">Load a JSON file to begin</div>
+</header>
+
+<div id="appContent">
+  <div style="padding: 24px;">
+    <div class="drop-zone" id="dropZone">
+      <h3>Load OEM Cross Reference</h3>
+      <p>Run <code>node generate_oem_crossref.cjs > oem_crossref.json</code><br>then drop the file here.</p>
+      <input type="file" id="fileInput" accept=".json" style="display:none">
+      <br>
+      <button class="load-btn" onclick="document.getElementById('fileInput').click()">Choose JSON File</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let DATA = {};
+let ENTRIES = [];
+let filtered = [];
+let sortCol = 'oem';
+let sortDir = 'asc';
+
+// ── FILE LOADING ──────────────────────────────────────────────────────────────
+const dropZone = document.getElementById('dropZone');
+document.getElementById('fileInput').addEventListener('change', e => { if (e.target.files[0]) readFile(e.target.files[0]); });
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); if (e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]); });
+
+function readFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      DATA = JSON.parse(e.target.result);
+      ENTRIES = Object.values(DATA);
+      init();
+    } catch(err) { alert('Failed to parse JSON: ' + err.message); }
+  };
+  reader.readAsText(file);
+}
+
+function init() {
+  // Build category list for filter
+  const cats = [...new Set(ENTRIES.map(e => e.section).filter(Boolean))].sort();
+
+  document.getElementById('appContent').innerHTML = `
+    <div class="search-bar">
+      <input type="text" id="searchInput" placeholder="Search OEM number, description, vendor SKU…" oninput="doSearch()">
+      <select class="filter-select" id="catFilter" onchange="doSearch()">
+        <option value="">All Categories</option>
+        ${cats.map(c => `<option value="${c}">${c}</option>`).join('')}
+      </select>
+      <select class="filter-select" id="vendorFilter" onchange="doSearch()">
+        <option value="">All OEM Numbers</option>
+        <option value="vtwin">V-Twin only</option>
+        <option value="wps">WPS only</option>
+        <option value="pu">PU only</option>
+        <option value="matched" selected>Has any SKU</option>
+        <option value="multi">Multi-vendor (2+)</option>
+      </select>
+      <div class="result-count" id="resultCount"></div>
+    </div>
+    <div class="table-wrap">
+      <table id="xrefTable">
+        <thead>
+          <tr>
+            <th onclick="sortBy('oem')" id="th-oem">HD OEM #</th>
+            <th onclick="sortBy('description')" id="th-description">Description</th>
+            <th onclick="sortBy('vtwin')" id="th-vtwin">V-Twin SKU</th>
+            <th onclick="sortBy('wps')" id="th-wps">WPS SKU</th>
+            <th onclick="sortBy('pu')" id="th-pu">PU SKU</th>
+            <th>Fitment</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  `;
+
+  // Update header stats
+  const withVtwin = ENTRIES.filter(e => e.vtwin.length).length;
+  const withWps   = ENTRIES.filter(e => e.wps.length).length;
+  const withPu    = ENTRIES.filter(e => e.pu.length).length;
+  const multi     = ENTRIES.filter(e => (e.vtwin.length > 0) + (e.wps.length > 0) + (e.pu.length > 0) > 1).length;
+  document.getElementById('headerStats').innerHTML =
+    `<strong>${ENTRIES.length.toLocaleString()}</strong> OEM numbers &nbsp;|&nbsp; ` +
+    `<strong>${multi.toLocaleString()}</strong> cross-vendor &nbsp;|&nbsp; ` +
+    `VT: <strong>${withVtwin.toLocaleString()}</strong> &nbsp; ` +
+    `WPS: <strong>${withWps.toLocaleString()}</strong> &nbsp; ` +
+    `PU: <strong>${withPu.toLocaleString()}</strong>`;
+
+  doSearch();
+}
+
+function doSearch() {
+  const q = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
+  const cat = document.getElementById('catFilter')?.value || '';
+  const vendor = document.getElementById('vendorFilter')?.value || '';
+
+  filtered = ENTRIES.filter(e => {
+    if (cat && (e.section || '') !== cat) return false;
+    if (vendor === 'vtwin'  && !e.vtwin.length) return false;
+    if (vendor === 'wps'    && !e.wps.length) return false;
+    if (vendor === 'pu'     && !e.pu.length) return false;
+    if (vendor === 'matched' && !e.vtwin.length && !e.wps.length && !e.pu.length) return false;
+    if (vendor === 'multi'  && (!!e.vtwin.length + !!e.wps.length + !!e.pu.length) <= 1) return false;
+    if (q) {
+      const haystack = [
+        e.oem,
+        e.description,
+        e.section || '',
+        ...e.vtwin,
+        ...e.wps,
+        ...e.pu,
+        ...e.fitment.map(f => f.model_code + ' ' + f.model_name + ' ' + f.family),
+      ].join(' ').toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+    return true;
+  });
+
+  sortEntries();
+  renderTable();
+  document.getElementById('resultCount').textContent = `${filtered.length.toLocaleString()} results`;
+}
+
+function sortBy(col) {
+  if (sortCol === col) {
+    sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortCol = col; sortDir = 'asc';
+  }
+  document.querySelectorAll('th[id^="th-"]').forEach(th => th.classList.remove('sort-asc','sort-desc'));
+  const th = document.getElementById('th-' + col);
+  if (th) th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+  sortEntries();
+  renderTable();
+}
+
+function sortEntries() {
+  // Natural sort for OEM numbers (numeric prefix aware)
+  function natVal(s) {
+    return s.replace(/(\d+)/g, n => n.padStart(8, '0'));
+  }
+  filtered.sort((a, b) => {
+    let av, bv;
+    if (sortCol === 'vtwin') { av = a.vtwin.length ? a.vtwin[0] : 'zzz'; bv = b.vtwin.length ? b.vtwin[0] : 'zzz'; }
+    else if (sortCol === 'wps') { av = a.wps.length ? a.wps[0] : 'zzz'; bv = b.wps.length ? b.wps[0] : 'zzz'; }
+    else if (sortCol === 'pu')  { av = a.pu.length ? a.pu[0] : 'zzz'; bv = b.pu.length ? b.pu[0] : 'zzz'; }
+    else if (sortCol === 'description') { av = a.description.toLowerCase(); bv = b.description.toLowerCase(); }
+    else { av = natVal(a.oem); bv = natVal(b.oem); }
+    const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+    return sortDir === 'asc' ? cmp : -cmp;
+  });
+}
+
+// SKU arrays are now plain string arrays from the DB ARRAY_AGG
+function skuTags(arr, cls) {
+  if (!arr || !arr.length) return `<span class="sku-none">—</span>`;
+  return arr.slice(0, 3).map(s => `<span class="sku-tag sku-${cls}">${s}</span>`).join('') +
+    (arr.length > 3 ? `<span class="sku-tag sku-${cls}" style="opacity:0.5">+${arr.length-3}</span>` : '');
+}
+
+function fitmentHtml(fitment) {
+  if (!fitment.length) return '<span style="color:#ccc;font-size:11px">—</span>';
+  const show = fitment.slice(0, 4);
+  const rest = fitment.length - 4;
+  let html = show.map(f =>
+    `<div class="fit-entry">
+      <span class="fit-model">${f.model_code}</span>
+      <span class="fit-years">${f.years}</span>
+    </div>`
+  ).join('');
+  if (rest > 0) html += `<span class="fit-more">+${rest} more</span>`;
+  return html;
+}
+
+const PAGE = 200;
+let rendered = 0;
+
+function renderTable() {
+  rendered = 0;
+  const tbody = document.getElementById('tableBody');
+  if (!tbody) return;
+
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="no-results">No results found</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = '';
+  renderChunk();
+
+  // Infinite scroll
+  const wrap = document.querySelector('.table-wrap');
+  if (wrap) {
+    wrap.onscroll = () => {
+      if (wrap.scrollTop + wrap.clientHeight >= wrap.scrollHeight - 200) renderChunk();
+    };
+  }
+}
+
+function renderChunk() {
+  const tbody = document.getElementById('tableBody');
+  if (!tbody || rendered >= filtered.length) return;
+  const chunk = filtered.slice(rendered, rendered + PAGE);
+  const frag = document.createDocumentFragment();
+  for (const e of chunk) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="oem-cell">${e.oem}</td>
+      <td class="desc-cell">
+        ${e.description}
+        ${e.section ? `<br><span class="cat-badge">${e.section}</span>` : ''}
+      </td>
+      <td class="sku-cell">${skuTags(e.vtwin, 'vtwin')}</td>
+      <td class="sku-cell">${skuTags(e.wps, 'wps')}</td>
+      <td class="sku-cell">${skuTags(e.pu, 'pu')}</td>
+      <td class="fit-cell">${fitmentHtml(e.fitment)}</td>
+    `;
+    frag.appendChild(tr);
+  }
+  tbody.appendChild(frag);
+  rendered += chunk.length;
+}
+</script>
+</body>
+</html>

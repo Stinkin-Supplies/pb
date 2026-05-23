@@ -50,3 +50,8 @@ Downloads/
 *.sql
 scripts/ingest/master-item-list.csv
 public/videos/triovideo.mp4
+
+# oversized generated data files (never commit these)
+fitment_tag_tree.json
+oem_crossref.json
+scripts/ingest/fitment_year_ranges.csv
