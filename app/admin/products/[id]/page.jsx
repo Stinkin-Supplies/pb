@@ -355,8 +355,8 @@ function vendorPillClass(v) {
 }
 
 export default async function ProductDetailPage({ params }) {
-  const id = toInt(params?.id, null);
-  if (!id) notFound();
+  const { id: rawId } = await params;
+  const id = toInt(rawId, null);
 
   const db = getCatalogDb();
   const res = await db.query(

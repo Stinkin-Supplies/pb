@@ -97,6 +97,7 @@ async function main() {
       MIN(cu.${brandCol}) as brand
     FROM wps_catalog w
     JOIN catalog_unified cu ON cu.vendor_sku = w.sku
+      AND cu.source_vendor = 'WPS'
     WHERE w.wps_product_id IS NOT NULL
     GROUP BY w.wps_product_id
     HAVING COUNT(DISTINCT cu.id) > 1
@@ -236,7 +237,16 @@ async function main() {
 
   // Back-reference on catalog_unified
   await pool.query(`ALTER TABLE catalog_unified ADD COLUMN IF NOT EXISTS variant_group_id INTEGER REFERENCES catalog_variant_groups(id)`);
-  await pool.query(`UPDATE catalog_unified cu SET variant_group_id = cvm.group_id FROM catalog_variant_members cvm WHERE cvm.product_id = cu.id`);
+  // Back-reference: only update WPS products (non-WPS handled separately below)
+  await pool.query(`
+    UPDATE catalog_unified cu
+    SET variant_group_id = cvm.group_id
+    FROM catalog_variant_members cvm
+    JOIN catalog_variant_groups cvg ON cvg.id = cvm.group_id
+    WHERE cvm.product_id = cu.id
+      AND cu.source_vendor = 'WPS'
+      AND cvg.source_vendor = 'WPS'
+  `);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_cu_variant_group ON catalog_unified(variant_group_id) WHERE variant_group_id IS NOT NULL`);
 
   // ── NAME-BASED GROUPING — PU + VTWIN ─────────────────────────────────────────
@@ -339,10 +349,17 @@ async function main() {
 
     for (let idx = 0; idx < uniqueMembers.length; idx++) {
       const m = uniqueMembers[idx];
+      // Safety: only insert if product vendor matches group vendor
       await q(`
         INSERT INTO catalog_variant_members
           (group_id, product_id, option_1_name, option_1_value, sort_order)
-        VALUES ($1, $2, $3, $4, $5)
+        SELECT $1, $2, $3, $4, $5
+        WHERE EXISTS (
+          SELECT 1 FROM catalog_unified cu
+          JOIN catalog_variant_groups cvg ON cvg.id = $1
+          WHERE cu.id = $2
+            AND cu.source_vendor = cvg.source_vendor
+        )
         ON CONFLICT (group_id, product_id) DO NOTHING
       `, [grp.id, m.id, m.attr.name, m.attr.value, idx]);
       nameMembersInserted++;

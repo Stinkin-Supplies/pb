@@ -251,11 +251,12 @@ function vendorClass(v) {
 }
 
 export default async function AdminProductsPage({ searchParams }) {
-  const q       = String(searchParams?.q       ?? "").trim();
-  const prefix  = String(searchParams?.prefix  ?? "").trim().toUpperCase();
-  const vendor  = String(searchParams?.vendor  ?? "").trim().toUpperCase();
-  const active  = String(searchParams?.active  ?? "").trim();
-  const page    = Math.max(0, toInt(searchParams?.page, 0));
+  const sp      = await searchParams;
+  const q       = String(sp?.q       ?? "").trim();
+  const prefix  = String(sp?.prefix  ?? "").trim().toUpperCase();
+  const vendor  = String(sp?.vendor  ?? "").trim().toUpperCase();
+  const active  = String(sp?.active  ?? "").trim();
+  const page    = Math.max(0, toInt(sp?.page, 0));
   const pageSize = 50;
   const offset   = page * pageSize;
 
@@ -348,20 +349,20 @@ export default async function AdminProductsPage({ searchParams }) {
           placeholder="Search SKU, name, brand, UPC…"
         />
 
-        <select name="prefix">
-          <option value="" selected={!prefix}>All Prefixes</option>
-          {PREFIXES.map(p => <option key={p} value={p} selected={prefix === p}>{p}</option>)}
+        <select name="prefix" defaultValue={prefix}>
+          <option value="">All Prefixes</option>
+          {PREFIXES.map(p => <option key={p} value={p}>{p}</option>)}
         </select>
 
-        <select name="vendor">
-          <option value="" selected={!vendor}>All Vendors</option>
-          {VENDORS.map(v => <option key={v} value={v} selected={vendor === v}>{v}</option>)}
+        <select name="vendor" defaultValue={vendor}>
+          <option value="">All Vendors</option>
+          {VENDORS.map(v => <option key={v} value={v}>{v}</option>)}
         </select>
 
-        <select name="active">
-          <option value="" selected={!active}>Any Status</option>
-          <option value="1" selected={active === "1"}>Active</option>
-          <option value="0" selected={active === "0"}>Inactive</option>
+        <select name="active" defaultValue={active}>
+          <option value="">Any Status</option>
+          <option value="1">Active</option>
+          <option value="0">Inactive</option>
         </select>
 
         <button className="btn" type="submit">Filter</button>

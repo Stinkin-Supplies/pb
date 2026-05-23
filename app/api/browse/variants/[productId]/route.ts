@@ -76,26 +76,26 @@ export async function GET(
         cu.id ASC
     `, [group_id]);
 
-    // Find sibling groups — linked by family_key (explicit, cross-vendor)
-    // or by base name prefix (auto, same vendor).
-    const baseName = display_name.replace(/\s*-\s*[^-]+$/, '').trim();
-    const siblingRows = await db.query(`
-      SELECT DISTINCT ON (cvg.id)
-        cvg.id,
-        cvg.display_name,
-        cu.slug AS representative_slug
-      FROM catalog_variant_groups cvg
-      JOIN catalog_variant_members cvm ON cvm.group_id = cvg.id
-      JOIN catalog_unified cu ON cu.id = cvm.product_id
-      WHERE cvg.id != $1
-        AND cvm.sort_order = 0
-        AND (
-          ($4::text IS NOT NULL AND cvg.family_key = $4)
-          OR ($4::text IS NULL AND cvg.source_vendor = $2 AND cvg.display_name ILIKE $3)
-        )
-      ORDER BY cvg.id, cvg.display_name
-      LIMIT 10
-    `, [group_id, source_vendor, `${baseName}%`, family_key ?? null]);
+    // Find sibling groups — only via explicit family_key linkage.
+    // The previous name-prefix ILIKE fallback was too loose: product names
+    // containing hyphens (e.g. "10-1/4 inch...") reduce baseName to "10"
+    // and match completely unrelated groups.
+    const siblingRows = family_key
+      ? await db.query(`
+          SELECT DISTINCT ON (cvg.id)
+            cvg.id,
+            cvg.display_name,
+            cu.slug AS representative_slug
+          FROM catalog_variant_groups cvg
+          JOIN catalog_variant_members cvm ON cvm.group_id = cvg.id
+          JOIN catalog_unified cu ON cu.id = cvm.product_id
+          WHERE cvg.id != $1
+            AND cvm.sort_order = 0
+            AND cvg.family_key = $2
+          ORDER BY cvg.id, cvg.display_name
+          LIMIT 10
+        `, [group_id, family_key])
+      : { rows: [] };
 
     const siblingGroups = siblingRows.rows.map(r => ({
       id: r.id,
