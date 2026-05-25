@@ -5,6 +5,7 @@
 // — Paginated, searchable, filterable table view of
 //   catalog_oem_crossref (HardDrive → WPS mappings)
 // — Add / delete rows inline
+// — Bulk edit: delete, change brand, add OEM# to selected rows
 // — Matches Stinkin' Supplies admin dark theme
 // ============================================================
 
@@ -140,6 +141,107 @@ const css = `
   .btn-danger:hover { background: rgba(185,28,28,0.1); border-color: var(--red); }
   .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+  /* ── BULK ACTION BAR ── */
+  .bulk-bar {
+    background: #1a1400;
+    border-bottom: 1px solid #3d2e00;
+    padding: 10px 28px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    animation: slideDown 0.15s ease;
+  }
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .bulk-bar-count {
+    font-family: var(--font-caesar), 'Bebas Neue', sans-serif;
+    font-size: 16px;
+    letter-spacing: 0.06em;
+    color: var(--gold);
+    white-space: nowrap;
+  }
+  .bulk-bar-count span { color: var(--cream); }
+  .bulk-bar-divider {
+    width: 1px;
+    height: 20px;
+    background: #3d2e00;
+    flex-shrink: 0;
+  }
+  .bulk-bar-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn-bulk {
+    font-family: var(--font-stencil), monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    padding: 7px 14px;
+    border-radius: 2px;
+    border: 1px solid;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+    background: none;
+  }
+  .btn-bulk-brand  { border-color: rgba(201,168,76,0.4); color: var(--gold); }
+  .btn-bulk-brand:hover  { background: rgba(201,168,76,0.1); border-color: var(--gold); }
+  .btn-bulk-oem    { border-color: rgba(59,130,246,0.4); color: var(--blue); }
+  .btn-bulk-oem:hover    { background: rgba(59,130,246,0.1); border-color: var(--blue); }
+  .btn-bulk-delete { border-color: rgba(185,28,28,0.4); color: var(--red); }
+  .btn-bulk-delete:hover { background: rgba(185,28,28,0.1); border-color: var(--red); }
+  .btn-bulk:disabled { opacity: 0.3; cursor: not-allowed; }
+  .bulk-bar-clear {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: var(--chrome);
+    font-family: var(--font-stencil), monospace;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    cursor: pointer;
+    padding: 4px 6px;
+    transition: color 0.15s;
+  }
+  .bulk-bar-clear:hover { color: var(--cream); }
+
+  /* ── SELECT-ALL BANNER ── */
+  .select-all-banner {
+    background: #0d1a0d;
+    border-bottom: 1px solid #1a3a1a;
+    padding: 9px 28px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 10px;
+    color: var(--chrome);
+    letter-spacing: 0.1em;
+  }
+  .select-all-banner strong { color: var(--green); }
+  .btn-select-all-match {
+    background: none;
+    border: 1px solid rgba(34,197,94,0.4);
+    color: var(--green);
+    font-family: var(--font-stencil), monospace;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    padding: 5px 12px;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-select-all-match:hover { background: rgba(34,197,94,0.1); border-color: var(--green); }
+  .btn-select-all-clear {
+    background: none;
+    border: none;
+    color: var(--chrome);
+    font-family: var(--font-stencil), monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: color 0.15s;
+  }
+  .btn-select-all-clear:hover { color: var(--cream); }
+
   /* ── TABLE ── */
   .xref-table-wrap {
     overflow-x: auto;
@@ -171,6 +273,7 @@ const css = `
   .xref-table th .sort-arrow { margin-left: 5px; font-size: 9px; }
   .xref-table th.no-sort { cursor: default; }
   .xref-table th.no-sort:hover { color: var(--chrome); }
+  .xref-table th.col-check { width: 40px; padding: 10px 8px 10px 14px; }
 
   .xref-table td {
     padding: 10px 14px;
@@ -178,7 +281,51 @@ const css = `
     vertical-align: middle;
     white-space: nowrap;
   }
+  .xref-table td.col-check { padding: 10px 8px 10px 14px; }
   .xref-table tr:hover td { background: rgba(255,255,255,0.015); }
+  .xref-table tr.row-selected td { background: rgba(201,168,76,0.06); }
+  .xref-table tr.row-selected:hover td { background: rgba(201,168,76,0.09); }
+
+  /* custom checkbox */
+  .xref-checkbox {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border: 1px solid var(--steel);
+    border-radius: 2px;
+    background: var(--iron);
+    cursor: pointer;
+    position: relative;
+    flex-shrink: 0;
+    transition: all 0.12s;
+  }
+  .xref-checkbox:checked {
+    background: var(--gold);
+    border-color: var(--gold);
+  }
+  .xref-checkbox:checked::after {
+    content: '';
+    position: absolute;
+    top: 1px; left: 4px;
+    width: 4px; height: 7px;
+    border: 2px solid var(--black);
+    border-top: none; border-left: none;
+    transform: rotate(45deg);
+  }
+  .xref-checkbox:indeterminate {
+    background: var(--iron);
+    border-color: var(--gold);
+  }
+  .xref-checkbox:indeterminate::after {
+    content: '';
+    position: absolute;
+    top: 50%; left: 2px;
+    width: 8px; height: 2px;
+    background: var(--gold);
+    transform: translateY(-50%);
+  }
+  .xref-checkbox:hover { border-color: var(--gold); }
 
   .cell-oem   { font-family: var(--font-caesar), 'Bebas Neue', sans-serif; font-size: 15px; letter-spacing: 0.06em; color: var(--orange); }
   .cell-wps   { font-family: var(--font-stencil), monospace; font-size: 11px; color: var(--cream); letter-spacing: 0.05em; }
@@ -260,7 +407,7 @@ const css = `
   .page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
   .page-btn.active { border-color: var(--orange); color: var(--orange); }
 
-  /* ── ADD MODAL ── */
+  /* ── MODALS ── */
   .modal-overlay {
     position: fixed; inset: 0;
     background: rgba(0,0,0,0.7);
@@ -282,9 +429,16 @@ const css = `
     font-family: var(--font-caesar), 'Bebas Neue', sans-serif;
     font-size: 22px;
     letter-spacing: 0.06em;
-    margin-bottom: 20px;
+    margin-bottom: 4px;
   }
   .modal-title span { color: var(--orange); }
+  .modal-subtitle {
+    font-size: 9px;
+    color: var(--chrome);
+    letter-spacing: 0.14em;
+    margin-bottom: 20px;
+  }
+  .modal-subtitle strong { color: var(--gold); }
   .modal-field { margin-bottom: 14px; }
   .modal-label {
     display: block;
@@ -305,6 +459,18 @@ const css = `
     margin-bottom: 14px;
     letter-spacing: 0.06em;
   }
+  .modal-warn {
+    background: rgba(185,28,28,0.08);
+    border: 1px solid rgba(185,28,28,0.25);
+    border-radius: 2px;
+    padding: 14px 16px;
+    margin-bottom: 20px;
+    font-size: 10px;
+    color: #e8a0a0;
+    letter-spacing: 0.06em;
+    line-height: 1.6;
+  }
+  .modal-warn strong { color: var(--red); display: block; font-size: 11px; margin-bottom: 4px; }
 
   /* ── TOAST ── */
   .toast {
@@ -340,7 +506,7 @@ const PAGE_SIZE = 50;
 const LIMIT_OPTIONS = [25, 50, 100, 200];
 
 export default function OemCrossRefPage() {
-  // State
+  // ── Core state ──
   const [rows,     setRows]     = useState([]);
   const [total,    setTotal]    = useState(0);
   const [brands,   setBrands]   = useState([]);
@@ -356,7 +522,18 @@ export default function OemCrossRefPage() {
   const [showAdd,  setShowAdd]  = useState(false);
   const [toast,    setToast]    = useState(null);
   const [deleting, setDeleting] = useState(null);
-  const searchRef = useRef(null);
+
+  // ── Selection state ──
+  // selectedIds: Set of row IDs selected on the current page via checkboxes
+  // allMatchingSelected: true when user clicks "select all N matching"
+  const [selectedIds,          setSelectedIds]          = useState(new Set());
+  const [allMatchingSelected,  setAllMatchingSelected]  = useState(false);
+
+  // ── Bulk action modals ──
+  const [bulkModal, setBulkModal] = useState(null); // "delete" | "brand" | "oem"
+  const [bulkWorking, setBulkWorking] = useState(false);
+
+  const searchRef   = useRef(null);
   const searchTimer = useRef(null);
 
   // ── Fetch ──
@@ -400,6 +577,12 @@ export default function OemCrossRefPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
+  // Clear selection when page/filters change
+  useEffect(() => {
+    setSelectedIds(new Set());
+    setAllMatchingSelected(false);
+  }, [page, limit, search, brand, source, sort, dir]);
+
   // ── Toast ──
   function showToast(msg, type = "success") {
     setToast({ msg, type });
@@ -425,7 +608,7 @@ export default function OemCrossRefPage() {
     return <span className="sort-arrow">{dir === "asc" ? "↑" : "↓"}</span>;
   }
 
-  // ── Delete ──
+  // ── Single delete ──
   async function handleDelete(id) {
     if (!confirm("Remove this cross-reference entry?")) return;
     setDeleting(id);
@@ -439,6 +622,123 @@ export default function OemCrossRefPage() {
       showToast(err.message, "error");
     } finally {
       setDeleting(null);
+    }
+  }
+
+  // ── Checkbox helpers ──
+  const pageIds = rows.map(r => r.id);
+  const allPageSelected = pageIds.length > 0 && pageIds.every(id => selectedIds.has(id));
+  const somePageSelected = pageIds.some(id => selectedIds.has(id));
+  const selectionCount = allMatchingSelected ? total : selectedIds.size;
+
+  function toggleRow(id) {
+    setAllMatchingSelected(false);
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function togglePageAll() {
+    setAllMatchingSelected(false);
+    if (allPageSelected) {
+      // deselect all on page
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        pageIds.forEach(id => next.delete(id));
+        return next;
+      });
+    } else {
+      // select all on page
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        pageIds.forEach(id => next.add(id));
+        return next;
+      });
+    }
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+    setAllMatchingSelected(false);
+  }
+
+  // ── Bulk operations ──
+  // Build the payload descriptor for the API
+  function bulkTarget() {
+    if (allMatchingSelected) {
+      // Pass current filters so the API can scope the query
+      return { mode: "filter", search, brand, source };
+    }
+    return { mode: "ids", ids: [...selectedIds] };
+  }
+
+  async function handleBulkDelete() {
+    setBulkWorking(true);
+    try {
+      const res = await fetch("/api/admin/oem-crossref/bulk", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(bulkTarget()),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Bulk delete failed");
+      showToast(`${data.deleted.toLocaleString()} entries deleted`, "success");
+      clearSelection();
+      setBulkModal(null);
+      fetchData();
+    } catch (err) {
+      showToast(err.message, "error");
+    } finally {
+      setBulkWorking(false);
+    }
+  }
+
+  async function handleBulkBrand(newBrand) {
+    setBulkWorking(true);
+    try {
+      const res = await fetch("/api/admin/oem-crossref/bulk", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...bulkTarget(), field: "oem_manufacturer", value: newBrand }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Bulk update failed");
+      showToast(`${data.updated.toLocaleString()} entries updated`, "success");
+      clearSelection();
+      setBulkModal(null);
+      fetchData();
+    } catch (err) {
+      showToast(err.message, "error");
+    } finally {
+      setBulkWorking(false);
+    }
+  }
+
+  async function handleBulkAddOem(oemNumber, oemManufacturer) {
+    setBulkWorking(true);
+    try {
+      const res = await fetch("/api/admin/oem-crossref/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...bulkTarget(),
+          oem_number: oemNumber,
+          oem_manufacturer: oemManufacturer,
+          source_file: "bulk_add",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Bulk add failed");
+      showToast(`${data.inserted.toLocaleString()} entries added (${data.skipped ?? 0} skipped as dupes)`, "success");
+      clearSelection();
+      setBulkModal(null);
+      fetchData();
+    } catch (err) {
+      showToast(err.message, "error");
+    } finally {
+      setBulkWorking(false);
     }
   }
 
@@ -456,6 +756,9 @@ export default function OemCrossRefPage() {
   const filteredCount = total;
   const startRow = page * limit + 1;
   const endRow   = Math.min((page + 1) * limit, total);
+
+  // Show "select all N matching" banner when entire page is checked but not all matching selected
+  const showSelectAllBanner = allPageSelected && !allMatchingSelected && total > rows.length;
 
   return (
     <div className="xref-wrap">
@@ -546,6 +849,66 @@ export default function OemCrossRefPage() {
         )}
       </div>
 
+      {/* BULK ACTION BAR — appears when rows are selected */}
+      {selectionCount > 0 && (
+        <div className="bulk-bar">
+          <div className="bulk-bar-count">
+            <span>{selectionCount.toLocaleString()}</span> ROW{selectionCount !== 1 ? "S" : ""} SELECTED
+          </div>
+          <div className="bulk-bar-divider" />
+          <div className="bulk-bar-actions">
+            <button
+              className="btn-bulk btn-bulk-brand"
+              disabled={bulkWorking}
+              onClick={() => setBulkModal("brand")}
+            >
+              ✎ CHANGE BRAND
+            </button>
+            <button
+              className="btn-bulk btn-bulk-oem"
+              disabled={bulkWorking}
+              onClick={() => setBulkModal("oem")}
+            >
+              + ADD OEM #
+            </button>
+            <button
+              className="btn-bulk btn-bulk-delete"
+              disabled={bulkWorking}
+              onClick={() => setBulkModal("delete")}
+            >
+              ✕ DELETE SELECTED
+            </button>
+          </div>
+          <button className="bulk-bar-clear" onClick={clearSelection}>
+            CLEAR SELECTION
+          </button>
+        </div>
+      )}
+
+      {/* SELECT-ALL-MATCHING BANNER */}
+      {showSelectAllBanner && (
+        <div className="select-all-banner">
+          All <strong>{rows.length}</strong> rows on this page are selected.
+          <button
+            className="btn-select-all-match"
+            onClick={() => setAllMatchingSelected(true)}
+          >
+            SELECT ALL {total.toLocaleString()} MATCHING ENTRIES
+          </button>
+          <button className="btn-select-all-clear" onClick={clearSelection}>
+            Clear selection
+          </button>
+        </div>
+      )}
+      {allMatchingSelected && (
+        <div className="select-all-banner">
+          All <strong>{total.toLocaleString()}</strong> matching entries are selected.
+          <button className="btn-select-all-clear" onClick={clearSelection}>
+            Clear selection
+          </button>
+        </div>
+      )}
+
       {/* TABLE */}
       <div className="xref-table-wrap">
         {loading ? (
@@ -564,6 +927,18 @@ export default function OemCrossRefPage() {
           <table className="xref-table">
             <thead>
               <tr>
+                <th className="col-check no-sort">
+                  <input
+                    type="checkbox"
+                    className="xref-checkbox"
+                    checked={allPageSelected}
+                    ref={el => {
+                      if (el) el.indeterminate = somePageSelected && !allPageSelected;
+                    }}
+                    onChange={togglePageAll}
+                    title={allPageSelected ? "Deselect page" : "Select page"}
+                  />
+                </th>
                 <th onClick={() => handleSort("oem_number")} className={sort === "oem_number" ? "sorted" : ""}>
                   OEM # {sortArrow("oem_number")}
                 </th>
@@ -584,7 +959,15 @@ export default function OemCrossRefPage() {
             </thead>
             <tbody>
               {rows.map(row => (
-                <tr key={row.id}>
+                <tr key={row.id} className={selectedIds.has(row.id) ? "row-selected" : ""}>
+                  <td className="col-check">
+                    <input
+                      type="checkbox"
+                      className="xref-checkbox"
+                      checked={selectedIds.has(row.id)}
+                      onChange={() => toggleRow(row.id)}
+                    />
+                  </td>
                   <td><span className="cell-oem">{row.oem_number}</span></td>
                   <td><span className="cell-wps">{row.sku}</span></td>
                   <td><span className="cell-brand">{row.oem_manufacturer || "—"}</span></td>
@@ -633,13 +1016,60 @@ export default function OemCrossRefPage() {
       )}
 
       {/* ADD MODAL */}
-      {showAdd && <AddModal onClose={() => setShowAdd(false)} onSuccess={() => { setShowAdd(false); fetchData(); showToast("Entry added"); }} />}
+      {showAdd && (
+        <AddModal
+          onClose={() => setShowAdd(false)}
+          onSuccess={() => { setShowAdd(false); fetchData(); showToast("Entry added"); }}
+        />
+      )}
+
+      {/* BULK DELETE MODAL */}
+      {bulkModal === "delete" && (
+        <BulkDeleteModal
+          count={selectionCount}
+          allMatching={allMatchingSelected}
+          working={bulkWorking}
+          onClose={() => setBulkModal(null)}
+          onConfirm={handleBulkDelete}
+        />
+      )}
+
+      {/* BULK BRAND MODAL */}
+      {bulkModal === "brand" && (
+        <BulkBrandModal
+          count={selectionCount}
+          allMatching={allMatchingSelected}
+          working={bulkWorking}
+          brands={brands}
+          onClose={() => setBulkModal(null)}
+          onConfirm={handleBulkBrand}
+        />
+      )}
+
+      {/* BULK ADD OEM MODAL */}
+      {bulkModal === "oem" && (
+        <BulkAddOemModal
+          count={selectionCount}
+          allMatching={allMatchingSelected}
+          working={bulkWorking}
+          onClose={() => setBulkModal(null)}
+          onConfirm={handleBulkAddOem}
+        />
+      )}
 
       {/* TOAST */}
       {toast && <div className={`toast ${toast.type}`}>{toast.msg}</div>}
     </div>
   );
 }
+
+// ── Shared field style ────────────────────────────────────────────────────────
+const fieldStyle = {
+  background: "#1a1919", border: "1px solid #2a2828", color: "#f0ebe3",
+  padding: "8px 12px", borderRadius: 2, width: "100%",
+  fontFamily: "var(--font-stencil), monospace", fontSize: 12, letterSpacing: "0.05em",
+  outline: "none",
+};
 
 // ── Add Entry Modal ───────────────────────────────────────────────────────────
 function AddModal({ onClose, onSuccess }) {
@@ -674,13 +1104,6 @@ function AddModal({ onClose, onSuccess }) {
       setSaving(false);
     }
   }
-
-  const fieldStyle = {
-    background: "#1a1919", border: "1px solid #2a2828", color: "#f0ebe3",
-    padding: "8px 12px", borderRadius: 2, width: "100%",
-    fontFamily: "var(--font-stencil), monospace", fontSize: 12, letterSpacing: "0.05em",
-    outline: "none",
-  };
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -717,6 +1140,137 @@ function AddModal({ onClose, onSuccess }) {
             <button type="button" className="btn btn-ghost" onClick={onClose} disabled={saving}>CANCEL</button>
             <button type="submit" className="btn btn-primary" disabled={saving}>
               {saving ? "SAVING…" : "SAVE ENTRY"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── Bulk Delete Modal ─────────────────────────────────────────────────────────
+function BulkDeleteModal({ count, allMatching, working, onClose, onConfirm }) {
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        <div className="modal-title">DELETE <span>ENTRIES</span></div>
+        <div className="modal-subtitle">
+          <strong>{count.toLocaleString()}</strong> {allMatching ? "ALL MATCHING" : "SELECTED"} ROW{count !== 1 ? "S" : ""}
+        </div>
+        <div className="modal-warn">
+          <strong>⚠ THIS CANNOT BE UNDONE</strong>
+          Deleting {count.toLocaleString()} {count !== 1 ? "entries" : "entry"} will permanently remove{" "}
+          {count !== 1 ? "them" : "it"} from <code>catalog_oem_crossref</code>. You should rebuild{" "}
+          <code>oem_numbers[]</code> on <code>catalog_unified</code> after large deletes.
+        </div>
+        <div className="modal-actions">
+          <button className="btn btn-ghost" onClick={onClose} disabled={working}>CANCEL</button>
+          <button className="btn btn-danger" onClick={onConfirm} disabled={working}>
+            {working ? "DELETING…" : `DELETE ${count.toLocaleString()} ENTR${count !== 1 ? "IES" : "Y"}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Bulk Change Brand Modal ───────────────────────────────────────────────────
+function BulkBrandModal({ count, allMatching, working, brands, onClose, onConfirm }) {
+  const [value, setValue] = useState("");
+  const [error, setError] = useState("");
+
+  function submit(e) {
+    e.preventDefault();
+    if (!value.trim()) { setError("Brand name is required."); return; }
+    onConfirm(value.trim());
+  }
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        <div className="modal-title">CHANGE <span>BRAND</span></div>
+        <div className="modal-subtitle">
+          APPLYING TO <strong>{count.toLocaleString()}</strong> {allMatching ? "ALL MATCHING" : "SELECTED"} ROW{count !== 1 ? "S" : ""}
+        </div>
+        {error && <div className="modal-error">{error}</div>}
+        <form onSubmit={submit}>
+          <div className="modal-field">
+            <label className="modal-label">NEW BRAND (OEM_MANUFACTURER) <span className="req">*</span></label>
+            {/* Combo: datalist lets them type or pick from existing brands */}
+            <input
+              list="brand-suggestions"
+              style={fieldStyle}
+              placeholder="Type or pick an existing brand…"
+              value={value}
+              onChange={e => { setValue(e.target.value); setError(""); }}
+              autoFocus
+            />
+            <datalist id="brand-suggestions">
+              {brands.map(b => <option key={b} value={b} />)}
+            </datalist>
+          </div>
+          <div className="modal-actions">
+            <button type="button" className="btn btn-ghost" onClick={onClose} disabled={working}>CANCEL</button>
+            <button type="submit" className="btn btn-primary" disabled={working}>
+              {working ? "UPDATING…" : `UPDATE ${count.toLocaleString()} ROW${count !== 1 ? "S" : ""}`}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── Bulk Add OEM # Modal ──────────────────────────────────────────────────────
+function BulkAddOemModal({ count, allMatching, working, onClose, onConfirm }) {
+  const [oemNumber,       setOemNumber]       = useState("");
+  const [oemManufacturer, setOemManufacturer] = useState("HD");
+  const [error,           setError]           = useState("");
+
+  function submit(e) {
+    e.preventDefault();
+    if (!oemNumber.trim())       { setError("OEM # is required."); return; }
+    if (!oemManufacturer.trim()) { setError("Manufacturer is required."); return; }
+    onConfirm(oemNumber.trim(), oemManufacturer.trim());
+  }
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        <div className="modal-title">ADD <span>OEM #</span></div>
+        <div className="modal-subtitle">
+          ADDING TO SKUS OF <strong>{count.toLocaleString()}</strong> {allMatching ? "ALL MATCHING" : "SELECTED"} ROW{count !== 1 ? "S" : ""}
+        </div>
+        <p style={{ fontSize: 10, color: "#8a8784", letterSpacing: "0.08em", marginBottom: 16, lineHeight: 1.6 }}>
+          A new <code>catalog_oem_crossref</code> row will be inserted for each unique SKU in your
+          selection with this OEM # + manufacturer. Duplicate (sku, oem_number, oem_manufacturer)
+          combinations are silently skipped.
+        </p>
+        {error && <div className="modal-error">{error}</div>}
+        <form onSubmit={submit}>
+          <div className="modal-field">
+            <label className="modal-label">OEM # <span className="req">*</span></label>
+            <input
+              style={fieldStyle}
+              placeholder="e.g. 11101-70"
+              value={oemNumber}
+              onChange={e => { setOemNumber(e.target.value); setError(""); }}
+              autoFocus
+            />
+          </div>
+          <div className="modal-field">
+            <label className="modal-label">MANUFACTURER <span className="req">*</span></label>
+            <input
+              style={fieldStyle}
+              placeholder="e.g. HD"
+              value={oemManufacturer}
+              onChange={e => { setOemManufacturer(e.target.value); setError(""); }}
+            />
+          </div>
+          <div className="modal-actions">
+            <button type="button" className="btn btn-ghost" onClick={onClose} disabled={working}>CANCEL</button>
+            <button type="submit" className="btn btn-primary" disabled={working}>
+              {working ? "ADDING…" : `ADD TO ${count.toLocaleString()} ROW${count !== 1 ? "S" : ""}`}
             </button>
           </div>
         </form>

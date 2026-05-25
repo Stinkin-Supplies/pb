@@ -26,6 +26,8 @@ const SORT_OPTIONS = [
   { value: "price_desc", label: "Price ↓" },
   { value: "name_asc",   label: "A → Z" },
   { value: "newest",     label: "Newest" },
+  { value: "year_asc",   label: "Year ↑" },
+  { value: "year_desc",  label: "Year ↓" },
 ];
 
 // ─── Product Card ─────────────────────────────────────────────────────────────

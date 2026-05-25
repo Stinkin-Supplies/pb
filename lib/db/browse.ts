@@ -127,7 +127,20 @@ export interface BrowseFilters {
   page?: number;
   perPage?: number;
   subcategory?: string;
-  sort?: "relevance" | "price_asc" | "price_desc" | "name_asc" | "newest";
+  sort?: "relevance" | "price_asc" | "price_desc" | "name_asc" | "newest" | "year_asc" | "year_desc";
+}
+
+export interface PartNeighbor {
+  id: number;
+  slug: string;
+  name: string;
+  brand: string;
+  category: string;
+  computed_price: number | null;
+  image_url: string | null;
+  fitment_year_start: number | null;
+  fitment_year_end: number | null;
+  in_stock: boolean;
 }
 
 export interface BrowseResult {
@@ -402,11 +415,13 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
     conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
   const sortMap: Record<string, string> = {
-    relevance:  "in_stock DESC, name ASC",
-    price_asc:  "computed_price ASC NULLS LAST",
-    price_desc: "computed_price DESC NULLS LAST",
-    name_asc:   "name ASC",
-    newest:     "id DESC",
+    relevance:  "d.in_stock DESC, d.name ASC",
+    price_asc:  "d.computed_price ASC NULLS LAST",
+    price_desc: "d.computed_price DESC NULLS LAST",
+    name_asc:   "d.name ASC",
+    newest:     "d.id DESC",
+    year_asc:   "d.fitment_year_start ASC NULLS LAST, d.name ASC",
+    year_desc:  "d.fitment_year_start DESC NULLS FIRST, d.name ASC",
   };
 
   const offset = (page - 1) * perPage;
@@ -420,7 +435,7 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
   // This push MUST come after facetParams is snapshotted.
   const orderBy = typesenseIds && sort === "relevance"
     ? `array_position($${p++}::int[], d.id), d.in_stock DESC`
-    : (sortMap[sort] ?? "cu.id DESC");
+    : (sortMap[sort] ?? "d.id DESC");
   if (typesenseIds && sort === "relevance") params.push(typesenseIds);
 
   // Now push pagination params
@@ -440,7 +455,8 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
         cu.computed_price, cu.msrp, cu.map_price,
         cu.image_url, cu.image_urls, cu.in_stock, cu.stock_quantity,
         cu.is_harley_fitment, cu.features, cu.oem_numbers,
-        cu.variant_group_id
+        cu.variant_group_id,
+        cu.fitment_year_start, cu.fitment_year_end
       FROM catalog_unified cu
       ${fitmentJoin}
       ${where}
@@ -559,4 +575,91 @@ export async function quickSearch(
     [`%${q}%`, `${q}%`, q, limit]
   );
   return rows;
+}
+
+/**
+ * For a product with H-D fitment, find the closest predecessor (fits same model
+ * codes, year range ends before ours starts) and successor (starts after ours ends).
+ *
+ * Year data lives in catalog_fitment_v2 → harley_model_years, NOT in
+ * catalog_unified.fitment_year_start / fitment_year_end (those columns are all NULL).
+ * We therefore derive the current product's year range and model codes in Step 1,
+ * then use GROUP BY + HAVING on the fitment tables to locate neighbors in Step 2.
+ */
+export async function getChronologicalNeighbors(
+  productId: number,
+  category: string | null,
+): Promise<{
+  prev: PartNeighbor | null;
+  next: PartNeighbor | null;
+  currentYearStart: number | null;
+  currentYearEnd: number | null;
+}> {
+  if (!category) {
+    return { prev: null, next: null, currentYearStart: null, currentYearEnd: null };
+  }
+
+  // ── Step 1: Derive model codes + year range from fitment tables ──────────
+  const { rows: selfRows } = await pool.query(
+    `SELECT
+       array_agg(DISTINCT hm.model_code) AS model_codes,
+       MIN(hmy.year)                      AS year_start,
+       MAX(hmy.year)                      AS year_end
+     FROM catalog_fitment_v2 cfv
+     JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id
+     JOIN harley_models      hm  ON hm.id  = hmy.model_id
+     WHERE cfv.product_id = $1`,
+    [productId]
+  );
+
+  const self = selfRows[0];
+  if (!self?.model_codes?.length || self.year_start == null || self.year_end == null) {
+    return { prev: null, next: null, currentYearStart: null, currentYearEnd: null };
+  }
+
+  const modelCodes: string[] = self.model_codes;
+  const yearStart = Number(self.year_start);
+  const yearEnd   = Number(self.year_end);
+
+  // ── Step 2: Find predecessor / successor via GROUP BY + HAVING ───────────
+  // The base SELECT computes each candidate product's year span from fitment rows.
+  // HAVING restricts to those whose span falls entirely before/after ours.
+  const neighborBase = `
+    SELECT
+      cu.id, cu.slug, cu.name, cu.brand, cu.category,
+      cu.computed_price, cu.image_url, cu.in_stock,
+      MIN(hmy.year) AS fitment_year_start,
+      MAX(hmy.year) AS fitment_year_end
+    FROM catalog_fitment_v2 cfv
+    JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id
+    JOIN harley_models      hm  ON hm.id  = hmy.model_id
+    JOIN catalog_unified    cu  ON cu.id  = cfv.product_id
+    WHERE hm.model_code = ANY($1::text[])
+      AND cu.is_active  = true
+      AND cu.category   = $2
+      AND cu.id        != $3
+    GROUP BY
+      cu.id, cu.slug, cu.name, cu.brand, cu.category,
+      cu.computed_price, cu.image_url, cu.in_stock
+  `;
+
+  const [prevRes, nextRes] = await Promise.all([
+    // Predecessor: latest year range that ends before our range starts
+    pool.query(
+      `${neighborBase} HAVING MAX(hmy.year) < $4 ORDER BY MAX(hmy.year) DESC LIMIT 1`,
+      [modelCodes, category, productId, yearStart]
+    ),
+    // Successor: earliest year range that starts after our range ends
+    pool.query(
+      `${neighborBase} HAVING MIN(hmy.year) > $4 ORDER BY MIN(hmy.year) ASC LIMIT 1`,
+      [modelCodes, category, productId, yearEnd]
+    ),
+  ]);
+
+  return {
+    prev: prevRes.rows[0] ?? null,
+    next: nextRes.rows[0] ?? null,
+    currentYearStart: yearStart,
+    currentYearEnd:   yearEnd,
+  };
 }

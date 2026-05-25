@@ -24,6 +24,31 @@ function extractBaseName(displayName) {
   return displayName?.replace(/\s*-\s*\d+\s*Gauge\s*$/i, '').trim() ?? displayName;
 }
 
+/**
+ * Derive a concise label for a variant card by stripping the group's display
+ * name prefix from the product name.
+ *
+ * e.g. group = "Bolts - Hex-Head"
+ *      name  = "Bolts - Hex-Head - Chrome - 1/2\"-13 x 2-1/4\""
+ *      →       "Chrome - 1/2\"-13 x 2-1/4\""
+ *
+ * Falls back to the full product name when stripping doesn't help.
+ */
+function makeShortLabel(name, groupDisplayName) {
+  if (!name) return name;
+  if (!groupDisplayName) return name;
+  // Normalise both strings for comparison (lower-case, collapse whitespace)
+  const norm = (s) => s.toLowerCase().replace(/[\s\-–]+/g, ' ').trim();
+  const grp = norm(groupDisplayName);
+  const nm  = norm(name);
+  if (nm.startsWith(grp)) {
+    // Strip prefix + any leading separators
+    const stripped = name.slice(groupDisplayName.length).replace(/^[\s\-–]+/, '').trim();
+    return stripped || name;
+  }
+  return name;
+}
+
 // Given a variant, determine the best year-range label for display
 function yearRangeLabel(variant) {
   const fams = variant.fitment_by_family;
@@ -248,6 +273,7 @@ export default function VariantSelector({ productId, currentSku }) {
           currentId={currentId}
           selected={selected}
           onSelect={handleSelect}
+          groupDisplayName={group?.displayName}
         />
       )}
     </div>
@@ -255,16 +281,16 @@ export default function VariantSelector({ productId, currentSku }) {
 }
 
 // ── Flat list with show more/less (original behavior for non-fitment variants) ─
-function FlatVariantList({ variants, currentId, selected, onSelect }) {
+function FlatVariantList({ variants, currentId, selected, onSelect, groupDisplayName }) {
   const [expanded, setExpanded] = useState(false);
-  const SHOW_INITIAL = 4;
+  const SHOW_INITIAL = 6;
 
+  // Already sorted by sort_order from the API — keep that order,
+  // just bump the current product to the top.
   const sorted = [...variants].sort((a, b) => {
     if (a.id === currentId) return -1;
     if (b.id === currentId) return 1;
-    const la = (a.option_1_value || a.name || '').toLowerCase();
-    const lb = (b.option_1_value || b.name || '').toLowerCase();
-    return la.localeCompare(lb);
+    return 0;
   });
 
   const display = expanded ? sorted : sorted.slice(0, SHOW_INITIAL);
@@ -280,6 +306,7 @@ function FlatVariantList({ variants, currentId, selected, onSelect }) {
             isSelected={v.id === selected}
             isCurrent={v.id === currentId}
             onSelect={() => onSelect(v)}
+            groupDisplayName={groupDisplayName}
           />
         ))}
       </div>
@@ -385,11 +412,23 @@ function FitmentVariantCard({ variant, isSelected, isCurrent, onSelect }) {
 }
 
 // ── Original flat variant card (color/size) ───────────────────
-function VariantCard({ variant, isSelected, isCurrent, onSelect }) {
+function VariantCard({ variant, isSelected, isCurrent, onSelect, groupDisplayName }) {
   const [hovered, setHovered] = useState(false);
   const inStock = variant.stock_qty > 0;
   const price   = variant.offer_price || variant.msrp;
   const active  = isSelected || isCurrent;
+
+  // Compute a concise label: strip the group name prefix from the product name.
+  // Falls back to option values, then full name, then SKU.
+  const shortLabel = makeShortLabel(variant.name, groupDisplayName)
+    || variant.option_2_value
+    || variant.option_1_value
+    || variant.name
+    || variant.sku;
+
+  // Build an option pill string (e.g. "Chrome · 1/2\"")
+  const optParts = [variant.option_1_value, variant.option_2_value].filter(Boolean);
+  const optLabel = optParts.length ? optParts.join(' · ') : null;
 
   return (
     <button
@@ -410,14 +449,25 @@ function VariantCard({ variant, isSelected, isCurrent, onSelect }) {
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flex: 1 }}>
         <div style={{
-          fontSize: 13, fontWeight: 600, color: DARK,
+          fontSize: 12, fontWeight: 600, color: DARK,
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          fontFamily: "var(--font-stencil, 'Barlow Condensed', monospace)",
+          letterSpacing: '0.03em', textTransform: 'uppercase',
         }}>
-          {variant.option_1_value || variant.name || variant.sku}
+          {shortLabel}
         </div>
-        <div style={{ fontSize: 11, color: '#9a8870', fontFamily: 'monospace' }}>
-          {variant.sku}
-        </div>
+        {/* Show option badges only when they add info beyond the label */}
+        {optLabel && optLabel !== shortLabel && (
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {optParts.map((v, i) => (
+              <span key={i} style={{
+                fontSize: 9, padding: '1px 6px', borderRadius: 3,
+                background: '#f0ebe0', color: '#7a6848', letterSpacing: '0.05em',
+                fontFamily: "var(--font-stencil, 'Barlow Condensed', monospace)",
+              }}>{v}</span>
+            ))}
+          </div>
+        )}
         {isCurrent && (
           <div style={{
             fontFamily: "var(--font-stencil, 'Barlow Condensed', monospace)",

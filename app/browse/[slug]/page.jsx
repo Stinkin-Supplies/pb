@@ -12,6 +12,7 @@ import { notFound } from "next/navigation";
 import getCatalogDb from "@/lib/db/catalog";
 import ProductDetailClient from "./ProductDetailClient";
 import { proxyImageUrl } from "@/lib/utils/image-proxy";
+import { getChronologicalNeighbors } from "@/lib/db/browse";
 
 export default async function ProductDetailPage({ params }) {
   const { slug } = await params;
@@ -163,6 +164,10 @@ export default async function ProductDetailPage({ params }) {
   let fitment      = [];
   let catalogSpecs = [];
   let related      = [];
+  let prevPart          = null;
+  let nextPart          = null;
+  let timelineYearStart = null;
+  let timelineYearEnd   = null;
 
   // Variants — table may not exist yet
   try {
@@ -210,34 +215,56 @@ export default async function ProductDetailPage({ params }) {
     // table doesn't exist yet — skip silently
   }
 
-  // Related products
-  try {
-    const { rows } = await catalogDb.query(
-      `SELECT
-        cp.id, cp.slug, cp.name, cp.brand, cp.category,
-        COALESCE(cp.computed_price, cp.msrp) AS price,
-        cp.msrp,
-        COALESCE((
-          SELECT cm.url FROM public.catalog_media cm
-          WHERE cm.product_id = cp.id ORDER BY cm.priority ASC LIMIT 1
-        ), cu.image_url) AS image,
-        COALESCE((
-          SELECT SUM(vo.total_qty) FROM public.vendor_offers vo
-          WHERE vo.catalog_product_id = cp.id AND vo.is_active = true
-        ), cu.stock_quantity, 0) AS stock_quantity
-       FROM public.catalog_products cp
-       INNER JOIN public.catalog_unified cu ON cu.sku = cp.sku
-       WHERE cp.category = $1
-         AND cp.slug <> $2
-         AND cp.is_active = true
-       ORDER BY cp.created_at DESC
-       LIMIT 4`,
-      [productRow.category, slug]
-    );
-    related = rows.map(normalizeProductRow);
-  } catch (e) {
-    console.error("[PDP] related fetch failed:", e.message);
-  }
+  // Related products + chronological neighbors — run in parallel
+  await Promise.all([
+    // Related: same category, recent
+    (async () => {
+      try {
+        const { rows } = await catalogDb.query(
+          `SELECT
+            cp.id, cp.slug, cp.name, cp.brand, cp.category,
+            COALESCE(cp.computed_price, cp.msrp) AS price,
+            cp.msrp,
+            COALESCE((
+              SELECT cm.url FROM public.catalog_media cm
+              WHERE cm.product_id = cp.id ORDER BY cm.priority ASC LIMIT 1
+            ), cu.image_url) AS image,
+            COALESCE((
+              SELECT SUM(vo.total_qty) FROM public.vendor_offers vo
+              WHERE vo.catalog_product_id = cp.id AND vo.is_active = true
+            ), cu.stock_quantity, 0) AS stock_quantity
+           FROM public.catalog_products cp
+           INNER JOIN public.catalog_unified cu ON cu.sku = cp.sku
+           WHERE cp.category = $1
+             AND cp.slug <> $2
+             AND cp.is_active = true
+           ORDER BY cp.created_at DESC
+           LIMIT 4`,
+          [productRow.category, slug]
+        );
+        related = rows.map(normalizeProductRow);
+      } catch (e) {
+        console.error("[PDP] related fetch failed:", e.message);
+      }
+    })(),
+
+    // Chronological neighbors: predecessor / successor for same model
+    (async () => {
+      try {
+        const unifiedId = productRow.unified_id ?? productRow.id;
+        const neighbors = await getChronologicalNeighbors(
+          unifiedId,
+          productRow.category ?? null,
+        );
+        prevPart          = neighbors.prev;
+        nextPart          = neighbors.next;
+        timelineYearStart = neighbors.currentYearStart;
+        timelineYearEnd   = neighbors.currentYearEnd;
+      } catch (e) {
+        console.error("[PDP] neighbors fetch failed:", e.message);
+      }
+    })(),
+  ]);
 
   const specs = catalogSpecs
     .filter(s => !["Catalog", "Product Code", "Data", "DATA"].includes(s.attribute))
@@ -259,6 +286,10 @@ export default async function ProductDetailPage({ params }) {
       variants={variants}
       fitment={fitment}
       relatedProducts={related}
+      prevPart={prevPart}
+      nextPart={nextPart}
+      timelineYearStart={timelineYearStart}
+      timelineYearEnd={timelineYearEnd}
     />
   );
 }

@@ -25,10 +25,12 @@ export async function GET(
 
     const { group_id, display_name, source_vendor, family_key } = groupRow.rows[0];
 
-    // DISTINCT ON deduplicates PU products with identical names but different vendor_skus.
+    // No DISTINCT ON needed — (group_id, product_id) is unique in catalog_variant_members.
+    // The previous DISTINCT ON (option_1_value) was silently collapsing all members that
+    // share the same option value (e.g. 33 "Chrome" bolts → 1 row), hiding the panel entirely.
     // Image falls back to cu.image_url (LeMans CDN) when catalog_media has no entry.
     const siblings = await db.query(`
-      SELECT DISTINCT ON (COALESCE(cvm.option_1_value, cu.id::text))
+      SELECT
         cu.id,
         cu.sku,
         cu.name,
@@ -38,6 +40,8 @@ export async function GET(
         cu.is_active,
         cvm.option_1_name,
         cvm.option_1_value,
+        cvm.option_2_name,
+        cvm.option_2_value,
         cvm.sort_order,
         COALESCE(vo.total_qty, 0) AS stock_qty,
         COALESCE(vo.msrp, cu.msrp) AS offer_price,
@@ -69,10 +73,11 @@ export async function GET(
       JOIN catalog_unified cu ON cu.id = cvm.product_id
       LEFT JOIN vendor_offers vo ON vo.catalog_product_id = cu.id
       WHERE cvm.group_id = $1
+        AND cu.is_active = true
       ORDER BY
-        COALESCE(cvm.option_1_value, cu.id::text),
+        cvm.sort_order ASC NULLS LAST,
         (COALESCE(vo.total_qty, 0) > 0) DESC,
-        COALESCE(vo.msrp, cu.msrp) ASC,
+        COALESCE(vo.msrp, cu.msrp) ASC NULLS LAST,
         cu.id ASC
     `, [group_id]);
 

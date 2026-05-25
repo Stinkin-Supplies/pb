@@ -410,8 +410,131 @@ function StockDot({ inStock, qty }) {
   );
 }
 
+// ── Model Timeline ────────────────────────────────────────────
+function TimelineCard({ part, direction }) {
+  const [imgErr, setImgErr] = useState(false);
+  const src = proxyImg(part.image_url);
+  const yearLabel = part.fitment_year_start && part.fitment_year_end
+    ? part.fitment_year_start === part.fitment_year_end
+      ? `${part.fitment_year_start}`
+      : `${part.fitment_year_start}–${part.fitment_year_end}`
+    : null;
+
+  return (
+    <Link href={`/browse/${part.slug}`} style={{ textDecoration: "none", flex: 1, minWidth: 0, maxWidth: 320 }}>
+      <div
+        onMouseEnter={e => { e.currentTarget.style.borderColor = GOLD; e.currentTarget.style.transform = "translateY(-2px)"; }}
+        onMouseLeave={e => { e.currentTarget.style.borderColor = BORDER; e.currentTarget.style.transform = ""; }}
+        style={{
+          background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 4,
+          overflow: "hidden", transition: "border-color 0.15s, transform 0.15s",
+          display: "flex", flexDirection: "column",
+        }}
+      >
+        {/* Direction label */}
+        <div style={{
+          background: CREAM2, borderBottom: `1px solid ${BORDER}`,
+          padding: "6px 12px", display: "flex", alignItems: "center",
+          justifyContent: direction === "prev" ? "flex-start" : "flex-end", gap: 6,
+        }}>
+          {direction === "prev" && (
+            <span style={{ fontFamily: FONT, fontSize: 9, color: GOLD, letterSpacing: "1.5px", textTransform: "uppercase" }}>
+              ← Earlier
+            </span>
+          )}
+          {yearLabel && (
+            <span style={{
+              fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)",
+              fontSize: 15, color: DARK, letterSpacing: "0.5px",
+            }}>{yearLabel}</span>
+          )}
+          {direction === "next" && (
+            <span style={{ fontFamily: FONT, fontSize: 9, color: GOLD, letterSpacing: "1.5px", textTransform: "uppercase" }}>
+              Later →
+            </span>
+          )}
+        </div>
+        {/* Image */}
+        <div style={{ aspectRatio: "1", background: CREAM, position: "relative", flexShrink: 0 }}>
+          {src && !imgErr ? (
+            <img src={src} alt={part.name} onError={() => setImgErr(true)}
+              style={{ width: "100%", height: "100%", objectFit: "contain", padding: 12 }} />
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", fontFamily: FONT, fontSize: 8, color: "#ccc", letterSpacing: "1px" }}>NO IMAGE</div>
+          )}
+        </div>
+        {/* Info */}
+        <div style={{ padding: "10px 12px 14px", borderTop: `1px solid ${BORDER}` }}>
+          <div style={{ fontFamily: FONT, fontSize: 8, color: GOLD, letterSpacing: "2px", marginBottom: 3 }}>{part.brand}</div>
+          <div style={{ fontFamily: FONT, fontSize: 11, color: DARK, lineHeight: 1.3, textTransform: "uppercase", letterSpacing: "0.5px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", marginBottom: 8 }}>
+            {part.name}
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontFamily: FONT, fontSize: 14, color: DARK }}>
+              {part.computed_price ? `$${Number(part.computed_price).toFixed(2)}` : "—"}
+            </span>
+            <span style={{
+              fontFamily: FONT, fontSize: 8, letterSpacing: "1px",
+              color: part.in_stock ? "#4a8c5c" : "#b05a40",
+            }}>
+              {part.in_stock ? "IN STOCK" : "OUT OF STOCK"}
+            </span>
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function ModelTimeline({ prevPart, nextPart, currentYearStart, currentYearEnd }) {
+  if (!prevPart && !nextPart) return null;
+  const currentLabel = currentYearStart && currentYearEnd
+    ? currentYearStart === currentYearEnd ? `${currentYearStart}` : `${currentYearStart}–${currentYearEnd}`
+    : null;
+
+  return (
+    <div style={{ maxWidth: 1160, margin: "0 auto", padding: "0 24px 60px", borderTop: `1px solid ${BORDER}` }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 20, paddingTop: 28 }}>
+        <span style={{ fontFamily: FONT, fontSize: 10, letterSpacing: "3px", color: DARK, textTransform: "uppercase" }}>
+          Model <span style={{ color: GOLD }}>Timeline</span>
+        </span>
+        <span style={{ fontFamily: FONT, fontSize: 8, color: "#bbb", letterSpacing: "1px" }}>
+          Same model · adjacent year ranges
+        </span>
+      </div>
+
+      <div style={{ display: "flex", gap: 16, alignItems: "stretch" }}>
+        {/* Predecessor */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {prevPart
+            ? <TimelineCard part={prevPart} direction="prev" />
+            : <div style={{ flex: 1, border: `1px dashed rgba(184,146,42,0.2)`, borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 120, fontFamily: FONT, fontSize: 9, color: "#ddd", letterSpacing: "1.5px" }}>No earlier version</div>
+          }
+        </div>
+
+        {/* Current — center marker */}
+        <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, padding: "0 8px" }}>
+          <div style={{ width: 1, flex: 1, background: `rgba(184,146,42,0.2)` }} />
+          <div style={{ background: GOLD, color: "#fff", fontFamily: FONT, fontSize: 8, letterSpacing: "1.5px", padding: "4px 10px", borderRadius: 2, whiteSpace: "nowrap", textTransform: "uppercase" }}>
+            {currentLabel ?? "This Part"}
+          </div>
+          <div style={{ width: 1, flex: 1, background: `rgba(184,146,42,0.2)` }} />
+        </div>
+
+        {/* Successor */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {nextPart
+            ? <TimelineCard part={nextPart} direction="next" />
+            : <div style={{ flex: 1, border: `1px dashed rgba(184,146,42,0.2)`, borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 120, fontFamily: FONT, fontSize: 9, color: "#ddd", letterSpacing: "1.5px" }}>No later version</div>
+          }
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main ──────────────────────────────────────────────────────
-export default function ProductDetailClient({ product, fitment = [], relatedProducts = [] }) {
+export default function ProductDetailClient({ product, fitment = [], relatedProducts = [], prevPart = null, nextPart = null, timelineYearStart = null, timelineYearEnd = null }) {
   const [tab, setTab]                   = useState("description");
   const [qty, setQty]                   = useState(1);
   const [modalProduct, setModalProduct] = useState(null);
@@ -678,6 +801,14 @@ export default function ProductDetailClient({ product, fitment = [], relatedProd
           </table>
         )}
       </div>
+
+      {/* ── MODEL TIMELINE ── */}
+      <ModelTimeline
+        prevPart={prevPart}
+        nextPart={nextPart}
+        currentYearStart={timelineYearStart}
+        currentYearEnd={timelineYearEnd}
+      />
 
       {/* ── RELATED ── */}
       {relatedProducts.length > 0 && (
