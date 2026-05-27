@@ -144,19 +144,23 @@ function BrowsePageInner() {
   const [searchInput, setSearchInput] = useState(searchParams.get("q") || "");
 
   const [filters, setFilters] = useState({
-    era:         searchParams.get("era")         || null,
-    family:      searchParams.get("family")      || null,
-    model:       searchParams.get("model")       || null,
-    modelCodes:  searchParams.getAll("model_code").length > 0 ? searchParams.getAll("model_code") : null,
-    year:        searchParams.get("year")        ? parseInt(searchParams.get("year")) : null,
-    category:    searchParams.get("category")    || null,
-    subcategory: searchParams.get("subcategory") || null,
-    brand:       searchParams.get("brand")       || null,
-    q:           searchParams.get("q")           || null,
-    in_stock:    searchParams.get("in_stock")    === "true",
-    min_price:   searchParams.get("min_price")   ? parseFloat(searchParams.get("min_price")) : null,
-    max_price:   searchParams.get("max_price")   ? parseFloat(searchParams.get("max_price")) : null,
-    sort:        searchParams.get("sort")        || "relevance",
+    era:                searchParams.get("era")              || null,
+    family:             searchParams.get("family")           || null,
+    model:              searchParams.get("model")            || null,
+    modelCodes:         searchParams.getAll("model_code").length > 0 ? searchParams.getAll("model_code") : null,
+    year:               searchParams.get("year")             ? parseInt(searchParams.get("year")) : null,
+    category:           searchParams.get("category")         || null,
+    subcategory:        searchParams.get("subcategory")      || null,
+    display_category:   searchParams.get("display_category") || null,
+    display_subcategory:searchParams.get("display_subcategory") || null,
+    year_min:           searchParams.get("year_min")          ? parseInt(searchParams.get("year_min")) : null,
+    year_max:           searchParams.get("year_max")          ? parseInt(searchParams.get("year_max")) : null,
+    brand:              searchParams.get("brand")            || null,
+    q:                  searchParams.get("q")                || null,
+    in_stock:           searchParams.get("in_stock")         === "true",
+    min_price:          searchParams.get("min_price")        ? parseFloat(searchParams.get("min_price")) : null,
+    max_price:          searchParams.get("max_price")        ? parseFloat(searchParams.get("max_price")) : null,
+    sort:               searchParams.get("sort")             || "relevance",
   });
 
   // ── Listen for BottomNav hamburger event ─────────────────────
@@ -180,18 +184,22 @@ function BrowsePageInner() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (f.era)         params.set("era",         f.era);
-      if (f.family)      params.set("family",       f.family);
-      if (f.modelCodes)  f.modelCodes.forEach(c => params.append("model_code", c));
-      if (f.model)       params.set("model",        f.model);
-      if (f.year)        params.set("year",         f.year);
-      if (f.category)    params.set("category",     f.category);
-      if (f.subcategory) params.set("subcategory",  f.subcategory);
-      if (f.brand)       params.set("brand",        f.brand);
-      if (f.q)           params.set("q",            f.q);
-      if (f.in_stock)    params.set("in_stock",     "true");
-      if (f.min_price)   params.set("min_price",    f.min_price);
-      if (f.max_price)   params.set("max_price",    f.max_price);
+      if (f.era)                  params.set("era",                f.era);
+      if (f.family)               params.set("family",             f.family);
+      if (f.modelCodes)           f.modelCodes.forEach(c => params.append("model_code", c));
+      if (f.model)                params.set("model",              f.model);
+      if (f.year)                 params.set("year",               f.year);
+      if (f.display_category)     params.set("display_category",   f.display_category);
+      if (f.display_subcategory)  params.set("display_subcategory",f.display_subcategory);
+      if (f.year_min)             params.set("year_min",           f.year_min);
+      if (f.year_max)             params.set("year_max",           f.year_max);
+      if (f.category)             params.set("category",           f.category);
+      if (f.subcategory)          params.set("subcategory",        f.subcategory);
+      if (f.brand)                params.set("brand",              f.brand);
+      if (f.q)                    params.set("q",                  f.q);
+      if (f.in_stock)             params.set("in_stock",           "true");
+      if (f.min_price)            params.set("min_price",          f.min_price);
+      if (f.max_price)            params.set("max_price",          f.max_price);
       params.set("sort",     f.sort);
       params.set("page",     pg);
       params.set("per_page", PER_PAGE);
@@ -215,28 +223,32 @@ function BrowsePageInner() {
     setFilters(next);
     setPage(1);
     const p = new URLSearchParams();
-    if (next.era)         p.set("era",         next.era);
-    if (next.family)      p.set("family",       next.family);
-    if (next.model)       p.set("model",        next.model);
-    if (next.modelCodes)  next.modelCodes.forEach(c => p.append("model_code", c));
-    if (next.year)        p.set("year",         next.year);
-    if (next.category)    p.set("category",     next.category);
-    if (next.subcategory) p.set("subcategory",  next.subcategory);
-    if (next.brand)       p.set("brand",        next.brand);
-    if (next.q)           p.set("q",            next.q);
-    if (next.in_stock)    p.set("in_stock",     "true");
-    if (next.min_price)   p.set("min_price",    next.min_price);
-    if (next.max_price)   p.set("max_price",    next.max_price);
-    if (next.sort && next.sort !== "relevance") p.set("sort", next.sort);
+    if (next.era)                  p.set("era",                next.era);
+    if (next.family)               p.set("family",             next.family);
+    if (next.model)                p.set("model",              next.model);
+    if (next.modelCodes)           next.modelCodes.forEach(c => p.append("model_code", c));
+    if (next.year)                 p.set("year",               next.year);
+    if (next.display_category)     p.set("display_category",   next.display_category);
+    if (next.display_subcategory)  p.set("display_subcategory",next.display_subcategory);
+    if (next.year_min)             p.set("year_min",           next.year_min);
+    if (next.year_max)             p.set("year_max",           next.year_max);
+    if (next.category)             p.set("category",           next.category);
+    if (next.subcategory)          p.set("subcategory",        next.subcategory);
+    if (next.brand)                p.set("brand",              next.brand);
+    if (next.q)                    p.set("q",                  next.q);
+    if (next.in_stock)             p.set("in_stock",           "true");
+    if (next.min_price)            p.set("min_price",          next.min_price);
+    if (next.max_price)            p.set("max_price",          next.max_price);
+    if (next.sort && next.sort !== "relevance") p.set("sort",  next.sort);
     const qs = p.toString();
     window.history.replaceState(null, "", qs ? `/browse?${qs}` : "/browse");
   }
 
-  const activeCount = [filters.family, filters.model, filters.era, filters.category, filters.brand, filters.min_price, filters.max_price, filters.in_stock].filter(Boolean).length;
+  const activeCount = [filters.family, filters.model, filters.era, filters.display_category, filters.brand, filters.min_price, filters.max_price, filters.in_stock].filter(Boolean).length;
   const totalPages  = Math.ceil(total / PER_PAGE);
   const contextLabel = filters.family
     ? [filters.family, filters.model, filters.year].filter(Boolean).join(" / ")
-    : filters.q ? `"${filters.q}"` : filters.category || "All Parts";
+    : filters.q ? `"${filters.q}"` : filters.display_category || "All Parts";
 
   return (
     <div style={{ background: CREAM, color: DARK, minHeight: "100vh" }}>
@@ -328,7 +340,7 @@ function BrowsePageInner() {
                     {contextLabel}
                   </span>
                   <button
-                    onClick={() => handleFilterChange({ family: null, model: null, year: null, era: null, category: null, brand: null, min_price: null, max_price: null, in_stock: false, subcategory: null, modelCodes: null, q: null })}
+                    onClick={() => handleFilterChange({ family: null, model: null, year: null, era: null, display_category: null, display_subcategory: null, year_min: null, year_max: null, category: null, subcategory: null, brand: null, min_price: null, max_price: null, in_stock: false, modelCodes: null, q: null })}
                     style={{ background: "none", border: "none", color: GOLD, cursor: "pointer", fontSize: "13px", lineHeight: 1, padding: 0 }}
                   >×</button>
                 </div>

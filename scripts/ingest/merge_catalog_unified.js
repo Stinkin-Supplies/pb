@@ -143,6 +143,85 @@ function getCategoryCode(category, vendor) {
   return map[category] || 'MSC';
 }
 
+// ─── Display category mapping ──────────────────────────────────────────────────
+// Maps raw vendor category strings → clean unified display_category values.
+// Run after every merge so catalog_unified.display_category stays consistent.
+
+function mapDisplayCategory(sourceVendor, category) {
+  const v = sourceVendor?.toUpperCase();
+  const c = category || '';
+
+  if ((v==='PU'||v==='VTWIN') && c==='ENGINE') return 'Engine';
+  if (v==='WPS' && ['Engine','ENGINE MOUNTS','Gasket Sets','Pistons & piston rings',
+      'AIR FILTER, ENGINE','SPARK PLUGS','Oil Filter','STARTER MOTOR'].includes(c)) return 'Engine';
+
+  if ((v==='PU'||v==='VTWIN') && c==='EXHAUST') return 'Exhaust';
+  if (v==='WPS' && c==='EXHAUST SYSTEM') return 'Exhaust';
+
+  if ((v==='PU'||v==='VTWIN') && c==='TRANSMISSION-CLUTCH') return 'Transmission & Clutch';
+  if ((v==='PU'||v==='VTWIN') && c==='DRIVE TRAIN') return 'Transmission & Clutch';
+  if (v==='WPS' && ['CLUTCH','BELT, CHAIN AND SPROCKETS','BELTS & SPROCKETS',
+      'SPROCKET, BELT','Chains'].includes(c)) return 'Transmission & Clutch';
+
+  if ((v==='PU'||v==='VTWIN') && c==='HANDLEBAR-CONTROLS-MIRRORS') return 'Handlebar & Controls';
+  if (v==='WPS' && ['HANDLEBAR','HANDLEBAR & THROTTLE CONTROL','HANDLEBAR GRIPS',
+      'RISER, HANDLEBAR','CLAMPS, HANDLEBAR UPPER & LOWER','CABLE, CLUTCH CONTROL',
+      'THROTTLE CONTROL','MIRRORS','Hand Controls'].includes(c)) return 'Handlebar & Controls';
+
+  if (v==='VTWIN' && c==='SUSPENSION') return 'Suspension';
+  if ((v==='PU'||v==='VTWIN') && ['SUSPENSION GROUP-FRONT','SUSPENSION GROUP-REAR'].includes(c)) return 'Suspension';
+  if (v==='WPS' && ['SHOCK ABSORBERS','FORK, FRONT','TRIPLE CLAMP'].includes(c)) return 'Suspension';
+
+  if ((v==='PU'||v==='VTWIN') && c==='BRAKING') return 'Brakes';
+  if (v==='WPS' && ['Brake - front','BRAKE LEVER, FRONT'].includes(c)) return 'Brakes';
+
+  if ((v==='PU'||v==='VTWIN') && c==='FOOT CONTROLS') return 'Foot Controls';
+  if (v==='WPS' && c==='FOOTBOARDS, OPERATOR') return 'Foot Controls';
+
+  if ((v==='PU'||v==='VTWIN') && c==='LIGHTING-LICENSE') return 'Lighting';
+  if (v==='WPS' && c==='HEADLAMP') return 'Lighting';
+
+  if ((v==='PU'||v==='VTWIN') && ['ELECTRICAL SYSTEM','ELECTRONICS'].includes(c)) return 'Electrical';
+  if (v==='WPS' && ['SWITCHES, SENSORS & ELECTRICAL CONNECTORS',
+      'ELECTRONIC CONTROL MODULE (ECM) AND COIL','SWITCHES',
+      'Battery','Electrical','Audio & Communication'].includes(c)) return 'Electrical';
+
+  if ((v==='PU'||v==='VTWIN') && c==='SEATING') return 'Seating';
+  if (v==='WPS' && ['SEATS','SADDLEBAGS'].includes(c)) return 'Seating';
+
+  if ((v==='PU'||v==='VTWIN') && ['CARBURETION-FUEL','TANK GROUP-GAS AND OIL'].includes(c)) return 'Carburetion & Fuel';
+  if (v==='VTWIN' && c==='TANK') return 'Carburetion & Fuel';
+  if (v==='WPS' && ['Carburetor','FUEL CAP','FUEL TANK'].includes(c)) return 'Carburetion & Fuel';
+
+  if ((v==='PU'||v==='VTWIN') && ['WHEEL AND RIM','TIRE AND TUBE'].includes(c)) return 'Wheels & Tires';
+  if (v==='WPS' && ['Tires & Wheels','TIRE AND TUBE'].includes(c)) return 'Wheels & Tires';
+
+  if ((v==='PU'||v==='VTWIN') && ['FENDER','WINDSHIELD-FAIRING'].includes(c)) return 'Fenders & Body';
+  if (v==='WPS' && ['WINDSHIELD','Covers,','DECALS, FUEL TANK'].includes(c)) return 'Fenders & Body';
+
+  if ((v==='PU'||v==='VTWIN') && ['FRAME AND BODY','HARDWARE'].includes(c)) return 'Frame & Hardware';
+  if (v==='WPS' && ['Hardware Listing','ENGINE MOUNTS'].includes(c)) return 'Frame & Hardware';
+
+  if ((v==='PU'||v==='VTWIN') && c==='INSTRUMENT') return 'Instrumentation';
+  if (v==='WPS' && c==='Gauges') return 'Instrumentation';
+
+  if ((v==='PU'||v==='VTWIN') && ['LUGGAGE','SISSY BAR-BACKREST-RACK'].includes(c)) return 'Luggage & Racks';
+  if (v==='WPS' && c==='LUGGAGE RACK, TOUR-PAK') return 'Luggage & Racks';
+
+  if ((v==='PU'||v==='VTWIN') && c==='SECURITY-COVERS-SHELTERS') return 'Security & Covers';
+  if (v==='WPS' && c==='Security') return 'Security & Covers';
+
+  if ((v==='PU'||v==='VTWIN') && c==='TOOLS') return 'Tools & Chemicals';
+  if (v==='WPS' && ['Tools & Shop Equipment','Chemicals & Maintenance'].includes(c)) return 'Tools & Chemicals';
+
+  if (v==='WPS' && ['Helmets','Riding Gear','Apparel','Accessories'].includes(c)) return 'Riding Gear & Apparel';
+
+  if ((v==='PU'||v==='VTWIN') && ['COMMON MISC','TRANSPORTATION','PROMOTIONAL ITEMS',
+      'MEDIA PRODUCTS','GRAPHICS','RADIATOR'].includes(c)) return 'Accessories & Misc';
+
+  return null;
+}
+
 // ─── SKU generator ─────────────────────────────────────────────────────────────
 
 const usedSkus = new Set();
@@ -204,6 +283,7 @@ async function main() {
       const catCode = getCategoryCode(r.commodity_category, 'PU');
       const internalSku = generateInternalSku(catCode, 'p');
       const slug = slugify(r.name, internalSku);
+      const displayCategory = mapDisplayCategory('PU', r.commodity_category);
 
       try {
         await client.query(`
@@ -223,14 +303,14 @@ async function main() {
             is_active, is_discontinued,
             oem_numbers, oem_part_number,
             part_add_date, special_instructions,
-            product_code, slug
+            product_code, slug, display_category
           ) VALUES (
             $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
             $11,$12,$13,$14,$15,$16,$17,$18,
             $19,$20,$21,$22,$23,$24,$25,$26,$27,$28,
             $29,$30,$31,$32,$33,$34,$35,$36,
             $37,$38,$39,$40,$41,$42,$43,$44,$45,$46,
-            $47,$48,$49,$50,$51,$52,$53,$54
+            $47,$48,$49,$50,$51,$52,$53,$54,$55
           )
         `, [
           r.sku,                          // $1  sku
@@ -287,6 +367,7 @@ async function main() {
           r.special_instructions,         // $52 special_instructions
           r.product_code,                 // $53 product_code
           slug,                           // $54 slug
+          displayCategory,               // $55 display_category
         ]);
         inserted++;
       } catch (e) {
@@ -310,6 +391,7 @@ async function main() {
       const catCode = getCategoryCode(r.category, 'WPS');
       const internalSku = generateInternalSku(catCode, 'w');
       const slug = slugify(r.name, internalSku);
+      const displayCategory = mapDisplayCategory('WPS', r.category);
       const stockQty =
         (r.warehouse_boise || 0) + (r.warehouse_fresno || 0) +
         (r.warehouse_elizabethtown || 0) + (r.warehouse_ashley || 0) +
@@ -331,12 +413,12 @@ async function main() {
             image_url,
             in_harddrive, closeout, is_active, is_discontinued,
             oem_numbers, brand_part_number,
-            slug
+            slug, display_category
           ) VALUES (
             $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
             $11,$12,$13,$14,$15,$16,$17,$18,
             $19,$20,$21,$22,$23,$24,$25,$26,
-            $27,$28,$29,$30,$31,$32,$33,$34,$35,$36
+            $27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37
           )
         `, [
           'WPS-' + r.sku,                 // $1
@@ -375,6 +457,7 @@ async function main() {
           r.oem_numbers,                  // $34
           r.supplier_item_id,             // $35 brand_part_number
           slug,                           // $36
+          displayCategory,               // $37 display_category
         ]);
         inserted++;
       } catch (e) {
@@ -397,6 +480,7 @@ async function main() {
     for (const r of vtwinRows.rows) {
       const internalSku = generateInternalSku('MSC', 'v'); // no category for vtwin
       const slug = slugify(r.name, internalSku);
+      const displayCategory = mapDisplayCategory('VTWIN', r.category || null);
 
       // Combine OEM xrefs into oem_numbers if not already set
       const oemNums = r.oem_numbers || [];
@@ -418,11 +502,11 @@ async function main() {
             oem_numbers, oem_part_number,
             brand_part_number,
             part_add_date,
-            slug
+            slug, display_category
           ) VALUES (
             $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
             $11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
-            $21,$22,$23,$24,$25
+            $21,$22,$23,$24,$25,$26
           )
         `, [
           'VT-' + r.sku,                  // $1
@@ -450,6 +534,7 @@ async function main() {
           r.vendor_part_no,               // $23 brand_part_number
           r.date_added,                   // $24
           slug,                           // $25
+          displayCategory,               // $26 display_category
         ]);
         inserted++;
       } catch (e) {

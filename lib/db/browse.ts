@@ -46,6 +46,8 @@ export interface CatalogProduct {
   brand: string;
   category: string;
   subcategory: string | null;
+  display_category: string | null;
+  display_subcategory: string | null;
   source_vendor: string;
   computed_price: number | null;
   msrp: number | null;
@@ -119,6 +121,8 @@ export interface BrowseFilters {
   year?: number;
   category?: string;
   dbCategories?: string[];
+  displayCategory?: string;
+  displaySubcategory?: string;
   brand?: string;
   inStock?: boolean;
   search?: string;
@@ -245,6 +249,8 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
     category,
     subcategory,
     dbCategories,
+    displayCategory,
+    displaySubcategory,
     brand,
     inStock,
     search,
@@ -354,7 +360,14 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
     // year/modelCode-only path — no family condition needed
   }
 
-  if (dbCategories && dbCategories.length > 0) {
+  // ── Category filtering ─────────────────────────────────────────────────────
+  // Prefer display_category (clean unified taxonomy) over raw category.
+  // Legacy dbCategories param still supported for backwards compat — maps to
+  // raw category column so existing links don't break during transition.
+  if (displayCategory) {
+    conditions.push(`cu.display_category = $${p++}`);
+    params.push(displayCategory);
+  } else if (dbCategories && dbCategories.length > 0) {
     if (dbCategories.length === 1) {
       conditions.push(`cu.category = $${p++}`);
       params.push(dbCategories[0]);
@@ -367,8 +380,11 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
     params.push(category);
   }
 
-  if (subcategory) {
-    conditions.push(`cu.subcategory = $${p++}`);
+  if (displaySubcategory) {
+    conditions.push(`cu.display_subcategory = $${p++}`);
+    params.push(displaySubcategory);
+  } else if (subcategory) {
+    conditions.push(`cu.display_subcategory = $${p++}`);
     params.push(subcategory);
   }
 
@@ -451,7 +467,9 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
     FROM (
       SELECT DISTINCT ON (COALESCE(cu.variant_group_id::text, 'u' || cu.id::text))
         cu.id, cu.sku, cu.slug, cu.name, cu.brand,
-        cu.category, cu.subcategory, cu.source_vendor,
+        cu.category, cu.subcategory,
+        cu.display_category, cu.display_subcategory,
+        cu.source_vendor,
         cu.computed_price, cu.msrp, cu.map_price,
         cu.image_url, cu.image_urls, cu.in_stock, cu.stock_quantity,
         cu.is_harley_fitment, cu.features, cu.oem_numbers,
@@ -483,7 +501,7 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
       facetParams
     ),
     pool.query(
-      `SELECT cu.category AS name, COUNT(DISTINCT cu.id) AS count ${facetBase} GROUP BY cu.category ORDER BY count DESC LIMIT 20`,
+      `SELECT cu.display_category AS name, COUNT(DISTINCT cu.id) AS count ${facetBase} ${where ? "AND" : "WHERE"} cu.display_category IS NOT NULL GROUP BY cu.display_category ORDER BY count DESC LIMIT 30`,
       facetParams
     ),
     pool.query(
@@ -495,7 +513,7 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
       facetParams
     ),
     pool.query(
-      `SELECT cu.subcategory AS name, COUNT(DISTINCT cu.id) AS count FROM catalog_unified cu ${fitmentJoin} ${where ? where + " AND cu.subcategory IS NOT NULL" : "WHERE cu.subcategory IS NOT NULL"} GROUP BY cu.subcategory ORDER BY count DESC LIMIT 30`,
+      `SELECT cu.display_subcategory AS name, COUNT(DISTINCT cu.id) AS count FROM catalog_unified cu ${fitmentJoin} ${where ? where + " AND cu.display_subcategory IS NOT NULL" : "WHERE cu.display_subcategory IS NOT NULL"} GROUP BY cu.display_subcategory ORDER BY count DESC LIMIT 30`,
       facetParams
     ),
   ]);

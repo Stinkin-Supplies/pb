@@ -26,6 +26,9 @@ export async function GET(req: NextRequest) {
       dbCategories: dbCategoriesRaw.length > 0 ? dbCategoriesRaw : undefined,
       category:     dbCategoriesRaw.length === 0 ? (p.get("category") || undefined) : undefined,
       subcategory:  p.get("subcategory") || undefined,
+      // Clean unified taxonomy — prefer these over raw category/subcategory
+      displayCategory:    p.get("display_category") || undefined,
+      displaySubcategory: p.get("display_subcategory") || undefined,
       modelCodes:   p.getAll("model_code").length > 0 ? p.getAll("model_code") : undefined,
       brand:        p.get("brand")       || undefined,
       inStock:      p.get("in_stock")    === "true",

@@ -72,7 +72,6 @@ const HD_FAMILY_SUBMODELS = {
 const HD_FAMILIES_FLAT = [
   "Touring","Softail","Dyna","Sportster","FXR",
   "Trike","Revolution Max","V-Rod","Street",
-  "Twin Cam","Evolution","Shovelhead","Flathead","Knucklehead","Panhead",
 ];
 
 const HD_ERAS = [
@@ -122,7 +121,7 @@ function FilterContent({ facets, filters, onChange, sections, setSections, colla
   function toggle(key) { setSections(s => ({ ...s, [key]: !s[key] })); }
 
   const subcategories = facets.subcategories ?? [];
-  const activeCount = [filters.family, filters.model, filters.era, filters.category, filters.brand, filters.min_price, filters.max_price, filters.in_stock].filter(Boolean).length;
+  const activeCount = [filters.family, filters.model, filters.era, filters.display_category, filters.brand, filters.min_price, filters.max_price, filters.in_stock].filter(Boolean).length;
 
   const sectionDefs = [
     {
@@ -186,17 +185,17 @@ function FilterContent({ facets, filters, onChange, sections, setSections, colla
       label: "Category",
       content: (
         <div style={{ paddingBottom: 8, maxHeight: 260, overflowY: "auto" }}>
-          {facets.categories.slice(0, 20).map(cat => (
+          {facets.categories.slice(0, 30).map(cat => (
             <FilterItem
               key={cat.name} label={cat.name} count={cat.count}
-              active={filters.category === cat.name}
-              onClick={() => onChange({ category: filters.category === cat.name ? null : cat.name, subcategory: null })}
+              active={filters.display_category === cat.name}
+              onClick={() => onChange({ display_category: filters.display_category === cat.name ? null : cat.name, display_subcategory: null })}
             />
           ))}
         </div>
       ),
     },
-    ...(filters.category && subcategories.length > 0 ? [{
+    ...(filters.display_category && subcategories.length > 0 ? [{
       key: "subcategory",
       label: "Subcategory",
       content: (
@@ -204,8 +203,8 @@ function FilterContent({ facets, filters, onChange, sections, setSections, colla
           {subcategories.map(sub => (
             <FilterItem
               key={sub.name} label={sub.name} count={sub.count}
-              active={filters.subcategory === sub.name}
-              onClick={() => onChange({ subcategory: filters.subcategory === sub.name ? null : sub.name })}
+              active={filters.display_subcategory === sub.name}
+              onClick={() => onChange({ display_subcategory: filters.display_subcategory === sub.name ? null : sub.name })}
             />
           ))}
         </div>
@@ -313,7 +312,7 @@ function FilterContent({ facets, filters, onChange, sections, setSections, colla
       {!collapsed && activeCount > 0 && (
         <div style={{ padding: "12px 14px" }}>
           <button
-            onClick={() => onChange({ family: null, model: null, modelCodes: null, era: null, category: null, brand: null, min_price: null, max_price: null, in_stock: false, subcategory: null })}
+            onClick={() => onChange({ family: null, model: null, modelCodes: null, era: null, display_category: null, display_subcategory: null, brand: null, min_price: null, max_price: null, in_stock: false })}
             style={{ width: "100%", background: "none", border: `1px solid rgba(184,146,42,0.3)`, color: GOLD, fontFamily: "var(--font-stencil, monospace)", fontSize: "8px", letterSpacing: "2px", padding: "7px", cursor: "pointer", textTransform: "uppercase" }}
           >
             Clear All Filters
@@ -333,8 +332,8 @@ export default function FilterSidebar({ facets, filters, onChange, open, onClose
   });
 
   useEffect(() => {
-    if (filters.category) setSections(s => ({ ...s, subcategory: true }));
-  }, [filters.category]);
+    if (filters.display_category) setSections(s => ({ ...s, subcategory: true }));
+  }, [filters.display_category]);
 
   // Lock body scroll when mobile sheet is open
   useEffect(() => {
@@ -343,7 +342,7 @@ export default function FilterSidebar({ facets, filters, onChange, open, onClose
     return () => { document.body.style.overflow = ""; };
   }, [open, mobileSheet]);
 
-  const activeCount = [filters.family, filters.model, filters.era, filters.category, filters.brand, filters.min_price, filters.max_price, filters.in_stock].filter(Boolean).length;
+  const activeCount = [filters.family, filters.model, filters.era, filters.display_category, filters.brand, filters.min_price, filters.max_price, filters.in_stock].filter(Boolean).length;
 
   // ── Mobile bottom sheet ───────────────────────────────────────
   if (mobileSheet) {

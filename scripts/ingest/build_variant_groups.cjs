@@ -2,6 +2,10 @@
 // build_variant_groups.cjs
 const { Pool } = require('pg');
 const DRY = process.argv.includes('--dry');
+// Groups with more members than this are product LINES, not variant groups.
+// Real variants (color/finish/size/compound/oversize) max out ~15 SKUs.
+// Anything above this cap is dissolved — members become individual cards.
+const MAX_VARIANT_MEMBERS = 20;
 const TOKEN = 'eceGqPuosZVzZeZ74vBIWUqNwPbG1aP2YUL24fBO';
 const BASE  = 'http://api.wps-inc.com';
 const pool = new Pool({ host: '2a01:4ff:f0:fa6f::1', port: 5432, database: 'stinkin_catalog', user: 'catalog_app', password: 'smelly' });
@@ -101,6 +105,7 @@ async function main() {
     WHERE w.wps_product_id IS NOT NULL
     GROUP BY w.wps_product_id
     HAVING COUNT(DISTINCT cu.id) > 1
+      AND COUNT(DISTINCT cu.id) <= ${MAX_VARIANT_MEMBERS}
     ORDER BY COUNT(DISTINCT cu.id) DESC
   `);
 
@@ -131,6 +136,40 @@ async function main() {
     tests.forEach(n => { const a = extractAttribute(n); console.log(`  "${n}" -> ${a ? a.name+': '+a.value : '(no match)'}`); });
     await pool.end();
     return;
+  }
+
+  // ── Cleanup: dissolve existing oversized groups ───────────────────────────────
+  // These are product lines that slipped in before the MAX_VARIANT_MEMBERS cap.
+  // Steps:
+  //   1. Find groups with too many members.
+  //   2. NULL out variant_group_id on their catalog_unified rows.
+  //   3. Delete the groups (CASCADE removes catalog_variant_members rows too).
+  const oversized = await q(`
+    SELECT cvg.id, cvg.display_name, COUNT(cvm.id) AS member_count
+    FROM catalog_variant_groups cvg
+    JOIN catalog_variant_members cvm ON cvm.group_id = cvg.id
+    GROUP BY cvg.id, cvg.display_name
+    HAVING COUNT(cvm.id) > $1
+    ORDER BY COUNT(cvm.id) DESC
+  `, [MAX_VARIANT_MEMBERS]);
+
+  if (oversized.length > 0) {
+    console.log(`\nDissolving ${oversized.length} oversized groups (>${MAX_VARIANT_MEMBERS} members):`);
+    oversized.slice(0, 10).forEach(g =>
+      console.log(`  id=${g.id} "${g.display_name}" — ${g.member_count} members`)
+    );
+    const oversizedIds = oversized.map(g => g.id);
+    await pool.query(
+      `UPDATE catalog_unified SET variant_group_id = NULL WHERE variant_group_id = ANY($1::int[])`,
+      [oversizedIds]
+    );
+    await pool.query(
+      `DELETE FROM catalog_variant_groups WHERE id = ANY($1::int[])`,
+      [oversizedIds]
+    );
+    console.log(`  Done — ${oversized.reduce((s, g) => s + parseInt(g.member_count), 0)} members released back to individual cards`);
+  } else {
+    console.log('\nNo oversized groups to dissolve.');
   }
 
   // Create tables
@@ -185,13 +224,18 @@ async function main() {
   let groupsInserted = 0, membersInserted = 0;
   const axisStats = {};
   for (const g of groups) {
+    // Skip if somehow over cap (HAVING clause should prevent this, but belt-and-suspenders)
+    if (parseInt(g.item_count) > MAX_VARIANT_MEMBERS) continue;
+
     const displayName = productNames[g.wps_product_id] || g.sample_name;
-    const [grp] = await q(`
+    const rows = await q(`
       INSERT INTO catalog_variant_groups (wps_product_id, display_name, source_vendor)
       VALUES ($1, $2, 'WPS')
       ON CONFLICT (wps_product_id) DO UPDATE SET display_name = EXCLUDED.display_name, updated_at = NOW()
       RETURNING id
     `, [g.wps_product_id, displayName]);
+    if (!rows[0]) continue;
+    const grp = rows[0];
     groupsInserted++;
 
     // Fetch member names and extract variant attributes
@@ -314,6 +358,7 @@ async function main() {
 
   for (const [key, group] of nameGroups) {
     if (group.members.length < 2) continue;
+    if (group.members.length > MAX_VARIANT_MEMBERS) continue; // product line, not a variant group
 
     const axes = group.members.map(m => m.attr.name);
     const dominantAxis = axes[0];

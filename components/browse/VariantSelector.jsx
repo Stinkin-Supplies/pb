@@ -150,9 +150,12 @@ export default function VariantSelector({ productId, currentSku }) {
   };
 
   // ── Decide render mode ────────────────────────────────────────
-  // If variants have fitment data → grouped by family view
-  // Otherwise → flat list (color/size variants like wire spools)
-  const useFitmentGrouping = hasFitmentData(variants);
+  // Fitment grouping is ONLY for variants that lack explicit option values
+  // (e.g. "fits Sportster 84-03" vs "fits Touring 99-17" as the differentiator).
+  // If variants have option_1_value set (color, size, RPM, finish etc.)
+  // always use the flat list — fitment is incidental, not the variant signal.
+  const hasOptionValues = variants.some(v => v.option_1_value);
+  const useFitmentGrouping = !hasOptionValues && hasFitmentData(variants);
   const familyGroups = useFitmentGrouping ? groupByFamily(variants) : null;
 
   return (
@@ -418,11 +421,11 @@ function VariantCard({ variant, isSelected, isCurrent, onSelect, groupDisplayNam
   const price   = variant.offer_price || variant.msrp;
   const active  = isSelected || isCurrent;
 
-  // Compute a concise label: strip the group name prefix from the product name.
-  // Falls back to option values, then full name, then SKU.
-  const shortLabel = makeShortLabel(variant.name, groupDisplayName)
-    || variant.option_2_value
-    || variant.option_1_value
+  // Prefer explicit option values as the label — they're concise and correct.
+  // Fall back to stripping the group name prefix from the product name.
+  const shortLabel = (variant.option_1_value
+    ? [variant.option_1_value, variant.option_2_value].filter(Boolean).join(' · ')
+    : makeShortLabel(variant.name, groupDisplayName))
     || variant.name
     || variant.sku;
 
