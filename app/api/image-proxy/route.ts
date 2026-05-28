@@ -63,9 +63,23 @@ export async function GET(req: NextRequest) {
   try {
     const { hostname } = new URL(url)
 
-    // WPS: redirect directly to CDN
+    // WPS: fetch server-side and pipe — direct redirect would expose http:// URL
+    // causing mixed content block on HTTPS pages
     if (hostname === 'cdn.wpsstatic.com' || hostname.endsWith('.wpsstatic.com')) {
-      return NextResponse.redirect(url, { status: 302 })
+      const upstream = await fetch(url, {
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+        cache: 'no-store',
+      })
+      if (!upstream.ok) return placeholder
+      const contentType = upstream.headers.get('content-type') ?? 'image/jpeg'
+      const blob = await upstream.arrayBuffer()
+      return new NextResponse(blob, {
+        status: 200,
+        headers: {
+          'Content-Type':  contentType,
+          'Cache-Control': 'public, max-age=86400, s-maxage=604800',
+        },
+      })
     }
 
     // VTwin: fetch with spoofed Referer to bypass hotlink protection

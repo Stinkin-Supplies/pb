@@ -13,6 +13,8 @@ const ALLOWED_HOSTS = new Set([
   "cdn.wps-inc.com",
   "assets.wps-inc.com",
   "img.wps-inc.com",
+  "cdn.wpsstatic.com",       // WPS static CDN (http — proxied to avoid mixed content)
+  "media.wpsstatic.com",
 ]);
 const CACHE_DIR     = process.env.IMG_CACHE_DIR ?? "/tmp/stinkin-img-cache";
 const FETCH_TIMEOUT = 12_000;
