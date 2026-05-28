@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const SEARCH_OPTIONS = [
@@ -59,18 +60,20 @@ export default function BottomNav() {
   const [open, setOpen] = useState(false);
   const collapsed = useScrollCollapse();
 
+  const hideOnRoute = pathname === "/database" || pathname === "/admin/database";
   const onBrowse = pathname === "/browse" || pathname.startsWith("/browse/");
-
-  useEffect(() => { if (collapsed) setOpen(false); }, [collapsed]);
+  const isOpen = open && !collapsed;
 
   const handleFilterToggle = () => {
     window.dispatchEvent(new CustomEvent("stinkin:filterToggle"));
   };
 
+  if (hideOnRoute) return null;
+
   // ── Shared search popup (position shifts with collapsed state) ────────────
   const searchPopup = (
     <AnimatePresence>
-      {open && !onBrowse && (
+      {isOpen && !onBrowse && (
         <>
           <motion.div
             key="backdrop"
@@ -229,7 +232,7 @@ export default function BottomNav() {
             >
               {/* Left slot */}
               <div style={{ position: "relative", minWidth: 48 }}>
-                <a
+                <Link
                   href="/"
                   className={onBrowse ? "left-home left-home--browse" : "left-home"}
                   style={{ textDecoration: "none" }}
@@ -240,7 +243,7 @@ export default function BottomNav() {
                     color: pathname === "/" ? "#c9a84c" : "#666",
                     transition: "color 0.15s",
                   }}>HOME</span>
-                </a>
+                </Link>
 
                 {onBrowse && (
                   <button
@@ -290,14 +293,14 @@ export default function BottomNav() {
               </button>
 
               {/* Right: GARAGE */}
-              <a href="/garage" style={{ textDecoration: "none" }}>
+              <Link href="/garage" style={{ textDecoration: "none" }}>
                 <span style={{
                   fontFamily: "var(--font-sailor, serif)", fontSize: 22, fontWeight: 700,
                   letterSpacing: "0.07em",
                   color: pathname.startsWith("/garage") ? "#c9a84c" : "#666",
                   transition: "color 0.15s",
                 }}>GARAGE</span>
-              </a>
+              </Link>
             </motion.div>
           )}
         </AnimatePresence>

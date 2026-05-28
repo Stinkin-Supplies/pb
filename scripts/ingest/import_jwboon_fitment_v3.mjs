@@ -213,11 +213,11 @@ async function main() {
 
   for (let i = 0; i < pairs.length; i += BATCH_SZ) {
     const batch = pairs.slice(i, i + BATCH_SZ);
-    const values = batch.map((_, j) => `($${j * 2 + 1}, $${j * 2 + 2})`).join(", ");
+    const values = batch.map((_, j) => `($${j * 2 + 1}, $${j * 2 + 2}, 'jwboon')`).join(", ");
     const flat = batch.flatMap((b) => [b.pid, b.hmyId]);
 
     const res = await pool.query(
-      `INSERT INTO catalog_fitment_v2 (product_id, model_year_id)
+      `INSERT INTO catalog_fitment_v2 (product_id, model_year_id, fitment_source)
        VALUES ${values}
        ON CONFLICT (product_id, model_year_id) DO NOTHING`,
       flat

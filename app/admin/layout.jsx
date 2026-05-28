@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -173,6 +174,7 @@ const NAV = [
     section: "OVERVIEW",
     links: [
       { href: "/admin/build-tracker", icon: "⌁", label: "BUILD TRACKER" },
+      { href: "/admin/database", icon: "◫", label: "DATABASE SNAPSHOT" },
       { href: "/admin",         icon: "◈", label: "DASHBOARD"   },
     ],
   },
@@ -209,7 +211,7 @@ const NAV = [
   },
 ];
 
-export default async function AdminLayout({ children, params }) {
+export default async function AdminLayout({ children }) {
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -223,10 +225,6 @@ export default async function AdminLayout({ children, params }) {
 
   if (profile?.role !== "admin") redirect("/garage");
 
-  // Get current path for active link highlighting
-  // We pass it down via a data attribute trick since this is a server component
-  const displayName = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || profile?.email || user.email;
-
   return (
     <>
       <style>{css}</style>
@@ -235,7 +233,7 @@ export default async function AdminLayout({ children, params }) {
           {/* SIDEBAR */}
           <aside className="admin-sidebar">
             <div className="sidebar-logo">
-              <div className="sidebar-logo-title">STINKIN<span>'</span> SUPPLIES</div>
+              <div className="sidebar-logo-title">STINKIN<span>&apos;</span> SUPPLIES</div>
               <div className="sidebar-logo-sub">ADMIN PANEL</div>
             </div>
 
@@ -243,17 +241,17 @@ export default async function AdminLayout({ children, params }) {
               <div key={section} className="sidebar-section">
                 <div className="sidebar-section-label">{section}</div>
                 {links.map(({ href, icon, label }) => (
-                  <a key={href} href={href} className="sidebar-link">
+                  <Link key={href} href={href} className="sidebar-link">
                     <span className="sidebar-link-icon">{icon}</span>
                     {label}
-                  </a>
+                  </Link>
                 ))}
               </div>
             ))}
 
             <div className="sidebar-footer">
               <div className="sidebar-footer-email">{profile?.email ?? user.email}</div>
-              <a href="/auth/signout" className="sidebar-footer-link">SIGN OUT →</a>
+              <Link href="/auth/signout" className="sidebar-footer-link">SIGN OUT →</Link>
             </div>
           </aside>
 
@@ -262,10 +260,11 @@ export default async function AdminLayout({ children, params }) {
             <div className="admin-topbar">
               <div className="topbar-breadcrumb">
                 ADMIN <span style={{ color: "#3a3838" }}>/ </span>
-                <span>STINKIN' SUPPLIES</span>
+                <span>STINKIN&apos; SUPPLIES</span>
               </div>
               <div className="topbar-right">
-                <a href="/browse" className="topbar-store-link">↗ VIEW STORE</a>
+                <Link href="/database" className="topbar-store-link">◌ PUBLIC SNAPSHOT</Link>
+                <Link href="/browse" className="topbar-store-link">↗ VIEW STORE</Link>
               </div>
             </div>
 
