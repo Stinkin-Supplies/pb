@@ -11,8 +11,9 @@
  * sort_priority, name_sort, warehouse_wi, warehouse_ny, warehouse_tx,
  * warehouse_nv, warehouse_nc, product_code, vendor_sku, upc, subcategory
  *
- * NOT in schema (removed): specs_blob, search_blob, oem_numbers (→ oem_part_number),
- *   fitment_make, fitment_model, computed_price (→ msrp)
+ * NOT in schema (removed): specs_blob, search_blob, fitment_make, fitment_model,
+ *   computed_price (→ msrp)
+ * oem_numbers IS in schema and query_by — required for OEM# search to hit all vendors
  */
 
 import Typesense from "typesense";
@@ -41,8 +42,8 @@ export const DEFAULT_SEARCH_PARAMS = {
   // description/features excluded from query_by — long text causes false-positive
   // matches (e.g. "wire" matching an oil filter whose description mentions
   // "wire harness routing"). Name + brand + SKU/OEM is precise enough.
-  query_by:         "name,brand,sku,oem_part_number",
-  query_by_weights: "10,6,5,5",
+  query_by:         "name,brand,sku,oem_part_number,oem_numbers",
+  query_by_weights: "10,6,5,5,5",
 
   // Facets: all confirmed present in schema
   facet_by: "brand,category,in_stock,source_vendor,is_harley_fitment,fitment_hd_families",

@@ -102,12 +102,12 @@ function FilterItem({ label, count, active, onClick }) {
     >
       <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: 1, minWidth: 0 }}>
         <div style={{ width: 10, height: 10, border: `1px solid ${active ? GOLD : "rgba(184,146,42,0.25)"}`, background: active ? GOLD : "transparent", flexShrink: 0, transition: "background 0.15s, border-color 0.15s" }} />
-        <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "10px", color: active ? DARK : "#888", textTransform: "uppercase", letterSpacing: "0.5px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: "left" }}>
+        <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "13px", color: active ? DARK : "#888", textTransform: "uppercase", letterSpacing: "0.5px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: "left" }}>
           {label}
         </span>
       </div>
       {count != null && (
-        <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "8px", color: "#bbb", flexShrink: 0 }}>
+        <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "11px", color: "#bbb", flexShrink: 0 }}>
           {count.toLocaleString()}
         </span>
       )}
@@ -124,62 +124,6 @@ function FilterContent({ facets, filters, onChange, sections, setSections, colla
   const activeCount = [filters.family, filters.model, filters.era, filters.display_category, filters.brand, filters.min_price, filters.max_price, filters.in_stock].filter(Boolean).length;
 
   const sectionDefs = [
-    {
-      key: "family",
-      label: "Model Family",
-      content: (
-        <div style={{ paddingBottom: 8, maxHeight: 320, overflowY: "auto" }}>
-          {HD_FAMILIES_FLAT.map(fam => (
-            <div key={fam}>
-              <FilterItem
-                label={fam} count={null}
-                active={filters.family === fam}
-                onClick={() => onChange({ family: filters.family === fam ? null : fam, model: null })}
-              />
-              {filters.family === fam && HD_FAMILY_SUBMODELS[fam] && (
-                <div style={{ paddingLeft: 18, borderLeft: `2px solid rgba(184,146,42,0.2)`, marginLeft: 8, marginBottom: 4 }}>
-                  {HD_FAMILY_SUBMODELS[fam].map(sub => (
-                    <button
-                      key={sub.label}
-                      onClick={e => { e.stopPropagation(); onChange({ model: filters.model === sub.label ? null : sub.label, modelCodes: filters.model === sub.label ? null : sub.codes }); }}
-                      style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: filters.model === sub.label ? "rgba(184,146,42,0.1)" : "none", border: "none", padding: "5px 8px", cursor: "pointer", borderRadius: 2 }}
-                    >
-                      <div style={{ width: 7, height: 7, borderRadius: "50%", flexShrink: 0, background: filters.model === sub.label ? GOLD : "rgba(184,146,42,0.3)", transition: "background 0.15s" }} />
-                      <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 9, color: filters.model === sub.label ? DARK : "#888", textTransform: "uppercase", letterSpacing: "0.5px", textAlign: "left" }}>
-                        {sub.label}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      ),
-    },
-    {
-      key: "era",
-      label: "Era",
-      content: (
-        <div style={{ paddingBottom: 8 }}>
-          {HD_ERAS.map(era => (
-            <button
-              key={era.slug}
-              onClick={() => onChange({ era: filters.era === era.slug ? null : era.slug })}
-              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: filters.era === era.slug ? "rgba(184,146,42,0.08)" : "none", border: "none", padding: "7px 8px", cursor: "pointer", gap: 8, borderRadius: 2 }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
-                <div style={{ width: 10, height: 10, flexShrink: 0, border: `1px solid ${filters.era === era.slug ? GOLD : "rgba(184,146,42,0.25)"}`, background: filters.era === era.slug ? GOLD : "transparent", transition: "all 0.15s" }} />
-                <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 10, color: filters.era === era.slug ? DARK : "#888", textTransform: "uppercase", letterSpacing: "0.5px", textAlign: "left" }}>
-                  {era.label}
-                </span>
-              </div>
-              <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 8, color: "#bbb", flexShrink: 0 }}>{era.years}</span>
-            </button>
-          ))}
-        </div>
-      ),
-    },
     {
       key: "category",
       label: "Category",
@@ -210,6 +154,62 @@ function FilterContent({ facets, filters, onChange, sections, setSections, colla
         </div>
       ),
     }] : []),
+    {
+      key: "family",
+      label: "Model Family",
+      content: (
+        <div style={{ paddingBottom: 8, maxHeight: 320, overflowY: "auto" }}>
+          {HD_FAMILIES_FLAT.map(fam => (
+            <div key={fam}>
+              <FilterItem
+                label={fam} count={null}
+                active={filters.family === fam}
+                onClick={() => onChange({ family: filters.family === fam ? null : fam, model: null })}
+              />
+              {filters.family === fam && HD_FAMILY_SUBMODELS[fam] && (
+                <div style={{ paddingLeft: 18, borderLeft: `2px solid rgba(184,146,42,0.2)`, marginLeft: 8, marginBottom: 4 }}>
+                  {HD_FAMILY_SUBMODELS[fam].map(sub => (
+                    <button
+                      key={sub.label}
+                      onClick={e => { e.stopPropagation(); onChange({ model: filters.model === sub.label ? null : sub.label, modelCodes: filters.model === sub.label ? null : sub.codes }); }}
+                      style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: filters.model === sub.label ? "rgba(184,146,42,0.1)" : "none", border: "none", padding: "5px 8px", cursor: "pointer", borderRadius: 2 }}
+                    >
+                      <div style={{ width: 7, height: 7, borderRadius: "50%", flexShrink: 0, background: filters.model === sub.label ? GOLD : "rgba(184,146,42,0.3)", transition: "background 0.15s" }} />
+                      <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 12, color: filters.model === sub.label ? DARK : "#888", textTransform: "uppercase", letterSpacing: "0.5px", textAlign: "left" }}>
+                        {sub.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      ),
+    },
+    {
+      key: "era",
+      label: "Era",
+      content: (
+        <div style={{ paddingBottom: 8 }}>
+          {HD_ERAS.map(era => (
+            <button
+              key={era.slug}
+              onClick={() => onChange({ era: filters.era === era.slug ? null : era.slug })}
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: filters.era === era.slug ? "rgba(184,146,42,0.08)" : "none", border: "none", padding: "7px 8px", cursor: "pointer", gap: 8, borderRadius: 2 }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
+                <div style={{ width: 10, height: 10, flexShrink: 0, border: `1px solid ${filters.era === era.slug ? GOLD : "rgba(184,146,42,0.25)"}`, background: filters.era === era.slug ? GOLD : "transparent", transition: "all 0.15s" }} />
+                <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 13, color: filters.era === era.slug ? DARK : "#888", textTransform: "uppercase", letterSpacing: "0.5px", textAlign: "left" }}>
+                  {era.label}
+                </span>
+              </div>
+              <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 11, color: "#bbb", flexShrink: 0 }}>{era.years}</span>
+            </button>
+          ))}
+        </div>
+      ),
+    },
     {
       key: "brand",
       label: "Brand",
@@ -256,7 +256,7 @@ function FilterContent({ facets, filters, onChange, sections, setSections, colla
           <span style={{ fontSize: 14, color: filters.in_stock ? GOLD : "#aaa" }} title="In Stock Only">●</span>
         ) : (
           <>
-            <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "9px", letterSpacing: "2px", textTransform: "uppercase", color: filters.in_stock ? GOLD : "#888" }}>
+            <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "13px", letterSpacing: "2px", textTransform: "uppercase", color: filters.in_stock ? GOLD : "#888" }}>
               In Stock
             </span>
             <motion.div
@@ -284,10 +284,10 @@ function FilterContent({ facets, filters, onChange, sections, setSections, colla
               <span style={{ fontSize: 12, color: "#aaa", fontFamily: "var(--font-stencil, monospace)", letterSpacing: "1px" }}>—</span>
             ) : (
               <>
-                <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "9px", letterSpacing: "2px", textTransform: "uppercase", color: sections[key] ? GOLD : "#888", transition: "color 0.15s" }}>
+                <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "13px", letterSpacing: "2px", textTransform: "uppercase", color: sections[key] ? GOLD : "#888", transition: "color 0.15s" }}>
                   {label}
                 </span>
-                <motion.span animate={{ rotate: sections[key] ? 180 : 0 }} transition={{ duration: 0.2 }} style={{ color: "#bbb", fontSize: 10, display: "block" }}>▼</motion.span>
+                <motion.span animate={{ rotate: sections[key] ? 180 : 0 }} transition={{ duration: 0.2 }} style={{ color: "#bbb", fontSize: 13, display: "block" }}>▼</motion.span>
               </>
             )}
           </button>
@@ -313,7 +313,7 @@ function FilterContent({ facets, filters, onChange, sections, setSections, colla
         <div style={{ padding: "12px 14px" }}>
           <button
             onClick={() => onChange({ family: null, model: null, modelCodes: null, era: null, display_category: null, display_subcategory: null, brand: null, min_price: null, max_price: null, in_stock: false })}
-            style={{ width: "100%", background: "none", border: `1px solid rgba(184,146,42,0.3)`, color: GOLD, fontFamily: "var(--font-stencil, monospace)", fontSize: "8px", letterSpacing: "2px", padding: "7px", cursor: "pointer", textTransform: "uppercase" }}
+            style={{ width: "100%", background: "none", border: `1px solid rgba(184,146,42,0.3)`, color: GOLD, fontFamily: "var(--font-stencil, monospace)", fontSize: "12px", letterSpacing: "2px", padding: "9px", cursor: "pointer", textTransform: "uppercase" }}
           >
             Clear All Filters
           </button>
@@ -328,7 +328,7 @@ function FilterContent({ facets, filters, onChange, sections, setSections, colla
 export default function FilterSidebar({ facets, filters, onChange, open, onClose, mobileSheet = false }) {
   const [collapsed, setCollapsed] = useState(false);
   const [sections, setSections] = useState({
-    family: true, era: false, category: false, subcategory: false, brand: false, price: false,
+    category: true, subcategory: false, family: false, era: false, brand: false, price: false,
   });
 
   useEffect(() => {
@@ -386,7 +386,7 @@ export default function FilterSidebar({ facets, filters, onChange, open, onClose
                 {/* Drag handle */}
                 <div style={{ width: 36, height: 4, background: "rgba(184,146,42,0.3)", borderRadius: 2, margin: "0 auto 12px" }} />
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "9px", letterSpacing: "3px", color: GOLD, textTransform: "uppercase" }}>
+                  <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "12px", letterSpacing: "3px", color: GOLD, textTransform: "uppercase" }}>
                     FILTER {activeCount > 0 && (
                       <span style={{ background: GOLD, color: "#fff", padding: "1px 5px", borderRadius: 2, marginLeft: 4, fontSize: 8 }}>{activeCount}</span>
                     )}
@@ -440,7 +440,7 @@ export default function FilterSidebar({ facets, filters, onChange, open, onClose
         flexDirection: "column",
         overflow: "hidden",
         flexShrink: 0,
-        width: collapsed ? 48 : 220,
+        width: collapsed ? 48 : 240,
         transition: "width 0.25s ease",
         zIndex: 10,
       }}
@@ -495,7 +495,7 @@ export default function FilterSidebar({ facets, filters, onChange, open, onClose
         {!collapsed && (
           <motion.span
             layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}
-            style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "8px", letterSpacing: "2px", color: "#aaa", marginLeft: 8, textTransform: "uppercase" }}
+            style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "12px", letterSpacing: "2px", color: "#aaa", marginLeft: 8, textTransform: "uppercase" }}
           >
             Hide
           </motion.span>

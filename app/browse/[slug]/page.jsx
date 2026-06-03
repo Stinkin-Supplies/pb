@@ -1,10 +1,8 @@
 // ============================================================
 // app/browse/[slug]/page.jsx  —  SERVER COMPONENT
 // ============================================================
-// Phase 10 — catalog_fitment retired.
-// Fitment display now reads from catalog_fitment_readable (view
-// over catalog_fitment_v2) which returns the same make/model/year
-// shape the UI expects.
+// PDP fitment and OEM display are sourced directly from the
+// dedicated catalog_fitment_v2 and catalog_oem_crossref tables.
 // ============================================================
 
 import SideNav from "components/SideNav";
@@ -159,9 +157,10 @@ export default async function ProductDetailPage({ params }) {
 
   if (!productRow) notFound();
 
-  // ── Fetch variants, fitment, specs, related — each isolated ──
+  // ── Fetch variants, fitment, OEM, specs, related — each isolated ──
   let variants     = [];
   let fitment      = [];
+  let oemNumbers   = [];
   let catalogSpecs = [];
   let related      = [];
   let prevPart          = null;
@@ -183,22 +182,50 @@ export default async function ProductDetailPage({ params }) {
     // table doesn't exist yet — skip silently
   }
 
-  // Fitment — Phase 10: catalog_fitment_readable view over catalog_fitment_v2
+  // Fitment — direct source of truth from catalog_fitment_v2.
   try {
+    const fitmentProductId = productRow.unified_id ?? productRow.id;
     const { rows } = await catalogDb.query(
       `SELECT
-         'Harley-Davidson' AS make,
-         model_code        AS model,
-         year              AS year_start,
-         year              AS year_end
-       FROM catalog_fitment_readable
-       WHERE product_id = $1
-       ORDER BY family, model_code, year`,
-      [productRow.id]
+         hf.name          AS make,
+         hm.model_code    AS model,
+         hmy.year         AS year
+       FROM catalog_fitment_v2 cfv
+       JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id
+       JOIN harley_models hm ON hm.id = hmy.model_id
+       JOIN harley_families hf ON hf.id = hm.family_id
+       WHERE cfv.product_id = $1
+       ORDER BY hf.name, hm.model_code, hmy.year`,
+      [fitmentProductId]
     );
-    fitment = rows;
+    fitment = rows.map((row) => ({
+      make: row.make,
+      model: row.model,
+      year: row.year,
+      year_start: row.year,
+      year_end: row.year,
+    }));
   } catch (e) {
     console.error("[PDP] fitment fetch failed:", e.message);
+  }
+
+  // OEM cross-reference — direct source of truth from catalog_oem_crossref.
+  try {
+    const skuCandidates = [productRow.sku, productRow.internal_sku].filter(Boolean);
+    if (skuCandidates.length) {
+      const { rows } = await catalogDb.query(
+        `SELECT DISTINCT oem_number
+         FROM catalog_oem_crossref
+         WHERE sku = ANY($1::text[])
+           AND oem_number IS NOT NULL
+           AND oem_number <> ''
+         ORDER BY oem_number`,
+        [skuCandidates]
+      );
+      oemNumbers = rows.map((row) => row.oem_number).filter(Boolean);
+    }
+  } catch (e) {
+    console.error("[PDP] OEM fetch failed:", e.message);
   }
 
   // Specs — table may not exist yet
@@ -279,10 +306,11 @@ export default async function ProductDetailPage({ params }) {
     .map(s => ({ label: s.attribute, value: s.value }));
 
   const normalized = normalizeProductRow(productRow);
+  const resolvedOemNumbers = oemNumbers.length ? oemNumbers : normalized.oemNumbers;
 
   return (
     <ProductDetailClient
-      product={{ ...normalized, specs }}
+      product={{ ...normalized, specs, oemNumbers: resolvedOemNumbers }}
       variants={variants}
       fitment={fitment}
       relatedProducts={related}

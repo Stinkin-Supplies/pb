@@ -95,7 +95,7 @@ function hasFitmentData(variants) {
   return variants.some(v => v.fitment_by_family?.length > 0);
 }
 
-export default function VariantSelector({ productId, currentSku }) {
+export default function VariantSelector({ productId }) {
   const router = useRouter();
   const [data, setData]         = useState(null);
   const [loading, setLoading]   = useState(true);
@@ -112,7 +112,7 @@ export default function VariantSelector({ productId, currentSku }) {
       .catch(() => setLoading(false));
   }, [productId]);
 
-  if (loading) return <VariantSkeleton />;
+  if (loading) return null;
   if (!data?.hasVariants || data.variants.length <= 1) return null;
 
   const { variants, currentProductId, group, siblingGroups } = data;
@@ -499,16 +499,5 @@ function Chevron({ up }) {
     <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
       <path d={up ? 'M2 8L6 4L10 8' : 'M2 4L6 8L10 4'} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
     </svg>
-  );
-}
-
-function VariantSkeleton() {
-  return (
-    <div style={{ margin: '16px 0', border: '1px solid #e8e0d0', borderRadius: 8, padding: 16, background: CREAM }}>
-      <div style={{ height: 12, width: 160, background: '#ede8de', borderRadius: 4, marginBottom: 12 }} />
-      {[1, 2, 3].map(i => (
-        <div key={i} style={{ height: 56, background: CREAM2, borderRadius: 6, marginBottom: 6, opacity: 1 - i * 0.2 }} />
-      ))}
-    </div>
   );
 }
