@@ -163,7 +163,10 @@ export default function AdminEditPanel({ product }) {
             fits_all_models:     fitsAll,
           };
 
-          const token = new URLSearchParams(window.location.search).get("token") ?? "";
+          const token = new URLSearchParams(window.location.search).get("token")
+                         ?? sessionStorage.getItem("stinkin_admin_token")
+                         ?? "";
+          if (token) sessionStorage.setItem("stinkin_admin_token", token);
           const res = await fetch(`/api/admin/products/${product.id}?token=${encodeURIComponent(token)}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },

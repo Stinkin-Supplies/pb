@@ -1,196 +1,215 @@
-# Stinkin' Supplies — Session Handoff
-**Date:** May 2, 2026 (sixth pass)
-**Status:** ✅ Sportster OEM catalog extracted | ✅ fitment_hd_models fully normalized | ✅ 681 SKUs backfilled | ⏳ JW Boon import next | ⏳ other catalog families queued
+# STINKIN' SUPPLIES — HANDOFF LOG
 
 ---
 
-## ✅ WHAT'S WORKING NOW
+# ——— THIRTY-EIGHTH PASS (June 4, 2026) ———
 
-- **Shop** — 88,512 products in catalog_unified (WPS + PU + VTwin)
-- **Search** — Typesense live, 88,512 docs (reindexed April 30, pricing current)
-- **Browse** — /browse replaces /shop everywhere
-- **Pricing** — Daily price sync live, MAP compliant, WPS + PU
-- **Homepage** — Era cards + Shop by Part categories + corner nav
-- **Era pages** — 10 eras live at /era/[slug]
-- **Era images** — 9/10 WebP images live (flathead.webp missing)
-- **PDP** — Multi-image gallery, special_instructions block
-- **Fonts** — Bebas Neue (headers) + Share Tech Mono (body)
-- **Admin** — /admin/products live
-- **Production** — https://stinksupp.vercel.app
-- **PU images** — 23,975 / 24,009 (99.9%)
-- **OEM crossref** — 1,587 clean HD OEM entries, 36,692 products enriched
-- **vendor_offers** — WPS (25,763) + PU (74,244) = 99,007 total
-- **Fulfillment routing** — pick_fulfillment() live, fastest/cheapest modes
-- **hd_models** — ✅ FULLY CORRECTED (engine era splits, vintage history)
-- **fitment_hd_models** — ✅ 107,022 clean codes, 0 verbose strings remaining
-- **oem_fitment** — ✅ 75,963 Sportster OEM rows, 23,869 matched to catalog_unified
+Session: Thirty-Eighth Pass · June 4, 2026
 
----
+## WHERE WE ARE
 
-## ✅ WHAT WAS DONE THIS SESSION (May 2)
+Short session focused entirely on the admin inline edit system. No schema changes beyond the auto-created `catalog_review_flags` table. No catalog or fitment changes. No reindex needed.
 
-### Sportster OEM Catalog Extraction
-Built `scripts/ingest/build_oem_fitment.mjs` — full pipeline:
-- Python/pdfplumber extractor embedded, shelled out per catalog
-- 30 Sportster PDFs processed (1986–2022)
-- 75,963 part rows extracted with section, OEM part#, description, qty note, model_codes[]
-- Handles: multi-year qualifiers (1991/1992 format), wrapped model lists (2016+ format)
+## What Was Done This Session
 
-New tables created:
-- **`oem_fitment`** — raw extracted rows, one per (oem_part_no × catalog year)
-- **`hd_sportster_models`** — 26 canonical Sportster model codes with year ranges
-- **`v_oem_fitment`** — aggregated view, one row per OEM part# with full history
+### 1. AdminEditPanel Component ✅
 
-### OEM Match → catalog_unified
-Match strategy (two passes):
-- Pass 1: `oem_fitment.oem_part_no = ANY(catalog_unified.oem_numbers)` → 23,869 matched
-- Pass 2: via `catalog_oem_crossref` bridge → 0 additional (crossref too sparse for Sportster)
-- 681 distinct SKUs updated in `catalog_unified` with `fitment_hd_models`, `fitment_year_start/end`, `is_harley_fitment=true`
+Built `components/admin/AdminEditPanel.jsx` — a self-contained floating edit panel for the PDP. Activated by visiting any product page with `?admin=1&token=ADMIN_SECRET` in the URL.
 
-### fitment_hd_models Normalization
-All 184,691 verbose WPS/PU strings → clean H-D model codes:
-- Pass 1 (`norm_hd_models_v2.sql`): 468 strings auto-normalized via VIN parenthetical extraction
-- Pass 2 (same file): 82 hand-mapped (common names, old Sportster codes, sidecars, police)
-- Pass 3 (`norm_hd_models_v3.sql`): final 17 mopped up
-- Result: 107,022 clean codes, **0 verbose strings remaining**
+**Edit Fields mode:** Edits `display_category` (dropdown of all 20), `display_subcategory` (freetext + quick-pick suggestion chips per category), and `fits_all_models` toggle. Shows the raw vendor category as a read-only reference. Save button greys out until a field is actually changed. On save: PATCH to `/api/admin/products/[id]` → Postgres UPDATE → single Typesense document PATCH (no full reindex).
 
----
+**Flag Issue mode:** Saves to `catalog_review_flags` — nothing changes on the live product. Flag types: wrong_category, wrong_subcategory, missing_fitment, wrong_fitment, bad_image, duplicate, other. Notes field optional.
 
-## 🚀 NEW FITMENT APPROACH — REMINDER
+### 2. API Route ✅
 
-**catalog_fitment_v2 is still empty.** The oem_fitment work this session wrote to `catalog_unified.fitment_hd_models` directly, not to catalog_fitment_v2. The proper fitment pipeline flows through:
+`app/api/admin/products/[id]/route.ts`:
+- **PATCH `{ action: "update" }`** — updates `display_category`, `display_subcategory`, `fits_all_models` on `catalog_unified`, then fires async Typesense single-doc PATCH
+- **PATCH `{ action: "flag" }`** — upserts to `catalog_review_flags` (ON CONFLICT updates notes + resets resolved=false)
+- **GET** — returns all unresolved flags joined to `catalog_unified` for review
 
-```
-harley_model_years (id) ← catalog_fitment_v2.model_year_id
-harley_models (id)      ← harley_model_years.model_id
-harley_families (id)    ← harley_models.family_id
+Auth: `ADMIN_SECRET` env var checked against `?token=` query param or `X-Admin-Token` header.
+
+### 3. catalog_review_flags Table ✅
+
+Auto-created by the route on first flag submission. No migration script needed.
+
+```sql
+CREATE TABLE IF NOT EXISTS catalog_review_flags (
+  id          SERIAL PRIMARY KEY,
+  product_id  INT NOT NULL,
+  flag_type   TEXT NOT NULL,
+  flag_notes  TEXT,
+  flagged_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  resolved    BOOLEAN NOT NULL DEFAULT false,
+  resolved_at TIMESTAMPTZ,
+  UNIQUE (product_id, flag_type)
+);
+CREATE INDEX IF NOT EXISTS idx_catalog_review_flags_unresolved
+  ON catalog_review_flags (resolved, flagged_at DESC) WHERE resolved = false;
 ```
 
-### Trusted Fitment Sources (in priority order)
+### 4. Next.js 15 Params Fix ✅
 
-**1. JW Boon Parts Database** (`jwboon_parts_final.xlsx`) ← DO NEXT
-- ~1,000 rows of NOS vintage HD parts
-- Columns: OEM Number, Description, Fitment, Notes, Models, Year Ranges, All Years
-- Human-curated, explicit model codes + year lists
-- Import: parse Models + Year Ranges → look up harley_model_years → insert catalog_fitment_v2
-- OEM lookup: check catalog_oem_crossref AND catalog_unified.oem_numbers[] (both paths)
-- fitment_source='jwboon', confidence_score=1.0
+Route handler params signature updated from `{ params: { id: string } }` to `{ params: Promise<{ id: string }> }` with `await params` before reading `.id`. Required for Next.js 15 App Router — breaks type check otherwise.
 
-**2. WPS Fitment Files** — pending from rep
-- Explicit year/make/model/submodel per SKU
-- When received: parse → catalog_fitment_v2 directly, no inference
+### 5. Auth Debug ✅
 
-**3. PU ACES XML** — `raw_vendor_aces` table (check if populated)
-- `SELECT COUNT(*) FROM raw_vendor_aces;`
-- If populated: parse ACES XML → catalog_fitment_v2
+Traced persistent 401 to token not being forwarded in the fetch call. Fixed by reading `window.location.search` for `?token=` and caching it in `sessionStorage('stinkin_admin_token')` — survives client-side navigation so the token only needs to be in the URL once per browser session.
 
-**4. Other H-D OEM Catalogs** — Touring, Softail, Dyna, FXR PDFs exist
-- Same format as Sportster, same script
-- Add to oem_fitment → then backfill catalog_unified same way
+## DB State After This Session
 
-### What NOT to do
-- Do NOT re-run infer_fitment_staging.js — retired
-- Do NOT populate fitment_staging via inference
-- Do NOT use keyword matching for year/model assignment
+No changes to catalog data. `catalog_review_flags` table auto-created on first use (empty until flags are submitted).
+
+## What Needs to Happen Next
+
+| # | Task | Priority |
+|---|------|----------|
+| 1 | Remove console.log from isAuthorized() in route.ts | HIGH — before deploying to prod |
+| 2 | Add ADMIN_SECRET to Vercel: `npx vercel env add ADMIN_SECRET` | HIGH — prod edit won't work without it |
+| 3 | Drop Tanker + Bespoke fonts from Fontshare | HIGH — /models broken without them |
+| 4 | Import vtwin_fitment.csv (scraper 100% complete) | HIGH |
+| 5 | Add 26 missing model codes | MEDIUM |
+| 6 | Verify null slug on /browse | MEDIUM |
+| 7 | Verify OEM search returns 3 results for 24009-06 | MEDIUM |
 
 ---
 
-## 🗺️ NEXT SESSION PRIORITIES
+# ——— THIRTY-SEVENTH PASS (June 3, 2026) ———
 
-1. **JW Boon fitment import** — `scripts/data/jwboon_parts_final.xlsx`
-   - Upload the file, read the actual column names/values first
-   - Parse Models → match to harley_model_years via harley_models.model_code
-   - Parse All Years (Fitment) → individual year rows
-   - OEM lookup: `catalog_unified.oem_numbers[]` first, then `catalog_oem_crossref`
-   - Insert to catalog_fitment_v2 with fitment_source='jwboon', confidence_score=1.0
+Session: Thirty-Seventh Pass · June 3, 2026
 
-2. **Check raw_vendor_aces** — `SELECT COUNT(*) FROM raw_vendor_aces LIMIT 1;`
+## WHERE WE ARE
 
-3. **WPS fitment files** — ingest once received
+Two things: (1) major /models page rebuild using FlowingMenu + materialized view fixing a 9s query, and (2) VTwin scraper completed. No fitment or catalog data changes. No reindex needed beyond what was already current.
 
-4. **Other OEM catalog families** — Touring/Softail/Dyna PDFs → oem_fitment
+## What Was Done This Session
 
-5. **Flathead era image** — drop flathead.webp in public/images/eras/
+### 1. mv_family_product_ranges Materialized View ✅
 
----
+Created to fix a 9.5s query on `/models/[family]/parts`. Pre-aggregates per-family product year ranges from the full `catalog_fitment_v2` join. 81,332 rows. Performance: 496ms cold start, 83ms cached.
 
-## 🏗️ INFRASTRUCTURE
-
-```
-Hetzner:    5.161.100.126
-SSH:        ssh stinkdb
-PostgreSQL: :5432  stinkin_catalog  (user: catalog_app, password: smelly)
-IPv6 direct: postgresql://catalog_app:smelly@[2a01:4ff:f0:fa6f::1]:5432/stinkin_catalog
-Typesense:  Docker "typesense" (typesense/typesense:30.1, API key: xyz)
-nginx:      :443 HTTPS → Typesense (5.161.100.226.nip.io)
-Vercel:     epluris-projects/pb → https://stinksupp.vercel.app
-Cron:       0 3 * * * daily_price_sync.js (Hetzner)
+```sql
+CREATE INDEX ON mv_family_product_ranges (family_name);
+CREATE INDEX ON mv_family_product_ranges (family_name, display_category, display_subcategory);
 ```
 
-## 💡 OPERATIONAL GOTCHAS
+Auto-refreshes at end of `index_unified.js --recreate`. Run manually after fitment imports that don't trigger a full reindex:
+```bash
+REFRESH MATERIALIZED VIEW CONCURRENTLY mv_family_product_ranges;
+```
+
+### 2. /models Page — FlowingMenu ✅
+
+`app/models/page.jsx` rebuilt using FlowingMenu component. Zero API calls. Static family definitions only. Families: touring · softail · dyna · sportster · fxr · shovelhead · vintage · trike · v-rod · all-makes.
+
+"All Makes" (was "Street") routes to `/browse?universal=true` — not `/models/street`. Slug is still `street` in FAMILIES array.
+
+Bike images at `public/images/models/{slug}.jpg` — 400x160px recommended. `touring.jpg` complete. 9 remaining images still needed.
+
+### 3. Font System ✅
+
+Two new CSS variables added in `layout.tsx`:
+- `--font-tanker` → `public/fonts/Tanker-Regular.ttf` (Fontshare) — FlowingMenu + marquee
+- `--font-bespoke` → `public/fonts/BespokeSerif-Regular.ttf` (Fontshare) — page headers + category headings
+
+⚠️ Files not in git. Must be downloaded from Fontshare and dropped manually.
+
+### 4. Parts Route Rewrite ✅
+
+`app/api/models/[family]/parts/route.ts` rewritten to query `mv_family_product_ranges` instead of raw joins across 4.9M fitment rows. Era resolution moved to JS using 15 cached `hd_engine_types` rows.
+
+### 5. ModelCatalogClient Cleanup ✅
+
+Removed broken `@font-face /New_Sailor.ttf` (404 on every load). FONT_DISPLAY → `var(--font-stencil)`. Headings → `var(--font-bespoke)`. `/api/models/summary` route deleted (7s query, replaced with static sub labels).
+
+### 6. VTwin Scraper Finished ✅
+
+37,980 rows scraped, 100% complete. 34,952 fitment hits, 10,057 OEM (26.5% hit rate), 0 errors. CSV at `./scripts/ingest/vtwin_fitment.csv` — ready to import with `--skip-existing`.
+
+## Gotchas Discovered This Session
 
 | Issue | Solution |
 |-------|----------|
-| DB connection from Mac | CATALOG_DB_HOST=2a01:4ff:f0:fa6f::1 CATALOG_DB_PORT=5432 CATALOG_DB_USER=catalog_app CATALOG_DB_PASSWORD=smelly |
-| psql IPv6 URL | postgresql://catalog_app:smelly@[2a01:4ff:f0:fa6f::1]:5432/stinkin_catalog (brackets required) |
-| psql with !~ operator | Use -f with a .sql file — zsh chokes on ! in -c strings |
-| catalog_fitment_v2 | EMPTY — ready for JW Boon + WPS fitment |
-| fitment_staging | EMPTY — do not use for inference |
-| hd_models | Fully corrected with engine era splits + full vintage history |
-| harley_models vs hd_models | harley_models = fitment table (has family_id FK), hd_models = reference table |
-| catalog_fitment_v2 columns | id, product_id, model_year_id, created_at, fitment_source, confidence_score, parsed_snapshot |
-| harley_model_years | Links harley_models to years — FK target in catalog_fitment_v2 |
-| VTwin family names in DB | Softail Evo, Softail M8 — NOT "Softail" or "Big Twin" |
-| harley_models requires start_year/end_year | NOT NULL — always include both |
-| vendor_code casing | Always lowercase ('wps'/'pu') |
-| source_vendor casing | Always UPPERCASE ('WPS'/'PU'/'VTWIN') |
-| catalog_oem_crossref | 1,587 rows — ONLY real HD OEM numbers |
-| oem_fitment match method | 'oem_numbers_array' = via cu.oem_numbers[], 'oem_crossref' = via bridge table |
-| fitment_hd_models | Now fully normalized — 107K clean codes, no verbose strings |
-| Daily price sync | scripts/ingest/daily_price_sync.js |
-| CATALOG_DATABASE_URL | Must be set — no fallback |
-| Era images | Drop WebP 800×600px+ in public/images/eras/{slug}.webp |
-| fonts | Bebas Neue = --font-caesar, Share Tech Mono = --font-stencil |
-| /browse not /shop | app/browse/[slug]/page.jsx is the PDP |
-| catalog_fitment archived | catalog_fitment_archived — do not write to it |
-| OEM fitment script | scripts/ingest/build_oem_fitment.mjs — update CATALOG_DIR for other families |
+| FlowingMenu hydration mismatch | Seeded random `sr()` function — never use `Math.random()` in row config |
+| FlowingMenu GSAP scrollWidth | 120ms setTimeout before measuring — images need time to affect layout. Do not reduce. |
+| "All Makes" slug | Still `street` in FAMILIES array — routes to browse, not /models/street |
+| mat view refresh | Must run after any fitment import. Auto in index_unified.js, manual otherwise. |
 
-## 📊 CURRENT STATE (End of May 2 — sixth pass)
+## DB State After This Session
 
-| Metric | Value |
-|--------|-------|
-| catalog_unified | 88,512 rows |
-| — WPS | 26,754 |
-| — PU | 24,009 |
-| — VTwin | 37,749 |
-| Typesense indexed | 88,512 ✅ |
-| catalog_fitment_v2 | 0 rows (EMPTY — JW Boon next) |
-| fitment_staging | 0 rows (WIPED) |
-| oem_fitment | 75,963 rows (Sportster 1986–2022) |
-| hd_sportster_models | 26 model codes |
-| vendor_offers | 99,007 rows (WPS 25,763 + PU 73,244) |
-| vendor_sku_crossref | 110,679 entries |
-| catalog_oem_crossref | 1,587 clean HD OEM rows |
-| oem_numbers enriched | 36,692 products |
-| fitment_hd_models clean codes | 107,022 (0 verbose remaining) |
-| catalog_unified OEM backfill | 681 SKUs updated |
-| hd_models | ~250 rows (fully corrected + vintage) |
-| harley_families | 16 |
-| harley_models | 170 |
-| harley_model_years | 1,501 rows |
-| MAP violations | 0 ✅ |
-| PU image coverage | 99.9% |
+No catalog or fitment changes. `mv_family_product_ranges` created (81,332 rows).
 
-## 🖼️ ERA IMAGES STATUS
-```
-public/images/eras/flathead.webp           ← STILL NEEDED
-public/images/eras/knucklehead.webp        ✅
-public/images/eras/panhead.webp            ✅
-public/images/eras/ironhead-sportster.webp ✅
-public/images/eras/shovelhead.webp         ✅
-public/images/eras/evolution.webp          ✅
-public/images/eras/evo-sportster.webp      ✅
-public/images/eras/twin-cam.webp           ✅
-public/images/eras/milwaukee-8.webp        ✅
-public/images/eras/chopper.webp            ✅
-```
+---
+
+# ——— THIRTY-SIXTH PASS (June 2, 2026) — SESSION 2 ———
+
+Session: Thirty-Sixth Pass · June 2, 2026 (Second session)
+
+## WHERE WE ARE
+
+No schema changes. No frontend changes (except Typesense query_by fix). Pure fitment data pass: bridged oem_fitment table to catalog_fitment_v2, extracted fitment from product name strings. Fitment coverage jumped from 30.9% to 40.5% overall — PU nearly hit 50%.
+
+## What Was Done This Session
+
+### 1. OEM Catalog Bridge — oem_fitment → catalog_fitment_v2 ✅
+
+The `oem_fitment` table (379,899 rows from real HD OEM parts catalog PDFs — Sportster, Touring, Softail, Dyna, FX) was never bridged to `catalog_fitment_v2`. Built 3-pass bridge:
+1. Exact `model_code` + year range → `harley_models` → `harley_model_years`
+2. `fits_all_models` rows → all model_years in year range
+3. Catalog filename implies family (touring.pdf → Touring, softail → Softail, etc.) → family model_years filtered by year
+
+Run for both `oem_fitment.matched_product_id` products AND direct `oem_part_number` match (VTwin) and `oem_numbers[]` match (PU/WPS). New sources: `oem_catalog` (0.90–0.95), `oem_catalog_universal` (0.75), `oem_catalog_family` (0.80).
+
+### 2. Fitment Extracted from Product Names ✅
+
+New script: `scripts/ingest/extract_fitment_from_names.mjs`. Parses product names for three signal tiers: (Tier 1, conf 0.85) model code + year range; (Tier 2, conf 0.80) family keyword + year; (Tier 3, conf 0.65) family keyword only. Apostrophe year: `'YY < 30 → 20YY else 19YY`. Pipe-separated segments each parsed independently. Inserted 1,552,960 fitment rows for 5,795 products. `fitment_source = 'name_extraction'`.
+
+### 3. Typesense oem_numbers Fix ✅
+
+`oem_numbers[]` was in Typesense schema but missing from `query_by`. Searching `24009-06` only returned 1 of 3 products. Fixed: added `oem_numbers` with weight 5 to `query_by` in `lib/typesense/client.ts`.
+
+## DB State After This Session
+
+`catalog_fitment_v2`: ~4,920,000 rows (was ~2,930,000). PU: 49.2%. VTwin: 34.3%. WPS: 40.8%. Overall: 40.5%.
+
+---
+
+# ——— THIRTY-FIFTH PASS (June 2, 2026) — SESSION 1 ———
+
+Session: Thirty-Fifth Pass · June 2, 2026 (First session)
+
+## WHERE WE ARE
+
+Massive fitment data expansion. No schema changes. No frontend changes. Pure data quality: VTwin slug fixes, image backfill, OEM extraction from names, fitment from crossref, PU staging promoted.
+
+## What Was Done This Session
+
+### 1. VTwin Null Slug Fix ✅
+31,078 `catalog_products` rows had null slugs. Root cause: `catalog_products` SKUs are raw (e.g. `33-2141`) while `catalog_unified` has `VT-` prefix (`VT-33-2141`) — join required `'VT-' || cp.sku = cu.sku`.
+
+### 2. VTwin Image Backfill ✅
+20,167 VTwin products missing images. Built `vtwin_image_backfill.py` — HEAD checks with 20 concurrent workers. 10,302 images found. 9,865 genuinely have no image.
+
+### 3. OEM Numbers Extracted from Product Names ✅
+~1,217 new OEM numbers extracted from `catalog_unified.name` using 4 progressive regex passes. Year ranges (1984-1999 etc.) correctly excluded.
+
+### 4. Fitment Copied from OEM Crossref ✅
+Products with zero fitment inherit fitment from OEM crossref matches. +5,434 products gained fitment, +~450K rows. VTwin 15.4→25.9%, PU 33.5→35.6%, WPS 35.5→36.1%.
+
+### 5. harley_model_years Additions ✅
+Added: FLH 1978-1982, FLHS 1980-1982, FLSTC 2015-2017, FXBR 2018-2019, FXBRS 2018-2020, FXLR 1988-1989.
+Deleted bad rows: FLHX 1984 (Street Glide didn't exist), FLTRX 2024-2025 + FLTRXSE 2023-2025 (discontinued ~2013).
+
+### 6. VTwin OEM Numbers Backfilled ✅
+13,449 VTwin products had `oem_part_number` populated but `oem_numbers[]` empty. Fixed with UPDATE SET `oem_numbers = ARRAY[oem_part_number]`.
+
+## DB State After This Session
+
+| Table | Rows | Notes |
+|-------|------|-------|
+| catalog_unified (active) | 103,264 | 51,024 VTwin / 36,396 PU / 15,844 WPS |
+| catalog_fitment_v2 | ~2,930,000+ | +~450,000 rows this session |
+| catalog_oem_crossref | ~65,000+ | +10,265 VTwin OEM rows |
+| harley_model_years | ~1,889 | +29 added, 6 deleted |
+| Typesense | 103,264 docs | Reindexed twice |
+

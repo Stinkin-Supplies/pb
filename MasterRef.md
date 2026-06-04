@@ -1,7 +1,7 @@
 # Stinkin' Supplies — Master Reference
-**Last Updated:** June 2, 2026 (Thirty-Sixth Pass)
+**Last Updated:** June 4, 2026 (Thirty-Eighth Pass)
 **Database:** Hetzner Postgres — stinkin_catalog
-**Status:** Catalog rebuilt ✅ | Fitment rebuilt ✅ | Search indexed ✅ | Nav redesigned ✅ | Category taxonomy normalized ✅ | Public database snapshot live ✅ | VTwin fitment partial imported ✅ | VTwin images backfilled ✅ | OEM crossref expanded ✅ | OEM catalog bridge built ✅ | Name extraction fitment built ✅
+**Status:** Catalog rebuilt ✅ | Fitment rebuilt ✅ | Search indexed ✅ | Nav redesigned ✅ | Category taxonomy normalized ✅ | VTwin fitment FULL imported ✅ | VTwin images backfilled ✅ | OEM crossref expanded ✅ | OEM catalog bridge built ✅ | Name extraction fitment built ✅ | /models FlowingMenu built ✅ | mv_family_product_ranges mat view created ✅ | 22 missing model codes added ✅
 
 ---
 
@@ -9,33 +9,34 @@
 
 | Metric | Value | Status |
 |--------|-------|--------|
-| catalog_unified (total / active) | ~103,264 active | ✅ PU 36,396 / WPS 15,844 / VTwin 51,024 |
-| catalog_fitment_v2 | ~4,920,000 rows | ✅ +~2M rows added June 2 (session 36) |
+| catalog_unified (total / active) | ~104,917 active | ✅ PU 36,396 / WPS 15,844 / VTwin 52,677 |
+| catalog_fitment_v2 | ~4,920,000+ rows | ✅ vtwin_partial +269,511 rows June 4 (session 38) |
 | catalog_oem_crossref | ~65,000+ rows | ✅ +10,265 VTwin OEMs added June 2 |
 | catalog_variant_groups | 7,377 | ✅ MAX_VARIANT_MEMBERS=20 cap enforced |
 | catalog_variant_members | 28,619 | ✅ |
-| oem_fitment | 379,899 rows | ✅ All families — now bridged to catalog_fitment_v2 |
-| harley_model_years | ~1,889 rows | ✅ +29 added, 6 deleted June 2 |
-| harley_models | ~325 rows | ✅ |
-| Typesense | 103,264 docs | ✅ Reindexing June 2 (session 36) |
+| oem_fitment | 379,899 rows | ✅ All families — bridged to catalog_fitment_v2 |
+| harley_model_years | ~2,020 rows | ✅ +131 added June 4 (22 new model codes) |
+| harley_models | ~347 rows | ✅ +22 added June 4 (CVO, Street, Rev Max variants) |
+| mv_family_product_ranges | 81,332 rows | ✅ Created June 3 — refreshes auto in index_unified.js |
+| Typesense | 104,917 docs | ✅ Reindexed June 4 (session 38) |
 
-### Fitment Coverage (June 2 — Session 36)
+### Fitment Coverage (June 4 — Session 38)
 | Vendor | Total | With Fitment | Coverage |
 |--------|-------|--------------|----------|
 | PU | 36,396 | 17,918 | 49.2% |
-| VTwin | 51,024 | 17,494 | 34.3% |
+| VTwin | **52,677** | **18,452** | **35.0%** |
 | WPS | 15,844 | 6,463 | 40.8% |
-| **Total** | **103,264** | **41,875** | **40.5%** |
+| **Total** | **104,917** | **42,833** | **40.8%** |
 
-### Fitment Sources (June 2 — Session 36)
+### Fitment Sources (June 4 — Session 38)
 | Source | Rows | Products | Confidence |
 |--------|------|----------|-----------|
 | jwboon | 1,442,318 | 13,764 | high |
-| wps | 802,890 | 5,847 | high |
 | name_extraction | 1,552,960 | 5,795 | 0.65–0.85 |
+| wps | 802,890 | 5,847 | high |
 | copied_from_crossref | 467,015 | 6,219 | varies |
+| **vtwin_partial** | **269,511** | **8,635** | high |
 | oem_catalog_universal | 261,091 | 1,239 | 0.75 |
-| vtwin_partial | 239,035 | 7,677 | high |
 | oem_catalog_family | 141,293 | 2,079 | 0.80 |
 | oem_catalog | 12,801 | 848 | 0.90–0.95 |
 | oem_crossref | 554 | 79 | high |
@@ -129,8 +130,26 @@ VTWIN_CSV=./scripts/ingest/new_batch.jsonl \
   node scripts/ingest/import_vtwin_fitment_partial.mjs --skip-existing
 ```
 
+### Full VTwin scraper import (June 4 — Session 38) ✅ DONE
+Two CSV files from scraper, imported sequentially:
+
+| File | SKUs | Fitment Rows | New Products |
+|------|------|-------------|-------------|
+| vtwin_fitment.csv | 13,275 | 239,494 | 0 (all existing) |
+| vtwin_fitment_missing.csv | 7,479 | 160,910 | 1,653 |
+
+```bash
+# Run sequentially (parallel runs cause delete/reinsert collisions):
+VTWIN_CSV=/path/to/vtwin_fitment.csv node scripts/ingest/import_vtwin_fitment_partial.mjs
+VTWIN_CSV=/path/to/vtwin_fitment_missing.csv node scripts/ingest/import_vtwin_fitment_partial.mjs
+```
+
+After import: fix null slugs, sync catalog_products, refresh mat view, reindex Typesense.
+
+Skipped permanently: `C`, `E` (single-letter bad data), `XL1200` (too generic), `FXLRFLFB` (parse error — FXLR+FLFB merged without pipe).
+
 ### VTwin product count note
-VTwin is ~51,024 products (not ~37,749 as originally cataloged). The difference (~13,275) came from the fitment partial import inserting net-new SKUs that weren't in the original VTwin catalog import.
+VTwin is ~52,677 products (+1,653 added June 4 from vtwin_fitment_missing.csv). Previously ~51,024.
 
 ---
 
@@ -195,8 +214,8 @@ Parses product names for three tiers of fitment signal:
 | 2 | Family keyword + year | `Big Twin '99-'06`, `1981-1984 XL` | 0.80 |
 | 3 | Family keyword only (no year) | `Softail`, `Touring` | 0.65 |
 
-Apostrophe year conversion: `'YY` → if YY < 30 → 2000+YY, else 1900+YY.  
-Pipe-separated segments (`Twin Cam '07-'17 | Dyna '06`) each parsed independently.  
+Apostrophe year conversion: `'YY` → if YY < 30 → 2000+YY, else 1900+YY.
+Pipe-separated segments (`Twin Cam '07-'17 | Dyna '06`) each parsed independently.
 `fitment_source = 'name_extraction'`, ON CONFLICT DO NOTHING, NOT EXISTS guard.
 
 ```bash
@@ -241,6 +260,39 @@ JOIN catalog_oem_crossref cor ON cor.oem_number = cu.oem_part_number
 
 ---
 
+## MISSING MODEL CODES — ADDED JUNE 4 (SESSION 38)
+
+22 model codes added to `harley_models` + `harley_model_years` (131 year rows total).
+These were previously unknown in VTwin fitment data — SKU fitment rows for these models were skipped until now.
+
+| Model Code | Name | Family | Years |
+|------------|------|--------|-------|
+| FLTRCVO | CVO Road Glide Ultra | Touring | 2018–2019 |
+| FLHTKCVO | CVO Ultra Limited | Touring | 2018–2019 |
+| FLHTCVO | CVO Electra Glide Classic | Touring | 2018–2019 |
+| FLTRXCVO | CVO Road Glide Custom | Touring | 2018–2019 |
+| FLHXCVO | CVO Street Glide | Touring | 2018–2019 |
+| FLHTKS | King of the Bagger | Touring | 2021–2026 |
+| FLHXX | Ultra Classic Electra Glide X | Touring | 2009–2013 |
+| FLTHK | Tri Glide Ultra (variant) | Touring | 2008–2023 |
+| FLTN | Touring Model (variant) | Touring | 2008 |
+| FLFBSANY | Fat Boy Annual (Y) | Softail | 2018–2019 |
+| FLFBSANV | Fat Boy Annual (V) | Softail | 2018–2026 |
+| FLFBSANX | Fat Boy Annual (X) | Softail | 2018–2026 |
+| FLHCSANV | Heritage Classic Anniversary | Softail | 2018–2025 |
+| FXBSE | CVO Breakout | Softail | 2013–2014 |
+| FLFS | Softail (variant) | Softail | 2018–2022 |
+| FLTSN | Softail Deluxe (variant) | Softail | 2004–2017 |
+| FXLRSST | Low Rider ST (variant) | Softail | 2018–2026 |
+| FXRST | Low Rider ST | Softail | 2018–2022 |
+| FXDE | Dyna (European variant) | Dyna | 1992–2005 |
+| XG | Street (generic) | Street | 2015–2021 |
+| RH120S | Sportster S (variant) | Revolution Max | 2021–2026 |
+
+Permanently skipped (intentional): `C`, `E` (single-letter noise), `XL1200` (too generic), `ELW` (bad PU data), `FXLRFLFB` (parse error).
+
+---
+
 ## VARIANT GROUP RULES
 
 - **MAX_VARIANT_MEMBERS = 20** in build_variant_groups.cjs — enforced via HAVING clause + per-group guard + cleanup pass
@@ -276,20 +328,53 @@ Typesense index: all active products indexed, no additional filter beyond is_act
 
 ## /MODELS/[FAMILY] PARTS CATALOG
 
-Route at `/models/[family]` — model-first navigation.
+Route at `/models/[family]` — model-first navigation. Rebuilt June 3 with FlowingMenu + materialized view.
 
 | Route | File | Purpose |
 |-------|------|---------|
-| /models | app/models/page.jsx | Family index grid |
+| /models | app/models/page.jsx | FlowingMenu family index — static, zero API calls |
 | /models/[family] | app/models/[family]/page.jsx | Server shell |
 | /models/[family] | app/models/[family]/ModelCatalogClient.jsx | Client — era chips, category accordion |
-| API | app/api/models/[family]/parts/route.ts | Era-bucketed catalog query |
+| API | app/api/models/[family]/parts/route.ts | Queries mv_family_product_ranges — 83ms cached |
 
-**Supported families:** touring · softail · dyna · sportster · fxr · shovelhead · vintage · trike · v-rod · street
+**Supported families:** touring · softail · dyna · sportster · fxr · shovelhead · vintage · trike · v-rod
 
-**Vintage** = Panhead + Knucklehead + Flathead grouped together. API uses `hf.name = ANY(...)`. Browse URL uses multiple `?family=` params.
+**"All Makes"** slug is `street` in FAMILIES array — routes to `/browse?universal=true`, not `/models/street`. No parts API route needed for it.
 
-**Era boundaries** come from `hd_engine_types.year_start/year_end` — not hardcoded.
+**Vintage** = Panhead + Knucklehead + Flathead grouped together. API uses `hf.name = ANY($1::text[])`.
+
+**Era boundaries** come from `hd_engine_types.year_start/year_end` — 15 rows, cached in module scope on cold start.
+
+**Performance:** 496ms cold start, 83ms cached (was 9.5s before mat view).
+
+### mv_family_product_ranges Materialized View
+
+Pre-aggregates per-family product year ranges. 81,332 rows.
+
+```sql
+CREATE INDEX ON mv_family_product_ranges (family_name);
+CREATE INDEX ON mv_family_product_ranges (family_name, display_category, display_subcategory);
+
+-- Query used by parts route:
+SELECT display_category, display_subcategory,
+  MIN(year_start), MAX(year_end), COUNT(*)
+FROM mv_family_product_ranges
+WHERE family_name = $1
+GROUP BY display_category, display_subcategory;
+
+-- Manual refresh (auto-runs in index_unified.js after reindex):
+REFRESH MATERIALIZED VIEW CONCURRENTLY mv_family_product_ranges;
+```
+
+### Font System (June 3)
+Two new CSS variables added in layout.tsx:
+
+| Variable | File | Used for |
+|----------|------|---------|
+| `--font-tanker` | `public/fonts/Tanker-Regular.ttf` | FlowingMenu family names + marquee |
+| `--font-bespoke` | `public/fonts/BespokeSerif-Regular.ttf` | Page headers + category headings |
+
+⚠️ Both files must exist locally — not in git. Download from Fontshare kit link.
 
 ---
 
@@ -309,6 +394,48 @@ Payload: `{ mode: "ids", ids: number[] }` or `{ mode: "filter", search, brand, s
 - DELETE: removes rows
 - PATCH: `{ field: "oem_manufacturer", value: string }` — bulk brand update
 - POST: `{ oem_number, oem_manufacturer, source_file }` — adds OEM# to distinct SKUs of selection, ON CONFLICT DO NOTHING
+
+### Inline PDP Admin Edit (June 4)
+
+Floating pencil button on every PDP. Visible only when `?admin=1&token=ADMIN_SECRET` is in the URL. Slides open a 360px panel with two modes:
+
+**Edit Fields** — updates `display_category`, `display_subcategory`, `fits_all_models` on `catalog_unified`, then fires a single-document Typesense PATCH (no full reindex needed). Save button stays grey until a field is actually changed.
+
+**Flag Issue** — writes to `catalog_review_flags` (auto-created on first use). Nothing changes on the live product — queued for batch review.
+
+Files:
+- `components/admin/AdminEditPanel.jsx` — client component, import into ProductDetailClient.jsx
+- `app/api/admin/products/[id]/route.ts` — PATCH (update or flag) + GET (list unresolved flags)
+
+Required env var:
+```
+ADMIN_SECRET=your-secret-here   # .env.local + Vercel dashboard
+```
+
+Usage:
+```
+# Any PDP — token only needed at save time, but easiest to keep both in URL
+http://localhost:3000/browse/{slug}?admin=1&token=YOUR_SECRET
+
+# List all unresolved flags
+GET /api/admin/products/1?token=YOUR_SECRET  (id ignored for GET)
+```
+
+Auth: token read from URL query param (`?token=`) or `X-Admin-Token` header. Token cached in `sessionStorage` after first use so it survives client-side navigation within the same session.
+
+#### catalog_review_flags schema (auto-created)
+```sql
+CREATE TABLE catalog_review_flags (
+  id          SERIAL PRIMARY KEY,
+  product_id  INT NOT NULL,
+  flag_type   TEXT NOT NULL,   -- wrong_category | wrong_subcategory | missing_fitment | wrong_fitment | bad_image | duplicate | other
+  flag_notes  TEXT,
+  flagged_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  resolved    BOOLEAN NOT NULL DEFAULT false,
+  resolved_at TIMESTAMPTZ,
+  UNIQUE (product_id, flag_type)
+);
+```
 
 ---
 
@@ -379,6 +506,7 @@ Step 12e: node scripts/ingest/extract_fitment_from_names.mjs
 Step 13: node scripts/ingest/build_variant_groups.cjs
 Step 14: [run display_subcategory UPDATE SQL — see HANDOFF_LOG for full statement]
 Step 15: node scripts/ingest/index_unified.js --recreate
+         (also auto-runs: REFRESH MATERIALIZED VIEW CONCURRENTLY mv_family_product_ranges)
 ```
 
 ---
@@ -419,6 +547,18 @@ Step 15: node scripts/ingest/index_unified.js --recreate
 | FLTRX/FLTRXSE 2023-2025 | Road Glide Custom discontinued ~2013 — bad PU data, deleted from harley_model_years |
 | ELW 2020 | Knucklehead Sidecar 1936-1947 — any year outside that range is bad PU data, ignore |
 | A- prefix on OEM numbers | Eastern Motorcycle Parts convention — 'A-24009-06' and '24009-06' are same OEM. Join with: replace(oem_part_number, 'A-', '') |
+| mv_family_product_ranges stale | Run REFRESH MATERIALIZED VIEW CONCURRENTLY mv_family_product_ranges after any fitment import. Auto-runs in index_unified.js. |
+| Tanker/Bespoke fonts missing | Files must exist at public/fonts/Tanker-Regular.ttf + BespokeSerif-Regular.ttf. Download from Fontshare. Not in git. |
+| FlowingMenu hydration | Seeded random sr() function ensures SSR + client produce identical row configs. Never use Math.random() in row config. |
+| FlowingMenu GSAP timing | 120ms setTimeout before measuring scrollWidth — images need time to affect layout. Do not reduce. |
+| "All Makes" family | Slug is still "street" in FAMILIES array. Routes to /browse?universal=true, not /models/street. No parts API route needed. |
+| AdminEditPanel token | Token read from ?token= URL param, cached in sessionStorage after first use. ADMIN_SECRET env var must be set in .env.local and Vercel. |
+| Next.js 15 route params | params is now Promise<{id}> in route handlers — must await params before reading .id |
+| VTwin fitment parallel import | NEVER run two import_vtwin_fitment_partial.mjs in parallel — delete step collides. Run sequentially. |
+| vtwin_fitment.csv --skip-existing | With --skip-existing, ALL 13,275 SKUs are filtered (already in catalog) → 0 imports. Drop flag to update fitment for existing products. |
+| vtwin_fitment_missing.csv | Contains 7,479 unique SKUs including 1,653 net-new products. Use import_vtwin_fitment_partial.mjs (not the full script — wrong schema). |
+| import_vtwin_fitment_full.mjs schema | This script uses harley_model_id/year_start/year_end columns that DON'T exist. catalog_fitment_v2 uses model_year_id. Do not use this script without fixing. |
+| mv_family_product_ranges CONCURRENTLY | CONCURRENTLY refresh requires a unique index — run plain REFRESH MATERIALIZED VIEW instead. |
 
 ---
 
@@ -428,9 +568,21 @@ Step 15: node scripts/ingest/index_unified.js --recreate
 # Connect
 psql 'postgresql://catalog_app:smelly@5.161.100.126:5432/stinkin_catalog'
 
-# VTwin fitment import
-VTWIN_CSV=./scripts/ingest/vtwin_fitment_partial.csv \
-  node scripts/ingest/import_vtwin_fitment_partial.mjs
+# VTwin fitment import — run SEQUENTIALLY (parallel causes delete collisions)
+VTWIN_CSV=/path/to/vtwin_fitment.csv node scripts/ingest/import_vtwin_fitment_partial.mjs
+VTWIN_CSV=/path/to/vtwin_fitment_missing.csv node scripts/ingest/import_vtwin_fitment_partial.mjs
+
+# Fix null slugs after VTwin import (1,653 new products added June 4)
+UPDATE catalog_unified SET slug = lower(regexp_replace(regexp_replace(name,'[^a-zA-Z0-9\s-]','','g'),'\s+','-','g'))
+  || '-' || lower(replace(sku,'VT-','')) || '-v'
+WHERE source_vendor='VTWIN' AND is_active=true AND (slug IS NULL OR slug='null');
+
+# Sync new VTwin products to catalog_products
+INSERT INTO catalog_products (sku,name,slug,source_vendor,is_active)
+SELECT replace(cu.sku,'VT-',''),cu.name,cu.slug,'vtwin',true FROM catalog_unified cu
+WHERE cu.source_vendor='VTWIN' AND cu.is_active=true
+AND NOT EXISTS (SELECT 1 FROM catalog_products cp WHERE 'VT-'||cp.sku=cu.sku OR cp.sku=cu.sku)
+ON CONFLICT DO NOTHING;
 
 # VTwin image backfill (run from vtwin_scraper venv)
 cd ~/Desktop/vtwin_scraper/vtwin_scraper && source venv/bin/activate
@@ -440,11 +592,18 @@ python3 /tmp/vtwin_image_backfill.py
 node scripts/ingest/build_variant_groups.cjs --dry  # preview
 node scripts/ingest/build_variant_groups.cjs         # live
 
-# Typesense reindex
+# Typesense reindex (also refreshes mv_family_product_ranges)
 node scripts/ingest/index_unified.js --recreate
+
+# Refresh mat view manually (after fitment import without full reindex)
+psql 'postgresql://catalog_app:smelly@5.161.100.126:5432/stinkin_catalog' \
+  -c 'REFRESH MATERIALIZED VIEW CONCURRENTLY mv_family_product_ranges;'
 
 # Deploy
 npx vercel --prod
+
+# Add ADMIN_SECRET to Vercel
+npx vercel env add ADMIN_SECRET
 
 # Check display_category coverage after merge
 SELECT display_category, COUNT(*) FROM catalog_unified WHERE is_active = true GROUP BY display_category ORDER BY COUNT(*) DESC;
@@ -467,8 +626,11 @@ SELECT source_vendor, COUNT(*) FROM catalog_products WHERE slug IS NULL OR slug 
 UPDATE catalog_unified SET oem_numbers = ARRAY[oem_part_number]
 WHERE source_vendor = 'VTWIN' AND oem_part_number IS NOT NULL AND oem_part_number != ''
 AND (oem_numbers IS NULL OR oem_numbers = '{}');
+
+# List all unresolved review flags
+GET /api/admin/products/1?token=YOUR_SECRET
 ```
 
 ---
 
-*Master Reference — Last update: June 2, 2026 · Thirty-Sixth Pass*
+*Master Reference — Last update: June 4, 2026 · Thirty-Eighth Pass (VTwin full fitment ingest + 22 model codes added)*
