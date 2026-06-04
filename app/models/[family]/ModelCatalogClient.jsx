@@ -15,7 +15,7 @@ const CREAM2  = '#ede8df';
 const DARK    = '#1a1208';
 const BORDER  = 'rgba(201,150,10,0.2)';
 const FONT_UI = "var(--font-stencil, 'Barlow Condensed', monospace)";
-const FONT_DISPLAY = "'New Sailor', serif";
+const FONT_DISPLAY = "var(--font-stencil, 'Barlow Condensed', monospace)";
 
 // Engine era → visual accent color
 const ERA_COLORS = {
@@ -211,7 +211,7 @@ function CatSection({ family, category, subcats, totalParts, defaultOpen }) {
         }}
       >
         <span style={{
-          fontFamily: FONT_DISPLAY,
+          fontFamily: "var(--font-bespoke, serif)",
           fontSize: 28,
           color: DARK,
           letterSpacing: '.04em',
@@ -334,7 +334,7 @@ export default function ModelCatalogClient({ family, meta }) {
 
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap', marginBottom: 12 }}>
           <h1 style={{
-            fontFamily: FONT_DISPLAY,
+            fontFamily: "var(--font-bespoke, serif)",
             fontSize: 'clamp(42px, 8vw, 72px)',
             color: DARK,
             letterSpacing: '.04em',
@@ -435,10 +435,6 @@ export default function ModelCatalogClient({ family, meta }) {
 
       <style>{`
         * { box-sizing: border-box; }
-        @font-face {
-          font-family: 'New Sailor';
-          src: url('/New_Sailor.ttf') format('truetype');
-          font-display: swap;
         }
         @media (max-width: 600px) {
           .era-chip-wrap { flex-direction: column; }

@@ -5,6 +5,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import AdminEditPanel from "@/components/admin/AdminEditPanel";
 import VariantSelector from "@/components/browse/VariantSelector";
 
 // ── Tokens ────────────────────────────────────────────────────
@@ -768,6 +769,8 @@ export default function ProductDetailClient({
           .pdp-grid { grid-template-columns: minmax(0,1fr) 320px !important; gap: 36px !important; }
         }
       `}</style>
+
+      <AdminEditPanel product={product} />
     </div>
   );
 }

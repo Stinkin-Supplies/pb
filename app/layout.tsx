@@ -29,6 +29,29 @@ const newSailor = localFont({
   display: "swap",
 });
 
+// Fontshare — loaded via next/font/local using the CDN URL trick
+// Tanker: heavy, wide, loud — marquee + family name display
+const tanker = localFont({
+  src: [{
+    path: "../public/fonts/Tanker-Regular.ttf",
+    weight: "400",
+    style: "normal",
+  }],
+  variable: "--font-tanker",
+  display: "swap",
+});
+
+// Bespoke Serif: editorial, classy — headers and titles
+const bespokeSerif = localFont({
+  src: [{
+    path: "../public/fonts/BespokeSerif-Regular.ttf",
+    weight: "400",
+    style: "normal",
+  }],
+  variable: "--font-bespoke",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "Stinkin' Supplies | Powersports Parts & Accessories",
   description:
@@ -37,7 +60,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${bebas.variable} ${shareTech.variable} ${newSailor.variable}`}>
+    <html
+      lang="en"
+      className={`${bebas.variable} ${shareTech.variable} ${newSailor.variable} ${tanker.variable} ${bespokeSerif.variable}`}
+    >
       <body>
         <CartRoot>
           {children}

@@ -1,98 +1,158 @@
 'use client';
 /**
  * app/models/page.jsx
- * Model family index — entry point to the parts catalog.
+ * /models index — model family selector using FlowingMenu.
+ * Zero API calls. Static data only. Instant load.
  */
 
 import Link from 'next/link';
+import FlowingMenu from '@/components/models/FlowingMenu';
 
-const FONT_DISPLAY = "'New Sailor', serif";
-const FONT_UI      = "var(--font-stencil, 'Barlow Condensed', monospace)";
-const GOLD         = '#c9960a';
-const CREAM        = '#f5f0e8';
-const CREAM2       = '#ede8df';
-const DARK         = '#1a1208';
-const BORDER       = 'rgba(201,150,10,0.2)';
+const GOLD     = '#c9960a';
+const GOLD_DIM = 'rgba(201,150,10,0.22)';
+const CREAM    = '#f5f0e8';
+const DARK     = '#1a1208';
+const TAN      = '#a07820';
+const FONT_UI  = "var(--font-stencil, 'Barlow Condensed', monospace)";
+const FONT_D   = "var(--font-bespoke, serif)";
 
 const FAMILIES = [
-  { slug: 'touring',    label: 'Touring',    years: '1980–2026', sub: 'Electra · Road · Street Glide · Ultra Classic', icon: '🏍' },
-  { slug: 'softail',    label: 'Softail',    years: '1984–2026', sub: 'Fat Boy · Heritage · Breakout · Slim', icon: '🏍' },
-  { slug: 'dyna',       label: 'Dyna',       years: '1991–2017', sub: 'Fat Bob · Wide Glide · Street Bob', icon: '🏍' },
-  { slug: 'sportster',  label: 'Sportster',  years: '1957–2022', sub: 'Iron 883 · Forty-Eight · XL Series', icon: '🏍' },
-  { slug: 'fxr',        label: 'FXR',        years: '1982–1994', sub: 'Super Glide II · FXRS · FXRT', icon: '🏍' },
-  { slug: 'shovelhead', label: 'Shovelhead', years: '1966–1986', sub: 'FL · FLH · FX · FXWG · Low Rider', icon: '🏍' },
-  { slug: 'vintage',    label: 'Vintage',    years: 'Pre-1966',  sub: 'Panhead · Knucklehead · Flathead', icon: '🏍' },
-  { slug: 'trike',      label: 'Trike',      years: '2009–2026', sub: 'Freewheeler · Tri Glide Ultra', icon: '🏍' },
-  { slug: 'v-rod',      label: 'V-Rod',      years: '2002–2017', sub: 'VRSC · Night Rod · Muscle', icon: '🏍' },
-  { slug: 'street',     label: 'Street',     years: '2015–2020', sub: 'Street 500 · Street 750', icon: '🏍' },
+  { slug: 'touring',    label: 'Touring',    years: '1980–2026', sub: 'Electra Glide · Road King · Street Glide · Ultra Classic',   image: '/images/models/touring.jpg'    },
+  { slug: 'softail',    label: 'Softail',    years: '1984–2026', sub: 'Fat Boy · Heritage Classic · Breakout · Slim · Street Bob',  image: '/images/models/softail.jpg'    },
+  { slug: 'dyna',       label: 'Dyna',       years: '1991–2017', sub: 'Fat Bob · Wide Glide · Street Bob · Low Rider',              image: '/images/models/dyna.jpg'       },
+  { slug: 'sportster',  label: 'Sportster',  years: '1957–2022', sub: 'Iron 883 · Forty-Eight · SuperLow · Custom · XL Series',    image: '/images/models/sportster.jpg'  },
+  { slug: 'fxr',        label: 'FXR',        years: '1982–1994', sub: 'Super Glide II · FXRS · FXRT · FXRD · Low Glide',           image: '/images/models/fxr.jpg'        },
+  { slug: 'shovelhead', label: 'Shovelhead', years: '1966–1986', sub: 'FL · FLH · FX · FXWG · Low Rider · Wide Glide',             image: '/images/models/shovelhead.jpg' },
+  { slug: 'vintage',    label: 'Vintage',    years: 'Pre-1966',  sub: 'Panhead · Knucklehead · Flathead · WL · EL · FL',           image: '/images/models/vintage.jpg'    },
+  { slug: 'trike',      label: 'Trike',      years: '2009–2026', sub: 'Freewheeler · Tri Glide Ultra · CVO Tri Glide',             image: '/images/models/trike.jpg'      },
+  { slug: 'v-rod',      label: 'V-Rod',      years: '2002–2017', sub: 'VRSC · Night Rod · Night Rod Special · V-Rod Muscle',       image: '/images/models/v-rod.jpg'      },
+  { slug: 'street',     label: 'All Makes',  years: '',          sub: 'Universal · Multi-Make · All Applications',                 image: ''                              },
 ];
+
+const menuItems = FAMILIES.map(f => ({
+  link:  f.slug === 'street' ? '/browse?universal=true' : `/models/${f.slug}`,
+  text:  f.label,
+  sub:   f.sub,
+  years: f.years,
+  image: f.image,
+}));
 
 export default function ModelsIndexPage() {
   return (
-    <div style={{ background: CREAM, minHeight: '100vh', color: DARK }}>
-      <div style={{
-        background: CREAM2,
+    <div style={{
+      background:    DARK,
+      minHeight:     '100dvh',
+      color:         CREAM,
+      display:       'flex',
+      flexDirection: 'column',
+    }}>
+
+      {/* ── Header — cream background, black text ── */}
+      <header style={{
+        background:  CREAM,
         borderBottom: `2px solid ${GOLD}`,
-        padding: '32px 28px 24px',
+        boxShadow:   `0 3px 0 0 ${GOLD_DIM}`,
+        padding:     'clamp(16px, 3vw, 28px) clamp(20px, 5vw, 56px)',
+        flexShrink:  0,
       }}>
-        <div style={{ fontFamily: FONT_UI, fontSize: 9, letterSpacing: '.18em', textTransform: 'uppercase', color: '#a07820', marginBottom: 10 }}>
-          <Link href="/" style={{ color: '#a07820', textDecoration: 'none' }}>Home</Link>
-          {' → '}
-          <span style={{ color: DARK }}>Models</span>
+
+        {/* Breadcrumb */}
+        <nav style={{
+          fontFamily:    FONT_UI,
+          fontSize:      10,
+          letterSpacing: '0.18em',
+          textTransform: 'uppercase',
+          color:         DARK,
+          opacity:       0.45,
+          marginBottom:  10,
+          display:       'flex',
+          alignItems:    'center',
+          gap:           8,
+        }}>
+          <Link href="/" style={{ color: DARK, textDecoration: 'none' }}>Home</Link>
+          <span>›</span>
+          <span style={{ opacity: 1, color: DARK }}>Models</span>
+        </nav>
+
+        {/* Title row */}
+        <div style={{
+          display:        'flex',
+          alignItems:     'flex-end',
+          justifyContent: 'space-between',
+          flexWrap:       'wrap',
+          gap:            12,
+        }}>
+          <h1 style={{
+            fontFamily:    FONT_D,
+            fontSize:      'clamp(36px, 6vw, 72px)',
+            color:         DARK,
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+            lineHeight:    0.95,
+            margin:        0,
+          }}>
+            Shop by <span style={{ color: GOLD }}>Model</span>
+          </h1>
+          <p style={{
+            fontFamily:    FONT_UI,
+            fontSize:      'clamp(10px, 1.1vw, 12px)',
+            letterSpacing: '0.08em',
+            color:         TAN,
+            lineHeight:    1.6,
+            margin:        0,
+            paddingBottom: 4,
+          }}>
+            Select a family · browse by era &amp; category
+          </p>
         </div>
-        <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 'clamp(36px, 7vw, 60px)', color: DARK, letterSpacing: '.04em', textTransform: 'uppercase', lineHeight: 1, margin: '0 0 8px' }}>
-          Shop by Model
-        </h1>
-        <p style={{ fontFamily: FONT_UI, fontSize: 11, color: '#a07820', letterSpacing: '.08em', textTransform: 'uppercase' }}>
-          Select a family to browse parts by era
-        </p>
+      </header>
+
+      {/* ── Flowing menu ── */}
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+        <FlowingMenu
+          items={menuItems}
+          speed={60}
+          textColor={CREAM}
+          bgColor={DARK}
+          marqueeBgColor="#ffffff"
+          marqueeTextColor={DARK}
+          borderColor={GOLD_DIM}
+        />
       </div>
 
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 28px 80px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
-          {FAMILIES.map(f => (
-            <Link
-              key={f.slug}
-              href={`/models/${f.slug}`}
-              style={{ textDecoration: 'none' }}
-            >
-              <div
-                style={{
-                  background: '#fff',
-                  border: `1px solid ${BORDER}`,
-                  padding: '20px 22px',
-                  transition: 'border-color .15s, transform .15s',
-                  cursor: 'pointer',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = GOLD; e.currentTarget.style.transform = 'translateY(-2px)'; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = BORDER; e.currentTarget.style.transform = ''; }}
-              >
-                <div style={{ fontFamily: FONT_DISPLAY, fontSize: 32, color: DARK, textTransform: 'uppercase', letterSpacing: '.04em', lineHeight: 1, marginBottom: 6 }}>
-                  {f.label}
-                </div>
-                <div style={{ fontFamily: FONT_UI, fontSize: 10, color: GOLD, letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 4 }}>
-                  {f.years}
-                </div>
-                <div style={{ fontFamily: FONT_UI, fontSize: 10, color: '#a07820', letterSpacing: '.04em' }}>
-                  {f.sub}
-                </div>
-                <div style={{ fontFamily: FONT_UI, fontSize: 9, color: GOLD, letterSpacing: '.12em', textTransform: 'uppercase', marginTop: 14 }}>
-                  Browse parts →
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
+      {/* ── Footer hint ── */}
+      <div style={{
+        padding:        'clamp(8px, 1.5vw, 14px) clamp(20px, 5vw, 56px)',
+        borderTop:      `1px solid ${GOLD_DIM}`,
+        background:     DARK,
+        display:        'flex',
+        alignItems:     'center',
+        justifyContent: 'space-between',
+        gap:            8,
+        flexShrink:     0,
+      }}>
+        <span style={{
+          fontFamily:    FONT_UI,
+          fontSize:      9,
+          letterSpacing: '0.16em',
+          textTransform: 'uppercase',
+          color:         'rgba(201,150,10,0.3)',
+        }}>
+          Hover to preview · Click to browse
+        </span>
+        <Link href="/browse" style={{
+          fontFamily:    FONT_UI,
+          fontSize:      9,
+          letterSpacing: '0.14em',
+          textTransform: 'uppercase',
+          color:         TAN,
+          textDecoration: 'none',
+        }}>
+          Browse all parts →
+        </Link>
       </div>
 
-      <style>{`
-        * { box-sizing: border-box; }
-        @font-face {
-          font-family: 'New Sailor';
-          src: url('/New_Sailor.ttf') format('truetype');
-          font-display: swap;
-        }
-      `}</style>
+      <style>{`* { box-sizing: border-box; }`}</style>
     </div>
   );
 }
