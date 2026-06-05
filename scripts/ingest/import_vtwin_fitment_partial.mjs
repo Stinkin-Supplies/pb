@@ -319,14 +319,25 @@ async function main() {
     // We need to expand each (model_code, year_start, year_end) range into
     // individual harley_model_years rows.
 
-    // Alias map: VTwin uses shorthand codes that expand to multiple specific models.
-    // E    → EL + ELH  (Knucklehead — VTwin uses bare 'E' for the whole line)
-    // XL1200 → all XL1200 variants (VTwin uses generic prefix)
-    // XL883  → all XL883 variants  (VTwin uses generic prefix)
+    // Alias map: VTwin uses shorthand/generic codes that expand to multiple specific models.
+    // Safe to list targets that don't exist in harley_model_years — they resolve to []
+    // and are silently skipped. Dedup step removes any duplicate (product_id, model_year_id) pairs.
     const MODEL_ALIASES = {
+      // Vintage / Knucklehead
       'E':      ['EL', 'ELH'],
+      // Sportster
       'XL1200': ['XL1200C','XL1200CX','XL1200L','XL1200N','XL1200NS','XL1200R','XL1200S','XL1200T','XL1200V','XL1200X','XL1200XS'],
       'XL883':  ['XL883','XL883C','XL883L','XL883N','XL883R'],
+      // Road King — VTwin uses FLHR generically for all Road King variants
+      'FLHR':   ['FLHR','FLHRI','FLHRC','FLHRCI','FLHRS','FLHRSI','FLHRSE','FLHRSEI','FLHRSCI','FLHRXS'],
+      // Street Glide — VTwin uses FLHX generically
+      'FLHX':   ['FLHX','FLHXI','FLHXSE','FLHXS'],
+      // Fat Boy (pre-2018 Softail platform)
+      'FLSTF':  ['FLSTF','FLSTFI','FLSTFSE','FLSTFB','FLSTFBS'],
+      // Night Train
+      'FXSTB':  ['FXSTB','FXSTBI','FXSTBSE'],
+      // Wide Glide
+      'FXDWG':  ['FXDWG','FXDWGI','FXDWG3','FXDWGS'],
     };
 
     log('\n📅  Resolving model codes → harley_model_years…');

@@ -178,7 +178,8 @@ function FilterContent({ facets, filters, onChange, sections, setSections, colla
 
   // Active filter chips
   const chips = [
-    filters.family     && { key: "family",             label: filters.family,            clear: () => onChange({ family: null, model: null, modelCodes: null }) },
+    filters.family     && { key: "family",             label: filters.family,            clear: () => onChange({ family: null, model: null, modelCodes: null, year: null }) },
+    filters.year       && { key: "year",               label: String(filters.year),      clear: () => onChange({ year: null }) },
     filters.model      && { key: "model",              label: filters.model,             clear: () => onChange({ model: null, modelCodes: null }) },
     filters.era        && { key: "era",                label: filters.era.replace(/-/g," "), clear: () => onChange({ era: null }) },
     filters.display_category && { key: "cat",          label: filters.display_category,  clear: () => onChange({ display_category: null, display_subcategory: null }) },
@@ -199,11 +200,21 @@ function FilterContent({ facets, filters, onChange, sections, setSections, colla
             <ActiveChip key={chip.key} label={chip.label} onRemove={chip.clear} />
           ))}
           <button
-            onClick={() => onChange({ family: null, model: null, modelCodes: null, era: null, display_category: null, display_subcategory: null, brand: null, min_price: null, max_price: null, in_stock: false })}
+            onClick={() => onChange({ family: null, model: null, modelCodes: null, year: null, era: null, display_category: null, display_subcategory: null, brand: null, min_price: null, max_price: null, in_stock: false })}
             style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-stencil, monospace)", fontSize: 9, color: "#bbb", letterSpacing: "1px", textTransform: "uppercase", padding: "3px 4px" }}
           >
             Clear all
           </button>
+        </div>
+      )}
+
+      {/* Fitment coverage hint — shown when bike context is active */}
+      {!collapsed && (filters.family || filters.model) && (
+        <div style={{ padding: "5px 14px 6px", borderBottom: `1px solid rgba(184,146,42,0.08)`, display: "flex", alignItems: "center", gap: 5 }}>
+          <div style={{ width: 5, height: 5, borderRadius: "50%", background: GOLD, flexShrink: 0, opacity: 0.6 }} />
+          <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 9, color: "#aaa", letterSpacing: "0.6px", textTransform: "uppercase" }}>
+            Fitment-matched + universal parts
+          </span>
         </div>
       )}
 
@@ -276,8 +287,8 @@ function FilterContent({ facets, filters, onChange, sections, setSections, colla
         </Section>
       )}
 
-      {/* Era */}
-      <Section label="Era" sectionKey="era" open={sections.era} onToggle={toggle}
+      {/* Engine Era */}
+      <Section label="Engine Era" sectionKey="era" open={sections.era} onToggle={toggle}
         hasActive={!!filters.era} collapsed={collapsed}>
         <div style={{ paddingBottom: 6 }}>
           {HD_ERAS.map(era => (
@@ -379,6 +390,7 @@ export default function FilterSidebar({ facets, filters, onChange, open, onClose
   }, [open, mobileSheet]);
 
   const activeCount = [
+    filters.family, filters.model, filters.year,
     filters.era, filters.display_category,
     filters.brand, filters.min_price, filters.max_price, filters.in_stock,
   ].filter(Boolean).length;
@@ -466,7 +478,7 @@ export default function FilterSidebar({ facets, filters, onChange, open, onClose
               }}>
                 {activeCount > 0 && (
                   <button
-                    onClick={() => onChange({ family: null, model: null, modelCodes: null, era: null, display_category: null, display_subcategory: null, brand: null, min_price: null, max_price: null, in_stock: false })}
+                    onClick={() => onChange({ family: null, model: null, modelCodes: null, year: null, era: null, display_category: null, display_subcategory: null, brand: null, min_price: null, max_price: null, in_stock: false })}
                     style={{
                       flex: "0 0 auto", height: 46, background: "none",
                       border: `1.5px solid ${GOLD_B}`, color: GOLD,
