@@ -271,10 +271,17 @@ function resolveModelYearIds(parsed, { modelYears, familyIdByName, modelByCode }
   }
 
   if (isBigTwin) {
-    // Big Twin = all families except Sportster (and vintage singles)
+    // Big Twin = all families except Sportster (and other non-Big-Twin families)
     const excludeFamilies = new Set(['sportster', 'street', 'v-rod', 'revolution max', 'trike']);
+    // Softail launched 1984 (FXST) but meaningful fitment starts 1986.
+    // If the product's year range ends ≤ 1984, "Big Twin" predates Softail entirely
+    // — exclude Softail family rows to prevent spurious Softail fitment on pre-1984 products.
+    const softailCutoff = yearEnd !== null && yearEnd <= 1984;
     for (const my of candidates) {
-      if (!excludeFamilies.has(my.family_name.toLowerCase())) resultIds.add(my.id);
+      const familyLower = my.family_name.toLowerCase();
+      if (excludeFamilies.has(familyLower)) continue;
+      if (softailCutoff && familyLower === 'softail') continue;
+      resultIds.add(my.id);
     }
   }
 

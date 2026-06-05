@@ -1,78 +1,23 @@
 "use client";
 // ============================================================
 // components/browse/FilterSidebar.jsx
-// Desktop: sticky left column (unchanged)
+// Desktop: sticky left column — collapsible
 // Mobile:  bottom sheet — slides up when open=true, mobileSheet=true
 // ============================================================
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
+// ── Palette ───────────────────────────────────────────────────
 const GOLD   = "#b8922a";
+const GOLD_L = "rgba(184,146,42,0.12)";
+const GOLD_B = "rgba(184,146,42,0.25)";
+const CREAM  = "#faf7f2";
 const CREAM2 = "#f2ede4";
 const DARK   = "#0a0909";
+const MUTED  = "#888";
 
-const HD_FAMILY_SUBMODELS = {
-  Touring: [
-    { label: "Road King",      codes: ["FLHR","FLHRC","FLHRCI","FLHRS","FLHRSI","FLHRI","FLHRXS","FLHRSE","FLHRSE3","FLHRSE4","FLHRSE5","FLHRSE6","FLHRSEI","FLHRSEI2","FLHRXI"] },
-    { label: "Road Glide",     codes: ["FLTR","FLTRI","FLTRX","FLTRXS","FLTRXST","FLTRU","FLTRXL","FLTRK","FLTRXP","FLTRXRRSE","FLTRSE","FLTRSE3","FLTRSEI","FLTRSEI2","FLTRXSE","FLTRXSE2","FLTRKSE","FLTRUSE","FLTRXSTSE"] },
-    { label: "Street Glide",   codes: ["FLHX","FLHXI","FLHXS","FLHXST","FLHXU","FLHXL","FLHXSE","FLHXSE2","FLHXSE3","FLHXLSE","FLHXSTSE"] },
-    { label: "Electra Glide",  codes: ["FL","FLH","FLI","FLHT","FLHTI","FLHS","FLHP","FLHTP","FLHTPI","FLHB","FLHF","FLHTC","FLHTCI","FLHFB","FLHTCSE","FLHTCSE2","FLHTKSE"] },
-    { label: "Ultra Classic",  codes: ["FLHTCU","FLHTCUI","FLHTCUL","FLHTCUTC","FLHTK","FLHTKL","FLHTCUSE","FLHTCUSE2","FLHTCUSE3","FLHTCUSE4","FLHTCUSE5","FLHTCUSE6","FLHTCUSE7","FLHTCUSE8"] },
-    { label: "Tour Glide",     codes: ["FLT","FLTC","FLTCU","FLTCUI"] },
-  ],
-  Softail: [
-    { label: "Fat Boy",        codes: ["FLSTF","FLSTFI","FLSTFSE","FLSTFSE2","FLFB","FLFBS"] },
-    { label: "Heritage",       codes: ["FLST","FLSTC","FLSTCI","FLSTN","FLSTNI","FLSTNSE","FLSTS","FLSTSI"] },
-    { label: "Springer",       codes: ["FXSTS","FXSTSI","FXSTSB","FLSTS","FLSTSI","FLSTSB","FLSTSBE"] },
-    { label: "Slim",           codes: ["FLS","FLSS","FLSB"] },
-    { label: "Deluxe",         codes: ["FLSTN","FLSTNI","FLDE"] },
-    { label: "Breakout",       codes: ["FXSB","FXSBSE","FXBR","FXBRS","FXSE"] },
-    { label: "Night Train",    codes: ["FXSTB","FXSTBI"] },
-    { label: "Deuce",          codes: ["FXSTD","FXSTDI"] },
-    { label: "Softail Standard", codes: ["FXST","FXSTI","FXSTC","FXSTCI"] },
-    { label: "Blackline / Low Rider S", codes: ["FXS","FXLR","FXLRS","FXLRST"] },
-    { label: "Bad Boy",        codes: ["FXSTSB"] },
-  ],
-  Dyna: [
-    { label: "Fat Bob",        codes: ["FXDF","FXDFI","FXDFSE","FXDFSE2"] },
-    { label: "Wide Glide",     codes: ["FXDWG","FXDWGI","FXDWG2","FXDWG3"] },
-    { label: "Super Glide",    codes: ["FXD","FXDI","FXDI35","FXDSE","FXDSE2"] },
-    { label: "Low Rider",      codes: ["FXDL","FXDLI","FXDLS","FXDRS"] },
-    { label: "Street Bob",     codes: ["FXDB","FXDBI"] },
-    { label: "Super Glide Sport", codes: ["FXDX","FXDXI","FXDXT"] },
-    { label: "Super Glide Custom", codes: ["FXDC","FXDCI"] },
-    { label: "Switchback",     codes: ["FLD"] },
-    { label: "Convertible",    codes: ["FXDS","FXDS-CONV"] },
-  ],
-  Sportster: [
-    { label: "Iron 883",       codes: ["XL883N"] },
-    { label: "Iron 1200",      codes: ["XL1200NS"] },
-    { label: "1200 Custom",    codes: ["XL1200C","XLH1200C"] },
-    { label: "1200 Sport",     codes: ["XL1200S"] },
-    { label: "1200 Roadster",  codes: ["XL1200R","XL1200CX"] },
-    { label: "Forty-Eight",    codes: ["XL1200X","XL1200XS"] },
-    { label: "Seventy-Two",    codes: ["XL1200V"] },
-    { label: "Nightster",      codes: ["XL1200N"] },
-    { label: "SuperLow",       codes: ["XL883L","XL1200L","XL1200T"] },
-    { label: "883 Custom",     codes: ["XL883C","XLH883C"] },
-    { label: "883 / 1200",     codes: ["XL883","XLH883","XL1200","XLH1200","XLH","XLH1000","XLH1100","XLH900"] },
-    { label: "K / KH Models",  codes: ["K","KK","KH","KHK","KR"] },
-    { label: "Cafe Racer",     codes: ["XLCR"] },
-    { label: "XR Models",      codes: ["XR1000","XR1200","XR1200X","XR750"] },
-  ],
-  FXR: [
-    { label: "Super Glide II", codes: ["FXR","FXRS","FXRT","FXRD","FXRDG","FXRC"] },
-    { label: "Low Rider",      codes: ["FXRS","FXLR"] },
-    { label: "Sport Glide",    codes: ["FXRT","FXRD"] },
-    { label: "Convertible",    codes: ["FXRS-CONV"] },
-  ],
-};
-
-const HD_FAMILIES_FLAT = [
-  "Touring","Softail","Dyna","Sportster","FXR",
-  "Trike","Revolution Max","V-Rod","Street",
-];
+// ── Static data ───────────────────────────────────────────────
 
 const HD_ERAS = [
   { label: "Milwaukee-Eight",    slug: "milwaukee-8",        years: "2017+" },
@@ -87,238 +32,324 @@ const HD_ERAS = [
   { label: "Chopper",            slug: "chopper",            years: "All eras" },
 ];
 
-// ── Shared sub-components ─────────────────────────────────────
+// ── Micro-components ──────────────────────────────────────────
 
-function FilterItem({ label, count, active, onClick }) {
+function Checkbox({ active }) {
   return (
-    <button
-      onClick={onClick}
+    <motion.div
+      animate={{ background: active ? GOLD : "transparent", borderColor: active ? GOLD : GOLD_B }}
+      transition={{ duration: 0.12 }}
       style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        width: "100%", background: active ? "rgba(184,146,42,0.08)" : "none",
-        border: "none", padding: "7px 8px", cursor: "pointer", gap: "8px",
-        borderRadius: 2, transition: "background 0.1s",
+        width: 13, height: 13, border: `1.5px solid ${active ? GOLD : GOLD_B}`,
+        flexShrink: 0, display: "grid", placeContent: "center",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: 1, minWidth: 0 }}>
-        <div style={{ width: 10, height: 10, border: `1px solid ${active ? GOLD : "rgba(184,146,42,0.25)"}`, background: active ? GOLD : "transparent", flexShrink: 0, transition: "background 0.15s, border-color 0.15s" }} />
-        <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "13px", color: active ? DARK : "#888", textTransform: "uppercase", letterSpacing: "0.5px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: "left" }}>
+      {active && (
+        <svg width="7" height="6" viewBox="0 0 7 6" fill="none">
+          <path d="M1 3L2.8 5L6 1" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      )}
+    </motion.div>
+  );
+}
+
+function FilterRow({ label, count, active, onClick, indent = false }) {
+  return (
+    <motion.button
+      onClick={onClick}
+      whileHover={{ background: active ? GOLD_L : "rgba(184,146,42,0.04)" }}
+      style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        width: "100%", background: active ? GOLD_L : "transparent",
+        border: "none", padding: indent ? "5px 14px 5px 28px" : "6px 14px",
+        cursor: "pointer", gap: 8, textAlign: "left",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+        <Checkbox active={active} />
+        <span style={{
+          fontFamily: "var(--font-stencil, monospace)", fontSize: indent ? 11 : 12,
+          color: active ? DARK : MUTED, textTransform: "uppercase",
+          letterSpacing: "0.6px", whiteSpace: "nowrap", overflow: "hidden",
+          textOverflow: "ellipsis", lineHeight: 1.3,
+        }}>
           {label}
         </span>
       </div>
       {count != null && (
-        <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "11px", color: "#bbb", flexShrink: 0 }}>
+        <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 10, color: "#ccc", flexShrink: 0 }}>
           {count.toLocaleString()}
         </span>
       )}
-    </button>
+    </motion.button>
   );
 }
 
-// ── The filter content (shared between desktop sidebar + mobile sheet) ────────
+// Gold pill for active filter chips at top of sidebar
+function ActiveChip({ label, onRemove }) {
+  return (
+    <div style={{
+      display: "inline-flex", alignItems: "center", gap: 4,
+      background: GOLD_L, border: `1px solid ${GOLD_B}`,
+      padding: "3px 6px 3px 8px", borderRadius: 2,
+    }}>
+      <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 9, color: GOLD, textTransform: "uppercase", letterSpacing: "0.8px" }}>
+        {label}
+      </span>
+      <button
+        onClick={onRemove}
+        style={{ background: "none", border: "none", cursor: "pointer", color: GOLD, fontSize: 13, lineHeight: 1, padding: "0 1px", display: "flex", alignItems: "center" }}
+      >×</button>
+    </div>
+  );
+}
+
+// Collapsible section wrapper
+function Section({ label, sectionKey, open, onToggle, children, hasActive = false, collapsed = false }) {
+  return (
+    <div style={{ borderBottom: `1px solid rgba(184,146,42,0.1)` }}>
+      <button
+        onClick={() => !collapsed && onToggle(sectionKey)}
+        title={collapsed ? label : undefined}
+        style={{
+          display: "flex", alignItems: "center",
+          justifyContent: collapsed ? "center" : "space-between",
+          width: "100%", background: "none", border: "none",
+          padding: collapsed ? "13px 0" : "10px 14px",
+          cursor: "pointer",
+        }}
+      >
+        {collapsed ? (
+          <span style={{
+            fontSize: 9, fontFamily: "var(--font-stencil, monospace)",
+            color: hasActive ? GOLD : "#bbb", letterSpacing: "1px",
+            writingMode: "vertical-rl", transform: "rotate(180deg)",
+          }}>
+            {label.slice(0,3)}
+          </span>
+        ) : (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{
+                fontFamily: "var(--font-stencil, monospace)", fontSize: 11,
+                letterSpacing: "2.5px", textTransform: "uppercase",
+                color: open || hasActive ? GOLD : "#999",
+                transition: "color 0.15s",
+              }}>
+                {label}
+              </span>
+              {hasActive && !open && (
+                <div style={{ width: 5, height: 5, borderRadius: "50%", background: GOLD }} />
+              )}
+            </div>
+            <motion.span
+              animate={{ rotate: open ? 180 : 0 }}
+              transition={{ duration: 0.18 }}
+              style={{ color: open ? GOLD : "#ccc", fontSize: 10, display: "block", lineHeight: 1 }}
+            >▼</motion.span>
+          </>
+        )}
+      </button>
+
+      <AnimatePresence initial={false}>
+        {!collapsed && open && (
+          <motion.div
+            key="body"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: "easeInOut" }}
+            style={{ overflow: "hidden" }}
+          >
+            {children}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ── FilterContent (shared between desktop + mobile) ───────────
 
 function FilterContent({ facets, filters, onChange, sections, setSections, collapsed = false }) {
   function toggle(key) { setSections(s => ({ ...s, [key]: !s[key] })); }
 
   const subcategories = facets.subcategories ?? [];
-  const activeCount = [filters.family, filters.model, filters.era, filters.display_category, filters.brand, filters.min_price, filters.max_price, filters.in_stock].filter(Boolean).length;
 
-  const sectionDefs = [
-    {
-      key: "category",
-      label: "Category",
-      content: (
-        <div style={{ paddingBottom: 8, maxHeight: 260, overflowY: "auto" }}>
-          {facets.categories.slice(0, 30).map(cat => (
-            <FilterItem
-              key={cat.name} label={cat.name} count={cat.count}
-              active={filters.display_category === cat.name}
-              onClick={() => onChange({ display_category: filters.display_category === cat.name ? null : cat.name, display_subcategory: null })}
-            />
-          ))}
-        </div>
-      ),
-    },
-    ...(filters.display_category && subcategories.length > 0 ? [{
-      key: "subcategory",
-      label: "Subcategory",
-      content: (
-        <div style={{ paddingBottom: 8, maxHeight: 200, overflowY: "auto" }}>
-          {subcategories.map(sub => (
-            <FilterItem
-              key={sub.name} label={sub.name} count={sub.count}
-              active={filters.display_subcategory === sub.name}
-              onClick={() => onChange({ display_subcategory: filters.display_subcategory === sub.name ? null : sub.name })}
-            />
-          ))}
-        </div>
-      ),
-    }] : []),
-    {
-      key: "family",
-      label: "Model Family",
-      content: (
-        <div style={{ paddingBottom: 8, maxHeight: 320, overflowY: "auto" }}>
-          {HD_FAMILIES_FLAT.map(fam => (
-            <div key={fam}>
-              <FilterItem
-                label={fam} count={null}
-                active={filters.family === fam}
-                onClick={() => onChange({ family: filters.family === fam ? null : fam, model: null })}
-              />
-              {filters.family === fam && HD_FAMILY_SUBMODELS[fam] && (
-                <div style={{ paddingLeft: 18, borderLeft: `2px solid rgba(184,146,42,0.2)`, marginLeft: 8, marginBottom: 4 }}>
-                  {HD_FAMILY_SUBMODELS[fam].map(sub => (
-                    <button
-                      key={sub.label}
-                      onClick={e => { e.stopPropagation(); onChange({ model: filters.model === sub.label ? null : sub.label, modelCodes: filters.model === sub.label ? null : sub.codes }); }}
-                      style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: filters.model === sub.label ? "rgba(184,146,42,0.1)" : "none", border: "none", padding: "5px 8px", cursor: "pointer", borderRadius: 2 }}
-                    >
-                      <div style={{ width: 7, height: 7, borderRadius: "50%", flexShrink: 0, background: filters.model === sub.label ? GOLD : "rgba(184,146,42,0.3)", transition: "background 0.15s" }} />
-                      <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 12, color: filters.model === sub.label ? DARK : "#888", textTransform: "uppercase", letterSpacing: "0.5px", textAlign: "left" }}>
-                        {sub.label}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      ),
-    },
-    {
-      key: "era",
-      label: "Era",
-      content: (
-        <div style={{ paddingBottom: 8 }}>
-          {HD_ERAS.map(era => (
-            <button
-              key={era.slug}
-              onClick={() => onChange({ era: filters.era === era.slug ? null : era.slug })}
-              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: filters.era === era.slug ? "rgba(184,146,42,0.08)" : "none", border: "none", padding: "7px 8px", cursor: "pointer", gap: 8, borderRadius: 2 }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
-                <div style={{ width: 10, height: 10, flexShrink: 0, border: `1px solid ${filters.era === era.slug ? GOLD : "rgba(184,146,42,0.25)"}`, background: filters.era === era.slug ? GOLD : "transparent", transition: "all 0.15s" }} />
-                <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 13, color: filters.era === era.slug ? DARK : "#888", textTransform: "uppercase", letterSpacing: "0.5px", textAlign: "left" }}>
-                  {era.label}
-                </span>
-              </div>
-              <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 11, color: "#bbb", flexShrink: 0 }}>{era.years}</span>
-            </button>
-          ))}
-        </div>
-      ),
-    },
-    {
-      key: "brand",
-      label: "Brand",
-      content: (
-        <div style={{ paddingBottom: 8, maxHeight: 240, overflowY: "auto" }}>
-          {facets.brands.slice(0, 25).map(b => (
-            <FilterItem
-              key={b.name} label={b.name} count={b.count}
-              active={filters.brand === b.name}
-              onClick={() => onChange({ brand: filters.brand === b.name ? null : b.name })}
-            />
-          ))}
-        </div>
-      ),
-    },
-    {
-      key: "price",
-      label: "Price",
-      content: (
-        <div style={{ padding: "8px 14px 14px", display: "flex", gap: 8 }}>
-          <input type="number" placeholder="Min" value={filters.min_price ?? ""} onChange={e => onChange({ min_price: e.target.value || null })}
-            style={{ flex: 1, background: "#fff", border: `1px solid rgba(184,146,42,0.3)`, color: DARK, fontFamily: "var(--font-stencil, monospace)", fontSize: 11, padding: "7px 10px", outline: "none" }} />
-          <input type="number" placeholder="Max" value={filters.max_price ?? ""} onChange={e => onChange({ max_price: e.target.value || null })}
-            style={{ flex: 1, background: "#fff", border: `1px solid rgba(184,146,42,0.3)`, color: DARK, fontFamily: "var(--font-stencil, monospace)", fontSize: 11, padding: "7px 10px", outline: "none" }} />
-        </div>
-      ),
-    },
-  ];
+  // Active filter chips
+  const chips = [
+    filters.family     && { key: "family",             label: filters.family,            clear: () => onChange({ family: null, model: null, modelCodes: null }) },
+    filters.model      && { key: "model",              label: filters.model,             clear: () => onChange({ model: null, modelCodes: null }) },
+    filters.era        && { key: "era",                label: filters.era.replace(/-/g," "), clear: () => onChange({ era: null }) },
+    filters.display_category && { key: "cat",          label: filters.display_category,  clear: () => onChange({ display_category: null, display_subcategory: null }) },
+    filters.display_subcategory && { key: "subcat",    label: filters.display_subcategory, clear: () => onChange({ display_subcategory: null }) },
+    filters.brand      && { key: "brand",              label: filters.brand,             clear: () => onChange({ brand: null }) },
+    filters.in_stock   && { key: "stock",              label: "In Stock",                clear: () => onChange({ in_stock: false }) },
+    (filters.min_price || filters.max_price) && { key: "price", label: `$${filters.min_price||0}–$${filters.max_price||"∞"}`, clear: () => onChange({ min_price: null, max_price: null }) },
+  ].filter(Boolean);
+
+  const activeCount = chips.length;
 
   return (
     <>
+      {/* Active filter chips — only when not collapsed */}
+      {!collapsed && activeCount > 0 && (
+        <div style={{ padding: "10px 14px 8px", borderBottom: `1px solid rgba(184,146,42,0.1)`, display: "flex", flexWrap: "wrap", gap: 5 }}>
+          {chips.map(chip => (
+            <ActiveChip key={chip.key} label={chip.label} onRemove={chip.clear} />
+          ))}
+          <button
+            onClick={() => onChange({ family: null, model: null, modelCodes: null, era: null, display_category: null, display_subcategory: null, brand: null, min_price: null, max_price: null, in_stock: false })}
+            style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-stencil, monospace)", fontSize: 9, color: "#bbb", letterSpacing: "1px", textTransform: "uppercase", padding: "3px 4px" }}
+          >
+            Clear all
+          </button>
+        </div>
+      )}
+
       {/* In Stock toggle */}
       <div
         onClick={() => onChange({ in_stock: !filters.in_stock })}
         style={{
           display: "flex", alignItems: "center",
           justifyContent: collapsed ? "center" : "space-between",
-          padding: collapsed ? "10px 0" : "10px 14px",
-          cursor: "pointer", borderBottom: `1px solid rgba(184,146,42,0.12)`,
-          background: filters.in_stock ? "rgba(184,146,42,0.08)" : "none",
+          padding: collapsed ? "11px 0" : "9px 14px",
+          cursor: "pointer",
+          borderBottom: `1px solid rgba(184,146,42,0.1)`,
+          background: filters.in_stock ? GOLD_L : "transparent",
+          transition: "background 0.15s",
         }}
       >
         {collapsed ? (
-          <span style={{ fontSize: 14, color: filters.in_stock ? GOLD : "#aaa" }} title="In Stock Only">●</span>
+          <span style={{ fontSize: 12, color: filters.in_stock ? GOLD : "#bbb" }} title="In Stock Only">◉</span>
         ) : (
           <>
-            <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "13px", letterSpacing: "2px", textTransform: "uppercase", color: filters.in_stock ? GOLD : "#888" }}>
+            <span style={{
+              fontFamily: "var(--font-stencil, monospace)", fontSize: 11,
+              letterSpacing: "2px", textTransform: "uppercase",
+              color: filters.in_stock ? GOLD : "#999",
+            }}>
               In Stock
             </span>
+            {/* Pill toggle */}
             <motion.div
               animate={{ background: filters.in_stock ? GOLD : "rgba(184,146,42,0.15)" }}
-              style={{ width: 32, height: 18, borderRadius: 9, position: "relative", flexShrink: 0, cursor: "pointer" }}
+              style={{ width: 34, height: 18, borderRadius: 9, position: "relative", flexShrink: 0 }}
             >
               <motion.div
-                animate={{ x: filters.in_stock ? 15 : 2 }}
-                style={{ position: "absolute", top: 2, width: 14, height: 14, borderRadius: "50%", background: "#fff" }}
+                animate={{ x: filters.in_stock ? 17 : 2 }}
+                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                style={{ position: "absolute", top: 2, width: 14, height: 14, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }}
               />
             </motion.div>
           </>
         )}
       </div>
 
-      {/* Collapsible sections */}
-      {sectionDefs.map(({ key, label, content }) => (
-        <div key={key} style={{ borderBottom: `1px solid rgba(184,146,42,0.12)` }}>
-          <button
-            onClick={() => collapsed ? undefined : toggle(key)}
-            style={{ display: "flex", alignItems: "center", justifyContent: collapsed ? "center" : "space-between", width: "100%", background: "none", border: "none", padding: collapsed ? "12px 0" : "11px 14px", cursor: "pointer" }}
-            title={collapsed ? label : undefined}
-          >
-            {collapsed ? (
-              <span style={{ fontSize: 12, color: "#aaa", fontFamily: "var(--font-stencil, monospace)", letterSpacing: "1px" }}>—</span>
-            ) : (
-              <>
-                <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "13px", letterSpacing: "2px", textTransform: "uppercase", color: sections[key] ? GOLD : "#888", transition: "color 0.15s" }}>
-                  {label}
-                </span>
-                <motion.span animate={{ rotate: sections[key] ? 180 : 0 }} transition={{ duration: 0.2 }} style={{ color: "#bbb", fontSize: 13, display: "block" }}>▼</motion.span>
-              </>
-            )}
-          </button>
-          <AnimatePresence initial={false}>
-            {!collapsed && sections[key] && (
-              <motion.div
-                key="content"
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2, ease: "easeInOut" }}
-                style={{ overflow: "hidden" }}
-              >
-                {content}
-              </motion.div>
-            )}
-          </AnimatePresence>
+      {/* Category */}
+      <Section label="Category" sectionKey="category" open={sections.category} onToggle={toggle}
+        hasActive={!!filters.display_category} collapsed={collapsed}>
+        <div style={{ paddingBottom: 6, maxHeight: 260, overflowY: "auto" }}>
+          {facets.categories.slice(0, 30).map(cat => (
+            <FilterRow
+              key={cat.name} label={cat.name} count={cat.count}
+              active={filters.display_category === cat.name}
+              onClick={() => onChange({ display_category: filters.display_category === cat.name ? null : cat.name, display_subcategory: null })}
+            />
+          ))}
         </div>
-      ))}
+      </Section>
 
-      {/* Clear all */}
-      {!collapsed && activeCount > 0 && (
-        <div style={{ padding: "12px 14px" }}>
-          <button
-            onClick={() => onChange({ family: null, model: null, modelCodes: null, era: null, display_category: null, display_subcategory: null, brand: null, min_price: null, max_price: null, in_stock: false })}
-            style={{ width: "100%", background: "none", border: `1px solid rgba(184,146,42,0.3)`, color: GOLD, fontFamily: "var(--font-stencil, monospace)", fontSize: "12px", letterSpacing: "2px", padding: "9px", cursor: "pointer", textTransform: "uppercase" }}
-          >
-            Clear All Filters
-          </button>
-        </div>
+      {/* Subcategory — only when a category is active and subcats exist */}
+      {filters.display_category && subcategories.length > 0 && (
+        <Section label="Subcategory" sectionKey="subcategory" open={sections.subcategory} onToggle={toggle}
+          hasActive={!!filters.display_subcategory} collapsed={collapsed}>
+          <div style={{ paddingBottom: 6, maxHeight: 200, overflowY: "auto" }}>
+            {subcategories.map(sub => (
+              <FilterRow
+                key={sub.name} label={sub.name} count={sub.count}
+                active={filters.display_subcategory === sub.name}
+                onClick={() => onChange({ display_subcategory: filters.display_subcategory === sub.name ? null : sub.name })}
+              />
+            ))}
+          </div>
+        </Section>
       )}
+
+      {/* Era */}
+      <Section label="Era" sectionKey="era" open={sections.era} onToggle={toggle}
+        hasActive={!!filters.era} collapsed={collapsed}>
+        <div style={{ paddingBottom: 6 }}>
+          {HD_ERAS.map(era => (
+            <motion.button
+              key={era.slug}
+              onClick={() => onChange({ era: filters.era === era.slug ? null : era.slug })}
+              whileHover={{ background: filters.era === era.slug ? GOLD_L : "rgba(184,146,42,0.04)" }}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                width: "100%", background: filters.era === era.slug ? GOLD_L : "transparent",
+                border: "none", padding: "6px 14px", cursor: "pointer", gap: 8,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Checkbox active={filters.era === era.slug} />
+                <span style={{
+                  fontFamily: "var(--font-stencil, monospace)", fontSize: 12,
+                  color: filters.era === era.slug ? DARK : MUTED,
+                  textTransform: "uppercase", letterSpacing: "0.6px",
+                }}>
+                  {era.label}
+                </span>
+              </div>
+              <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 10, color: "#ccc", flexShrink: 0 }}>
+                {era.years}
+              </span>
+            </motion.button>
+          ))}
+        </div>
+      </Section>
+
+      {/* Brand */}
+      {facets.brands?.length > 0 && (
+        <Section label="Brand" sectionKey="brand" open={sections.brand} onToggle={toggle}
+          hasActive={!!filters.brand} collapsed={collapsed}>
+          <div style={{ paddingBottom: 6, maxHeight: 240, overflowY: "auto" }}>
+            {facets.brands.slice(0, 25).map(b => (
+              <FilterRow
+                key={b.name} label={b.name} count={b.count}
+                active={filters.brand === b.name}
+                onClick={() => onChange({ brand: filters.brand === b.name ? null : b.name })}
+              />
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* Price */}
+      <Section label="Price" sectionKey="price" open={sections.price} onToggle={toggle}
+        hasActive={!!(filters.min_price || filters.max_price)} collapsed={collapsed}>
+        <div style={{ padding: "8px 14px 14px", display: "flex", gap: 8, alignItems: "center" }}>
+          <input
+            type="number" placeholder="Min" value={filters.min_price ?? ""}
+            onChange={e => onChange({ min_price: e.target.value ? parseFloat(e.target.value) : null })}
+            style={{
+              flex: 1, background: "#fff", border: `1px solid ${GOLD_B}`,
+              color: DARK, fontFamily: "var(--font-stencil, monospace)",
+              fontSize: 11, padding: "7px 10px", outline: "none", width: 0,
+            }}
+          />
+          <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 10, color: "#ccc" }}>—</span>
+          <input
+            type="number" placeholder="Max" value={filters.max_price ?? ""}
+            onChange={e => onChange({ max_price: e.target.value ? parseFloat(e.target.value) : null })}
+            style={{
+              flex: 1, background: "#fff", border: `1px solid ${GOLD_B}`,
+              color: DARK, fontFamily: "var(--font-stencil, monospace)",
+              fontSize: 11, padding: "7px 10px", outline: "none", width: 0,
+            }}
+          />
+        </div>
+      </Section>
     </>
   );
 }
@@ -328,9 +359,14 @@ function FilterContent({ facets, filters, onChange, sections, setSections, colla
 export default function FilterSidebar({ facets, filters, onChange, open, onClose, mobileSheet = false }) {
   const [collapsed, setCollapsed] = useState(false);
   const [sections, setSections] = useState({
-    category: true, subcategory: false, family: false, era: false, brand: false, price: false,
+    category: true,
+    subcategory: false,
+    era: false,
+    brand: false,
+    price: false,
   });
 
+  // Auto-open subcategory section when a category is selected
   useEffect(() => {
     if (filters.display_category) setSections(s => ({ ...s, subcategory: true }));
   }, [filters.display_category]);
@@ -342,7 +378,10 @@ export default function FilterSidebar({ facets, filters, onChange, open, onClose
     return () => { document.body.style.overflow = ""; };
   }, [open, mobileSheet]);
 
-  const activeCount = [filters.family, filters.model, filters.era, filters.display_category, filters.brand, filters.min_price, filters.max_price, filters.in_stock].filter(Boolean).length;
+  const activeCount = [
+    filters.era, filters.display_category,
+    filters.brand, filters.min_price, filters.max_price, filters.in_stock,
+  ].filter(Boolean).length;
 
   // ── Mobile bottom sheet ───────────────────────────────────────
   if (mobileSheet) {
@@ -354,10 +393,10 @@ export default function FilterSidebar({ facets, filters, onChange, open, onClose
             <motion.div
               key="backdrop"
               initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+              animate={{ opacity: 0.5 }}
               exit={{ opacity: 0 }}
               onClick={onClose}
-              style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 300 }}
+              style={{ position: "fixed", inset: 0, background: "#000", zIndex: 300 }}
             />
 
             {/* Sheet */}
@@ -366,40 +405,48 @@ export default function FilterSidebar({ facets, filters, onChange, open, onClose
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
-              transition={{ type: "spring", stiffness: 380, damping: 38 }}
+              transition={{ type: "spring", stiffness: 420, damping: 42 }}
               style={{
                 position: "fixed",
-                bottom: 0,
-                left: 0,
-                right: 0,
+                bottom: 0, left: 0, right: 0,
                 zIndex: 301,
                 background: CREAM2,
-                borderRadius: "16px 16px 0 0",
-                maxHeight: "82vh",
+                borderRadius: "18px 18px 0 0",
+                maxHeight: "88vh",
                 display: "flex",
                 flexDirection: "column",
-                boxShadow: "0 -8px 40px rgba(0,0,0,0.25)",
+                boxShadow: "0 -12px 48px rgba(0,0,0,0.2)",
               }}
             >
-              {/* Handle + header */}
-              <div style={{ padding: "12px 16px 10px", flexShrink: 0 }}>
-                {/* Drag handle */}
-                <div style={{ width: 36, height: 4, background: "rgba(184,146,42,0.3)", borderRadius: 2, margin: "0 auto 12px" }} />
+              {/* Drag handle + header */}
+              <div style={{ padding: "10px 16px 8px", flexShrink: 0, borderBottom: `1px solid rgba(184,146,42,0.12)` }}>
+                <div style={{ width: 40, height: 4, background: GOLD_B, borderRadius: 2, margin: "0 auto 10px" }} />
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "12px", letterSpacing: "3px", color: GOLD, textTransform: "uppercase" }}>
-                    FILTER {activeCount > 0 && (
-                      <span style={{ background: GOLD, color: "#fff", padding: "1px 5px", borderRadius: 2, marginLeft: 4, fontSize: 8 }}>{activeCount}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{
+                      fontFamily: "var(--font-stencil, monospace)", fontSize: 10,
+                      letterSpacing: "3px", color: GOLD, textTransform: "uppercase",
+                    }}>
+                      Filters
+                    </span>
+                    {activeCount > 0 && (
+                      <span style={{
+                        background: GOLD, color: "#fff", fontFamily: "var(--font-stencil, monospace)",
+                        fontSize: 9, padding: "2px 6px", borderRadius: 2, letterSpacing: "0.5px",
+                      }}>
+                        {activeCount} active
+                      </span>
                     )}
-                  </span>
+                  </div>
                   <button
                     onClick={onClose}
-                    style={{ background: "none", border: "none", cursor: "pointer", color: "#aaa", fontSize: 20, lineHeight: 1, padding: "2px 4px" }}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "#aaa", padding: "4px 6px", fontSize: 20, lineHeight: 1 }}
                   >×</button>
                 </div>
               </div>
 
-              {/* Scrollable filter content */}
-              <div style={{ flex: 1, overflowY: "auto", padding: "0 2px 100px" }}>
+              {/* Scrollable content */}
+              <div style={{ flex: 1, overflowY: "auto", paddingBottom: 100 }}>
                 <FilterContent
                   facets={facets}
                   filters={filters}
@@ -410,13 +457,37 @@ export default function FilterSidebar({ facets, filters, onChange, open, onClose
                 />
               </div>
 
-              {/* Apply button */}
-              <div style={{ padding: "12px 16px 28px", flexShrink: 0, borderTop: `1px solid rgba(184,146,42,0.15)`, background: CREAM2 }}>
+              {/* Footer: clear + apply */}
+              <div style={{
+                padding: "12px 16px 28px", flexShrink: 0,
+                borderTop: `1px solid rgba(184,146,42,0.12)`,
+                background: CREAM2,
+                display: "flex", gap: 10,
+              }}>
+                {activeCount > 0 && (
+                  <button
+                    onClick={() => onChange({ family: null, model: null, modelCodes: null, era: null, display_category: null, display_subcategory: null, brand: null, min_price: null, max_price: null, in_stock: false })}
+                    style={{
+                      flex: "0 0 auto", height: 46, background: "none",
+                      border: `1.5px solid ${GOLD_B}`, color: GOLD,
+                      fontFamily: "var(--font-stencil, monospace)", fontSize: 10,
+                      letterSpacing: "2px", textTransform: "uppercase",
+                      cursor: "pointer", borderRadius: 3, padding: "0 16px",
+                    }}
+                  >
+                    Clear
+                  </button>
+                )}
                 <button
                   onClick={onClose}
-                  style={{ width: "100%", height: 46, background: GOLD, border: "none", color: "#fff", fontFamily: "var(--font-stencil, monospace)", fontSize: "11px", letterSpacing: "3px", textTransform: "uppercase", cursor: "pointer", borderRadius: 3 }}
+                  style={{
+                    flex: 1, height: 46, background: GOLD, border: "none",
+                    color: "#fff", fontFamily: "var(--font-stencil, monospace)",
+                    fontSize: 10, letterSpacing: "3px", textTransform: "uppercase",
+                    cursor: "pointer", borderRadius: 3,
+                  }}
                 >
-                  Show Results
+                  {activeCount > 0 ? `Show Results` : "Done"}
                 </button>
               </div>
             </motion.div>
@@ -435,38 +506,47 @@ export default function FilterSidebar({ facets, filters, onChange, open, onClose
         top: 0,
         height: "100vh",
         background: CREAM2,
-        borderRight: `1px solid rgba(184,146,42,0.2)`,
+        borderRight: `1px solid rgba(184,146,42,0.18)`,
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
         flexShrink: 0,
-        width: collapsed ? 48 : 240,
-        transition: "width 0.25s ease",
+        width: collapsed ? 42 : 236,
+        transition: "width 0.22s ease",
         zIndex: 10,
       }}
     >
-      {/* Header */}
+      {/* Sidebar header */}
       <div style={{
         display: "flex", alignItems: "center",
         justifyContent: collapsed ? "center" : "space-between",
-        padding: collapsed ? "16px 0" : "16px 14px 12px",
-        borderBottom: `1px solid rgba(184,146,42,0.15)`,
+        padding: collapsed ? "14px 0" : "14px 14px 10px",
+        borderBottom: `1px solid rgba(184,146,42,0.12)`,
         flexShrink: 0,
       }}>
         {!collapsed && (
-          <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "9px", letterSpacing: "3px", color: GOLD }}>
-            FILTER {activeCount > 0 && (
-              <span style={{ background: GOLD, color: "#fff", padding: "1px 5px", borderRadius: 2, marginLeft: 4, fontSize: 8 }}>{activeCount}</span>
+          <span style={{
+            fontFamily: "var(--font-stencil, monospace)", fontSize: 9,
+            letterSpacing: "3px", color: GOLD, textTransform: "uppercase",
+          }}>
+            Filters {activeCount > 0 && (
+              <span style={{ background: GOLD, color: "#fff", padding: "1px 5px", borderRadius: 2, marginLeft: 4, fontSize: 8 }}>
+                {activeCount}
+              </span>
             )}
           </span>
         )}
         {collapsed && activeCount > 0 && (
-          <div style={{ width: 8, height: 8, borderRadius: "50%", background: GOLD }} />
+          <div style={{ width: 7, height: 7, borderRadius: "50%", background: GOLD }} />
         )}
       </div>
 
-      {/* Scrollable content */}
-      <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: collapsed ? "8px 0" : "8px 0 80px" }}>
+      {/* Scrollable filter content */}
+      <div style={{
+        flex: 1, overflowY: "auto", overflowX: "hidden",
+        padding: collapsed ? "4px 0" : 0,
+        scrollbarWidth: "none",
+      }}>
         <FilterContent
           facets={facets}
           filters={filters}
@@ -478,29 +558,33 @@ export default function FilterSidebar({ facets, filters, onChange, open, onClose
       </div>
 
       {/* Collapse toggle */}
-      <motion.button
-        layout
+      <button
         onClick={() => setCollapsed(c => !c)}
-        style={{ display: "flex", alignItems: "center", padding: "12px 14px", background: "none", border: "none", borderTop: `1px solid rgba(184,146,42,0.15)`, cursor: "pointer", width: "100%", flexShrink: 0 }}
+        style={{
+          display: "flex", alignItems: "center",
+          padding: collapsed ? "12px 0" : "11px 14px",
+          background: "none", border: "none",
+          borderTop: `1px solid rgba(184,146,42,0.12)`,
+          cursor: "pointer", width: "100%", flexShrink: 0,
+          justifyContent: collapsed ? "center" : "flex-start",
+          gap: 8,
+        }}
       >
-        <motion.div layout style={{ display: "grid", placeContent: "center", width: 20, height: 20 }}>
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <motion.path
-              animate={{ d: collapsed ? "M4 2 L10 7 L4 12" : "M10 2 L4 7 L10 12" }}
-              stroke={GOLD} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-              transition={{ duration: 0.2 }}
-            />
-          </svg>
-        </motion.div>
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path
+            d={collapsed ? "M4 2 L10 7 L4 12" : "M10 2 L4 7 L10 12"}
+            stroke={GOLD} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+          />
+        </svg>
         {!collapsed && (
-          <motion.span
-            layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}
-            style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "12px", letterSpacing: "2px", color: "#aaa", marginLeft: 8, textTransform: "uppercase" }}
-          >
-            Hide
-          </motion.span>
+          <span style={{
+            fontFamily: "var(--font-stencil, monospace)", fontSize: 10,
+            letterSpacing: "2px", color: "#bbb", textTransform: "uppercase",
+          }}>
+            Collapse
+          </span>
         )}
-      </motion.button>
+      </button>
     </motion.nav>
   );
 }

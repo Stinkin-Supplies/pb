@@ -40,7 +40,6 @@ async function typesenseUpdate(id: number, fields: Record<string, unknown>) {
 function isAuthorized(req: NextRequest): boolean {
   const secret = process.env.ADMIN_SECRET;
   const param = new URL(req.url).searchParams.get("token");
-  console.log("[AdminEdit] secret set:", !!secret, "| param:", param, "| match:", param === secret);
 
   if (!secret) return false;
   const header = req.headers.get("x-admin-token");

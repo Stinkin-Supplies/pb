@@ -197,6 +197,21 @@ async function main() {
 
     log('\n📥  Upserting products into catalog_unified…');
 
+    // Pre-load which bare SKUs already have an active VT- prefixed counterpart.
+    // For those, we upsert using the VT- prefixed SKU so we hit the canonical row.
+    // For SKUs with no VT- counterpart, we use the bare SKU as before.
+    const skuListForCheck = rows.map(r => r.sku);
+    const prefixCheckRes = await client.query(`
+      SELECT REPLACE(sku, 'VT-', '') as bare_sku
+      FROM catalog_unified
+      WHERE source_vendor = 'VTWIN'
+        AND is_active = true
+        AND sku LIKE 'VT-%'
+        AND REPLACE(sku, 'VT-', '') = ANY($1::text[])
+    `, [skuListForCheck]);
+    const hasVtPrefix = new Set(prefixCheckRes.rows.map(r => r.bare_sku));
+    log(`    ${hasVtPrefix.size.toLocaleString()} SKUs have active VT- prefixed counterpart — will upsert with prefix`);
+
     let insertedProducts = 0;
     let updatedProducts  = 0;
     let processedProducts = 0;
@@ -212,6 +227,10 @@ async function main() {
         if (fitmentClass === 'custom_text' && r.fitment_raw) techParts.push(r.fitment_raw.trim());
         if (r.tech_note && r.tech_note.trim()) techParts.push(r.tech_note.trim());
         const techNote = techParts.length ? techParts.join(' | ') : null;
+        const isUniversal = fitmentClass === 'universal';
+
+        // Use VT- prefixed SKU if a canonical prefixed row exists, bare SKU otherwise
+        const upsertSku = hasVtPrefix.has(r.sku) ? 'VT-' + r.sku : r.sku;
 
         const res = await client.query(`
           INSERT INTO catalog_unified (
@@ -220,6 +239,7 @@ async function main() {
             brand, country_of_origin,
             oem_numbers,
             special_instructions,
+            fits_all_models,
             is_active, in_stock, in_vtwinmfg
           ) VALUES (
             'VTWIN', $1, $2, $3,
@@ -227,6 +247,7 @@ async function main() {
             $5, $6,
             $7,
             $8,
+            $9,
             true, true, true
           )
           ON CONFLICT (sku) DO UPDATE SET
@@ -238,11 +259,12 @@ async function main() {
             country_of_origin    = COALESCE(EXCLUDED.country_of_origin, catalog_unified.country_of_origin),
             oem_numbers          = CASE WHEN EXCLUDED.oem_numbers IS NOT NULL THEN EXCLUDED.oem_numbers ELSE catalog_unified.oem_numbers END,
             special_instructions = COALESCE(EXCLUDED.special_instructions, catalog_unified.special_instructions),
+            fits_all_models      = CASE WHEN EXCLUDED.fits_all_models = true THEN true ELSE catalog_unified.fits_all_models END,
             in_vtwinmfg          = true,
             updated_at           = NOW()
           RETURNING (xmax = 0) AS inserted
         `, [
-          r.sku,
+          upsertSku,
           r.product_name || r.sku,
           r.description  || null,
           price,
@@ -250,6 +272,7 @@ async function main() {
           r.origin       || null,
           r.oem_no       ? [r.oem_no.trim()] : null,
           techNote,
+          isUniversal,
         ]);
 
         if (res.rows[0]?.inserted) insertedProducts++;
@@ -261,16 +284,34 @@ async function main() {
     log(`    Inserted: ${insertedProducts.toLocaleString()} new  |  Updated: ${updatedProducts.toLocaleString()} existing`);
 
     // ── 5. Resolve SKU → catalog_unified.id ───────────────────────────
+    //
+    // VTwin SKUs in catalog_unified exist in two forms:
+    //   bare:    "10-0030"   (imported via this script — no prefix)
+    //   prefixed: "VT-10-0030" (imported via the main catalog merge)
+    // We try both forms and map the CSV bare SKU → product id either way.
 
     log('\n🔗  Resolving SKU → product IDs…');
     const skuList = rows.map(r => r.sku);
+    const skuListPrefixed = skuList.map(s => 'VT-' + s);
+
     const idRes = await client.query(`
       SELECT id, sku FROM catalog_unified
-      WHERE source_vendor = 'VTWIN' AND sku = ANY($1::text[])
-    `, [skuList]);
+      WHERE source_vendor = 'VTWIN'
+        AND is_active = true
+        AND (sku = ANY($1::text[]) OR sku = ANY($2::text[]))
+    `, [skuList, skuListPrefixed]);
 
-    const skuToId = new Map(idRes.rows.map(r => [r.sku, r.id]));
-    log(`    Resolved ${skuToId.size.toLocaleString()} SKUs`);
+    // Map bare CSV sku → id, preferring prefixed (VT-) rows over bare rows.
+    // Prefixed rows are the canonical catalog entries; bare rows are legacy orphans.
+    const skuToId = new Map();
+    for (const row of idRes.rows) {
+      const bareSku = row.sku.startsWith('VT-') ? row.sku.slice(3) : row.sku;
+      // Only overwrite if we don't already have a prefixed entry for this SKU
+      if (!skuToId.has(bareSku) || row.sku.startsWith('VT-')) {
+        skuToId.set(bareSku, row.id);
+      }
+    }
+    log(`    Resolved ${skuToId.size.toLocaleString()} SKUs (bare + VT- prefix match, active only)`);
 
     // ── 6. Resolve model_code → harley_model_years rows ────────────────
     //
@@ -278,8 +319,21 @@ async function main() {
     // We need to expand each (model_code, year_start, year_end) range into
     // individual harley_model_years rows.
 
+    // Alias map: VTwin uses shorthand codes that expand to multiple specific models.
+    // E    → EL + ELH  (Knucklehead — VTwin uses bare 'E' for the whole line)
+    // XL1200 → all XL1200 variants (VTwin uses generic prefix)
+    // XL883  → all XL883 variants  (VTwin uses generic prefix)
+    const MODEL_ALIASES = {
+      'E':      ['EL', 'ELH'],
+      'XL1200': ['XL1200C','XL1200CX','XL1200L','XL1200N','XL1200NS','XL1200R','XL1200S','XL1200T','XL1200V','XL1200X','XL1200XS'],
+      'XL883':  ['XL883','XL883C','XL883L','XL883N','XL883R'],
+    };
+
     log('\n📅  Resolving model codes → harley_model_years…');
-    const modelCodes = [...new Set(fitmentRows.map(r => r.model_code))];
+    const rawModelCodes = [...new Set(fitmentRows.map(r => r.model_code))];
+
+    // Expand aliases so we query all concrete codes in one shot
+    const expandedCodes = [...new Set(rawModelCodes.flatMap(c => MODEL_ALIASES[c] ?? [c]))];
 
     const hymRes = await client.query(`
       SELECT hmy.id, hm.model_code, hmy.year
@@ -287,7 +341,7 @@ async function main() {
       JOIN harley_models hm ON hm.id = hmy.model_id
       WHERE hm.model_code = ANY($1::text[])
       ORDER BY hm.model_code, hmy.year
-    `, [modelCodes]);
+    `, [expandedCodes]);
 
     // Index: model_code → [{id, year}]
     const hymByModel = new Map();
@@ -296,11 +350,24 @@ async function main() {
       hymByModel.get(row.model_code).push({ id: row.id, year: parseInt(row.year, 10) });
     }
 
-    // Find model codes not in harley_model_years
-    const unknownModels = modelCodes.filter(m => !hymByModel.has(m));
+    // Build a resolved lookup: original code → merged [{id, year}] entries
+    // Aliases point to the union of all their target models' year entries.
+    const resolvedByCode = new Map();
+    for (const code of rawModelCodes) {
+      const targets = MODEL_ALIASES[code] ?? [code];
+      const entries = targets.flatMap(t => hymByModel.get(t) ?? []);
+      if (entries.length) resolvedByCode.set(code, entries);
+    }
+
+    // Find model codes not in harley_model_years (after alias expansion)
+    const unknownModels = rawModelCodes.filter(m => !resolvedByCode.has(m));
     if (unknownModels.length > 0) {
       log(`\n⚠️  ${unknownModels.length} model codes not found in harley_model_years (will be skipped):`);
       log(`    ${unknownModels.join(', ')}`);
+    }
+    const aliasesUsed = rawModelCodes.filter(m => MODEL_ALIASES[m] && resolvedByCode.has(m));
+    if (aliasesUsed.length > 0) {
+      log(`    Aliases expanded: ${aliasesUsed.map(m => m + ' → [' + MODEL_ALIASES[m].join(', ') + ']').join(' | ')}`);
     }
 
     // ── 7. Expand fitment rows to (product_id, model_year_id) pairs ────
@@ -313,7 +380,7 @@ async function main() {
       const productId = skuToId.get(row.sku);
       if (!productId) continue; // SKU not resolved (shouldn't happen)
 
-      const yearEntries = hymByModel.get(row.model_code);
+      const yearEntries = resolvedByCode.get(row.model_code);
       if (!yearEntries) continue; // unknown model code
 
       for (const { id: myi, year } of yearEntries) {
@@ -337,13 +404,26 @@ async function main() {
 
     log('\n💾  Inserting into catalog_fitment_v2…');
 
-    // Delete existing fitment for these products first (clean slate for re-run safety)
+    // Delete existing vtwin_partial fitment for these products (clean slate for re-run safety).
+    // Must delete by BOTH the resolved IDs (prefixed) AND any old bare IDs from previous runs,
+    // since earlier script versions wrote fitment to bare-SKU product IDs.
     const productIds = [...skuToId.values()];
+
+    // Also collect bare-SKU product IDs for the same SKUs (may be inactive)
+    const bareSkuList = rows.map(r => r.sku);
+    const bareIdRes = await client.query(`
+      SELECT id FROM catalog_unified
+      WHERE source_vendor = 'VTWIN'
+        AND sku = ANY($1::text[])
+    `, [bareSkuList]);
+    const bareIds = bareIdRes.rows.map(r => r.id);
+    const allDeleteIds = [...new Set([...productIds, ...bareIds])];
+
     await client.query(`
       DELETE FROM catalog_fitment_v2
       WHERE product_id = ANY($1::int[])
         AND fitment_source = 'vtwin_partial'
-    `, [productIds]);
+    `, [allDeleteIds]);
 
     let fitmentInserted = 0;
     const fitBatches = chunks(fitmentUnique, BATCH);

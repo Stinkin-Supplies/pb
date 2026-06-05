@@ -460,12 +460,18 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
   params.push(perPage, offset);
 
   // Variant dedup: DISTINCT ON picks one SKU per group (in-stock + lowest price first).
-  // Two-level query: DISTINCT ON cannot use window functions, so variant_count
-  // is added via a separate GROUP BY subquery joined in the outer level.
+  //
+  // Grouping key priority:
+  //   1. variant_group_id   — explicit group from catalog_variant_groups (best)
+  //   2. name_group_key     — derived from (brand, base_name) for products whose
+  //                           names differ only by a color/finish/size suffix.
+  //                           e.g. "100' SPOOL 20-GAUGE WIRE (BLACK)" and
+  //                                "100' SPOOL 20-GAUGE WIRE (BLUE)" → same key.
+  //   3. 'u' || id          — unique per product (no grouping)
   const dataQuery = `
-    SELECT d.*, COALESCE(vc.variant_count, 1) AS variant_count
+    SELECT d.*, COALESCE(vc.variant_count, ng.name_group_count, 1) AS variant_count
     FROM (
-      SELECT DISTINCT ON (COALESCE(cu.variant_group_id::text, 'u' || cu.id::text))
+      SELECT DISTINCT ON (group_key)
         cu.id, cu.sku, cu.slug, cu.name, cu.brand,
         cu.category, cu.subcategory,
         cu.display_category, cu.display_subcategory,
@@ -474,11 +480,22 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
         cu.image_url, cu.image_urls, cu.in_stock, cu.stock_quantity,
         cu.is_harley_fitment, cu.features, cu.oem_numbers,
         cu.variant_group_id,
-        cu.fitment_year_start, cu.fitment_year_end
+        cu.fitment_year_start, cu.fitment_year_end,
+        CASE
+          WHEN cu.variant_group_id IS NOT NULL
+            THEN cu.variant_group_id::text
+          ELSE
+            cu.brand || '||' || TRIM(regexp_replace(regexp_replace(regexp_replace(
+              cu.name,
+              '\s*\([A-Z][A-Z0-9 /\-]+\)\s*$', '', 'i'),
+              '\s*-\s*[A-Z][A-Z0-9 /]+$', '', 'i'),
+              '\s+(BLACK|CHROME|SILVER|GOLD|RED|BLUE|GREEN|BROWN|PINK|WHITE|NATURAL|POLISHED|WRINKLE|GLOSS|MATTE|SATIN)\s*$',
+              '', 'i'))
+        END AS group_key
       FROM catalog_unified cu
       ${fitmentJoin}
       ${where}
-      ORDER BY COALESCE(cu.variant_group_id::text, 'u' || cu.id::text),
+      ORDER BY group_key,
                cu.in_stock DESC,
                cu.computed_price ASC NULLS LAST
     ) d
@@ -488,6 +505,20 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
       WHERE variant_group_id IS NOT NULL AND is_active = true
       GROUP BY variant_group_id
     ) vc ON vc.variant_group_id = d.variant_group_id
+    LEFT JOIN (
+      SELECT
+        brand || '||' || TRIM(regexp_replace(regexp_replace(regexp_replace(
+          name,
+          '\s*\([A-Z][A-Z0-9 /\-]+\)\s*$', '', 'i'),
+          '\s*-\s*[A-Z][A-Z0-9 /]+$', '', 'i'),
+          '\s+(BLACK|CHROME|SILVER|GOLD|RED|BLUE|GREEN|BROWN|PINK|WHITE|NATURAL|POLISHED|WRINKLE|GLOSS|MATTE|SATIN)\s*$',
+          '', 'i')) AS name_group_key,
+        COUNT(*) AS name_group_count
+      FROM catalog_unified
+      WHERE variant_group_id IS NULL AND is_active = true
+      GROUP BY name_group_key
+      HAVING COUNT(*) > 1
+    ) ng ON ng.name_group_key = d.group_key AND d.variant_group_id IS NULL
     ORDER BY ${orderBy}
     LIMIT $${limitParam} OFFSET $${offsetParam}
   `;
