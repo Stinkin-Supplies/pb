@@ -2,189 +2,225 @@
 
 ---
 
-# ——— FORTY-FIRST PASS (June 5, 2026) ———
+# ——— FORTY-THIRD PASS (June 7, 2026) ———
 
-Session: Forty-First Pass · June 5, 2026
+Session: Forty-Third Pass · June 7, 2026
 
 ## WHERE WE ARE
 
-Full frontend + data quality session. Homepage rebuilt around ModelFinder. Font system locked in. Variant display overhauled. 199 variant sub-groups merged into 8 master groups. Typesense reindexed twice.
+Mixed frontend + data pipeline session. Font system fully overhauled (Barlow loaded, body uppercase removed, Bespoke Serif variable font). Browse UI gained product quick-view modal with fitment/OEM tabs and sidebar search. VTwin import pipeline patched to write OEM to canonical table. Scraper running against 19,662 remaining targets.
 
-⚠️ Several output files need to be dropped into the codebase — see NEXT SESSION in CHASE_LIST.
+⚠️ Scraper still running — import + reindex + universal mark still pending.
+⚠️ Component files built this session need to be dropped into codebase — see CHASE_LIST files table.
 
 ## What Was Done This Session
 
-### 1. Homepage Rebuilt ✅
-`app/page.jsx` — new section order:
-- VideoHero (unchanged)
-- ModelFinder (new — era → year → model code)
-- ScrollVelocity band
-- BrandRolodex
+### 1. Font System Overhaul ✅
 
-Removed: FloatingNav, EraKineticTile, EraCarousel.
+**globals.css:**
+- Body font changed: `var(--font-stencil)` (Share Tech Mono) → `var(--font-body, 'Barlow')` — monospace was the default for ALL body text
+- `text-transform: uppercase` **removed from body** — was forcing every character site-wide to caps. Single biggest readability fix.
+- Added `font-size: 15px`, `font-weight: 500`, `line-height: 1.55` to body
+- Added full type scale: `--text-2xs` (10px) through `--text-4xl` (56px)
+- Added weight vars: `--fw-normal/medium/semibold/bold`
+- Letter spacing switched to em-based (`--ls-label: 0.08em`)
+- Added utility classes: `.label`, `.font-body`, `.fw-bold`, `.text-lg`, etc.
 
-### 2. ModelFinder Component ✅
-`components/home/ModelFinder.jsx` — 3-step bike selector:
-- **Step 1:** Era image cards (uses ERAS array from eras.js, full art/gradient/corner bracket style matching EraCarousel). Clicking advances immediately.
-- **Step 2:** Year slider locked to era's year range. Smart tick marks. GO button fetches models.
-- **Step 3:** Model codes from `/api/models/search?q={year}`, grouped by family, gold rivet radio buttons. Find Parts CTA routes to `/browse?family=X&year=Y&model=Z`.
+**layout.tsx:**
+- `Barlow` added via `next/font/google` (weights 400/500/600/700) as `--font-body` variable
+- Previously just a string `'Barlow', 'Barlow Condensed', sans-serif` — never actually loaded by Next.js
+- `--font-barlow` legacy alias wired to `--font-body`
+- Bespoke Serif switched from `BespokeSerif-Regular.ttf` → `BespokeSerif-Variable.ttf` with `weight: "300 800"`
 
-Props: `compact` (narrow sidebar variant), `onSelect` (controlled mode).
-Routing: always goes to `/browse` — no more `/harley/` intermediate page.
+**BespokeSerif-Variable.ttf:**
+- Covers wght 300–800: Light · Regular · Medium · Bold · Extrabold
+- Replaces all static weight files (Regular/Bold/Extrabold/Light can be deleted)
+- Usage: `font-family: var(--font-bespoke); font-weight: 700;` now just works
 
-### 3. Font System Locked In ✅
-`app/layout.tsx` updated:
-- `--font-tanker` = Tanker Regular (primary display — replaces New Sailor + Bebas Neue)
-- `--font-bespoke` = Bespoke Serif Regular (editorial/secondary)
-- `--font-stencil` = Share Tech Mono (UI mono, unchanged)
-- Legacy aliases: `--font-sailor → --font-tanker`, `--font-caesar → --font-bespoke`
-- Bebas Neue removed from Google Fonts import
+**Component typography fixes (FilterSidebar + ProductQuickViewModal):**
+- All font sizes below 12px bumped: 8/9→12px, 10/11→13px
+- `MUTED: "#888"` → `"#555"` (was failing 3:1 contrast on cream)
+- Washed-out grays `#aaa/#bbb/#ccc` → `#777/#888/#999`
+- Absolute px letter-spacing → em-based throughout
 
-Files confirmed at: `public/fonts/Tanker-Regular.ttf` + `public/fonts/BespokeSerif-Regular.ttf`
+### 2. ModelFinder — Title Size ✅
+`components/home/ModelFinder.jsx`:
+- KineticText fontSize: `clamp(14px,1.8vw,20px)` → `clamp(36px,5vw,72px)` — was 20px max, now 72px max
+- Header layout restructured: "STINKIN' SUPPLIES" label + step dots on top row; title gets full width below
+- Gold fading horizontal rule added under title
 
-### 4. FilterSidebar — Model Family Removed ✅
+### 3. FilterSidebar — Inline Search ✅
 `components/browse/FilterSidebar.jsx`:
-- Removed `HD_FAMILY_SUBMODELS` constant
-- Removed `HD_FAMILIES_FLAT` constant
-- Removed `{/* Model Family */}` Section block
-- Removed `family: false` from sections initial state
-- Removed family auto-open `useEffect`
-- Removed `filters.family` + `filters.model` from `activeCount`
+- `useDebounce(value, 320)` hook added
+- Search input rendered at top of FilterContent (hidden in collapsed mode)
+- Local `searchInput` state, debounced → `onChange({ search: value })`
+- Sync-back `useEffect`: resets input when `filters.search` cleared externally
+- `filters.search` added to: chips array (quoted label), activeCount, all clear-all handlers (FilterContent + mobile footer)
 
-### 5. VariantSelector — Fitment+Color Mode ✅
-`components/browse/VariantSelector.jsx` — new Mode A (fitment+color):
+### 4. ProductQuickViewModal — Tabbed Rebuild ✅
+`components/browse/ProductQuickViewModal.jsx` — full rebuild with 3 tabs:
 
-**Problem:** Products like sissy bars had `option_1_value="BLACK"` AND `fitment_by_family` data, causing flat list to show 3× BLACK, 2× CHROME (one per fitment family).
+**Architecture:** Card data renders Details tab instantly (no loading). Fetch to `/api/products/[slug]` runs in background, enriches Details tab and populates Fitment/OEM tabs.
 
-**Fix:** When variants have both option values AND fitment, group by fitment family first. Each family row is an accordion; color swatches inside. Gold color dot per finish name.
+**Details tab:** Brand, name, category tags, price, stock, SKU/MPN/UPC, description, weight/origin, H-D fitment + universal badges. All fields from `ProductDetail`.
 
-Three modes total:
-- Mode A — fitment+color (new): fitment accordions with color swatches
-- Mode B — fitment only (unchanged): flat year-range rows
-- Mode C — options only (unchanged): flat color/size list
+**Fitment tab:** Compact alternating-stripe table. Grouped by family in canonical order (Touring→CVO→Softail→Dyna→Sportster→FXR→V-Rod→Street→Vintage). Family header rows (gold background). Model / Code / Years columns. Summary line shows count + family count.
 
-### 6. browse.ts — Name-Based Group Key ✅
-`lib/db/browse.ts` — DISTINCT ON key upgraded:
+**OEM tab:** Pill grid of all OEM numbers. Click any pill to copy. "Copy All" button copies comma-separated list. Empty states for no data.
 
-**Before:** `COALESCE(variant_group_id::text, 'u' || id::text)`
+**Tab badges:** Show count once fetch resolves (e.g. `Fitment 42`). Spinner in tab label while loading.
 
-**After:** 3-tier key:
-1. `variant_group_id::text` — explicit group (best)
-2. `brand || '||' || base_name` — strip trailing color/finish suffixes via 3-pass regex
-3. `'u' || id::text` — unique (no grouping)
+**"View Full Details →"** writes `window.location.href` to `sessionStorage['stinkin_browse_return']` before navigating to PDP.
 
-Regex strips: `(BLACK)` parenthetical, `- BLACK` dash-suffix, bare trailing color words (BLACK/CHROME/SILVER/GOLD/RED/BLUE/GREEN/BROWN/PINK/WHITE/NATURAL/POLISHED/WRINKLE/GLOSS/MATTE/SATIN).
+**Wiring in browse page:**
+```jsx
+const [quickView, setQuickView] = useState(null);
+// on card: onClick={() => setQuickView(product)}
+{quickView && <ProductQuickViewModal product={quickView} onClose={() => setQuickView(null)} />}
+```
 
-Also adds `ng` subquery to count name-grouped variants for the badge.
+### 5. BrowseBackButton.jsx ✅
+New `components/pdp/BrowseBackButton.jsx`:
+- Reads `stinkin_browse_return` from sessionStorage on mount
+- Only renders when key is present (user arrived from browse modal)
+- Clears key on navigate to avoid stale back links
+- Matches cream/gold palette
 
-### 7. Variant Group Merges ✅
-8 master groups created, 199 sub-groups deleted:
+### 6. API Route — `/api/products/[slug]` ✅
+New `app/api/products/[slug]/route.ts`:
+- Thin wrapper around `getProductBySlug(slug)` from browse.ts
+- Powers the ProductQuickViewModal fetch
+- Returns full `ProductDetail` including fitment array
 
-| Master Group | family_key | Members |
-|---|---|---|
-| Universal Brake Line | universal-brake-line | 122 |
-| Brake Line | brake-line | 387 |
-| Quick Connect Clutch Cable - Upper | qc-clutch-cable-upper | 102 |
-| License Plate Frame | license-plate-frame | 14 |
-| Windshield | windshield | 32 |
-| Air Cleaner Cover | air-cleaner-cover | 14 |
-| Foot Pegs | foot-pegs | 19 |
-| 100' Wire Spool | 100-wire-spool | 68 |
+### 7. PDP SKU Fix ✅
+`app/browse/[slug]/page.jsx` line 100:
+- `COALESCE(cp.internal_sku, cu.internal_sku)` → `COALESCE(cu.internal_sku, cp.internal_sku)`
+- `catalog_products.internal_sku` was winning over `catalog_unified.internal_sku` (taxonomy SKU)
+- Now taxonomy SKU wins. `catalog_products` value only used as fallback.
 
-Also: 25' GXL Wire Spool (32 members), 35' Wire Spool (10 members).
+### 8. catalog_oem_crossref Schema Fixes ✅
+```sql
+ALTER TABLE catalog_oem_crossref ADD COLUMN product_id integer REFERENCES catalog_unified(id);
+-- Backfilled 20,836 rows via sku join (7,553 FatBook/OldBook rows remain NULL — ok)
+DELETE FROM catalog_oem_crossref WHERE id NOT IN (SELECT MIN(id) FROM catalog_oem_crossref GROUP BY sku, oem_number);
+-- Removed 1,898 duplicates
+CREATE UNIQUE INDEX catalog_oem_crossref_sku_oem_uniq ON catalog_oem_crossref (sku, oem_number);
+ALTER TABLE catalog_oem_crossref ALTER COLUMN oem_manufacturer DROP NOT NULL;
+```
 
-Wire spool `option_2_value` (Color) populated from product names via file-based SQL (psql regex workaround).
+### 9. import_vtwin_fitment_partial.mjs — OEM Pipeline Fix ✅
+Key problem: OEM data was writing directly to `catalog_unified.oem_numbers[]`, bypassing `catalog_oem_crossref` entirely.
 
-**Key lesson:** `catalog_variant_members` reparenting is not enough — must also UPDATE `catalog_unified.variant_group_id` to avoid FK violations and ensure browse dedup works.
+**Patches applied:**
+- Dedup pass now builds `skuToOem` map (bare_sku → oem_number)
+- `oem_numbers` column removed from `catalog_unified` upsert
+- New step 9: batch INSERT into `catalog_oem_crossref` (`source = 'VTWIN_SCRAPE'`, `ON CONFLICT DO NOTHING`)
+- New step 9b: rebuild `oem_numbers[]` on `catalog_unified` from `catalog_oem_crossref` for affected products
+- **All delete-then-reinsert patterns removed** — script now only fills gaps, never wipes existing data
+- Summary now reports OEM rows inserted
+- Next steps simplified to: mark universals → refresh mat view → reindex
 
-### 8. Typesense Reindex ✅ (×2)
-90,510 docs, 0 errors both runs.
+### 10. VTwin Fitment Import ✅
+Ran against new checkpoint (12,100 SKUs):
+- 3,513 new fitment rows (rest were already present — ON CONFLICT DO NOTHING working correctly)
+- 868 new OEM rows into catalog_oem_crossref
+- oem_numbers[] rebuilt for 3,863 products
+- Coverage: **45.7%** (15,371 with fitment + 2,946 universal out of 38,353 active)
+
+### 11. VTwin Scraper — Round 2 ✅
+Generated `vtwin_scrape_targets_2.csv` — 19,662 SKUs never scraped:
+```sql
+\copy (SELECT REPLACE(cu.sku, 'VT-', '') AS sku FROM catalog_unified cu
+LEFT JOIN vtwin_scrape_data vsd ON (cu.sku = 'VT-' || vsd.sku OR cu.sku = vsd.sku)
+WHERE cu.source_vendor = 'VTWIN' AND cu.is_active = true AND cu.is_universal = false
+AND vsd.sku IS NULL AND NOT EXISTS (SELECT 1 FROM catalog_fitment_v2 cfv WHERE cfv.product_id = cu.id))
+TO '.../vtwin_scrape_targets_2.csv' CSV HEADER
+```
+Scraper restarted: `source venv/bin/activate && python scrape_vtwin_fitment.py --input vtwin_scrape_targets_2.csv`
 
 ## DB State After This Session
 
 | Table | Change |
 |-------|--------|
-| catalog_variant_groups | 8 new master groups added (IDs 30315–30324). 199 old sub-groups deleted. |
-| catalog_variant_members | All members reparented to master group IDs. |
-| catalog_unified.variant_group_id | Updated to master group IDs for all affected products. Wire spool 74 products assigned to 30315. |
-| catalog_variant_members (wire spool) | option_2_name=Color, option_2_value extracted for 45 members of group 30315. |
-| Typesense | 90,510 docs indexed. |
-
-## Files in outputs/ Ready to Drop In
-
-| File | Destination |
-|------|-------------|
-| page.jsx | app/page.jsx |
-| ModelFinder.jsx | components/home/ModelFinder.jsx |
-| FilterSidebar.jsx | components/browse/FilterSidebar.jsx |
-| VariantSelector.jsx | components/browse/VariantSelector.jsx |
-| browse.ts | lib/db/browse.ts |
-| layout.tsx | app/layout.tsx |
-| by-engine-route.ts | app/api/models/by-engine/route.ts |
-| codes-route.ts | app/api/models/codes/route.ts |
-| Tanker-Regular.ttf | public/fonts/Tanker-Regular.ttf |
-| BespokeSerif-Regular.ttf | public/fonts/BespokeSerif-Regular.ttf |
+| catalog_oem_crossref | Added `product_id` FK. 20,836 backfilled. 1,898 dupes removed. Unique index on (sku, oem_number). oem_manufacturer nullable. |
+| catalog_unified | 52,707 VTwin oem_numbers[] rebuilt from catalog_oem_crossref. 13 new VTwin products added. |
+| catalog_fitment_v2 | +3,513 VTwin rows from new checkpoint import. |
 
 ## What Needs to Happen Next
 
-See CHASE_LIST — NEXT SESSION section. Priority order:
-1. Drop all output files into codebase
-2. Run vtwin_mark_universal.sql
-3. Import vtwin scraper results when ready
-4. Add ADMIN_SECRET to Vercel
-5. Manual variant group review (size variants)
+1. Wait for scraper to finish against vtwin_scrape_targets_2.csv
+2. Export checkpoint → run import → mark universals → refresh mat view → reindex
+3. Drop session 43 component files into codebase (see CHASE_LIST)
+4. Wire ProductQuickViewModal into browse page product cards
+5. Wire BrowseBackButton into PDP
+6. Add ADMIN_SECRET to Vercel
+
+---
+
+# ——— FORTY-SECOND PASS (June 5, 2026) ———
+
+Session: Forty-Second Pass · June 5, 2026
+
+## WHERE WE ARE
+
+Full filtering system audit + fixes. 4-layer review of browse.ts, FilterSidebar, fitment data, Typesense. All critical issues resolved. VTwin scraper partial import run. filter_roadmap.md created.
+
+## What Was Done This Session
+
+### 1. Filtering System Audit ✅
+4-layer audit. 5 critical bugs, 7 gaps, 2 minor. filter_roadmap.md built.
+
+### 2. browse.ts — is_universal Fix ✅
+`OR cu.is_universal = true` added to modelCode, year, and family fallback WHERE conditions. Column is `is_universal` not `fits_all_models`.
+
+### 3. browse.ts — Dash-Suffix Regex ✅
+Open-ended regex replaced with finish-word-restricted pattern. Directional parts no longer collapse.
+
+### 4. vtwin_mark_universal.sql ✅
+Rebuilt. 2,328 VTwin products marked via category + name patterns.
+
+### 5. FilterSidebar Fixes ✅
+Year chip added. Family chip clear resets year. Outer activeCount fixed. "Engine Era" rename. Coverage hint added.
+
+### 6. Model Codes + MODEL_ALIASES ✅
+12 model codes added. 5 new alias groups: FLHR, FLHX, FLSTF, FXSTB, FXDWG.
+
+### 7. extract_fitment_from_names ✅
+PU 45.3%→49.2%, VTwin 36.3%→37.7%, WPS 38.7%→40.8%
+
+### 8. VTwin Scraper Partial Import ✅
+6,742 SKUs / 91,259 fitment rows / 550 universals.
+
+### 9. Typesense Reindex ✅
+90,536 docs, 0 errors.
+
+---
+
+# ——— FORTY-FIRST PASS (June 5, 2026) ———
+
+Homepage rebuilt around ModelFinder. Font system locked in. Variant display overhauled. 199 variant sub-groups merged. Typesense reindexed twice.
 
 ---
 
 # ——— FORTIETH PASS (June 4, 2026) ———
 
-Session: Fortieth Pass · June 4, 2026
-
-## WHERE WE ARE
-
-Long data quality + fitment session. Fixed three files (route.ts, extract_fitment_from_names.mjs, FilterSidebar.jsx), resolved major VTwin SKU duplicate problem, imported VTwin fitment, identified remaining scrape gap.
-
-## What Was Done This Session
-
-### 1. console.log Removed from route.ts ✅
-Removed debug console.log from isAuthorized() in app/api/admin/products/[id]/route.ts.
-
-### 2. extract_fitment_from_names.mjs — Tier 2 Fix ✅
-Added softailCutoff: skip Softail family mapping when year range ends ≤ 1984.
-
-### 3. FilterSidebar.jsx — Full Redesign ✅
-Active filter chips, gold dot indicators, auto-open sections, collapsed desktop labels, mobile Clear + Show Results footer, framer-motion hover.
-
-### 4. VTwin SKU Duplicate Discovery & Cleanup ✅
-14,407 bare-SKU dupes deactivated. Prefixed (VT-) rows canonical. Active VTwin: 38,270.
-
-### 5. import_vtwin_fitment_partial.mjs — Four Patches ✅
-fits_all_models wired, MODEL_ALIASES added, SKU resolution active-only + prefixed priority, delete scope includes bare IDs.
-
-### 6. VTwin Fitment Import ✅
-185,234 rows inserted on correct prefixed IDs.
-
-### 7. VTwin Fitment Gap Analysis ✅
-20,236 genuine scrape targets → vtwin_scrape_targets.csv. Scraper running.
-
-### 8. OEM Backfill ✅
-catalog_oem_crossref joins on sku. UPDATE 3,897 VTwin products.
+VTwin SKU duplicate cleanup. import_vtwin_fitment_partial.mjs patched (×4). 185,234 fitment rows. vtwin_scrape_targets.csv generated.
 
 ---
 
 # ——— THIRTY-NINTH PASS (June 4, 2026) ———
 
-Data quality session. Fitment filter bug fixed. OEM cleanup. Typesense reindex 104,917 docs.
+Fitment filter bug fixed. OEM cleanup. Typesense reindex 104,917 docs.
 
 ---
 
 # ——— THIRTY-EIGHTH PASS (June 4, 2026) ———
 
-Admin inline PDP edit built. API route for update + flag. catalog_review_flags table. Next.js 15 params fix.
+Admin inline PDP edit. API route. catalog_review_flags. Next.js 15 params fix.
 
 ---
 
 # ——— THIRTY-SEVENTH PASS (June 3, 2026) ———
 
-FlowingMenu built. /models page rebuilt. mv_family_product_ranges mat view (9s → 83ms). Font system added. VTwin scraper finished (37,980 rows).
+FlowingMenu. /models page. mv_family_product_ranges mat view (9s→83ms). Font system. VTwin scraper finished.
 

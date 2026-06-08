@@ -6,6 +6,7 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import AdminEditPanel from "@/components/admin/AdminEditPanel";
+import BrowseBackButton from "@/components/pdp/BrowseBackButton";
 import VariantSelector from "@/components/browse/VariantSelector";
 
 // ── Tokens ────────────────────────────────────────────────────
@@ -539,6 +540,8 @@ export default function ProductDetailClient({
 
   return (
     <div style={{ background: C.surface, minHeight: "100vh", fontFamily: BODY }}>
+
+      <BrowseBackButton />
 
       {/* ── BREADCRUMB ── */}
       <div style={{

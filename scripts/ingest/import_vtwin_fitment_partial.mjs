@@ -116,10 +116,15 @@ async function main() {
 
   const seen = new Set();
   const rows = [];
+  const skuToOem = new Map(); // bare_sku → oem_number
   for (const r of allRows) {
     if (!seen.has(r.sku)) { seen.add(r.sku); rows.push(r); }
+    if (r.oem_no && r.oem_no.trim() && !skuToOem.has(r.sku)) {
+      skuToOem.set(r.sku, r.oem_no.trim());
+    }
   }
   log(`✅  After dedup: ${rows.length.toLocaleString()} unique SKUs (removed ${(allRows.length - rows.length).toLocaleString()} duplicates)`);
+  log(`🔑  OEM numbers found: ${skuToOem.size.toLocaleString()} SKUs have OEM data`);
 
   // ── 1b. Optional: skip SKUs already in DB ───────────────────────────────
 
@@ -237,7 +242,6 @@ async function main() {
             source_vendor, sku, name, description,
             msrp, computed_price,
             brand, country_of_origin,
-            oem_numbers,
             special_instructions,
             fits_all_models,
             is_active, in_stock, in_vtwinmfg
@@ -247,7 +251,6 @@ async function main() {
             $5, $6,
             $7,
             $8,
-            $9,
             true, true, true
           )
           ON CONFLICT (sku) DO UPDATE SET
@@ -257,7 +260,6 @@ async function main() {
             computed_price       = COALESCE(EXCLUDED.computed_price, catalog_unified.computed_price),
             brand                = COALESCE(EXCLUDED.brand, catalog_unified.brand),
             country_of_origin    = COALESCE(EXCLUDED.country_of_origin, catalog_unified.country_of_origin),
-            oem_numbers          = CASE WHEN EXCLUDED.oem_numbers IS NOT NULL THEN EXCLUDED.oem_numbers ELSE catalog_unified.oem_numbers END,
             special_instructions = COALESCE(EXCLUDED.special_instructions, catalog_unified.special_instructions),
             fits_all_models      = CASE WHEN EXCLUDED.fits_all_models = true THEN true ELSE catalog_unified.fits_all_models END,
             in_vtwinmfg          = true,
@@ -270,7 +272,6 @@ async function main() {
           price,
           r.manufacturer || null,
           r.origin       || null,
-          r.oem_no       ? [r.oem_no.trim()] : null,
           techNote,
           isUniversal,
         ]);
@@ -415,26 +416,8 @@ async function main() {
 
     log('\n💾  Inserting into catalog_fitment_v2…');
 
-    // Delete existing vtwin_partial fitment for these products (clean slate for re-run safety).
-    // Must delete by BOTH the resolved IDs (prefixed) AND any old bare IDs from previous runs,
-    // since earlier script versions wrote fitment to bare-SKU product IDs.
+    // ON CONFLICT DO NOTHING on the INSERT handles re-run safety without wiping existing data.
     const productIds = [...skuToId.values()];
-
-    // Also collect bare-SKU product IDs for the same SKUs (may be inactive)
-    const bareSkuList = rows.map(r => r.sku);
-    const bareIdRes = await client.query(`
-      SELECT id FROM catalog_unified
-      WHERE source_vendor = 'VTWIN'
-        AND sku = ANY($1::text[])
-    `, [bareSkuList]);
-    const bareIds = bareIdRes.rows.map(r => r.id);
-    const allDeleteIds = [...new Set([...productIds, ...bareIds])];
-
-    await client.query(`
-      DELETE FROM catalog_fitment_v2
-      WHERE product_id = ANY($1::int[])
-        AND fitment_source = 'vtwin_partial'
-    `, [allDeleteIds]);
 
     let fitmentInserted = 0;
     const fitBatches = chunks(fitmentUnique, BATCH);
@@ -463,7 +446,53 @@ async function main() {
 
     log(`    Inserted: ${fitmentInserted.toLocaleString()} fitment rows`);
 
-    // ── 9. Commit ──────────────────────────────────────────────────────
+    // ── 9. Upsert OEM numbers → catalog_oem_crossref → rebuild arrays ──────
+
+    const oemRows = [];
+    for (const [bareSku, oemNumber] of skuToOem) {
+      const productId = skuToId.get(bareSku);
+      if (productId) oemRows.push({ product_id: productId, sku: bareSku, oem_number: oemNumber });
+    }
+
+    let oemInserted = 0;
+    if (oemRows.length > 0) {
+      log(`\n🔑  Inserting ${oemRows.length.toLocaleString()} OEM rows into catalog_oem_crossref…`);
+
+      for (const batch of chunks(oemRows, BATCH)) {
+        const vals = [];
+        const params = [];
+        let idx = 1;
+        for (const { product_id, sku, oem_number } of batch) {
+          vals.push(`($${idx++}, $${idx++}, $${idx++}, 'VTWIN_SCRAPE')`);
+          params.push(product_id, sku, oem_number);
+        }
+        const res = await client.query(`
+          INSERT INTO catalog_oem_crossref (product_id, sku, oem_number, source)
+          VALUES ${vals.join(',')}
+          ON CONFLICT DO NOTHING
+        `, params);
+        oemInserted += res.rowCount;
+      }
+      log(`    Inserted: ${oemInserted.toLocaleString()} new OEM rows`);
+
+      // Rebuild oem_numbers[] from catalog_oem_crossref (all sources) for these products
+      log('\n🔄  Rebuilding oem_numbers[] from catalog_oem_crossref…');
+      const oemProductIds = [...new Set(oemRows.map(r => r.product_id))];
+      const rebuildRes = await client.query(`
+        UPDATE catalog_unified cu
+        SET oem_numbers = ARRAY(
+          SELECT DISTINCT oem_number FROM catalog_oem_crossref
+          WHERE product_id = cu.id
+          ORDER BY oem_number
+        )
+        WHERE id = ANY($1::int[])
+      `, [oemProductIds]);
+      log(`    Rebuilt arrays for ${rebuildRes.rowCount.toLocaleString()} products`);
+    } else {
+      log('\nℹ️   No OEM data in this batch');
+    }
+
+    // ── 10. Commit ─────────────────────────────────────────────────────────
 
     await client.query('COMMIT');
     log('\n✅  Transaction committed.');
@@ -476,17 +505,14 @@ async function main() {
     log(`  Products inserted:           ${insertedProducts.toLocaleString()}`);
     log(`  Products updated:            ${updatedProducts.toLocaleString()}`);
     log(`  Fitment rows inserted:       ${fitmentInserted.toLocaleString()}`);
+    log(`  OEM rows inserted:           ${oemInserted.toLocaleString()}`);
     log(`  Unknown model codes skipped: ${unknownModels.length}`);
     if (unknownModels.length > 0) log(`    → ${unknownModels.join(', ')}`);
     log('═══════════════════════════════════════════════════════');
     log('\nNext steps:');
-    log('  1. Run display_subcategory UPDATE SQL (map_display_subcategory.sql)');
-    log('  2. Rebuild oem_numbers[] if oem_no column had new values:');
-    log('     UPDATE catalog_unified cu SET oem_numbers = ');
-    log('       ARRAY(SELECT oem_number FROM catalog_oem_crossref WHERE product_id = cu.id)');
-    log('     WHERE source_vendor = \'VTWIN\';');
+    log('  1. Mark universals: run vtwin_mark_universal.sql');
+    log('  2. Refresh mat view: REFRESH MATERIALIZED VIEW mv_family_product_ranges;');
     log('  3. Reindex Typesense: node scripts/ingest/index_unified.js --recreate');
-    log('  4. Rebuild variant groups: node scripts/ingest/build_variant_groups.cjs');
 
   } catch (err) {
     await client.query('ROLLBACK');

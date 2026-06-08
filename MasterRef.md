@@ -1,7 +1,7 @@
 # Stinkin' Supplies — Master Reference
-**Last Updated:** June 5, 2026 (Forty-First Pass)
+**Last Updated:** June 5, 2026 (Forty-Second Pass)
 **Database:** Hetzner Postgres — stinkin_catalog
-**Status:** Catalog rebuilt ✅ | Fitment rebuilt ✅ | Search indexed ✅ | Homepage rebuilt ✅ | Font system locked ✅ | ModelFinder built ✅ | FilterSidebar updated ✅ | VariantSelector fitment+color mode ✅ | Variant groups merged ✅ | browse.ts name-grouping ✅ | VTwin SKU dupes resolved ✅ | Knucklehead + Sportster aliases wired ✅
+**Status:** Catalog rebuilt ✅ | Fitment rebuilt ✅ | Search indexed ✅ | Homepage rebuilt ✅ | Font system locked ✅ | ModelFinder built ✅ | FilterSidebar updated ✅ | VariantSelector fitment+color mode ✅ | Variant groups merged ✅ | browse.ts name-grouping ✅ | VTwin SKU dupes resolved ✅ | Filtering system audit complete ✅ | MODEL_ALIASES expanded ✅ | VTwin scraper partial import ✅
 
 ---
 
@@ -9,23 +9,25 @@
 
 | Metric | Value | Status |
 |--------|-------|--------|
-| catalog_unified (active) | **90,510** | ✅ PU 36,396 / WPS 15,844 / VTwin 38,270 |
-| catalog_fitment_v2 | ~3,680,000 rows | ✅ |
+| catalog_unified (active) | **90,536** | ✅ PU 36,396 / WPS 15,844 / VTwin 38,296 |
+| catalog_fitment_v2 | ~3,800,000 rows | ✅ |
 | catalog_oem_crossref | ~65,000+ rows | ✅ |
 | catalog_variant_groups | 7,556 | ✅ 8 new master groups added session 41 |
 | catalog_variant_members | ~29,031 | ✅ All reparented to master groups |
 | oem_fitment | 379,899 rows | ✅ |
-| harley_model_years | ~2,020 rows | ✅ |
-| harley_models | ~347 rows | ✅ |
+| harley_model_years | ~2,070 rows | ✅ |
+| harley_models | ~360 rows | ✅ |
 | mv_family_product_ranges | 81,332 rows | ✅ Auto-refreshes in index_unified.js |
-| Typesense | **90,510 docs** | ✅ Current |
+| Typesense | **90,536 docs** | ✅ Current |
 
-### Fitment Coverage (June 4 — Session 40)
+### Fitment Coverage (June 5 — Session 42)
 | Vendor | Total Active | With Fitment | Coverage |
 |--------|-------------|--------------|----------|
-| PU | 36,396 | 16,502 | 45.3% |
-| VTwin | 38,270 | 13,877 | 36.3% |
-| WPS | 15,844 | 6,133 | 38.7% |
+| PU | 36,396 | 17,918 | 49.2% |
+| VTwin | 38,296 | 14,797 | 38.6% |
+| WPS | 15,844 | 6,463 | 40.8% |
+
+⚠️ VTwin scraper import is partial (6,742/20,236 SKUs). Coverage will increase after full re-run.
 
 ---
 
@@ -127,11 +129,19 @@ Scrape target list: `vtwin_scrape_targets.csv` (20,236 SKUs)
 ## VTWIN FITMENT IMPORT
 
 ```bash
-VTWIN_CSV=./scripts/ingest/vtwin_fitment_combined.csv \
+VTWIN_CSV=/Users/home/Desktop/vtwin_scraper/vtwin_scraper/vtwin_checkpoint_export.csv \
   node scripts/ingest/import_vtwin_fitment_partial.mjs
+
+# After import: mark "All models" rows as universal
+UPDATE catalog_unified cu SET is_universal = true
+FROM vtwin_scrape_data vsd
+WHERE cu.source_vendor = 'VTWIN'
+  AND (cu.sku = 'VT-' || vsd.sku OR cu.sku = vsd.sku)
+  AND vsd.fitment_raw IN ('All models', 'All')
+  AND cu.is_universal = false;
 ```
 
-MODEL_ALIASES: `E → [EL,ELH]`, `XL883 → [5 variants]`, `XL1200 → [11 variants]`
+MODEL_ALIASES: `E → [EL,ELH]`, `XL883 → [5 variants]`, `XL1200 → [11 variants]`, `FLHR → [10 Road King variants]`, `FLHX → [4 Street Glide variants]`, `FLSTF → [5 Fat Boy variants]`, `FXSTB → [3 Night Train variants]`, `FXDWG → [4 Wide Glide variants]`
 
 ---
 
@@ -192,7 +202,7 @@ DISTINCT ON key — 3-tier priority:
 
 Color suffixes stripped: `(BLACK)` parenthetical, `- BLACK` dash-suffix, bare words: BLACK/CHROME/SILVER/GOLD/RED/BLUE/GREEN/BROWN/PINK/WHITE/NATURAL/POLISHED/WRINKLE/GLOSS/MATTE/SATIN.
 
-⚠️ Middle regex `\s*-\s*[A-Z][A-Z0-9 /]+$` strips anything after a dash — watch for over-collapsing (BRAKE PAD - FRONT vs BRAKE PAD - REAR). Tighten to known finish words if needed.
+✅ Middle regex tightened in session 42 — now restricted to known finish words `(BLACK|CHROME|SILVER|...)` only. BRAKE PAD - FRONT and BRAKE PAD - REAR no longer collapse.
 
 ---
 
@@ -202,9 +212,15 @@ Color suffixes stripped: `(BLACK)` parenthetical, `- BLACK` dash-suffix, bare wo
 
 Props: `facets`, `filters`, `onChange`, `open`, `onClose`, `mobileSheet`
 
-Sections: In Stock toggle, Category, Subcategory (when category active), Era, Brand, Price.
+Sections: In Stock toggle, Category, Subcategory (when category active), **Engine Era**, Brand, Price.
 
-Model Family section REMOVED in session 41.
+- Model Family section removed in session 41.
+- `year` chip added in session 42 — shows and dismisses independently.
+- Family chip clear also resets `year`.
+- Outer `activeCount` now includes `family`, `model`, `year` — header badge correct.
+- Both clear-all handlers include `year: null`.
+- Section renamed "Era" → "Engine Era" (engine generation, not HD family).
+- Coverage hint ("Fitment-matched + universal parts") shown when family/model active.
 
 ---
 
@@ -283,6 +299,12 @@ Fallback: https://www.vtwinmfg.com/WebPics/{first-segment}/{raw-sku}.jpg
 | A- prefix on OEM | Eastern Motorcycle Parts — same OEM as without prefix |
 | FLHX 1984 | Street Glide didn't exist — bad data, deleted |
 | VTwin bare dupes | 14,407 deactivated. 521 legitimate bare-only remain active. |
+| fits_all_models column | Does NOT exist on catalog_unified. Use `is_universal` instead. |
+| vtwin_mark_universal.sql | Sets `is_universal = true` using category + name patterns. 2,328 marked. |
+| VTwin "All models" scraper rows | Post-import: UPDATE from vtwin_scrape_data WHERE fitment_raw IN ('All models','All') |
+| browse.ts dash-suffix regex | Fixed session 42 — open-ended dash strip replaced with finish-word list |
+| import_vtwin_fitment_full.mjs | Wrong schema — uses harley_model_id not model_year_id. Do not use. |
+| harley_models duplicate codes | OK to have same model_code with different year ranges (different eras). NOT ok to duplicate same year range. |
 
 ---
 
@@ -299,9 +321,18 @@ node scripts/ingest/index_unified.js --recreate
 VTWIN_CSV=./scripts/ingest/vtwin_fitment_combined.csv \
   node scripts/ingest/import_vtwin_fitment_partial.mjs
 
-# Mark universal VTwin tools
+# Mark universal VTwin tools (initial — category/name based)
 psql 'postgresql://catalog_app:smelly@5.161.100.126:5432/stinkin_catalog' \
   -f scripts/ingest/vtwin_mark_universal.sql
+
+# Mark "All models" universals from scrape data (run after vtwin fitment import)
+psql 'postgresql://catalog_app:smelly@5.161.100.126:5432/stinkin_catalog' -c "
+UPDATE catalog_unified cu SET is_universal = true
+FROM vtwin_scrape_data vsd
+WHERE cu.source_vendor = 'VTWIN'
+  AND (cu.sku = 'VT-' || vsd.sku OR cu.sku = vsd.sku)
+  AND vsd.fitment_raw IN ('All models', 'All')
+  AND cu.is_universal = false;"
 
 # OEM backfill (VTwin)
 UPDATE catalog_unified cu
@@ -356,4 +387,4 @@ GROUP BY cvg.display_name, cvg.family_key, cvg.id ORDER BY cvg.display_name;
 
 ---
 
-*Master Reference — Last update: June 5, 2026 · Forty-First Pass (Homepage rebuilt, ModelFinder built, font system locked, FilterSidebar Model Family removed, VariantSelector fitment+color mode, browse.ts name-grouping, 199 variant sub-groups merged)*
+*Master Reference — Last update: June 5, 2026 · Forty-Second Pass (Filtering system audit + full Phase 1–3 execution: browse.ts is_universal fix + regex fix, FilterSidebar year chip + activeCount + Engine Era, vtwin_mark_universal 2,328 rows, 12 model codes added, MODEL_ALIASES 5 new groups, extract_fitment_from_names, VTwin scraper partial import 91,259 rows)*

@@ -8,6 +8,16 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
+// Debounce search input so we don't hit Typesense on every keystroke
+function useDebounce(value, delay) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  return debounced;
+}
+
 // ── Palette ───────────────────────────────────────────────────
 const GOLD   = "#b8922a";
 const GOLD_L = "rgba(184,146,42,0.12)";
@@ -37,10 +47,11 @@ const HD_ERAS = [
 function Checkbox({ active }) {
   return (
     <motion.div
-      animate={{ background: active ? GOLD : "transparent", borderColor: active ? GOLD : GOLD_B }}
+      animate={{ background: active ? GOLD : "rgba(0,0,0,0)", borderColor: active ? GOLD : GOLD_B }}
       transition={{ duration: 0.12 }}
       style={{
-        width: 13, height: 13, border: `1.5px solid ${active ? GOLD : GOLD_B}`,
+        width: 13, height: 13,
+        borderWidth: "1.5px", borderStyle: "solid", borderColor: active ? GOLD : GOLD_B,
         flexShrink: 0, display: "grid", placeContent: "center",
       }}
     >
@@ -176,16 +187,38 @@ function FilterContent({ facets, filters, onChange, sections, setSections, colla
 
   const subcategories = facets.subcategories ?? [];
 
+  // ── Search input (controlled locally, synced to filters.search) ──────────
+  const [searchInput, setSearchInput] = useState(filters.search ?? "");
+  const debouncedSearch = useDebounce(searchInput, 320);
+
+  // Push debounced value up to browse page
+  useEffect(() => {
+    const v = debouncedSearch.trim();
+    const current = filters.search ?? "";
+    if (v !== current) onChange({ search: v || null });
+  }, [debouncedSearch]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reset local input when filter is cleared externally (chip × or clear-all)
+  useEffect(() => {
+    if (!filters.search && searchInput) setSearchInput("");
+  }, [filters.search]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const clearAll = () => {
+    setSearchInput("");
+    onChange({ family: null, model: null, modelCodes: null, year: null, era: null, display_category: null, display_subcategory: null, brand: null, min_price: null, max_price: null, in_stock: false, search: null });
+  };
+
   // Active filter chips
   const chips = [
-    filters.family     && { key: "family",             label: filters.family,            clear: () => onChange({ family: null, model: null, modelCodes: null, year: null }) },
-    filters.year       && { key: "year",               label: String(filters.year),      clear: () => onChange({ year: null }) },
-    filters.model      && { key: "model",              label: filters.model,             clear: () => onChange({ model: null, modelCodes: null }) },
-    filters.era        && { key: "era",                label: filters.era.replace(/-/g," "), clear: () => onChange({ era: null }) },
-    filters.display_category && { key: "cat",          label: filters.display_category,  clear: () => onChange({ display_category: null, display_subcategory: null }) },
-    filters.display_subcategory && { key: "subcat",    label: filters.display_subcategory, clear: () => onChange({ display_subcategory: null }) },
-    filters.brand      && { key: "brand",              label: filters.brand,             clear: () => onChange({ brand: null }) },
-    filters.in_stock   && { key: "stock",              label: "In Stock",                clear: () => onChange({ in_stock: false }) },
+    filters.search     && { key: "search",   label: `"${filters.search}"`,             clear: () => { setSearchInput(""); onChange({ search: null }); } },
+    filters.family     && { key: "family",   label: filters.family,                    clear: () => onChange({ family: null, model: null, modelCodes: null, year: null }) },
+    filters.year       && { key: "year",     label: String(filters.year),              clear: () => onChange({ year: null }) },
+    filters.model      && { key: "model",    label: filters.model,                     clear: () => onChange({ model: null, modelCodes: null }) },
+    filters.era        && { key: "era",      label: filters.era.replace(/-/g," "),     clear: () => onChange({ era: null }) },
+    filters.display_category && { key: "cat",    label: filters.display_category,     clear: () => onChange({ display_category: null, display_subcategory: null }) },
+    filters.display_subcategory && { key: "subcat", label: filters.display_subcategory, clear: () => onChange({ display_subcategory: null }) },
+    filters.brand      && { key: "brand",    label: filters.brand,                     clear: () => onChange({ brand: null }) },
+    filters.in_stock   && { key: "stock",    label: "In Stock",                        clear: () => onChange({ in_stock: false }) },
     (filters.min_price || filters.max_price) && { key: "price", label: `$${filters.min_price||0}–$${filters.max_price||"∞"}`, clear: () => onChange({ min_price: null, max_price: null }) },
   ].filter(Boolean);
 
@@ -193,6 +226,48 @@ function FilterContent({ facets, filters, onChange, sections, setSections, colla
 
   return (
     <>
+      {/* Search box — hidden in collapsed mode (sidebar too narrow) */}
+      {!collapsed && (
+        <div style={{ padding: "10px 14px 8px", borderBottom: `1px solid rgba(184,146,42,0.1)` }}>
+          <div style={{
+            display: "flex", alignItems: "center",
+            border: `1.5px solid ${searchInput ? GOLD_B : "rgba(184,146,42,0.15)"}`,
+            background: "rgba(255,255,255,0.45)",
+            padding: "0 8px 0 10px", gap: 6,
+            transition: "border-color 0.18s",
+          }}>
+            {/* Search icon */}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={searchInput ? GOLD : MUTED} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transition: "stroke 0.15s" }}>
+              <circle cx="11" cy="11" r="7" />
+              <line x1="16.5" y1="16.5" x2="22" y2="22" />
+            </svg>
+            <input
+              type="text"
+              value={searchInput}
+              onChange={e => setSearchInput(e.target.value)}
+              placeholder="Search parts, OEM#…"
+              style={{
+                flex: 1, border: "none", outline: "none",
+                background: "transparent",
+                fontSize: 11, fontFamily: "var(--font-stencil, monospace)",
+                letterSpacing: "0.5px", color: DARK,
+                padding: "8px 0",
+              }}
+            />
+            {searchInput && (
+              <button
+                onClick={() => { setSearchInput(""); onChange({ search: null }); }}
+                style={{
+                  background: "none", border: "none", cursor: "pointer",
+                  color: "#bbb", padding: "0 1px", fontSize: 15,
+                  lineHeight: 1, display: "flex", alignItems: "center",
+                }}
+              >×</button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Active filter chips — only when not collapsed */}
       {!collapsed && activeCount > 0 && (
         <div style={{ padding: "10px 14px 8px", borderBottom: `1px solid rgba(184,146,42,0.1)`, display: "flex", flexWrap: "wrap", gap: 5 }}>
@@ -200,7 +275,7 @@ function FilterContent({ facets, filters, onChange, sections, setSections, colla
             <ActiveChip key={chip.key} label={chip.label} onRemove={chip.clear} />
           ))}
           <button
-            onClick={() => onChange({ family: null, model: null, modelCodes: null, year: null, era: null, display_category: null, display_subcategory: null, brand: null, min_price: null, max_price: null, in_stock: false })}
+            onClick={clearAll}
             style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-stencil, monospace)", fontSize: 9, color: "#bbb", letterSpacing: "1px", textTransform: "uppercase", padding: "3px 4px" }}
           >
             Clear all
@@ -390,7 +465,7 @@ export default function FilterSidebar({ facets, filters, onChange, open, onClose
   }, [open, mobileSheet]);
 
   const activeCount = [
-    filters.family, filters.model, filters.year,
+    filters.search, filters.family, filters.model, filters.year,
     filters.era, filters.display_category,
     filters.brand, filters.min_price, filters.max_price, filters.in_stock,
   ].filter(Boolean).length;
@@ -478,7 +553,7 @@ export default function FilterSidebar({ facets, filters, onChange, open, onClose
               }}>
                 {activeCount > 0 && (
                   <button
-                    onClick={() => onChange({ family: null, model: null, modelCodes: null, year: null, era: null, display_category: null, display_subcategory: null, brand: null, min_price: null, max_price: null, in_stock: false })}
+                    onClick={() => onChange({ family: null, model: null, modelCodes: null, year: null, era: null, display_category: null, display_subcategory: null, brand: null, min_price: null, max_price: null, in_stock: false, search: null })}
                     style={{
                       flex: "0 0 auto", height: 46, background: "none",
                       border: `1.5px solid ${GOLD_B}`, color: GOLD,

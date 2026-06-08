@@ -512,19 +512,34 @@ export default function ModelFinder({ compact = false, onSelect }) {
 
         {/* Header */}
         <div style={{
-          padding:'16px 24px 14px',
+          padding:'28px 32px 22px',
           borderBottom:'1px solid rgba(201,168,76,0.14)',
-          display:'flex', alignItems:'center', justifyContent:'space-between',
           position:'relative', zIndex:1,
         }}>
-          <div>
-            <div style={{fontFamily:MONO, fontSize:8, letterSpacing:'0.22em',
-              color:'rgba(201,168,76,0.5)', textTransform:'uppercase', marginBottom:3}}>
+          {/* Top row: label + step dots */}
+          <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10}}>
+            <div style={{
+              fontFamily:MONO, fontSize:11, letterSpacing:'0.22em',
+              color:'rgba(201,168,76,0.55)', textTransform:'uppercase',
+            }}>
               Stinkin' Supplies
             </div>
-            <KineticText text="Find Parts for Your Harley" fontSize="clamp(14px,1.8vw,20px)"/>
+            <StepDots step={step}/>
           </div>
-          <StepDots step={step}/>
+
+          {/* Big kinetic title */}
+          <KineticText
+            text="Find Parts for Your Harley"
+            fontSize="clamp(36px,5vw,72px)"
+            letterSpacing="0.03em"
+          />
+
+          {/* Gold rule under title */}
+          <div style={{
+            marginTop:14,
+            height:1,
+            background:'linear-gradient(to right, rgba(201,168,76,0.5), rgba(201,168,76,0.08) 60%, transparent)',
+          }}/>
         </div>
 
         {/* ── STEP 1: Era ────────────────────────────────────────────────────── */}

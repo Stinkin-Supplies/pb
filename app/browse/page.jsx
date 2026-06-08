@@ -7,12 +7,12 @@
  * floating pill button OR the BottomNav hamburger (via 'stinkin:filterToggle' window event).
  */
 
-import { useState, useEffect, useCallback, useRef, Suspense } from "react";
-import Link from "next/link";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { getProductImage } from "@/lib/getProductImage";
 import FilterSidebar from "@/components/browse/FilterSidebar";
+import ProductQuickViewModal from "@/components/browse/ProductQuickViewModal";
 
 const GOLD     = "#b8922a";
 const CREAM    = "#faf7f2";
@@ -32,7 +32,7 @@ const SORT_OPTIONS = [
 
 // ─── Product Card ─────────────────────────────────────────────────────────────
 
-function ProductCard({ product, index }) {
+function ProductCard({ product, index, onOpen }) {
   const [imgErr, setImgErr] = useState(false);
   const imageSrc = getProductImage({
     image: product.image_url ?? null,
@@ -45,81 +45,93 @@ function ProductCard({ product, index }) {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.03, type: "spring", stiffness: 300, damping: 24 }}
-      style={{ position: "relative" }}
+      role="button"
+      tabIndex={0}
+      aria-label={`Quick view ${product.name}`}
+      onClick={() => onOpen(product)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen(product);
+        }
+      }}
+      style={{ position: "relative", cursor: "pointer", outline: "none" }}
     >
-      <Link href={`/browse/${product.slug}`} style={{ textDecoration: "none", display: "block" }} onClick={() => sessionStorage.setItem('browse_scroll', window.scrollY)}>
-        <motion.div
-          whileHover={{ y: -4, borderColor: GOLD, boxShadow: `0 8px 32px rgba(184,146,42,0.15)` }}
-          transition={{ type: "spring", stiffness: 400, damping: 25 }}
-          style={{ background: "#ffffff", border: `1px solid rgba(184,146,42,0.35)`, overflow: "hidden" }}
-        >
-          {/* Image */}
-          <div style={{
-            aspectRatio: "1", background: CREAM,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            overflow: "hidden", position: "relative",
-          }}>
-            {imageSrc && !imgErr ? (
-              <img
-                src={imageSrc} alt={product.name} onError={() => setImgErr(true)}
-                style={{ width: "100%", height: "100%", objectFit: "contain", padding: "10px" }}
-              />
-            ) : (
-              <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "9px", letterSpacing: "2px", color: "#ccc", textTransform: "uppercase" }}>
-                No Image
-              </div>
-            )}
+      <motion.div
+        whileHover={{ y: -4, borderColor: GOLD, boxShadow: `0 8px 32px rgba(184,146,42,0.15)` }}
+        transition={{ type: "spring", stiffness: 400, damping: 25 }}
+        style={{ background: "#ffffff", border: `1px solid rgba(184,146,42,0.35)`, overflow: "hidden" }}
+      >
+        {/* Image */}
+        <div style={{
+          aspectRatio: "1", background: CREAM,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          overflow: "hidden", position: "relative",
+        }}>
+          {imageSrc && !imgErr ? (
+            <img
+              src={imageSrc} alt={product.name} onError={() => setImgErr(true)}
+              style={{ width: "100%", height: "100%", objectFit: "contain", padding: "10px" }}
+            />
+          ) : (
+            <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "9px", letterSpacing: "2px", color: "#ccc", textTransform: "uppercase" }}>
+              No Image
+            </div>
+          )}
 
 
-            {!product.in_stock && (
-              <div style={{ position: "absolute", top: 8, right: 8, background: "rgba(255,255,255,0.9)", border: "1px solid #ddd", fontFamily: "var(--font-stencil, monospace)", fontSize: "8px", letterSpacing: "1px", color: "#999", padding: "3px 7px", textTransform: "uppercase" }}>
-                Out of Stock
-              </div>
-            )}
-            {product.oem_numbers?.length > 0 ? (
-              <div style={{ position: "absolute", top: 8, left: 0 }}>
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 22" width={72} height={22} style={{ display: "block" }}>
-                  <defs><linearGradient id="oem-grad" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stopColor="#ffd700" /><stop offset="50%" stopColor="#c8a800" /><stop offset="100%" stopColor="#a88800" /></linearGradient></defs>
-                  <path d="M6,2 L66,2 L72,11 L66,20 L6,20 L0,11 Z" fill="rgba(0,0,0,0.15)" transform="translate(1,1.5)" />
-                  <path d="M6,2 L66,2 L72,11 L66,20 L6,20 L0,11 Z" fill="url(#oem-grad)" />
-                  <path d="M8,5 L64,5 L69,11 L64,17 L8,17 L3,11 Z" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="0.75" />
-                  <text x="36" y="15" textAnchor="middle" fontFamily="'Barlow Condensed','Arial Narrow',sans-serif" fontWeight="700" fontSize="9" letterSpacing="1.5" fill="rgba(0,0,0,0.75)">OEM</text>
-                </svg>
-              </div>
-            ) : product.is_harley_fitment ? (
-              <div style={{ position: "absolute", top: 8, left: 8, background: "rgba(184,146,42,0.1)", border: "1px solid rgba(184,146,42,0.4)", fontFamily: "var(--font-stencil, monospace)", fontSize: "8px", letterSpacing: "1px", color: GOLD, padding: "3px 7px", textTransform: "uppercase" }}>
-                HD Fit
-              </div>
-            ) : null}
-            {product.variant_count > 1 && (
-              <div style={{ position: "absolute", bottom: 8, left: 8, display: "flex", alignItems: "center", gap: 4, background: GOLD, border: "1.5px solid rgba(0,0,0,0.25)", borderRadius: 3, padding: "3px 8px" }}>
-                <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><circle cx="2" cy="2" r="1.5" fill="#1a1000"/><circle cx="6" cy="2" r="1.5" fill="#1a1000" opacity="0.7"/><circle cx="2" cy="6" r="1.5" fill="#1a1000" opacity="0.7"/><circle cx="6" cy="6" r="1.5" fill="#1a1000" opacity="0.4"/></svg>
-                <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "8px", letterSpacing: "1px", color: "#1a1000", textTransform: "uppercase" }}>{product.variant_count} options</span>
-              </div>
-            )}
+          {!product.in_stock && (
+            <div style={{ position: "absolute", top: 8, right: 8, background: "rgba(255,255,255,0.9)", border: "1px solid #ddd", fontFamily: "var(--font-stencil, monospace)", fontSize: "8px", letterSpacing: "1px", color: "#999", padding: "3px 7px", textTransform: "uppercase" }}>
+              Out of Stock
+            </div>
+          )}
+          {product.oem_numbers?.length > 0 ? (
+            <div style={{ position: "absolute", top: 8, left: 0 }}>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 22" width={72} height={22} style={{ display: "block" }}>
+                <defs><linearGradient id="oem-grad" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stopColor="#ffd700" /><stop offset="50%" stopColor="#c8a800" /><stop offset="100%" stopColor="#a88800" /></linearGradient></defs>
+                <path d="M6,2 L66,2 L72,11 L66,20 L6,20 L0,11 Z" fill="rgba(0,0,0,0.15)" transform="translate(1,1.5)" />
+                <path d="M6,2 L66,2 L72,11 L66,20 L6,20 L0,11 Z" fill="url(#oem-grad)" />
+                <path d="M8,5 L64,5 L69,11 L64,17 L8,17 L3,11 Z" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="0.75" />
+                <text x="36" y="15" textAnchor="middle" fontFamily="'Barlow Condensed','Arial Narrow',sans-serif" fontWeight="700" fontSize="9" letterSpacing="1.5" fill="rgba(0,0,0,0.75)">OEM</text>
+              </svg>
+            </div>
+          ) : product.is_harley_fitment ? (
+            <div style={{ position: "absolute", top: 8, left: 8, background: "rgba(184,146,42,0.1)", border: "1px solid rgba(184,146,42,0.4)", fontFamily: "var(--font-stencil, monospace)", fontSize: "8px", letterSpacing: "1px", color: GOLD, padding: "3px 7px", textTransform: "uppercase" }}>
+              HD Fit
+            </div>
+          ) : null}
+          {product.variant_count > 1 && (
+            <div style={{ position: "absolute", bottom: 8, left: 8, display: "flex", alignItems: "center", gap: 4, background: GOLD, border: "1.5px solid rgba(0,0,0,0.25)", borderRadius: 3, padding: "3px 8px" }}>
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><circle cx="2" cy="2" r="1.5" fill="#1a1000"/><circle cx="6" cy="2" r="1.5" fill="#1a1000" opacity="0.7"/><circle cx="2" cy="6" r="1.5" fill="#1a1000" opacity="0.7"/><circle cx="6" cy="6" r="1.5" fill="#1a1000" opacity="0.4"/></svg>
+              <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "8px", letterSpacing: "1px", color: "#1a1000", textTransform: "uppercase" }}>{product.variant_count} options</span>
+            </div>
+          )}
+        </div>
+        {/* Info */}
+        <div style={{ padding: "12px 14px 16px", borderTop: `1px solid rgba(184,146,42,0.2)` }}>
+          <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "8px", letterSpacing: "2px", color: GOLD, textTransform: "uppercase", marginBottom: "4px" }}>
+            {product.brand}
           </div>
-          {/* Info */}
-          <div style={{ padding: "12px 14px 16px", borderTop: `1px solid rgba(184,146,42,0.2)` }}>
-            <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "8px", letterSpacing: "2px", color: GOLD, textTransform: "uppercase", marginBottom: "4px" }}>
-              {product.brand}
-            </div>
-            <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "12px", color: "#2a2018", lineHeight: 1.3, marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.5px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-              {product.name}
-            </div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div style={{ fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)", fontSize: "20px", letterSpacing: "1px", color: DARK }}>
-                {product.computed_price ? `$${Number(product.computed_price).toFixed(2)}` : "—"}
-              </div>
-              <motion.button
-                whileHover={{ scale: 1.05, background: GOLD, color: "#fff" }}
-                whileTap={{ scale: 0.95 }}
-                onClick={e => e.preventDefault()}
-                style={{ background: CREAM2, border: `1px solid rgba(184,146,42,0.3)`, color: GOLD, width: 30, height: 30, fontSize: "18px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s, color 0.15s" }}
-              >+</motion.button>
-            </div>
+          <div style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: "12px", color: "#2a2018", lineHeight: 1.3, marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.5px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+            {product.name}
           </div>
-        </motion.div>
-      </Link>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+            <div style={{ fontFamily: "var(--font-caesar, 'Bebas Neue', sans-serif)", fontSize: "20px", letterSpacing: "1px", color: DARK }}>
+              {product.computed_price ? `$${Number(product.computed_price).toFixed(2)}` : "—"}
+            </div>
+            <motion.button
+              type="button"
+              whileHover={{ scale: 1.05, background: GOLD, color: "#fff" }}
+              whileTap={{ scale: 0.95 }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpen(product);
+              }}
+              style={{ background: CREAM2, border: `1px solid rgba(184,146,42,0.3)`, color: GOLD, width: 30, height: 30, fontSize: "18px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s, color 0.15s" }}
+            >+</motion.button>
+          </div>
+        </div>
+      </motion.div>
     </motion.div>
   );
 }
@@ -141,6 +153,7 @@ function BrowsePageInner() {
   const [loading, setLoading]     = useState(true);
   const [page, setPage]           = useState(1);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [quickView, setQuickView] = useState(null);
   const [searchInput, setSearchInput] = useState(searchParams.get("q") || "");
 
   const [filters, setFilters] = useState({
@@ -214,6 +227,7 @@ function BrowsePageInner() {
     }
   }, []);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchProducts(filters, page); }, [filters, page, fetchProducts]);
 
 
@@ -369,8 +383,8 @@ function BrowsePageInner() {
             </div>
           ) : (
             <>
-              <div className="product-grid">
-                {products.map((p, i) => <ProductCard key={p.id} product={p} index={i} />)}
+            <div className="product-grid">
+                {products.map((p, i) => <ProductCard key={p.id} product={p} index={i} onOpen={setQuickView} />)}
               </div>
 
               {totalPages > 1 && (
@@ -390,6 +404,10 @@ function BrowsePageInner() {
           )}
         </div>
       </div>
+
+      {quickView && (
+        <ProductQuickViewModal product={quickView} onClose={() => setQuickView(null)} />
+      )}
 
       {/* ── Floating filter pill — mobile only, sits above bottom nav ── */}
       <div className="mobile-filter-pill">

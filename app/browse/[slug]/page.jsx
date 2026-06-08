@@ -97,7 +97,7 @@ export default async function ProductDetailPage({ params }) {
           COALESCE(cp.id, cu.id)               AS id,
           cp.id                                AS cp_id,
           cu.sku,
-          COALESCE(cp.internal_sku, cu.internal_sku) AS internal_sku,
+          COALESCE(cu.internal_sku, cp.internal_sku) AS internal_sku,
           cu.slug,
           cu.name,
           cu.brand AS brand,
