@@ -89,11 +89,16 @@ function getWeight(i, hov) {
 }
 
 function getLetterStyle(w, hot) {
-  if (!hot) return { color: 'rgba(245,240,232,0.92)', textShadow: '0 2px 12px rgba(0,0,0,0.45)' };
-  if (w >= 900) return { color: '#fff8e6', textShadow: `0 0 32px ${GOLD}, 0 0 12px rgba(236,173,47,0.9)` };
-  if (w >= 800) return { color: '#ffcc66', textShadow: '0 0 22px rgba(232,98,26,0.9)' };
-  if (w >= 700) return { color: '#e8821a', textShadow: '0 0 16px rgba(231,164,48,0.7)' };
-  return { color: '#c0390a', textShadow: '0 0 8px rgba(225,117,17,0.5)' };
+  // Base state (no hover): brand gold — the title reads gold at rest
+  if (!hot) return { color: '#c9a84c', textShadow: '0 2px 14px rgba(0,0,0,0.55)' };
+  // Hottest letter — bright warm gold, strong glow
+  if (w >= 900) return { color: '#ffe680', textShadow: `0 0 32px ${GOLD}, 0 0 16px rgba(201,168,76,0.95), 0 0 56px rgba(201,168,76,0.4)` };
+  // Very hot — saturated gold
+  if (w >= 800) return { color: '#e8c248', textShadow: '0 0 24px rgba(201,168,76,0.85), 0 0 44px rgba(201,168,76,0.35)' };
+  // Hot — mid gold
+  if (w >= 700) return { color: '#c9a84c', textShadow: '0 0 18px rgba(201,168,76,0.65)' };
+  // Cooling — darker antique gold
+  return { color: '#8a6c28', textShadow: '0 0 8px rgba(201,168,76,0.25)' };
 }
 
 function KineticText({ text, fontSize = 'clamp(16px,2vw,22px)', letterSpacing = '0.06em' }) {
