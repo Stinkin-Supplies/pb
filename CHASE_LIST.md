@@ -1,110 +1,88 @@
 # STINKIN' SUPPLIES — CHASE LIST
-**Last Updated: June 7, 2026 — Forty-Third Pass**
+**Last Updated: June 8, 2026 — Forty-Fifth Pass**
 
 ## 🚀 NEXT SESSION — START HERE
 
 | # | Task | Notes |
 |---|------|-------|
-| 1 | VTwin scraper finish + import | Scraper running against `vtwin_scrape_targets_2.csv` (19,662 SKUs). When done: export checkpoint → `import_vtwin_fitment_partial.mjs` → universal mark → mat view refresh → reindex |
-| 2 | Mark universals + mat view + reindex | Still pending from last import run: universal SQL + `REFRESH MATERIALIZED VIEW mv_family_product_ranges` + `node scripts/ingest/index_unified.js --recreate` |
-| 3 | Add ADMIN_SECRET to Vercel | `npx vercel env add ADMIN_SECRET` — required for inline PDP edit in production |
-| 4 | Add FLHRX to harley_models | Skipped in importer as unknown model code — Road Glide Custom, valid model |
-| 5 | Drop in session 43 component files | See files list below — layout.tsx, globals.css, FilterSidebar.jsx, ProductQuickViewModal.jsx, BrowseBackButton.jsx, ModelFinder.jsx, BespokeSerif-Variable.ttf |
-| 6 | Wire ProductQuickViewModal into browse page | Add `quickView` state, `setQuickView(product)` on card click, render modal |
-| 7 | Wire BrowseBackButton into PDP | `import BrowseBackButton from "@/components/pdp/BrowseBackButton"` near top of PDP layout |
-| 8 | Verify null slug on /browse | Hard refresh /browse — VTwin cards should route to real PDPs, not /browse/null |
-| 9 | Add remaining model images | 9 images needed: softail, dyna, sportster, fxr, shovelhead, vintage, trike, v-rod, street. 400x160px at `public/images/models/{slug}.jpg` |
-| 10 | Manual variant group review | Size variants: valve guides, rocker arm shims, helmet pads, cam lock washers, mainshaft races |
-| 11 | Bulk-fix flagged products | `GET /api/admin/products/1?token=YOUR_SECRET` returns all unresolved flags |
+| 1 | Drop in session 44 + 43 component files | See files table below |
+| 2 | Run mat view refresh | `psql $CATALOG_DATABASE_URL -c 'REFRESH MATERIALIZED VIEW mv_family_product_ranges;'` |
+| 3 | Run universal mark (round 2 scrape) | `psql $CATALOG_DATABASE_URL -c "UPDATE catalog_unified cu SET is_universal = true FROM vtwin_scrape_data vsd WHERE cu.source_vendor = 'VTWIN' AND (cu.sku = 'VT-' || vsd.sku OR cu.sku = vsd.sku) AND vsd.fitment_raw IN ('All models', 'All', 'Custom application') AND cu.is_universal = false;"` |
+| 4 | Add FLHRX + FLI to harley_models | FLHRX = Road Glide Custom, FLI = Road Glide Limited. Both skipped by importer. |
+| 5 | Add ADMIN_SECRET to Vercel | `npx vercel env add ADMIN_SECRET` |
+| 6 | Fix Framer Motion transparent errors | Replace `transparent` with `rgba(0,0,0,0)` anywhere background animates. May be in computed values not literal strings — check framer-motion variant objects. |
+| 7 | Browse query performance Engine + Dyna | 3.5–7.6s. EXPLAIN shows index hit but fitment JOIN on 14K+ rows is culprit. Check catalog_fitment_v2 indexes — may need composite index on (product_id, model_year_id). |
+| 8 | Wire CategoryBentoGrid image backgrounds | When images ready: add `images` prop to CategoryBentoGrid in ModelCatalogClient. Files at `public/images/categories/{area}.jpg` |
+| 9 | Wire ProductQuickViewModal into browse page | Add `quickView` state, `setQuickView(product)` on card click, render modal |
+| 10 | Wire BrowseBackButton into PDP | `import BrowseBackButton from "@/components/pdp/BrowseBackButton"` near top of PDP layout |
+| 11 | Add remaining model images | 9 images: softail, dyna, sportster, fxr, shovelhead, vintage, trike, v-rod, street. 400×160px at `public/images/models/{slug}.jpg` |
+| 12 | Verify null slug on /browse | Hard refresh — VTwin cards should route to real PDPs, not /browse/null |
+| 13 | Bulk-fix flagged products | `GET /api/admin/products/1?token=YOUR_SECRET` returns all unresolved flags |
 
-## Session 43 — Files to Drop In
+## Files to Drop In — Sessions 43 + 44
 
-| File | Destination |
-|------|-------------|
-| globals.css | app/globals.css |
-| layout.tsx | app/layout.tsx |
-| BespokeSerif-Variable.ttf | public/fonts/BespokeSerif-Variable.ttf (replace Regular) |
-| FilterSidebar.jsx | components/browse/FilterSidebar.jsx |
-| ProductQuickViewModal.jsx | components/browse/ProductQuickViewModal.jsx |
-| BrowseBackButton.jsx | components/pdp/BrowseBackButton.jsx |
-| ModelFinder.jsx | components/home/ModelFinder.jsx |
-| products-slug-route.ts | app/api/products/[slug]/route.ts (new file) |
-| import_vtwin_fitment_partial.mjs | scripts/ingest/import_vtwin_fitment_partial.mjs |
+| File | Destination | Session |
+|------|-------------|---------|
+| CategoryBentoGrid.jsx | components/models/CategoryBentoGrid.jsx (new) | 44 |
+| ModelCatalogClient.jsx | app/models/[family]/ModelCatalogClient.jsx (replace) | 44 |
+| globals.css | app/globals.css | 43 |
+| layout.tsx | app/layout.tsx | 43 |
+| BespokeSerif-Variable.ttf | public/fonts/BespokeSerif-Variable.ttf (replace Regular) | 43 |
+| FilterSidebar.jsx | components/browse/FilterSidebar.jsx | 43 |
+| ProductQuickViewModal.jsx | components/browse/ProductQuickViewModal.jsx | 43 |
+| BrowseBackButton.jsx | components/pdp/BrowseBackButton.jsx | 43 |
+| ModelFinder.jsx | components/home/ModelFinder.jsx | 43 |
+| products-slug-route.ts | app/api/products/[slug]/route.ts (new) | 43 |
+| import_vtwin_fitment_partial.mjs | scripts/ingest/import_vtwin_fitment_partial.mjs | 43 |
+
+## ✅ DONE JUNE 8 — FORTY-FIFTH PASS
+
+| Area | What Was Done |
+|------|---------------|
+| display_subcategory — Handlebar & Controls | 9 subcategories. Key: WPS "LW CABLE" and "BURLY CNTRL KIT" patterns. ~5% NULL. |
+| display_subcategory — Brakes | 8 subcategories. Brake Hardware new subcategory (pedals, levers). Moves: PU Misc Electrical → Electrical, air cleaner backing plates → Carburetion & Fuel. ~6% NULL. |
+| display_subcategory — Suspension | 8 subcategories. Moves: valve spring kits → Engine, spring fork fenders → Fenders & Body, spotlamps → Lighting. ~12% NULL. |
+| display_subcategory — Lighting | 8 subcategories. Key: `%spotlamp%` → Auxiliary. License plate frames/holders caught. ~5% NULL. |
+| display_subcategory — Wheels & Tires | 7 subcategories. Key: `%spoke set%` and `% spoke %` needed (not `%wheel spoke%`). WPS FR/RR prefix = complete wheels. ~8% NULL. |
+| display_subcategory — Foot Controls | 9 subcategories. Kickstands new subcategory. Moves: Wyatt Gatling exhaust → Exhaust, luggage rack → Luggage, solo seat → Seating. ~7% NULL. |
+| display_subcategory — Exhaust | 4 subcategories. Moves: exhaust valves → Engine, brake crossover → Brakes, grip sets → Handlebar. ~7% NULL. |
+| display_subcategory — Frame & Hardware | 5 subcategories. Moves: PU Misc Engine Parts → Engine, shifter shaft → Transmission. ~13% NULL. |
+| display_subcategory — Seating | 4 subcategories. ~5% NULL. |
+| display_subcategory — Luggage & Racks | 5 subcategories. ~7% NULL. |
+| display_subcategory — Instrumentation | 3 subcategories. 96.5% mapped — best coverage of all categories. |
+| display_subcategory — Security & Covers | 3 subcategories. ~8% NULL. |
+| display_subcategory — Tools & Chemicals | 3 subcategories. Moves: transmission gear kit, electrical items, bike covers out. 71% mapped — WPS abbreviations limit coverage. |
+| display_subcategory — Riding Gear & Apparel | 6 subcategories. Moves: switchblade lowers, side plates → Fenders & Body; phone mounts → Accessories; handguards → Handlebar. 65% mapped — excluded from bento grid. |
+| display_subcategory — Accessories & Misc | 5 subcategories. 1,274 misclassified products moved to correct categories (primary covers, axles, motor mounts, valve kits, brake sensors, etc.). 6% mapped — intentional catch-all. |
+| Typesense reindex | Final reindex with full subcategory data. All 20 categories now have display_subcategory facets live. |
+
+## ✅ DONE JUNE 8 — FORTY-FOURTH PASS
+
+CategoryBentoGrid + ModelCatalogClient rebuilt. VTwin scraper round 2 imported (48% coverage). Engine/Electrical/Carburetion & Fuel/Fenders & Body/Transmission & Clutch subcategories mapped. VACUUM ANALYZE. placeholder.jpg.
 
 ## ✅ DONE JUNE 7 — FORTY-THIRD PASS
 
-| Area | What Was Done |
-|------|---------------|
-| Font system — globals.css | Body font changed from Share Tech Mono → Barlow (via `--font-body`). `text-transform: uppercase` removed from body (was forcing all text to caps site-wide). Added `font-size: 15px`, `font-weight: 500`, `line-height: 1.55`. Added type scale CSS vars (`--text-2xs` through `--text-4xl`) and weight vars (`--fw-normal` through `--fw-bold`). Letter spacing switched to em-based. |
-| Font system — layout.tsx | Barlow formally loaded via `next/font/google` (weights 400/500/600/700) as `--font-body`. Previously just a string reference — never actually loaded. `--font-barlow` legacy alias wired. |
-| Font system — Bespoke Serif | Switched from static `BespokeSerif-Regular.ttf` (weight 400 only) to `BespokeSerif-Variable.ttf` (wght 300–800: Light/Regular/Medium/Bold/Extrabold). `weight: "300 800"` range in localFont. Static files can be deleted. |
-| Typography — components | FilterSidebar + ProductQuickViewModal: all font sizes below 12px bumped (8/9→12, 10/11→13). MUTED color #888→#555 (contrast fix). Absolute px letter-spacing→em. #aaa/#bbb/#ccc grays darkened. |
-| ModelFinder — title | KineticText `clamp(14px,1.8vw,20px)` → `clamp(36px,5vw,72px)`. Header layout restructured: label+step dots on top row, title full-width below with gold fading rule. |
-| FilterSidebar — search | `useDebounce` hook added (320ms). Search input at top of FilterContent. `filters.search` wired to chips, activeCount, and all clear-all handlers. Calls `onChange({ search })` on debounce. |
-| ProductQuickViewModal | Rebuilt with 3-tab interface: Details / Fitment / OEM. Details shows card data instantly, enriches from fetch. Fitment: alternating-stripe table grouped by family in canonical order (Touring→Softail→etc), model+code+year columns. OEM: copyable pill grid, "Copy All" button. Tab badges show counts. Fetches from `/api/products/[slug]`. |
-| BrowseBackButton.jsx | New component. Reads `stinkin_browse_return` from sessionStorage (written by modal's "View Full Details"). Shows back button on PDP only when set. Clears key on navigate. |
-| API route — products/[slug] | New `app/api/products/[slug]/route.ts` wrapping `getProductBySlug`. Powers ProductQuickViewModal fetch. |
-| PDP SKU fix | `page.jsx` line 100: flipped `COALESCE(cp.internal_sku, cu.internal_sku)` → `COALESCE(cu.internal_sku, cp.internal_sku)` so taxonomy SKU wins over catalog_products SKU. |
-| catalog_oem_crossref schema | Added `product_id` FK column. Backfilled 20,836 rows via `sku` join. Deduped 1,898 duplicate rows. Added unique index on `(sku, oem_number)`. Dropped NOT NULL on `oem_manufacturer`. |
-| import_vtwin_fitment_partial.mjs | Major patch: OEM collection during dedup (skuToOem map). Removed `oem_numbers` from `catalog_unified` upsert. New step 9 writes OEM to `catalog_oem_crossref` (ON CONFLICT DO NOTHING) then rebuilds `oem_numbers[]` from crossref. Removed all delete-then-reinsert patterns — script now only fills gaps, never wipes. |
-| VTwin fitment import | Ran against new checkpoint (12,100 SKUs): 3,513 fitment rows inserted, 868 OEM rows to crossref. Coverage: 45.7% (15,371 with fitment + 2,946 universal). |
-| vtwin_scrape_targets_2.csv | Generated: 19,662 SKUs never scraped. Scraper restarted against this file. |
-| OEM arrays rebuilt | `UPDATE 52,707` VTwin products rebuilding `oem_numbers[]` from crossref. |
+Font system. FilterSidebar search. ProductQuickViewModal. BrowseBackButton. API route. catalog_oem_crossref schema. VTwin round 2 scraper.
 
 ## ✅ DONE JUNE 5 — FORTY-SECOND PASS
 
-| Area | What Was Done |
-|------|---------------|
-| Filtering system audit | 4-layer audit (browse.ts, FilterSidebar, fitment data, Typesense). 5 critical + 7 gaps + 2 minor identified. filter_roadmap.md built. |
-| browse.ts — is_universal fix | `OR cu.is_universal = true` added to modelCode, year, and family fallback conditions. Column is `is_universal` not `fits_all_models`. |
-| browse.ts — dash-suffix regex | Open-ended `\s*-\s*[A-Z][A-Z0-9 /]+$` replaced with finish-word-restricted pattern. Directional parts no longer collapse. |
-| vtwin_mark_universal.sql | Rebuilt from scratch. 2,328 VTwin products marked is_universal=true via category + name patterns. |
-| FilterSidebar — year chip | `filters.year` chip added. Family chip clear resets year. Both clear-all handlers include year: null. |
-| FilterSidebar — activeCount | Outer activeCount now includes family, model, year. Header badge correct. |
-| FilterSidebar — Engine Era | Section renamed "Era" → "Engine Era". Coverage hint added when fitment active. |
-| Model codes | 12 added to harley_models: FLTRCVO, FLHTKCVO, FLHTCVO, FLTRXCVO, FLHXCVO, XG, FLFBSANY/V/X, FLHCSANV, FLHTKS, FXDR. |
-| MODEL_ALIASES expanded | 5 new groups: FLHR, FLHX, FLSTF, FXSTB, FXDWG. All fired on first import. |
-| extract_fitment_from_names | PU 45.3%→49.2%, VTwin 36.3%→37.7%, WPS 38.7%→40.8% |
-| VTwin scraper partial import | 6,742 SKUs / 91,259 fitment rows / 26 new products / 550 universals. FXDR added. |
-| Typesense reindex | 90,536 docs, 0 errors. |
+Filtering audit + all critical fixes. browse.ts. FilterSidebar. 12 model codes. Reindex 90,536.
 
 ## ✅ DONE JUNE 5 — FORTY-FIRST PASS
 
-| Area | What Was Done |
-|------|---------------|
-| Homepage rebuilt | VideoHero → ModelFinder → ScrollVelocity → BrandRolodex. FloatingNav + EraCarousel removed. |
-| ModelFinder | Era → Year → Model Code, 3-step flow. Era image cards. Year slider locked to era range. Routes to /browse. |
-| Font system | Tanker (--font-tanker) replaces New Sailor + Bebas Neue. Bespoke Serif (--font-bespoke). Legacy aliases wired. |
-| FilterSidebar | Model Family section removed entirely. |
-| VariantSelector | Mode A fitment+color grouping. Fixes duplicate BLACK/CHROME rows. |
-| browse.ts | DISTINCT ON key upgraded to 3-tier: variant_group_id → name-based → u||id. |
-| Variant group merges | 8 master groups, 199 sub-groups collapsed. |
-| Typesense reindex | 90,510 docs, 0 errors (×2). |
+Homepage + ModelFinder. Font system locked. VariantSelector Mode A. 199 sub-groups merged.
 
 ## ✅ DONE JUNE 4 — FORTIETH PASS
 
-| Area | What Was Done |
-|------|---------------|
-| route.ts | Removed debug console.log from isAuthorized(). |
-| extract_fitment_from_names.mjs | Tier 2 Big Twin → Softail exclusion for year ranges ending ≤ 1984. |
-| FilterSidebar.jsx | Full redesign — chips, gold dots, auto-open, mobile footer. |
-| VTwin SKU duplicates | 14,407 bare-SKU dupes deactivated. Prefixed (VT-) rows canonical. |
-| import_vtwin_fitment_partial.mjs | fits_all_models, MODEL_ALIASES, SKU resolution, delete scope patches. |
-| VTwin fitment import | 185,234 rows on correct prefixed IDs. |
-| vtwin_scrape_targets.csv | 20,236 SKUs ready. Scraper started. |
-| OEM backfill schema fix | catalog_oem_crossref joins on sku. UPDATE 3,897 VTwin products. |
+VTwin SKU duplicates. import_vtwin_fitment_partial.mjs ×4. 185,234 fitment rows.
 
-## ✅ DONE JUNE 4 — THIRTY-NINTH PASS
+## ✅ DONE JUNE 4 — THIRTY-NINTH/EIGHTH PASS
 
-Fitment filter bug fixed. OEM cleanup. Typesense reindex 104,917 docs.
-
-## ✅ DONE JUNE 4 — THIRTY-EIGHTH PASS
-
-Admin inline PDP edit. API route. catalog_review_flags table. Next.js 15 params fix.
+Fitment filter. OEM. Admin inline edit. catalog_review_flags. Next.js 15 params.
 
 ## ✅ DONE JUNE 3 — THIRTY-SEVENTH PASS
 
-FlowingMenu. /models page rebuilt. mv_family_product_ranges mat view (9s→83ms). Font system. VTwin scraper finished.
+FlowingMenu. /models. mv_family_product_ranges mat view. Font system.
 
 ## 🔵 LOW PRIORITY / FUTURE
 
@@ -120,11 +98,12 @@ FlowingMenu. /models page rebuilt. mv_family_product_ranges mat view (9s→83ms)
 | Hard Drive book crossref | Same pattern as FatBook/OldBook — import when file available |
 | Admin flag batch resolver | Script to read catalog_review_flags WHERE resolved = false |
 | Harden admin auth | Replace ?token= URL param with session cookie |
-| PU 5,900 Handlebar & Controls no fitment | Worth investigating whether PU fitment scrape missed this category |
 | Size variant grouping | Valve guides, rocker shims, helmet pads, cam lock washers, mainshaft races |
 | /models in nav | Add Models link to main nav + home page Shop by Model tile |
 | Mobile layout pass on /models | FlowingMenu rows too tall on mobile |
-| display_subcategory UPDATE script | Extract into scripts/ingest/map_display_subcategory.sql |
 | Reindex automation | Wire npm run reindex as post-step in ingest scripts |
 | Typesense schema documentation | Create scripts/ingest/TYPESENSE_SCHEMA.md |
-| SKU display on PDP | Show clean internal_sku or branded part number instead of vendor SKU — defer until taxonomy finalized |
+| SKU display on PDP | Show clean internal_sku — defer until taxonomy finalized (now finalized) |
+| display_subcategory master script | Consolidate all mapping scripts into scripts/ingest/map_display_subcategory.sql |
+| Accessories & Misc subcategory improvement | 3,809 NULL — VTwin catch-all products; low ROI |
+| Tools & Chemicals coverage | 547 NULL — WPS specialty abbreviations; low ROI |

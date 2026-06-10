@@ -2,225 +2,169 @@
 
 ---
 
-# ——— FORTY-THIRD PASS (June 7, 2026) ———
+# ——— FORTY-FIFTH PASS (June 8, 2026) ———
 
-Session: Forty-Third Pass · June 7, 2026
+Session: Forty-Fifth Pass · June 8, 2026
 
 ## WHERE WE ARE
 
-Mixed frontend + data pipeline session. Font system fully overhauled (Barlow loaded, body uppercase removed, Bespoke Serif variable font). Browse UI gained product quick-view modal with fitment/OEM tabs and sidebar search. VTwin import pipeline patched to write OEM to canonical table. Scraper running against 19,662 remaining targets.
+display_subcategory taxonomy COMPLETE across all 20 categories. ~78,000 products mapped. Final coverage 87–97% for core categories. Hundreds of misclassified products relocated to correct display_categories throughout. Typesense reindexed with full subcategory data live.
 
-⚠️ Scraper still running — import + reindex + universal mark still pending.
-⚠️ Component files built this session need to be dropped into codebase — see CHASE_LIST files table.
+⚠️ CategoryBentoGrid + ModelCatalogClient + session 43 files still need to be dropped into codebase.
+⚠️ mat view refresh + universal mark still pending.
+⚠️ FLHRX + FLI model codes still need adding to harley_models.
 
 ## What Was Done This Session
 
-### 1. Font System Overhaul ✅
+### display_subcategory Taxonomy — All Remaining Categories ✅
 
-**globals.css:**
-- Body font changed: `var(--font-stencil)` (Share Tech Mono) → `var(--font-body, 'Barlow')` — monospace was the default for ALL body text
-- `text-transform: uppercase` **removed from body** — was forcing every character site-wide to caps. Single biggest readability fix.
-- Added `font-size: 15px`, `font-weight: 500`, `line-height: 1.55` to body
-- Added full type scale: `--text-2xs` (10px) through `--text-4xl` (56px)
-- Added weight vars: `--fw-normal/medium/semibold/bold`
-- Letter spacing switched to em-based (`--ls-label: 0.08em`)
-- Added utility classes: `.label`, `.font-body`, `.fw-bold`, `.text-lg`, etc.
+All scripts in `scripts/ingest/`. All BEGIN/COMMIT. Each pass included gap analysis + targeted cleanup.
 
-**layout.tsx:**
-- `Barlow` added via `next/font/google` (weights 400/500/600/700) as `--font-body` variable
-- Previously just a string `'Barlow', 'Barlow Condensed', sans-serif` — never actually loaded by Next.js
-- `--font-barlow` legacy alias wired to `--font-body`
-- Bespoke Serif switched from `BespokeSerif-Regular.ttf` → `BespokeSerif-Variable.ttf` with `weight: "300 800"`
+#### Handlebar & Controls — 9 subcategories, 95% mapped
+Cables & Lines (4,182) · Handlebars (2,586) · Risers & Clamps (863) · Levers & Controls (768) · Mirrors (678) · Grips (624) · Throttle & Accessories (461) · Switches & Wiring (134) · ~562 NULL
 
-**BespokeSerif-Variable.ttf:**
-- Covers wght 300–800: Light · Regular · Medium · Bold · Extrabold
-- Replaces all static weight files (Regular/Bold/Extrabold/Light can be deleted)
-- Usage: `font-family: var(--font-bespoke); font-weight: 700;` now just works
+Key: WPS uses "LW CABLE" for extended cables. "BURLY CNTRL KIT" = Burly Brand ape hanger cable kit. `%memory foam grip%` needed for WPS heated grip products.
 
-**Component typography fixes (FilterSidebar + ProductQuickViewModal):**
-- All font sizes below 12px bumped: 8/9→12px, 10/11→13px
-- `MUTED: "#888"` → `"#555"` (was failing 3:1 contrast on cream)
-- Washed-out grays `#aaa/#bbb/#ccc` → `#777/#888/#999`
-- Absolute px letter-spacing → em-based throughout
+#### Brakes — 8 subcategories, 94% mapped
+Brake Lines & Hoses (2,307) · Rotors & Drums (849) · Brake Pads & Shoes (839) · Calipers (610) · Brake Hardware (414) · Master Cylinders (315) · Brake Conversion Kits (14) · ~326 NULL
 
-### 2. ModelFinder — Title Size ✅
-`components/home/ModelFinder.jsx`:
-- KineticText fontSize: `clamp(14px,1.8vw,20px)` → `clamp(36px,5vw,72px)` — was 20px max, now 72px max
-- Header layout restructured: "STINKIN' SUPPLIES" label + step dots on top row; title gets full width below
-- Gold fading horizontal rule added under title
+Moves: PU "MISCELLANEOUS ELECTRICAL" (16 rows) moved to Electrical. Air cleaner backing plates moved to Carburetion & Fuel. Shifter levers moved to Foot Controls. "Econoline" and "Ebony" are WPS brake line brand names needing explicit patterns.
 
-### 3. FilterSidebar — Inline Search ✅
-`components/browse/FilterSidebar.jsx`:
-- `useDebounce(value, 320)` hook added
-- Search input rendered at top of FilterContent (hidden in collapsed mode)
-- Local `searchInput` state, debounced → `onChange({ search: value })`
-- Sync-back `useEffect`: resets input when `filters.search` cleared externally
-- `filters.search` added to: chips array (quoted label), activeCount, all clear-all handlers (FilterContent + mobile footer)
+#### Suspension — 8 subcategories, 88% mapped
+Fork Tubes & Internals (879) · Shocks & Springs (762) · Triple Trees & Stems (650) · Fork Lowers & Sliders (273) · Swingarms (225) · Fork Seals & Boots (212) · Lowering & Lift Kits (159) · ~438 NULL
 
-### 4. ProductQuickViewModal — Tabbed Rebuild ✅
-`components/browse/ProductQuickViewModal.jsx` — full rebuild with 3 tabs:
+Moves: Valve spring kits (Kibblewhite etc.) moved to Engine/Cams & Valvetrain. Spring fork fenders → Fenders & Body. Spotlamp kit → Lighting. Brake shackle bar → Brakes. "Dog bone" = lowering link.
 
-**Architecture:** Card data renders Details tab instantly (no loading). Fetch to `/api/products/[slug]` runs in background, enriches Details tab and populates Fitment/OEM tabs.
+#### Lighting — 8 subcategories, 95% mapped
+Auxiliary Lighting (968) · Turn Signals (719) · Bulbs (654) · Taillights (622) · Headlights (619) · License Plate Lighting (266) · Lighting Controls (172) · ~199 NULL
 
-**Details tab:** Brand, name, category tags, price, stock, SKU/MPN/UPC, description, weight/origin, H-D fitment + universal badges. All fields from `ProductDetail`.
+Key additions: `%spotlamp%` → Auxiliary Lighting (VTwin vintage spotlight products). License plate frames/holders → License Plate Lighting. Marker/indicator lamps → Auxiliary.
 
-**Fitment tab:** Compact alternating-stripe table. Grouped by family in canonical order (Touring→CVO→Softail→Dyna→Sportster→FXR→V-Rod→Street→Vintage). Family header rows (gold background). Model / Code / Years columns. Summary line shows count + family count.
+#### Wheels & Tires — 7 subcategories, 92% mapped
+Wheels (728) · Axles & Spacers (595) · Tires & Tubes (538) · Hubs & Spokes (385) · Bearings & Seals (238) · Valves & Balancing (140) · ~236 NULL
 
-**OEM tab:** Pill grid of all OEM numbers. Click any pill to copy. "Copy All" button copies comma-separated list. Empty states for no data.
+Key: Spoke sets were missing — only had `%wheel spoke%`, needed `%spoke set%` and `% spoke %`. WPS "FR /RR" prefix = front/rear complete wheel assemblies. Fork neck bearing moved to Suspension/Triple Trees.
 
-**Tab badges:** Show count once fetch resolves (e.g. `Fitment 42`). Spinner in tab label while loading.
+#### Foot Controls — 9 subcategories, 93% mapped
+Footpegs (893) · Shifters (575) · Floorboards (519) · Kickstands (278) · Highway Bars & Pegs (175) · Forward Controls (132) · Brake Pedals (122) · Rearsets & Mid Controls (93) · ~225 NULL
 
-**"View Full Details →"** writes `window.location.href` to `sessionStorage['stinkin_browse_return']` before navigating to PDP.
+Moves: Wyatt Gatling exhaust → Exhaust. Luggage rack → Luggage & Racks. Solo seat → Seating.
 
-**Wiring in browse page:**
-```jsx
-const [quickView, setQuickView] = useState(null);
-// on card: onClick={() => setQuickView(product)}
-{quickView && <ProductQuickViewModal product={quickView} onClose={() => setQuickView(null)} />}
-```
+#### Exhaust — 4 subcategories, 93% mapped
+Exhaust Systems (720) · Exhaust Parts (650) · Mufflers (648) · Headers & Pipes (561) · ~192 NULL
 
-### 5. BrowseBackButton.jsx ✅
-New `components/pdp/BrowseBackButton.jsx`:
-- Reads `stinkin_browse_return` from sessionStorage on mount
-- Only renders when key is present (user arrived from browse modal)
-- Clears key on navigate to avoid stale back links
-- Matches cream/gold palette
+Moves: Exhaust valves → Engine/Heads & Valves. Brake crossover → Brakes. Grip sets → Handlebar & Controls. VTwin "Shocker Pipes", "Lake Side Pipe", "Holeshot Exhaust" = complete exhaust systems.
 
-### 6. API Route — `/api/products/[slug]` ✅
-New `app/api/products/[slug]/route.ts`:
-- Thin wrapper around `getProductBySlug(slug)` from browse.ts
-- Powers the ProductQuickViewModal fetch
-- Returns full `ProductDetail` including fitment array
+#### Frame & Hardware — 5 subcategories, 87% mapped
+Hardware & Fasteners (1,888) · Frame Parts (335) · Kickstands (152) · Body Panels (63) · Protection (53) · ~375 NULL
 
-### 7. PDP SKU Fix ✅
-`app/browse/[slug]/page.jsx` line 100:
-- `COALESCE(cp.internal_sku, cu.internal_sku)` → `COALESCE(cu.internal_sku, cp.internal_sku)`
-- `catalog_products.internal_sku` was winning over `catalog_unified.internal_sku` (taxonomy SKU)
-- Now taxonomy SKU wins. `catalog_products` value only used as fallback.
+Moves: PU "MISCELLANEOUS ENGINE PARTS" (22 rows) moved to Engine. Rolling chassis/bike kits → Frame Parts. Shifter shaft → Transmission.
 
-### 8. catalog_oem_crossref Schema Fixes ✅
-```sql
-ALTER TABLE catalog_oem_crossref ADD COLUMN product_id integer REFERENCES catalog_unified(id);
--- Backfilled 20,836 rows via sku join (7,553 FatBook/OldBook rows remain NULL — ok)
-DELETE FROM catalog_oem_crossref WHERE id NOT IN (SELECT MIN(id) FROM catalog_oem_crossref GROUP BY sku, oem_number);
--- Removed 1,898 duplicates
-CREATE UNIQUE INDEX catalog_oem_crossref_sku_oem_uniq ON catalog_oem_crossref (sku, oem_number);
-ALTER TABLE catalog_oem_crossref ALTER COLUMN oem_manufacturer DROP NOT NULL;
-```
+#### Seating — 4 subcategories, 95% mapped
+Seats (3,186) · Seat Hardware (248) · Backrests (243) · Seat Pads & Covers (71) · ~199 NULL
 
-### 9. import_vtwin_fitment_partial.mjs — OEM Pipeline Fix ✅
-Key problem: OEM data was writing directly to `catalog_unified.oem_numbers[]`, bypassing `catalog_oem_crossref` entirely.
+#### Luggage & Racks — 5 subcategories, 93% mapped
+Sissy Bars (425) · Saddlebags (314) · Bags & Packs (186) · Luggage Racks (160) · Luggage Parts (25) · ~80 NULL
 
-**Patches applied:**
-- Dedup pass now builds `skuToOem` map (bare_sku → oem_number)
-- `oem_numbers` column removed from `catalog_unified` upsert
-- New step 9: batch INSERT into `catalog_oem_crossref` (`source = 'VTWIN_SCRAPE'`, `ON CONFLICT DO NOTHING`)
-- New step 9b: rebuild `oem_numbers[]` on `catalog_unified` from `catalog_oem_crossref` for affected products
-- **All delete-then-reinsert patterns removed** — script now only fills gaps, never wipes existing data
-- Summary now reports OEM rows inserted
-- Next steps simplified to: mark universals → refresh mat view → reindex
+#### Instrumentation — 3 subcategories, 97% mapped
+Speedometers (665) · Gauges (333) · Dash & Trim (108) · ~40 NULL
 
-### 10. VTwin Fitment Import ✅
-Ran against new checkpoint (12,100 SKUs):
-- 3,513 new fitment rows (rest were already present — ON CONFLICT DO NOTHING working correctly)
-- 868 new OEM rows into catalog_oem_crossref
-- oem_numbers[] rebuilt for 3,863 products
-- Coverage: **45.7%** (15,371 with fitment + 2,946 universal out of 38,353 active)
+#### Security & Covers — 3 subcategories, 93% mapped
+Security (107) · Bike Covers (57) · Shelters & Storage (13) · ~16 NULL
 
-### 11. VTwin Scraper — Round 2 ✅
-Generated `vtwin_scrape_targets_2.csv` — 19,662 SKUs never scraped:
-```sql
-\copy (SELECT REPLACE(cu.sku, 'VT-', '') AS sku FROM catalog_unified cu
-LEFT JOIN vtwin_scrape_data vsd ON (cu.sku = 'VT-' || vsd.sku OR cu.sku = vsd.sku)
-WHERE cu.source_vendor = 'VTWIN' AND cu.is_active = true AND cu.is_universal = false
-AND vsd.sku IS NULL AND NOT EXISTS (SELECT 1 FROM catalog_fitment_v2 cfv WHERE cfv.product_id = cu.id))
-TO '.../vtwin_scrape_targets_2.csv' CSV HEADER
-```
-Scraper restarted: `source venv/bin/activate && python scrape_vtwin_fitment.py --input vtwin_scrape_targets_2.csv`
+#### Tools & Chemicals — 3 subcategories, 71% mapped
+Tools (772) · Chemicals & Lubricants (527) · Cleaners & Detailing (63) · ~547 NULL
+
+Moves: Transmission gear kit, electrical items, bike covers moved to correct categories. WPS specialty items (octane booster, diesel treatment) caught via product-specific patterns.
+
+#### Riding Gear & Apparel — 6 subcategories, 65% mapped
+Helmets (1,452) · Gloves (585) · Jackets & Vests (186) · Pants & Base Layers (85) · Footwear (74) · Accessories (59) · ~1,305 NULL
+
+Moves: Switchblade lowers → Fenders & Body. Phone/handlebar mounts → Accessories & Misc. Handguards → Handlebar & Controls. Side plates → Fenders & Body. High NULL rate expected — WPS uses heavy abbreviations.
+
+#### Accessories & Misc — 5 subcategories, 6% mapped
+Books & Manuals (155) · Trailer & Towing (29) · Decals & Emblems (29) · Tie-Downs & Transport (20) · Cooling Systems (14) · ~3,809 NULL
+
+Moves from Accessories & Misc to correct categories: Primary covers → Transmission. Belt/chain drive kits → Transmission. Shifter levers → Foot Controls. Axles → Wheels & Tires. Motor mounts → Engine. Valve kits → Engine. ABS sensors → Brakes. Brake drums → Brakes. Grip sets → Handlebar & Controls. Screws/bolts → Frame & Hardware. (~1,274 products correctly relocated)
+
+### Final Coverage Summary
+| Category | Total | Mapped | % |
+|----------|-------|--------|---|
+| Instrumentation | 1,146 | 1,106 | 96.5% |
+| Fenders & Body | 3,908 | 3,748 | 95.9% |
+| Carburetion & Fuel | 5,261 | 5,041 | 95.8% |
+| Lighting | 4,219 | 4,020 | 95.3% |
+| Seating | 3,947 | 3,748 | 95.0% |
+| Handlebar & Controls | 11,025 | 10,463 | 94.9% |
+| Transmission & Clutch | 7,738 | 7,334 | 94.8% |
+| Brakes | 5,763 | 5,437 | 94.3% |
+| Luggage & Racks | 1,190 | 1,110 | 93.3% |
+| Exhaust | 2,771 | 2,579 | 93.1% |
+| Foot Controls | 3,152 | 2,927 | 92.9% |
+| Security & Covers | 222 | 206 | 92.8% |
+| Wheels & Tires | 3,035 | 2,799 | 92.2% |
+| Electrical | 6,674 | 6,146 | 92.1% |
+| Engine | 13,060 | 11,911 | 91.2% |
+| Suspension | 3,603 | 3,165 | 87.8% |
+| Frame & Hardware | 2,994 | 2,619 | 87.5% |
+| Tools & Chemicals | 1,909 | 1,362 | 71.3% |
+| Riding Gear & Apparel | 3,746 | 2,441 | 65.2% |
+| Accessories & Misc | 4,056 | 247 | 6.1% |
 
 ## DB State After This Session
 
 | Table | Change |
 |-------|--------|
-| catalog_oem_crossref | Added `product_id` FK. 20,836 backfilled. 1,898 dupes removed. Unique index on (sku, oem_number). oem_manufacturer nullable. |
-| catalog_unified | 52,707 VTwin oem_numbers[] rebuilt from catalog_oem_crossref. 13 new VTwin products added. |
-| catalog_fitment_v2 | +3,513 VTwin rows from new checkpoint import. |
+| catalog_unified | display_subcategory fully mapped across all 20 categories. ~2,000+ misclassified products moved to correct display_categories during cleanup passes. |
 
 ## What Needs to Happen Next
 
-1. Wait for scraper to finish against vtwin_scrape_targets_2.csv
-2. Export checkpoint → run import → mark universals → refresh mat view → reindex
-3. Drop session 43 component files into codebase (see CHASE_LIST)
-4. Wire ProductQuickViewModal into browse page product cards
-5. Wire BrowseBackButton into PDP
-6. Add ADMIN_SECRET to Vercel
+1. Drop CategoryBentoGrid + ModelCatalogClient + session 43 files into codebase
+2. Run mat view refresh + universal mark (see CHASE_LIST)
+3. Add FLHRX + FLI model codes to harley_models
+4. Add ADMIN_SECRET to Vercel
+5. Fix Framer Motion transparent animation errors
+6. Investigate browse query slowness Engine + Dyna (3.5–7.6s)
+7. Wire ProductQuickViewModal + BrowseBackButton into browse/PDP pages
+
+---
+
+# ——— FORTY-FOURTH PASS (June 8, 2026) ———
+
+CategoryBentoGrid built. ModelCatalogClient rebuilt. VTwin scraper round 2 imported (48% coverage). display_subcategory mapped for Engine, Electrical, Carburetion & Fuel, Fenders & Body, Transmission & Clutch. VACUUM ANALYZE run. placeholder.jpg created.
+
+---
+
+# ——— FORTY-THIRD PASS (June 7, 2026) ———
+
+Font system overhaul. FilterSidebar inline search. ProductQuickViewModal 3-tab rebuild. BrowseBackButton. API route. PDP SKU fix. catalog_oem_crossref schema. VTwin scraper round 2 started.
 
 ---
 
 # ——— FORTY-SECOND PASS (June 5, 2026) ———
 
-Session: Forty-Second Pass · June 5, 2026
-
-## WHERE WE ARE
-
-Full filtering system audit + fixes. 4-layer review of browse.ts, FilterSidebar, fitment data, Typesense. All critical issues resolved. VTwin scraper partial import run. filter_roadmap.md created.
-
-## What Was Done This Session
-
-### 1. Filtering System Audit ✅
-4-layer audit. 5 critical bugs, 7 gaps, 2 minor. filter_roadmap.md built.
-
-### 2. browse.ts — is_universal Fix ✅
-`OR cu.is_universal = true` added to modelCode, year, and family fallback WHERE conditions. Column is `is_universal` not `fits_all_models`.
-
-### 3. browse.ts — Dash-Suffix Regex ✅
-Open-ended regex replaced with finish-word-restricted pattern. Directional parts no longer collapse.
-
-### 4. vtwin_mark_universal.sql ✅
-Rebuilt. 2,328 VTwin products marked via category + name patterns.
-
-### 5. FilterSidebar Fixes ✅
-Year chip added. Family chip clear resets year. Outer activeCount fixed. "Engine Era" rename. Coverage hint added.
-
-### 6. Model Codes + MODEL_ALIASES ✅
-12 model codes added. 5 new alias groups: FLHR, FLHX, FLSTF, FXSTB, FXDWG.
-
-### 7. extract_fitment_from_names ✅
-PU 45.3%→49.2%, VTwin 36.3%→37.7%, WPS 38.7%→40.8%
-
-### 8. VTwin Scraper Partial Import ✅
-6,742 SKUs / 91,259 fitment rows / 550 universals.
-
-### 9. Typesense Reindex ✅
-90,536 docs, 0 errors.
+Filtering audit. browse.ts fixes. FilterSidebar chips. Engine Era. 12 model codes + 5 aliases. VTwin import. Reindex 90,536.
 
 ---
 
 # ——— FORTY-FIRST PASS (June 5, 2026) ———
 
-Homepage rebuilt around ModelFinder. Font system locked in. Variant display overhauled. 199 variant sub-groups merged. Typesense reindexed twice.
+Homepage rebuilt. ModelFinder. Font system. VariantSelector Mode A. 199 sub-groups merged. Reindexed ×2.
 
 ---
 
 # ——— FORTIETH PASS (June 4, 2026) ———
 
-VTwin SKU duplicate cleanup. import_vtwin_fitment_partial.mjs patched (×4). 185,234 fitment rows. vtwin_scrape_targets.csv generated.
+VTwin SKU duplicates. import_vtwin_fitment_partial.mjs patched ×4. 185,234 fitment rows.
 
 ---
 
-# ——— THIRTY-NINTH PASS (June 4, 2026) ———
+# ——— THIRTY-NINTH / THIRTY-EIGHTH PASS (June 4, 2026) ———
 
-Fitment filter bug fixed. OEM cleanup. Typesense reindex 104,917 docs.
-
----
-
-# ——— THIRTY-EIGHTH PASS (June 4, 2026) ———
-
-Admin inline PDP edit. API route. catalog_review_flags. Next.js 15 params fix.
+Fitment filter fix. OEM cleanup. Admin inline edit. catalog_review_flags. Next.js 15 params fix.
 
 ---
 
 # ——— THIRTY-SEVENTH PASS (June 3, 2026) ———
 
-FlowingMenu. /models page. mv_family_product_ranges mat view (9s→83ms). Font system. VTwin scraper finished.
-
+FlowingMenu. /models page. mv_family_product_ranges mat view. Font system. VTwin scraper finished.

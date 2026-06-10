@@ -360,33 +360,10 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
     // year/modelCode-only path — no family condition needed
   }
 
-  // ── Category filtering ─────────────────────────────────────────────────────
-  // Prefer display_category (clean unified taxonomy) over raw category.
-  // Legacy dbCategories param still supported for backwards compat — maps to
-  // raw category column so existing links don't break during transition.
-  if (displayCategory) {
-    conditions.push(`cu.display_category = $${p++}`);
-    params.push(displayCategory);
-  } else if (dbCategories && dbCategories.length > 0) {
-    if (dbCategories.length === 1) {
-      conditions.push(`cu.category = $${p++}`);
-      params.push(dbCategories[0]);
-    } else {
-      conditions.push(`cu.category = ANY($${p++}::text[])`);
-      params.push(dbCategories);
-    }
-  } else if (category) {
-    conditions.push(`cu.category = $${p++}`);
-    params.push(category);
-  }
-
-  if (displaySubcategory) {
-    conditions.push(`cu.display_subcategory = $${p++}`);
-    params.push(displaySubcategory);
-  } else if (subcategory) {
-    conditions.push(`cu.display_subcategory = $${p++}`);
-    params.push(subcategory);
-  }
+  // ── Non-category filters — must come BEFORE display_category/subcategory ────
+  // brand, inStock, search, and price are added here so that catFacetConditions
+  // (snapshotted below) captures them. If they were added after the snapshot,
+  // the category facet query would not respect active brand/price/etc. filters.
 
   if (brand) {
     conditions.push(`cu.brand ILIKE $${p++}`);
@@ -395,6 +372,7 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
   if (inStock) {
     conditions.push(`cu.in_stock = true`);
   }
+
   // ── Text search via Typesense ─────────────────────────────────
   // When `search` is present, hit Typesense first to get relevance-ranked IDs,
   // then filter postgres to those IDs. Falls back to ILIKE if Typesense fails.
@@ -427,8 +405,52 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
     params.push(maxPrice);
   }
 
+  // ── catFacetConditions snapshot ────────────────────────────────────────────
+  // Captured BEFORE display_category and display_subcategory.
+  // Used by the category facet query so it returns all available categories
+  // (not just the one currently selected) — i.e. disjunctive faceting.
+  const catFacetConditions = [...conditions];
+  const catFacetParams    = [...params];
+
+  // ── Category filtering ─────────────────────────────────────────────────────
+  // Prefer display_category (clean unified taxonomy) over raw category.
+  // Legacy dbCategories param still supported for backwards compat.
+  if (displayCategory) {
+    conditions.push(`cu.display_category = $${p++}`);
+    params.push(displayCategory);
+  } else if (dbCategories && dbCategories.length > 0) {
+    if (dbCategories.length === 1) {
+      conditions.push(`cu.category = $${p++}`);
+      params.push(dbCategories[0]);
+    } else {
+      conditions.push(`cu.category = ANY($${p++}::text[])`);
+      params.push(dbCategories);
+    }
+  } else if (category) {
+    conditions.push(`cu.category = $${p++}`);
+    params.push(category);
+  }
+
+  // ── subcatFacetConditions snapshot ────────────────────────────────────────
+  // Captured AFTER display_category but BEFORE display_subcategory.
+  // Used by the subcategory facet query so it returns all subcategories within
+  // the selected category (not just the one currently selected).
+  const subcatFacetConditions = [...conditions];
+  const subcatFacetParams     = [...params];
+
+  if (displaySubcategory) {
+    conditions.push(`cu.display_subcategory = $${p++}`);
+    params.push(displaySubcategory);
+  } else if (subcategory) {
+    conditions.push(`cu.display_subcategory = $${p++}`);
+    params.push(subcategory);
+  }
+
   const where =
     conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  // catFacetConditions always has at least cu.is_active = true, so these are never empty.
+  const catFacetWhere    = `WHERE ${catFacetConditions.join(" AND ")}`;
+  const subcatFacetWhere = `WHERE ${subcatFacetConditions.join(" AND ")}`;
 
   const sortMap: Record<string, string> = {
     relevance:  "d.in_stock DESC, d.name ASC",
@@ -525,15 +547,38 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
 
   const facetBase = `FROM catalog_unified cu ${fitmentJoin} ${where}`;
 
+  // GROUP_KEY_SQL must be byte-for-byte identical to the group_key CASE expression
+  // inside dataQuery's DISTINCT ON — otherwise COUNT(DISTINCT group_key) diverges
+  // from the number of rows actually returned, producing phantom extra pages.
+  const GROUP_KEY_SQL = `
+    CASE
+      WHEN cu.variant_group_id IS NOT NULL
+        THEN cu.variant_group_id::text
+      ELSE
+        cu.brand || '||' || TRIM(regexp_replace(regexp_replace(regexp_replace(
+          cu.name,
+          '\\s*\\([A-Z][A-Z0-9 /\\-]+\\)\\s*$', '', 'i'),
+          '\\s*-\\s*[A-Z][A-Z0-9 /]+$', '', 'i'),
+          '\\s+(BLACK|CHROME|SILVER|GOLD|RED|BLUE|GREEN|BROWN|PINK|WHITE|NATURAL|POLISHED|WRINKLE|GLOSS|MATTE|SATIN)\\s*$',
+          '', 'i'))
+    END`;
+
   const [dataRes, countRes, catRes, brandRes, priceRes, subCatRes] = await Promise.all([
     pool.query(dataQuery, params),
+    // Count uses the same group_key expression as DISTINCT ON in dataQuery.
     pool.query(
-      `SELECT COUNT(DISTINCT COALESCE(cu.variant_group_id::text, 'u' || cu.id::text)) AS total FROM catalog_unified cu ${fitmentJoin} ${where}`,
+      `SELECT COUNT(DISTINCT ${GROUP_KEY_SQL}) AS total
+       FROM catalog_unified cu ${fitmentJoin} ${where}`,
       facetParams
     ),
+    // catFacetWhere omits display_category + display_subcategory →
+    // returns all 20 categories with counts for current family/brand/etc. filters.
     pool.query(
-      `SELECT cu.display_category AS name, COUNT(DISTINCT cu.id) AS count ${facetBase} ${where ? "AND" : "WHERE"} cu.display_category IS NOT NULL GROUP BY cu.display_category ORDER BY count DESC LIMIT 30`,
-      facetParams
+      `SELECT cu.display_category AS name, COUNT(DISTINCT cu.id) AS count
+       FROM catalog_unified cu ${fitmentJoin} ${catFacetWhere}
+       AND cu.display_category IS NOT NULL
+       GROUP BY cu.display_category ORDER BY count DESC LIMIT 30`,
+      catFacetParams
     ),
     pool.query(
       `SELECT cu.brand AS name, COUNT(DISTINCT cu.id) AS count ${facetBase} GROUP BY cu.brand ORDER BY count DESC LIMIT 30`,
@@ -543,9 +588,14 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
       `SELECT MIN(cu.computed_price) AS min, MAX(cu.computed_price) AS max ${facetBase}`,
       facetParams
     ),
+    // subcatFacetWhere includes display_category but omits display_subcategory →
+    // returns all subcategories within the selected category.
     pool.query(
-      `SELECT cu.display_subcategory AS name, COUNT(DISTINCT cu.id) AS count FROM catalog_unified cu ${fitmentJoin} ${where ? where + " AND cu.display_subcategory IS NOT NULL" : "WHERE cu.display_subcategory IS NOT NULL"} GROUP BY cu.display_subcategory ORDER BY count DESC LIMIT 30`,
-      facetParams
+      `SELECT cu.display_subcategory AS name, COUNT(DISTINCT cu.id) AS count
+       FROM catalog_unified cu ${fitmentJoin} ${subcatFacetWhere}
+       AND cu.display_subcategory IS NOT NULL
+       GROUP BY cu.display_subcategory ORDER BY count DESC LIMIT 30`,
+      subcatFacetParams
     ),
   ]);
 

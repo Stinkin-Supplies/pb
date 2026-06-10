@@ -1,7 +1,7 @@
 # Stinkin' Supplies — Master Reference
-**Last Updated:** June 5, 2026 (Forty-Second Pass)
+**Last Updated:** June 8, 2026 (Forty-Fifth Pass)
 **Database:** Hetzner Postgres — stinkin_catalog
-**Status:** Catalog rebuilt ✅ | Fitment rebuilt ✅ | Search indexed ✅ | Homepage rebuilt ✅ | Font system locked ✅ | ModelFinder built ✅ | FilterSidebar updated ✅ | VariantSelector fitment+color mode ✅ | Variant groups merged ✅ | browse.ts name-grouping ✅ | VTwin SKU dupes resolved ✅ | Filtering system audit complete ✅ | MODEL_ALIASES expanded ✅ | VTwin scraper partial import ✅
+**Status:** Catalog rebuilt ✅ | Fitment rebuilt ✅ | Search indexed ✅ | Homepage rebuilt ✅ | Font system locked ✅ | ModelFinder built ✅ | FilterSidebar updated ✅ | VariantSelector fitment+color mode ✅ | Variant groups merged ✅ | browse.ts name-grouping ✅ | VTwin SKU dupes resolved ✅ | Filtering system audit complete ✅ | MODEL_ALIASES expanded ✅ | VTwin scraper round 2 complete ✅ | CategoryBentoGrid built ✅ | display_subcategory taxonomy COMPLETE ✅
 
 ---
 
@@ -9,7 +9,7 @@
 
 | Metric | Value | Status |
 |--------|-------|--------|
-| catalog_unified (active) | **90,536** | ✅ PU 36,396 / WPS 15,844 / VTwin 38,296 |
+| catalog_unified (active) | **~91,000** | ✅ PU 36,396+ / WPS 15,844+ / VTwin 38,365+ (misclassification cleanup added products) |
 | catalog_fitment_v2 | ~3,800,000 rows | ✅ |
 | catalog_oem_crossref | ~65,000+ rows | ✅ |
 | catalog_variant_groups | 7,556 | ✅ 8 new master groups added session 41 |
@@ -18,16 +18,16 @@
 | harley_model_years | ~2,070 rows | ✅ |
 | harley_models | ~360 rows | ✅ |
 | mv_family_product_ranges | 81,332 rows | ✅ Auto-refreshes in index_unified.js |
-| Typesense | **90,536 docs** | ✅ Current |
+| Typesense | **90,605 docs** | ✅ Current |
 
-### Fitment Coverage (June 5 — Session 42)
+### Fitment Coverage (June 8 — Session 44)
 | Vendor | Total Active | With Fitment | Coverage |
 |--------|-------------|--------------|----------|
 | PU | 36,396 | 17,918 | 49.2% |
-| VTwin | 38,296 | 14,797 | 38.6% |
+| VTwin | 38,365 | 15,480 | 48.0% |
 | WPS | 15,844 | 6,463 | 40.8% |
 
-⚠️ VTwin scraper import is partial (6,742/20,236 SKUs). Coverage will increase after full re-run.
+✅ VTwin scraper round 2 complete (22,583 rows imported). Coverage ceiling ~50% — remaining products are universal/generic with no fitment data.
 
 ---
 
@@ -60,7 +60,7 @@ Vercel env: CATALOG_DATABASE_URL
 | `--font-sailor` | → alias for --font-tanker | Legacy compat |
 | `--font-caesar` | → alias for --font-bespoke | Legacy compat |
 
-Files: `public/fonts/Tanker-Regular.ttf` + `public/fonts/BespokeSerif-Regular.ttf`
+Files: `public/fonts/Tanker-Regular.ttf` + `public/fonts/BespokeSerif-Variable.ttf` (variable wght 300–800, replaces BespokeSerif-Regular.ttf)
 Bebas Neue — removed. No longer used.
 
 ---
@@ -251,8 +251,44 @@ API: `app/api/admin/products/[id]/route.ts`
 
 ## CATEGORY TAXONOMY
 
-20 Display Categories:
-Engine · Exhaust · Transmission & Clutch · Handlebar & Controls · Suspension · Brakes · Foot Controls · Lighting · Electrical · Seating · Carburetion & Fuel · Wheels & Tires · Fenders & Body · Frame & Hardware · Instrumentation · Luggage & Racks · Security & Covers · Tools & Chemicals · Riding Gear & Apparel · Accessories & Misc
+21 Display Categories (confirmed June 8 from DB):
+Accessories & Misc · Brakes · Carburetion & Fuel · Electrical · Engine · Exhaust · Fenders & Body · Foot Controls · Frame & Hardware · Handlebar & Controls · Instrumentation · Lighting · Luggage & Racks · Riding Gear & Apparel · Seating · Security & Covers · Suspension · Tools & Chemicals · Transmission & Clutch · Wheels & Tires
+
+CategoryBentoGrid excludes: Riding Gear & Apparel + Tools & Chemicals (18 tiles shown)
+
+### display_subcategory Status — ALL CATEGORIES COMPLETE ✅
+
+| Category | Coverage |
+|----------|---------|
+| Instrumentation | 96.5% |
+| Fenders & Body | 95.9% |
+| Carburetion & Fuel | 95.8% |
+| Lighting | 95.3% |
+| Seating | 95.0% |
+| Handlebar & Controls | 94.9% |
+| Transmission & Clutch | 94.8% |
+| Brakes | 94.3% |
+| Luggage & Racks | 93.3% |
+| Exhaust | 93.1% |
+| Foot Controls | 92.9% |
+| Security & Covers | 92.8% |
+| Wheels & Tires | 92.2% |
+| Electrical | 92.1% |
+| Engine | 91.2% |
+| Suspension | 87.8% |
+| Frame & Hardware | 87.5% |
+| Tools & Chemicals | 71.3% |
+| Riding Gear & Apparel | 65.2% |
+| Accessories & Misc | 6.1% (catch-all) |
+
+See filter_roadmap.md Phase 5 for full subcategory lists per category.
+
+### Category Reorganizations (Session 44)
+- Gas Tanks & Caps (was Carburetion & Fuel) → **Fenders & Body** (Gas Tanks + Gas Caps & Petcocks)
+- Oil System (was Carburetion & Fuel) → **Transmission & Clutch** (Oil System subcategory)
+- Alternators/ignition/starters → moved from Engine → **Electrical**
+- ABS sensors → moved from Engine/Electrical → **Brakes**
+- Wheel bearings → moved from Transmission → **Wheels & Tires**
 
 ---
 
@@ -387,4 +423,4 @@ GROUP BY cvg.display_name, cvg.family_key, cvg.id ORDER BY cvg.display_name;
 
 ---
 
-*Master Reference — Last update: June 5, 2026 · Forty-Second Pass (Filtering system audit + full Phase 1–3 execution: browse.ts is_universal fix + regex fix, FilterSidebar year chip + activeCount + Engine Era, vtwin_mark_universal 2,328 rows, 12 model codes added, MODEL_ALIASES 5 new groups, extract_fitment_from_names, VTwin scraper partial import 91,259 rows)*
+*Master Reference — Last update: June 8, 2026 · Forty-Fifth Pass (display_subcategory taxonomy COMPLETE across all 20 categories, ~78,000 products mapped 87–97% coverage, ~2,000 misclassified products relocated, subcategory facets live in Typesense)*

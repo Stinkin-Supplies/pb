@@ -17,7 +17,7 @@
  *   onSelect {fn}       controlled: receives { era, year, model, url }
  */
 
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ERAS } from './eras';
 
@@ -98,27 +98,54 @@ function getLetterStyle(w, hot) {
 
 function KineticText({ text, fontSize = 'clamp(16px,2vw,22px)', letterSpacing = '0.06em' }) {
   const [hov, setHov] = useState(null);
+
+  // Build word groups preserving each character's global index so the
+  // hover-distance math still works across the full text.
+  // Space tokens become null (gaps are handled by columnGap on the container).
+  const chars = [...text];
+  const words = [];
+  let buf = [];
+  chars.forEach((ch, gi) => {
+    if (ch === ' ') {
+      if (buf.length) { words.push(buf); buf = []; }
+      words.push(null); // null = word separator (rendered as columnGap gap)
+    } else {
+      buf.push({ ch, gi });
+    }
+  });
+  if (buf.length) words.push(buf);
+
   return (
     <span aria-hidden="true" style={{
-      display:'inline-flex', gap:0, fontFamily:SAILOR, fontSize,
-      textTransform:'uppercase', letterSpacing, lineHeight:1, userSelect:'none',
+      // Outer container: flex row that wraps WHOLE WORDS, not letters
+      display:'flex', flexWrap:'wrap', justifyContent:'center', alignItems:'flex-end',
+      columnGap:'0.22em',  // space between words
+      rowGap:0,
+      fontFamily:SAILOR, fontSize,
+      textTransform:'uppercase', lineHeight:1, userSelect:'none',
     }}>
-      {text.split('').map((char, i) => {
-        const w   = getWeight(i, hov);
-        const hot = hov !== null && Math.abs(i - hov) <= SPREAD;
-        const { color, textShadow } = getLetterStyle(w, hot);
+      {words.map((word, wi) => {
+        // Space tokens: skip — columnGap handles visual spacing
+        if (word === null) return null;
         return (
-          <span key={i}
-            onMouseEnter={() => setHov(i)}
-            onMouseLeave={() => setHov(null)}
-            style={{
-              display:'inline-block',
-              whiteSpace: char === ' ' ? 'pre' : 'normal',
-              fontWeight: w, color, textShadow,
-              transition: 'font-weight 0.1s ease, color 0.1s ease, text-shadow 0.1s ease',
-            }}
-          >
-            {char === ' ' ? '\u00A0' : char}
+          // Word wrapper: inline-flex + nowrap keeps all letters of a word together
+          <span key={wi} style={{ display:'inline-flex', letterSpacing }}>
+            {word.map(({ ch, gi }) => {
+              const w   = getWeight(gi, hov);
+              const hot = hov !== null && Math.abs(gi - hov) <= SPREAD;
+              const { color, textShadow } = getLetterStyle(w, hot);
+              return (
+                <span key={gi}
+                  onMouseEnter={() => setHov(gi)}
+                  onMouseLeave={() => setHov(null)}
+                  style={{
+                    display:'inline-block',
+                    fontWeight: w, color, textShadow,
+                    transition:'font-weight 0.1s ease, color 0.1s ease, text-shadow 0.1s ease',
+                  }}
+                >{ch}</span>
+              );
+            })}
           </span>
         );
       })}
@@ -268,78 +295,15 @@ function RivetRow({ item, selected, onClick }) {
 export default function ModelFinder({ compact = false, onSelect }) {
   const router = useRouter();
 
-  const [step,     setStep]     = useState(1);
-  const [era,      setEra]      = useState(null);   // full ERAS object
-  const [year,     setYear]     = useState(null);
-  const [models,   setModels]   = useState([]);
-  const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState(false);
-  const [selected, setSelected] = useState(null);
+  const [era, setEra] = useState(null);   // tracks selected tile for highlight
 
-  // Derived year range from selected era
-  const { min: yearMin, max: yearMax } = era ? getEraYears(era.slug) : { min: 1930, max: new Date().getFullYear() };
-  const currentYear = year ?? yearMax;
-  const fillPct = Math.round(((currentYear - yearMin) / (yearMax - yearMin)) * 100);
-  const ticks = getTicks(yearMin, yearMax);
-
-  const stepYear = delta =>
-    setYear(p => Math.min(yearMax, Math.max(yearMin, (p ?? yearMax) + delta)));
-
-  // Pick era → init year to era's most recent year → step 2
+  // Pick era → navigate directly to browse filtered by that era.
+  // No year slider, no model-code step — user refines on the browse page.
   const pickEra = (e) => {
-    setEra(e);
-    const { max } = getEraYears(e.slug);
-    setYear(max);
-    setStep(2);
-  };
-
-  // Fetch models for selected era + year → step 3
-  const goToModels = useCallback(async (yr) => {
-    setLoading(true); setError(false); setModels([]); setSelected(null);
-    setStep(3);
-    try {
-      const res  = await fetch(`/api/models/search?q=${yr}`);
-      const data = await res.json();
-      // Filter to this era's results only
-      // The API returns all models for the year; we filter by era slug match
-      // (catchall items with era_slug matching, or family members of this era)
-      const all = data.results || [];
-      // Keep items that belong to this era by checking era_slug or letting all through
-      // since year already constrains reasonably well for specific eras.
-      // For overlapping eras (e.g. Evolution 1984-2000 overlaps Twin Cam 1999-2017),
-      // the year range in ERA_YEARS already gates the slider so only valid years are reachable.
-      setModels(all);
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Pick model — advance only if not already auto-advancing via rivet click
-  const pickModel = (item) => { setSelected(item); };
-
-  // Navigate
-  const navigate = useCallback(() => {
-    if (!selected) return;
-    const params = new URLSearchParams();
-    if (selected.family)     params.set('family', selected.family);
-    if (currentYear)         params.set('year',   currentYear);
-    if (selected.model_code) params.set('model',  selected.model_code);
-    const url = `/browse?${params.toString()}`;
-    if (onSelect) onSelect({ era, year: currentYear, model: selected, url });
+    const url = `/browse?eraSlug=${e.slug}`;
+    if (onSelect) onSelect({ era: e, url });
     else router.push(url);
-  }, [selected, era, currentYear, onSelect, router]);
-
-  const reset = () => { setStep(1); setEra(null); setYear(null); setModels([]); setSelected(null); };
-  const back  = () => { setStep(s => s - 1); if (step === 3) { setSelected(null); setModels([]); } };
-
-  // Group models by family
-  const grouped = models.reduce((acc, item) => {
-    const f = item.family || 'Other';
-    (acc[f] = acc[f] || []).push(item);
-    return acc;
-  }, {});
+  };
 
   return (
     <>
@@ -349,55 +313,23 @@ export default function ModelFinder({ compact = false, onSelect }) {
           src:url('/fonts/Tanker-Regular.ttf') format('truetype');
           font-weight:400; font-display:swap;
         }
-        .mf-range {
-          -webkit-appearance:none; appearance:none;
-          width:100%; height:3px; border-radius:0; outline:none; cursor:pointer;
-          background:linear-gradient(to right,
-            ${GOLD} 0%, ${GOLD} var(--fill-pct,50%),
-            rgba(90,66,14,0.5) var(--fill-pct,50%), rgba(90,66,14,0.5) 100%
-          );
-        }
-        .mf-range::-webkit-slider-thumb {
-          -webkit-appearance:none;
-          width:18px; height:18px; border-radius:0;
-          background:${GOLD}; border:2px solid #0e0b07;
-          box-shadow:0 0 0 1px #5a420e; cursor:pointer;
-          transition:transform 0.1s;
-        }
-        .mf-range:active::-webkit-slider-thumb { transform:scale(1.2); }
-        .mf-range::-moz-range-thumb {
-          width:18px; height:18px; border-radius:0;
-          background:${GOLD}; border:2px solid #0e0b07; cursor:pointer;
-        }
-        .mf-range::-moz-range-track { height:3px; background:rgba(90,66,14,0.5); }
-        .mf-range::-moz-range-progress { height:3px; background:${GOLD}; }
-        .mf-tick {
-          font-family:${MONO}; font-size:9px; letter-spacing:0.06em;
-          color:rgba(201,168,76,0.28); cursor:pointer; user-select:none;
-          transition:color 0.15s;
-        }
-        .mf-tick:hover { color:rgba(201,168,76,0.7); }
-        .mf-go {
-          flex-shrink:0; height:40px; padding:0 22px;
-          background:${GOLD}; border:none;
-          outline:1px solid #5a420e;
-          box-shadow:inset 0 0 0 1px #0e0b07, inset 0 0 0 2px #8a6420;
-          color:${BLACK}; font-family:${SAILOR}; font-size:16px; font-weight:700;
-          letter-spacing:0.18em; text-transform:uppercase;
-          cursor:pointer; display:flex; align-items:center; gap:6px;
-          transition:background 0.15s;
-        }
-        .mf-go:hover { background:#e2c06a; }
-        .mf-go:active { transform:scale(0.94); }
+
+        /* ── Era tile cards ───────────────────────────────────────────────── */
         .mf-era-btn {
-          background:#111009; border:1px solid rgba(255,255,255,0.07);
-          border-radius:12px; padding:0;
-          cursor:pointer; text-align:left;
-          transition:border-color 0.25s, transform 0.18s, box-shadow 0.25s;
-          position:relative; overflow:hidden;
-          aspect-ratio:16/10;
-          display:flex; flex-direction:column; justify-content:flex-end;
+          background:#111009;
+          border:1px solid rgba(255,255,255,0.07);
+          border-radius:12px;
+          padding:0;
+          cursor:pointer;
+          text-align:left;
+          position:relative;
+          overflow:hidden;
+          width:100%;
+          display:flex;
+          flex-direction:column;
+          justify-content:flex-end;
           box-shadow:0 8px 32px rgba(0,0,0,0.5);
+          transition:border-color 0.25s, transform 0.18s, box-shadow 0.25s;
         }
         .mf-era-btn:hover {
           border-color:rgba(201,168,76,0.5);
@@ -406,30 +338,53 @@ export default function ModelFinder({ compact = false, onSelect }) {
         }
         .mf-era-btn.sel {
           border-color:rgba(201,168,76,0.9);
-          box-shadow:0 0 0 1px rgba(201,168,76,0.25), 0 16px 48px rgba(0,0,0,0.7), 0 0 60px rgba(201,168,76,0.12);
+          box-shadow:0 0 0 1px rgba(201,168,76,0.25),
+                     0 16px 48px rgba(0,0,0,0.7),
+                     0 0 60px rgba(201,168,76,0.12);
         }
+
+        /* Background photo — clipped to tile via parent overflow:hidden */
         .mf-era-btn .era-art {
-          position:absolute; inset:0;
-          background-size:cover; background-position:center;
-          opacity:0.28; transition:opacity 0.3s;
+          position:absolute;
+          inset:0;
+          background-size:cover;
+          background-position:center;
+          opacity:0.55;
+          transition:opacity 0.3s;
         }
-        .mf-era-btn:hover .era-art { opacity:0.42; }
-        .mf-era-btn.sel .era-art   { opacity:0.52; }
+        .mf-era-btn:hover .era-art { opacity:0.72; }
+        .mf-era-btn.sel   .era-art { opacity:0.80; }
+
+        /* Dark gradient scrim — keeps text legible over the photo */
         .mf-era-btn .era-gradient {
-          position:absolute; inset:0;
-          background:linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.4) 50%, transparent 100%);
+          position:absolute;
+          inset:0;
+          background:linear-gradient(
+            to top,
+            rgba(0,0,0,0.92) 0%,
+            rgba(0,0,0,0.4)  50%,
+            transparent      100%
+          );
         }
+
+        /* Selected-state corner bracket */
         .mf-era-btn .era-corner {
           position:absolute; top:10px; right:10px;
           width:16px; height:16px;
           border-top:1.5px solid ${GOLD}; border-right:1.5px solid ${GOLD};
-          border-radius:0 4px 0 0; opacity:0; transition:opacity 0.25s;
+          border-radius:0 4px 0 0;
+          opacity:0; transition:opacity 0.25s;
         }
         .mf-era-btn.sel .era-corner { opacity:1; }
+
+        /* Text content sits above all overlays */
         .mf-era-btn .era-content {
-          position:relative; z-index:1;
-          padding:10px 12px 11px;
+          position:relative;
+          z-index:1;
+          padding:14px 14px 16px;
         }
+
+        /* Selected-state gold dot */
         .mf-era-btn .era-sel-dot {
           position:absolute; top:10px; left:10px; z-index:2;
           width:8px; height:8px; border-radius:50%;
@@ -439,58 +394,13 @@ export default function ModelFinder({ compact = false, onSelect }) {
           transition:opacity 0.2s, transform 0.25s cubic-bezier(0.34,1.56,0.64,1);
         }
         .mf-era-btn.sel .era-sel-dot { opacity:1; transform:scale(1); }
-        .mf-family-hdr {
-          padding:7px 14px 5px;
-          font-family:${MONO}; font-size:9px; letter-spacing:0.22em;
-          text-transform:uppercase; color:${GOLD};
-          background:rgba(201,168,76,0.05);
-          border-top:1px solid rgba(201,168,76,0.08);
-          border-bottom:1px solid rgba(201,168,76,0.1);
-        }
-        .mf-scroll { overflow-y:auto; }
-        .mf-scroll::-webkit-scrollbar { width:3px; }
-        .mf-scroll::-webkit-scrollbar-thumb { background:#5a420e; }
-        .mf-find {
-          width:100%; padding:13px 0;
-          background:linear-gradient(135deg,${GOLD} 0%,#a07828 100%);
-          border:none; border-radius:0; color:${BLACK};
-          font-family:${COND}; font-size:16px; font-weight:800;
-          letter-spacing:0.18em; text-transform:uppercase;
-          cursor:pointer; position:relative; overflow:hidden;
-          outline:1px solid #5a420e;
-          box-shadow:inset 0 0 0 1px #0e0b07, inset 0 0 0 2px #8a6420;
-          transition:opacity 0.15s;
-        }
-        .mf-find::before {
-          content:''; position:absolute; inset:0;
-          background:linear-gradient(135deg,rgba(255,255,255,0.18) 0%,transparent 50%);
-        }
-        .mf-find:hover { opacity:0.9; }
-        .mf-find:active { transform:scale(0.99); }
-        .mf-back {
-          background:transparent; border-radius:0;
-          border:1px solid rgba(255,255,255,0.1);
-          color:rgba(245,240,232,0.45); font-family:${MONO};
-          font-size:9px; letter-spacing:0.18em; text-transform:uppercase;
-          padding:8px 14px; cursor:pointer; flex-shrink:0;
-          transition:border-color 0.15s, color 0.15s;
-        }
-        .mf-back:hover { border-color:rgba(255,255,255,0.28); color:rgba(245,240,232,0.75); }
-        .mf-spinner {
-          width:16px; height:16px; border-radius:50%;
-          border:2px solid #2a1f08; border-top-color:${GOLD};
-          animation:mfSpin 0.7s linear infinite; flex-shrink:0;
-        }
-        @keyframes mfSpin { to { transform:rotate(360deg); } }
+
+        /* ── Entrance animation ────────────────────────────────────────────── */
         @keyframes mfIn {
           from { opacity:0; transform:translateY(8px); }
           to   { opacity:1; transform:translateY(0); }
         }
         .mf-anim { animation:mfIn 0.28s ease; }
-        .mf-era-years {
-          font-family:${MONO}; font-size:8px;
-          color:rgba(245,240,232,0.35); margin-top:4px; letter-spacing:0.06em;
-        }
       `}</style>
 
       <div style={{
@@ -516,23 +426,24 @@ export default function ModelFinder({ compact = false, onSelect }) {
           borderBottom:'1px solid rgba(201,168,76,0.14)',
           position:'relative', zIndex:1,
         }}>
-          {/* Top row: label + step dots */}
-          <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10}}>
+          {/* Top row: label */}
+          <div style={{display:'flex', alignItems:'center', marginBottom:10}}>
             <div style={{
               fontFamily:MONO, fontSize:11, letterSpacing:'0.22em',
               color:'rgba(201,168,76,0.55)', textTransform:'uppercase',
             }}>
               Stinkin' Supplies
             </div>
-            <StepDots step={step}/>
           </div>
 
-          {/* Big kinetic title */}
-          <KineticText
-            text="Find Parts for Your Harley"
-            fontSize="clamp(36px,5vw,72px)"
-            letterSpacing="0.03em"
-          />
+          {/* Big kinetic title — centered, 2× size */}
+          <div style={{ textAlign:'center', width:'100%' }}>
+            <KineticText
+              text="Find Your Parts"
+              fontSize="clamp(72px,10vw,144px)"
+              letterSpacing="0.03em"
+            />
+          </div>
 
           {/* Gold rule under title */}
           <div style={{
@@ -542,270 +453,68 @@ export default function ModelFinder({ compact = false, onSelect }) {
           }}/>
         </div>
 
-        {/* ── STEP 1: Era ────────────────────────────────────────────────────── */}
-        {step === 1 && (
-          <div key="s1" className="mf-anim" style={{padding:'20px 20px 22px', position:'relative', zIndex:1}}>
-            <div style={{fontFamily:MONO, fontSize:9, letterSpacing:'0.2em',
-              color:'rgba(201,168,76,0.5)', textTransform:'uppercase', marginBottom:14}}>
-              Step 01 — Select Era / Engine
-            </div>
-
-            <div style={{
-              display:'grid',
-              gridTemplateColumns: compact ? 'repeat(2,1fr)' : 'repeat(5,1fr)',
-              gap:10,
-            }}>
-              {ERAS.map(e => {
-                const sel = era?.slug === e.slug;
-                return (
-                  <button
-                    key={e.slug}
-                    type="button"
-                    className={`mf-era-btn${sel ? ' sel' : ''}`}
-                    onClick={() => pickEra(e)}
-                  >
-                    {/* Background image */}
-                    <div
-                      className="era-art"
-                      style={{ backgroundImage: e.img ? `url('/images/eras/${e.img}')` : 'none' }}
-                    />
-                    {/* Gradient overlay */}
-                    <div className="era-gradient"/>
-                    {/* Selected corner bracket */}
-                    <div className="era-corner"/>
-                    {/* Selected gold dot */}
-                    <div className="era-sel-dot"/>
-                    {/* Text content */}
-                    <div className="era-content">
-                      <span style={{
-                        display:'block', fontFamily:MONO, fontSize:8,
-                        letterSpacing:'0.16em', color: sel ? '#f0c040' : GOLD,
-                        textTransform:'uppercase', marginBottom:4,
-                      }}>
-                        {e.years}
-                      </span>
-                      <span style={{
-                        display:'block', fontFamily:SAILOR,
-                        fontSize:'clamp(12px,1.3vw,15px)', fontWeight:400,
-                        letterSpacing:'0.04em', textTransform:'uppercase',
-                        color: sel ? '#fff8e6' : CREAM,
-                        lineHeight:1.1,
-                        textShadow:'0 1px 4px rgba(0,0,0,0.8)',
-                      }}>
-                        {e.name}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+        {/* Era tiles — click any tile to browse that era */}
+        <div key="s1" className="mf-anim" style={{
+          padding:'20px 20px 22px',
+          position:'relative', zIndex:1,
+          background: BLACK,
+        }}>
+          <div style={{fontFamily:MONO, fontSize:9, letterSpacing:'0.2em',
+            color:'rgba(201,168,76,0.5)', textTransform:'uppercase', marginBottom:14}}>
+            Select Era / Engine
           </div>
-        )}
 
-        {/* ── STEP 2: Year ───────────────────────────────────────────────────── */}
-        {step === 2 && (
-          <div key="s2" className="mf-anim" style={{padding:'26px 24px 24px', position:'relative', zIndex:1}}>
-            <div style={{fontFamily:MONO, fontSize:9, letterSpacing:'0.2em',
-              color:'rgba(201,168,76,0.5)', textTransform:'uppercase', marginBottom:18}}>
-              Step 02 — Select Year
-            </div>
-
-            {/* Era badge */}
-            <div style={{
-              display:'inline-flex', alignItems:'center', gap:8,
-              marginBottom:16,
-              background:'rgba(201,168,76,0.07)',
-              border:'1px solid rgba(201,168,76,0.2)',
-              padding:'5px 12px 5px 10px',
-            }}>
-              <div style={{
-                width:6, height:6, borderRadius:'50%',
-                background:GOLD, flexShrink:0,
-              }}/>
-              <span style={{fontFamily:SAILOR, fontSize:13, fontWeight:700,
-                letterSpacing:'0.06em', textTransform:'uppercase', color:CREAM}}>
-                {era?.name}
-              </span>
-              <span style={{fontFamily:MONO, fontSize:8, color:'rgba(201,168,76,0.5)',
-                letterSpacing:'0.12em', textTransform:'uppercase'}}>
-                {era?.years}
-              </span>
-            </div>
-
-            {/* Giant year */}
-            <div aria-live="polite" aria-atomic="true" style={{
-              fontFamily:SAILOR, fontSize:'clamp(64px,13vw,100px)',
-              fontWeight:700, letterSpacing:'0.06em',
-              color:CREAM, lineHeight:1, textAlign:'center',
-              textShadow:'1px 1px 0 #000, -1px -1px 0 rgba(255,220,100,0.15)',
-              userSelect:'none', marginBottom:20,
-            }}>
-              {currentYear}
-            </div>
-
-            {/* Controls */}
-            <div style={{display:'flex', alignItems:'center', gap:10}}>
-              <ArrowBtn onClick={() => stepYear(-1)} label="Previous year">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="15" height="15">
-                  <path d="m15 18-6-6 6-6"/>
-                </svg>
-              </ArrowBtn>
-
-              <div style={{flex:1, display:'flex', flexDirection:'column', gap:7}}>
-                <input type="range" className="mf-range"
-                  min={yearMin} max={yearMax} step={1}
-                  value={currentYear}
-                  style={{'--fill-pct':`${fillPct}%`}}
-                  onChange={e => setYear(parseInt(e.target.value, 10))}
-                  onKeyDown={e => { if(e.key==='Enter') goToModels(currentYear); }}
-                  aria-label="Select model year"
-                />
-                <div style={{display:'flex', justifyContent:'space-between', padding:'0 2px'}}>
-                  {ticks.map(yr => (
-                    <span key={yr} className="mf-tick" onClick={() => setYear(yr)}>{yr}</span>
-                  ))}
-                </div>
-              </div>
-
-              <ArrowBtn onClick={() => stepYear(1)} label="Next year">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="15" height="15">
-                  <path d="m9 18 6-6-6-6"/>
-                </svg>
-              </ArrowBtn>
-
-              <button className="mf-go" onClick={() => goToModels(currentYear)}
-                aria-label={`Browse ${currentYear} models`}>
-                GO
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" width="11" height="11">
-                  <path d="m9 18 6-6-6-6"/>
-                </svg>
-              </button>
-            </div>
-
-          </div>
-        )}
-
-        {/* ── STEP 3: Model codes ────────────────────────────────────────────── */}
-        {step === 3 && (
-          <div key="s3" className="mf-anim" style={{position:'relative', zIndex:1}}>
-
-            {/* Sub-header */}
-            <div style={{
-              padding:'14px 24px 12px',
-              borderBottom:'1px solid rgba(201,168,76,0.1)',
-              display:'flex', alignItems:'center', justifyContent:'space-between', gap:12,
-            }}>
-              <div style={{fontFamily:MONO, fontSize:9, letterSpacing:'0.2em',
-                color:'rgba(201,168,76,0.5)', textTransform:'uppercase'}}>
-                Step 03 — Select Model
-              </div>
-              <div style={{display:'flex', alignItems:'center', gap:8, flexShrink:0}}>
-                <span style={{fontFamily:SAILOR, fontSize:'clamp(18px,2.5vw,24px)',
-                  fontWeight:700, color:CREAM, letterSpacing:'0.06em', lineHeight:1}}>
-                  {currentYear}
-                </span>
-                <span style={{fontFamily:MONO, fontSize:8, color:'rgba(201,168,76,0.5)',
-                  letterSpacing:'0.1em', textTransform:'uppercase'}}>
-                  {era?.name}
-                </span>
-              </div>
-            </div>
-
-            {loading && (
-              <div style={{display:'flex', alignItems:'center', justifyContent:'center',
-                gap:12, padding:'44px 24px', fontFamily:MONO, fontSize:10,
-                letterSpacing:'0.15em', textTransform:'uppercase', color:'rgba(201,168,76,0.4)'}}>
-                <span className="mf-spinner"/>
-                Loading {currentYear} models…
-              </div>
-            )}
-
-            {!loading && error && (
-              <div style={{padding:'44px 24px', textAlign:'center', fontFamily:MONO,
-                fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase',
-                color:'rgba(201,168,76,0.3)'}}>
-                Couldn't load models — try again.
-              </div>
-            )}
-
-            {!loading && !error && models.length === 0 && (
-              <div style={{padding:'44px 24px', textAlign:'center', fontFamily:MONO,
-                fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase',
-                color:'rgba(201,168,76,0.3)'}}>
-                No models found for {currentYear}.
-              </div>
-            )}
-
-            {!loading && models.length > 0 && (
-              <div className="mf-scroll" role="radiogroup"
-                aria-label={`${currentYear} model selection`}
-                style={{maxHeight: compact ? 280 : 360}}>
-                {Object.entries(grouped).map(([family, items]) => (
-                  <div key={family}>
-                    <div className="mf-family-hdr">{family}</div>
-                    {items
-                      .filter((item, idx, arr) => arr.findIndex(x => x.model_code === item.model_code) === idx)
-                      .map(item => (
-                      <RivetRow
-                        key={`${family}-${item.year}-${item.model_code}`}
-                        item={item}
-                        selected={selected?.model_code === item.model_code}
-                        onClick={() => pickModel(item)}
-                      />
-                    ))}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Footer */}
-            <div style={{
-              padding:'12px 24px 16px',
-              borderTop:'1px solid rgba(201,168,76,0.1)',
-              display:'flex', alignItems:'center', gap:10,
-            }}>
-              <button className="mf-back" onClick={back}>← Back</button>
-              {selected ? (
-                <button className="mf-find" onClick={navigate} style={{flex:1}}>
-                  Find Parts for {selected.model_code || selected.model_name} →
-                </button>
-              ) : (
-                <div style={{flex:1, fontFamily:MONO, fontSize:9,
-                  letterSpacing:'0.14em', color:'rgba(201,168,76,0.3)',
-                  textTransform:'uppercase', textAlign:'center'}}>
-                  Select a model above
-                </div>
-              )}
-            </div>
-
-          </div>
-        )}
-
-        {/* Breadcrumb trail + reset (steps 2+) */}
-        {step > 1 && (
           <div style={{
-            padding:'8px 24px 10px',
-            borderTop: step === 1 ? 'none' : '1px solid rgba(201,168,76,0.06)',
-            display:'flex', alignItems:'center', justifyContent:'space-between',
-            position:'relative', zIndex:1,
+            display:'grid',
+            gridTemplateColumns: compact ? 'repeat(2,1fr)' : 'repeat(5,1fr)',
+            gridAutoRows: compact ? '200px' : '320px',
+            gap:10,
           }}>
-            <div style={{fontFamily:MONO, fontSize:8, letterSpacing:'0.14em',
-              color:'rgba(201,168,76,0.4)', textTransform:'uppercase'}}>
-              <span style={{color:'rgba(201,168,76,0.65)'}}>{era?.name}</span>
-              {step >= 2 && year && <> · <span style={{color:'rgba(201,168,76,0.65)'}}>{currentYear}</span></>}
-              {step >= 3 && selected && <> · <span style={{color:GOLD}}>{selected.model_code || selected.model_name}</span></>}
-            </div>
-            <button type="button" onClick={reset}
-              style={{background:'none', border:'none', fontFamily:MONO, fontSize:8,
-                letterSpacing:'0.18em', color:'rgba(180,150,80,0.4)',
-                textTransform:'uppercase', cursor:'pointer', transition:'color 0.15s'}}
-              onMouseEnter={e => e.currentTarget.style.color='rgba(201,168,76,0.75)'}
-              onMouseLeave={e => e.currentTarget.style.color='rgba(180,150,80,0.4)'}
-            >
-              Reset
-            </button>
+            {ERAS.map(e => {
+              const sel = era?.slug === e.slug;
+              return (
+                <button
+                  key={e.slug}
+                  type="button"
+                  className={`mf-era-btn${sel ? ' sel' : ''}`}
+                  onClick={() => { setEra(e); pickEra(e); }}
+                >
+                  {/* Background image */}
+                  <div
+                    className="era-art"
+                    style={{ backgroundImage: e.img ? `url('/images/eras/${e.img}')` : 'none' }}
+                  />
+                  {/* Gradient overlay */}
+                  <div className="era-gradient"/>
+                  {/* Selected corner bracket */}
+                  <div className="era-corner"/>
+                  {/* Selected gold dot */}
+                  <div className="era-sel-dot"/>
+                  {/* Text content */}
+                  <div className="era-content">
+                    <span style={{
+                      display:'block', fontFamily:MONO, fontSize:11,
+                      letterSpacing:'0.16em', color: sel ? '#f0c040' : GOLD,
+                      textTransform:'uppercase', marginBottom:6,
+                    }}>
+                      {e.years}
+                    </span>
+                    <span style={{
+                      display:'block', fontFamily:SAILOR,
+                      fontSize:'clamp(16px,2vw,26px)', fontWeight:400,
+                      letterSpacing:'0.04em', textTransform:'uppercase',
+                      color: sel ? '#fff8e6' : CREAM,
+                      lineHeight:1.1,
+                      textShadow:'0 1px 4px rgba(0,0,0,0.8)',
+                    }}>
+                      {e.name}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
-        )}
+        </div>
 
       </div>
     </>
