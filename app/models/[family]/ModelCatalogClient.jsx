@@ -164,9 +164,26 @@ export default function ModelCatalogClient({ family, meta }) {
         <CategoryBentoGrid
           categories={CATEGORIES}
           familySlug={family}
+          images={{
+            engine:  '/images/cats/engine.jpg',
+            trans:   '/images/cats/trans.jpg',
+            exhaust: '/images/cats/exhaust.jpg',
+            carb:    '/images/cats/carb.jpg',
+            fenders: '/images/cats/fenders.jpg',
+            susp:    '/images/cats/susp.jpg',
+            wheels:  '/images/cats/wheels.jpg',
+            instr:   '/images/cats/inst.jpg',
+            handle:  '/images/cats/handle.jpg',
+            lug:     '/images/cats/lug.jpg',
+          }}
         />
-      </div>
 
+        <style>{`
+          * { box-sizing: border-box; }
+          div::-webkit-scrollbar { display: none; }
+        `}</style>
+      </div>
+      
       <style>{`
         * { box-sizing: border-box; }
         /* Hide tab scrollbar on mobile */

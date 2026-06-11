@@ -2,6 +2,96 @@
 
 ---
 
+# ——— FORTY-SIXTH PASS (June 10, 2026) ———
+
+Session: Forty-Sixth Pass · June 10, 2026
+
+## WHERE WE ARE
+
+VTwin round-2 scrape fully imported (501K fitment rows, 4,255 OEMs, 6,331 universals). browse.ts has disjunctive faceting, fixed Typesense ordering, and variant count fix. CategoryBentoGrid fully wired with images. ModelFinder redesigned. OEM data cleaned. HUMMER + FLHRX added to harley_models.
+
+⚠️ Session 43 files still need dropping: globals.css, layout.tsx, BespokeSerif-Variable.ttf, FilterSidebar.jsx, ProductQuickViewModal.jsx, BrowseBackButton.jsx, products-slug-route.ts
+⚠️ FLI model code still needs adding to harley_models
+⚠️ ADMIN_SECRET still needs adding to Vercel
+⚠️ ProductQuickViewModal + BrowseBackButton still need wiring into browse/PDP
+
+## What Was Done This Session
+
+### CategoryBentoGrid — Subcategory Overlay ✅
+Full overlay system built through multiple iterations:
+- Spring animation from clicked tile center (x/y translate + scale), panel physically starts at tile and springs to left-side position
+- Left-panel-only design (40% width), right tiles fully visible and interactive
+- Large gold ✕ button (56px) straddling panel right edge
+- Tanker-font text list with underlines (textDecorationColor dim→gold on hover)
+- justifyContent: flex-start (top-aligned subcategories)
+- Word-wrap fix: KineticText now groups letters into word spans so "HARLEY" never breaks mid-word
+- tileOffset computed via getBoundingClientRect relative to grid container
+
+### CategoryBentoGrid — Layout & Tile Redesign ✅
+- New grid: EXHAUST tall narrow (rows 1–2), compact short-name row (LIGHT/ELEC/BRAKES/FOOT at 110px), bottom-right 2×2 HANDLEBAR secondary hero
+- Row heights varied: 168/168/130/110/115/138/138px
+- HANDLEBAR: deep dark bg (#170f04), gold text (inverse of ENGINE gold bg + dark text)
+- Per-area font size map: exhaust ~3.8rem, brakes ~2.8rem, access ~1.25rem — wide typographic range
+- 5 category images wired: engine, trans, carb, fenders, susp at public/images/cats/
+
+### browse.ts — Multiple Fixes ✅
+- **Disjunctive faceting**: catFacetConditions (no display_category/subcategory) + subcatFacetConditions (no display_subcategory) snapshots. Sidebar now shows all 20 categories.
+- **Count fix**: GROUP_KEY_SQL used for COUNT(DISTINCT) — eliminates phantom extra pages.
+- **Typesense fix**: page:1 always, explicit sort_by "_text_match:desc,in_stock:desc,computed_price:asc", per_page scales with browse page. Fixes same-product-always-first and broken deep pagination.
+- **Variant count fix**: Removed ng LEFT JOIN (expensive full-catalog subquery). COALESCE(vc.variant_count, 1) — name-normalized groups no longer show false "X OPTIONS" badge.
+
+### ModelFinder — Full Redesign ✅
+- Text: "FIND YOUR PARTS" (was "Find Parts for Your Harley")
+- Font: clamp(72px, 10vw, 144px), centered, flexWrap word-level grouping
+- Color: gold palette (#c9a84c base, #ffe680 hottest) — was orange/red
+- Era tiles: gridAutoRows 320px (portrait cards), height:100% removed (grid stretch handles it)
+- Year slider removed entirely — clicking era navigates directly to /browse?eraSlug=X
+- All year/model/step state removed — 318 lines deleted
+
+### VTwin Round-2 Scrape Import ✅
+- import_vtwin_scrape_round2.mjs written (optimised: pre-cached SKU + model-year maps, unnest batch inserts)
+- 501,478 fitment rows inserted
+- 4,255 OEM numbers added to catalog_oem_crossref
+- 6,331 products marked is_universal = true
+- 56 vintage year gap entries filled (EL, WL, G, etc.)
+- HUMMER (Vintage, 1947–1958) + FLHRX (Touring, 2006–2008) added to harley_models
+
+### OEM Data Cleanup ✅
+- 4,122 PU catalog numbers (XXXX-XXXX format, source=null from OEM_Crossref_Merged.xlsx) deleted from catalog_oem_crossref
+- 4,143 catalog_unified.oem_numbers arrays cleaned via regexp filter
+- 15,723 VTwin products had oem_numbers synced from crossref (VT-XXXXX vs bare SKU mismatch was blocking sync)
+- Reindexed after each cleanup
+
+### Final State
+- catalog_fitment_v2: ~5M rows, VACUUM ANALYZE done
+- mv_family_product_ranges: refreshed
+- Typesense: reindexed clean
+- VTwin fitment coverage: 48.1% (ceiling — ~20K remaining have no model data available)
+- OEM coverage: 22,016 products with oem_numbers across all vendors
+
+## DB State After This Session
+
+| Table | Change |
+|-------|--------|
+| catalog_fitment_v2 | +501,478 rows from VTwin round-2. VACUUM ANALYZE run. |
+| catalog_oem_crossref | +4,255 VTwin OEM rows. -4,122 PU catalog numbers. |
+| catalog_unified | 15,723 VTwin oem_numbers arrays synced. 6,331 is_universal=true marks. |
+| harley_models | HUMMER (Vintage) + FLHRX (Touring) added with year ranges. |
+| harley_model_years | 56 gap entries + 3 FLHRX years added. |
+
+## What Needs to Happen Next
+
+1. Drop remaining session 43 files (globals.css, layout.tsx, BespokeSerif-Variable.ttf, FilterSidebar.jsx, ProductQuickViewModal.jsx, BrowseBackButton.jsx, products-slug-route.ts)
+2. Add FLI to harley_models (Road Glide Limited — confirm year range)
+3. Add ADMIN_SECRET to Vercel
+4. Fix Framer Motion transparent errors
+5. Investigate Engine+Dyna query slowness — composite index on catalog_fitment_v2 (product_id, model_year_id)
+6. Wire ProductQuickViewModal into browse page
+7. Wire BrowseBackButton into PDP
+8. Rename "Luggage Racks" subcategory → "Racks" in DB + CategoryBentoGrid SUBCATEGORIES map
+
+---
+
 # ——— FORTY-FIFTH PASS (June 8, 2026) ———
 
 Session: Forty-Fifth Pass · June 8, 2026

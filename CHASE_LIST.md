@@ -1,39 +1,52 @@
 # STINKIN' SUPPLIES — CHASE LIST
-**Last Updated: June 8, 2026 — Forty-Fifth Pass**
+**Last Updated: June 10, 2026 — Forty-Sixth Pass**
 
 ## 🚀 NEXT SESSION — START HERE
 
 | # | Task | Notes |
 |---|------|-------|
-| 1 | Drop in session 44 + 43 component files | See files table below |
-| 2 | Run mat view refresh | `psql $CATALOG_DATABASE_URL -c 'REFRESH MATERIALIZED VIEW mv_family_product_ranges;'` |
-| 3 | Run universal mark (round 2 scrape) | `psql $CATALOG_DATABASE_URL -c "UPDATE catalog_unified cu SET is_universal = true FROM vtwin_scrape_data vsd WHERE cu.source_vendor = 'VTWIN' AND (cu.sku = 'VT-' || vsd.sku OR cu.sku = vsd.sku) AND vsd.fitment_raw IN ('All models', 'All', 'Custom application') AND cu.is_universal = false;"` |
-| 4 | Add FLHRX + FLI to harley_models | FLHRX = Road Glide Custom, FLI = Road Glide Limited. Both skipped by importer. |
-| 5 | Add ADMIN_SECRET to Vercel | `npx vercel env add ADMIN_SECRET` |
-| 6 | Fix Framer Motion transparent errors | Replace `transparent` with `rgba(0,0,0,0)` anywhere background animates. May be in computed values not literal strings — check framer-motion variant objects. |
-| 7 | Browse query performance Engine + Dyna | 3.5–7.6s. EXPLAIN shows index hit but fitment JOIN on 14K+ rows is culprit. Check catalog_fitment_v2 indexes — may need composite index on (product_id, model_year_id). |
-| 8 | Wire CategoryBentoGrid image backgrounds | When images ready: add `images` prop to CategoryBentoGrid in ModelCatalogClient. Files at `public/images/categories/{area}.jpg` |
-| 9 | Wire ProductQuickViewModal into browse page | Add `quickView` state, `setQuickView(product)` on card click, render modal |
-| 10 | Wire BrowseBackButton into PDP | `import BrowseBackButton from "@/components/pdp/BrowseBackButton"` near top of PDP layout |
-| 11 | Add remaining model images | 9 images: softail, dyna, sportster, fxr, shovelhead, vintage, trike, v-rod, street. 400×160px at `public/images/models/{slug}.jpg` |
-| 12 | Verify null slug on /browse | Hard refresh — VTwin cards should route to real PDPs, not /browse/null |
-| 13 | Bulk-fix flagged products | `GET /api/admin/products/1?token=YOUR_SECRET` returns all unresolved flags |
+| 1 | Drop remaining session 43 files | globals.css, layout.tsx, BespokeSerif-Variable.ttf, FilterSidebar.jsx, ProductQuickViewModal.jsx, BrowseBackButton.jsx, products-slug-route.ts — see files table below |
+| 2 | Add FLI to harley_models | FLI = Road Glide Limited. Need year range — likely 2012–2013. Same SQL pattern as FLHRX. |
+| 3 | Add ADMIN_SECRET to Vercel | `npx vercel env add ADMIN_SECRET` |
+| 4 | Fix Framer Motion transparent errors | Replace `transparent` with `rgba(0,0,0,0)` anywhere background animates. May be in computed variant values. |
+| 5 | Browse query performance Engine + Dyna | 3.5–7.6s. ng join removed (helps). Still needs composite index on `catalog_fitment_v2 (product_id, model_year_id)`. Run EXPLAIN ANALYZE. |
+| 6 | Wire ProductQuickViewModal into browse page | Add `quickView` state, `setQuickView(product)` on card click, render modal |
+| 7 | Wire BrowseBackButton into PDP | `import BrowseBackButton from "@/components/pdp/BrowseBackButton"` near top of PDP layout |
+| 8 | Verify null slug on /browse | Hard refresh — VTwin cards should route to real PDPs, not /browse/null |
+| 9 | Add remaining model images | 9 images: softail, dyna, sportster, fxr, shovelhead, vintage, trike, v-rod, street. 400×160px at `public/images/models/{slug}.jpg` |
+| 10 | Bulk-fix flagged products | `GET /api/admin/products/1?token=YOUR_SECRET` returns all unresolved flags |
+| 11 | Rename "Luggage Racks" subcategory to "Racks" | `UPDATE catalog_unified SET display_subcategory = 'Racks' WHERE display_category = 'Luggage & Racks' AND display_subcategory = 'Luggage Racks';` then update SUBCATEGORIES map in CategoryBentoGrid.jsx + reindex |
 
-## Files to Drop In — Sessions 43 + 44
+## Files to Drop In — Session 43 (still pending)
 
-| File | Destination | Session |
-|------|-------------|---------|
-| CategoryBentoGrid.jsx | components/models/CategoryBentoGrid.jsx (new) | 44 |
-| ModelCatalogClient.jsx | app/models/[family]/ModelCatalogClient.jsx (replace) | 44 |
-| globals.css | app/globals.css | 43 |
-| layout.tsx | app/layout.tsx | 43 |
-| BespokeSerif-Variable.ttf | public/fonts/BespokeSerif-Variable.ttf (replace Regular) | 43 |
-| FilterSidebar.jsx | components/browse/FilterSidebar.jsx | 43 |
-| ProductQuickViewModal.jsx | components/browse/ProductQuickViewModal.jsx | 43 |
-| BrowseBackButton.jsx | components/pdp/BrowseBackButton.jsx | 43 |
-| ModelFinder.jsx | components/home/ModelFinder.jsx | 43 |
-| products-slug-route.ts | app/api/products/[slug]/route.ts (new) | 43 |
-| import_vtwin_fitment_partial.mjs | scripts/ingest/import_vtwin_fitment_partial.mjs | 43 |
+| File | Destination |
+|------|-------------|
+| globals.css | app/globals.css |
+| layout.tsx | app/layout.tsx |
+| BespokeSerif-Variable.ttf | public/fonts/BespokeSerif-Variable.ttf (replace Regular) |
+| FilterSidebar.jsx | components/browse/FilterSidebar.jsx |
+| ProductQuickViewModal.jsx | components/browse/ProductQuickViewModal.jsx |
+| BrowseBackButton.jsx | components/pdp/BrowseBackButton.jsx |
+| products-slug-route.ts | app/api/products/[slug]/route.ts (new) |
+
+## ✅ DONE JUNE 10 — FORTY-SIXTH PASS
+
+| Area | What Was Done |
+|------|---------------|
+| CategoryBentoGrid subcategory overlay | Full overlay system built and iterated: spring animation from clicked tile (x/y translate + scale), left-panel-only design (40% width, right tiles exposed), large gold ✕ button straddling panel edge, Tanker-font text list with underlines, top-aligned subcategories, word-wrap fix for KineticText |
+| browse.ts — disjunctive faceting | catFacetConditions + subcatFacetConditions snapshots added. Category sidebar now shows all 20 categories instead of collapsing to selected one. Subcategory sidebar shows all subcategories for selected category. |
+| browse.ts — count fix | GROUP_KEY_SQL used for COUNT(DISTINCT) so page count matches actual DISTINCT ON rows. Eliminates phantom extra pages. |
+| browse.ts — Typesense fix | page:1 always (Postgres handles pagination via OFFSET). explicit sort_by: "_text_match:desc,in_stock:desc,computed_price:asc" so same product no longer always shows first. per_page scales with browse page so deep pages work. |
+| browse.ts — variant count fix | Removed ng LEFT JOIN (expensive full-catalog subquery). COALESCE now uses only vc.variant_count. Products grouped by name-normalization no longer show false "X OPTIONS" badge. |
+| ModelFinder redesign | Text changed to "FIND YOUR PARTS", 2× larger (clamp 72px→144px), centered, word-wrap fix. Era tiles: gridAutoRows 320px (portrait), year slider removed, clicking era navigates directly to /browse?eraSlug=X. Gold color palette (was orange). |
+| CategoryBentoGrid layout | Grid redesigned: EXHAUST tall narrow col (rows 1–2), compact short-name row (LIGHT/ELEC/BRAKES/FOOT at 110px), HANDLEBAR as bottom-right 2×2 secondary hero (gold text on deep dark). Row heights varied (168/168/130/110/115/138/138). Per-area font size map replacing uniform 2rem. |
+| CategoryBentoGrid images | 5 images wired: engine, trans, carb, fenders, susp. Files at public/images/cats/. |
+| VTwin round-2 scrape imported | 501,478 fitment rows inserted. 4,255 OEM numbers added to catalog_oem_crossref. 6,331 products marked is_universal=true. 56 vintage year gap entries filled. |
+| HUMMER + FLHRX added | Both added to harley_models with correct family and year ranges (HUMMER 1947–1958 Vintage, FLHRX 2006–2008 Touring). Year entries generated. |
+| OEM cleanup | 4,122 PU catalog numbers (XXXX-XXXX format) deleted from catalog_oem_crossref. 4,143 catalog_unified.oem_numbers arrays cleaned. Reindexed. |
+| VTwin OEM sync | 15,723 VTwin products had oem_numbers arrays synced from catalog_oem_crossref (SKU format mismatch VT-XXXXX vs bare was preventing sync). Reindexed. |
+| Mat view refresh | REFRESH MATERIALIZED VIEW mv_family_product_ranges run. |
+| VACUUM ANALYZE | catalog_fitment_v2 analyzed after round-2 import. |
 
 ## ✅ DONE JUNE 8 — FORTY-FIFTH PASS
 

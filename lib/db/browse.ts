@@ -210,17 +210,31 @@ async function searchProductIds(
   extraFilters?: string
 ): Promise<{ ids: number[]; total: number }> {
   try {
+    // Always fetch from Typesense page 1. Postgres handles browse pagination via
+    // OFFSET — but for that to work, Typesense must return enough results to cover
+    // the current browse page. e.g. browse page 3 (perPage=24) needs at least 72 IDs.
+    //
+    // Old behaviour was `page: page` which caused Typesense to skip to its OWN
+    // page N, meaning browse page 2 received Typesense global ranks 73–144
+    // instead of 25–48, and browse page 3+ would often return zero rows.
+    //
+    // Cap at 250 (Typesense per_page hard limit). Deep pages beyond ~10 will hit
+    // this ceiling but that's an acceptable trade-off vs fetching everything.
+    const neededIds = page * perPage + perPage * 2;
+
     const results = await typesenseClient
       .collections(COLLECTION)
       .documents()
       .search({
         ...DEFAULT_SEARCH_PARAMS,
         q,
-        page,
-        per_page: perPage * 3, // fetch extra to account for variant dedup in postgres
-        // Don't group here — postgres handles variant dedup
+        // Explicit sort_by so DEFAULT_SEARCH_PARAMS can't accidentally override
+        // text-match relevance with a fixed field (price, id, etc.) that would
+        // return the same product first regardless of what was searched.
+        sort_by: "_text_match:desc,in_stock:desc,computed_price:asc",
+        page: 1,                                     // ← always 1; Postgres owns pagination
+        per_page: Math.min(neededIds, 250),          // ← enough to reach current browse page
         ...(extraFilters ? { filter_by: extraFilters } : {}),
-        // Only return id field — we fetch full data from postgres
         include_fields: "id",
       } as any);
 
@@ -491,7 +505,7 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
   //                                "100' SPOOL 20-GAUGE WIRE (BLUE)" → same key.
   //   3. 'u' || id          — unique per product (no grouping)
   const dataQuery = `
-    SELECT d.*, COALESCE(vc.variant_count, ng.name_group_count, 1) AS variant_count
+    SELECT d.*, COALESCE(vc.variant_count, 1) AS variant_count
     FROM (
       SELECT DISTINCT ON (group_key)
         cu.id, cu.sku, cu.slug, cu.name, cu.brand,
@@ -527,20 +541,6 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
       WHERE variant_group_id IS NOT NULL AND is_active = true
       GROUP BY variant_group_id
     ) vc ON vc.variant_group_id = d.variant_group_id
-    LEFT JOIN (
-      SELECT
-        brand || '||' || TRIM(regexp_replace(regexp_replace(regexp_replace(
-          name,
-          '\s*\([A-Z][A-Z0-9 /\-]+\)\s*$', '', 'i'),
-          '\s*-\s*[A-Z][A-Z0-9 /]+$', '', 'i'),
-          '\s+(BLACK|CHROME|SILVER|GOLD|RED|BLUE|GREEN|BROWN|PINK|WHITE|NATURAL|POLISHED|WRINKLE|GLOSS|MATTE|SATIN)\s*$',
-          '', 'i')) AS name_group_key,
-        COUNT(*) AS name_group_count
-      FROM catalog_unified
-      WHERE variant_group_id IS NULL AND is_active = true
-      GROUP BY name_group_key
-      HAVING COUNT(*) > 1
-    ) ng ON ng.name_group_key = d.group_key AND d.variant_group_id IS NULL
     ORDER BY ${orderBy}
     LIMIT $${limitParam} OFFSET $${offsetParam}
   `;

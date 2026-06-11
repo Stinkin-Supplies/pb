@@ -157,7 +157,7 @@ const SUBCATEGORIES = {
     'Speedometers', 'Gauges', 'Dash & Trim',
   ],
   'Luggage & Racks': [
-    'Sissy Bars', 'Saddlebags', 'Bags & Packs', 'Luggage Racks', 'Luggage Parts',
+  'Sissy Bars', 'Saddlebags', 'Bags & Packs', 'Racks', 'Luggage Parts',
   ],
   'Security & Covers': [
     'Security', 'Bike Covers', 'Shelters & Storage',
@@ -203,8 +203,9 @@ function Tile({ area, name, image, hov, setHov, onClick }) {
   };
   const fontSize = FONT_SIZES[area] ?? 'clamp(1.05rem, 2vw, 2rem)';
 
-  // Text color:  ENGINE → dark (on gold),  HANDLEBAR hero → gold (on deep dark),  rest → cream
-  const textColor = hasImg ? CREAM : (isEngine ? DARK : isHero ? GOLD : CREAM);
+  // Text color: image-backed tiles get a gold label with a dark outline;
+  // non-image tiles keep the existing high-contrast scheme.
+  const textColor = hasImg ? GOLD : (isEngine ? DARK : isHero ? GOLD : CREAM);
 
   return (
     <div
@@ -214,7 +215,6 @@ function Tile({ area, name, image, hov, setHov, onClick }) {
       onMouseEnter={() => setHov(area)}
       onMouseLeave={() => setHov(null)}
       style={{
-        gridArea: area,
         // Engine keeps its gold on hover too; others darken slightly
         backgroundColor: hasImg ? '#1a1208' : (isHov && !isEngine ? '#2b1c0c' : bg),
         backgroundImage: hasImg ? `url(${image})` : 'none',
@@ -227,9 +227,12 @@ function Tile({ area, name, image, hov, setHov, onClick }) {
         cursor: 'pointer',
         position: 'relative',
         overflow: 'hidden',
-        outline: `${isHov ? 2 : 1}px solid ${isHov ? GOLD : 'rgba(201,168,76,0.14)'}`,
-        outlineOffset: '-1px',
-        transition: 'outline-color 0.15s',
+        border: isHov ? '2px solid transparent' : '1px solid transparent',
+        backgroundClip: 'padding-box',
+        boxShadow: isHov
+          ? `0 0 0 2px #6b4f0e, 0 0 0 4px #e8c96a, 0 0 0 5.5px #6b4f0e, 0 0 14px rgba(201,168,76,0.4)`
+          : `0 0 0 1.5px #3d2e08, 0 0 0 3px #c9a84c, 0 0 0 4.5px #3d2e08`,
+        transition: 'box-shadow 0.18s ease',
         userSelect: 'none',
       }}
     >
@@ -304,6 +307,10 @@ function Tile({ area, name, image, hov, setHov, onClick }) {
         position: 'relative',
         zIndex: 1,
         color: textColor,
+        WebkitTextStroke: hasImg ? '1px rgba(26,18,8,0.8)' : '0',
+        textShadow: hasImg
+          ? '0 1px 0 rgba(0,0,0,0.85), 0 0 10px rgba(201,168,76,0.18)'
+          : '0 1px 0 rgba(0,0,0,0.45)',
       }}>
         {name}
       </span>
@@ -594,6 +601,11 @@ export default function CategoryBentoGrid({
           gap: ${GAP}px;
         }
 
+        /* Assign grid-area via CSS so media queries can truly override it */
+        ${Object.entries(AREA_MAP).map(([, area]) =>
+          `.ss-cat-tile[data-area="${area}"] { grid-area: ${area}; }`
+        ).join('\n        ')}
+
         .ss-subcat-item:hover {
           color: ${GOLD} !important;
           text-decoration-color: rgba(201,168,76,0.7) !important;
@@ -601,26 +613,26 @@ export default function CategoryBentoGrid({
 
         @media (max-width: 860px) and (min-width: 541px) {
           .ss-cat-grid {
-            grid-template-columns: 1fr 1fr !important;
-            grid-template-areas: none !important;
-            grid-template-rows: none !important;
+            grid-template-columns: 1fr 1fr;
+            grid-template-areas: none;
+            grid-template-rows: none;
             grid-auto-rows: 128px;
             grid-auto-flow: dense;
           }
-          .ss-cat-tile            { grid-area: unset !important; min-height: 128px; }
+          .ss-cat-tile[data-area] { grid-area: unset; min-height: 128px; }
           .ss-cat-tile[data-area="engine"] { grid-column: span 2; min-height: 160px; }
         }
 
         @media (max-width: 540px) {
           .ss-cat-grid {
-            grid-template-columns: 1fr 1fr !important;
-            grid-template-areas: none !important;
-            grid-template-rows: none !important;
+            grid-template-columns: 1fr 1fr;
+            grid-template-areas: none;
+            grid-template-rows: none;
             grid-auto-rows: 108px;
             grid-auto-flow: dense;
           }
-          .ss-cat-tile {
-            grid-area: unset !important;
+          .ss-cat-tile[data-area] {
+            grid-area: unset;
             min-height: 108px;
             padding: 0.7rem 0.85rem !important;
           }
