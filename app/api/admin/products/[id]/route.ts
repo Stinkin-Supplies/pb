@@ -1,6 +1,7 @@
 // app/api/admin/products/[id]/route.ts
-// PATCH — update display_category / display_subcategory / fits_all_models on catalog_unified
-//         then push a single-document update to Typesense (no full reindex needed).
+// PATCH — update display_category / display_subcategory / fits_all_models /
+//         pack_qty on catalog_unified, then push a single-document update to
+//         Typesense (no full reindex needed).
 // POST  — create a review flag in catalog_review_flags.
 //
 // Auth: checks X-Admin-Token header or ?admin=1 + ADMIN_SECRET env var.
@@ -91,6 +92,12 @@ export async function PATCH(
 
   const db = getCatalogDb();
 
+  // No `action` field — ProductManager.jsx flat-body update (inline edit or
+  // full edit modal save). Route to generic whitelisted-column handler.
+  if (action === undefined) {
+    return handleGenericUpdate(db, productId, body);
+  }
+
   // ── FLAG action ──
   if (action === "flag") {
     const { flagType, flagNotes } = body as { flagType: string; flagNotes?: string };
@@ -118,10 +125,12 @@ export async function PATCH(
       display_category,
       display_subcategory,
       fits_all_models,
+      pack_qty,
     } = body as {
       display_category?:    string;
       display_subcategory?: string;
       fits_all_models?:     boolean;
+      pack_qty?:            number;
     };
 
     // Build dynamic SET clause — only include fields that were sent
@@ -141,6 +150,11 @@ export async function PATCH(
       setClauses.push(`fits_all_models = $${idx++}`);
       values.push(fits_all_models);
     }
+    if (pack_qty !== undefined) {
+      const qty = Math.max(1, Math.trunc(Number(pack_qty)) || 1);
+      setClauses.push(`pack_qty = $${idx++}`);
+      values.push(qty);
+    }
 
     if (setClauses.length === 0) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
@@ -153,7 +167,7 @@ export async function PATCH(
       UPDATE catalog_unified
       SET ${setClauses.join(", ")}
       WHERE id = $${idx}
-      RETURNING id, display_category, display_subcategory, fits_all_models
+      RETURNING id, display_category, display_subcategory, fits_all_models, pack_qty
     `;
 
     const result = await db.query(sql, values);
@@ -169,15 +183,100 @@ export async function PATCH(
     if (display_category    !== undefined) tsFields.display_category    = updated.display_category;
     if (display_subcategory !== undefined) tsFields.display_subcategory = updated.display_subcategory;
     if (fits_all_models     !== undefined) tsFields.fits_all_models     = updated.fits_all_models;
+    if (pack_qty            !== undefined) tsFields.pack_qty            = updated.pack_qty;
 
-    typesenseUpdate(productId, tsFields).catch((e) =>
-      console.error("[AdminEdit] Typesense update error:", e)
-    );
+    if (Object.keys(tsFields).length > 0) {
+      typesenseUpdate(productId, tsFields).catch((e) =>
+        console.error("[AdminEdit] Typesense update error:", e)
+      );
+    }
 
     return NextResponse.json({ ok: true, action: "updated", product: updated });
   }
 
   return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+}
+
+// ── Whitelisted columns for generic flat-body PATCH ─────────────
+// ProductManager.jsx sends bare field bodies like { price: 12.34 }
+// (inline cell edit) or the full content/pricing/era object (edit modal),
+// with no `action` wrapper. Map external field names -> real columns and
+// validate/cast values here. Add new editable fields to this map.
+const GENERIC_FIELD_MAP: Record<string, { column: string; cast?: (v: unknown) => unknown }> = {
+  name:               { column: "name" },
+  description:        { column: "description" },
+  brand:              { column: "brand" },
+  category:           { column: "category" },
+  price:              { column: "computed_price", cast: v => (v === null || v === "" ? null : Number(v)) },
+  msrp:               { column: "msrp",           cast: v => (v === null || v === "" ? null : Number(v)) },
+  map_price:          { column: "map_price",      cast: v => (v === null || v === "" ? null : Number(v)) },
+  features:           { column: "features",       cast: v => (Array.isArray(v) ? v : []) },
+  is_active:          { column: "is_active" },
+  is_discontinued:    { column: "is_discontinued" },
+  is_harley_fitment:  { column: "is_harley_fitment" },
+  is_universal:       { column: "is_universal" },
+  has_map_policy:     { column: "has_map_policy" },
+  pack_qty:           { column: "pack_qty", cast: v => Math.max(1, Math.trunc(Number(v)) || 1) },
+  // Era flags — same key in body and column
+  era_flathead:       { column: "era_flathead" },
+  era_knucklehead:    { column: "era_knucklehead" },
+  era_panhead:        { column: "era_panhead" },
+  era_shovelhead:     { column: "era_shovelhead" },
+  era_ironhead:       { column: "era_ironhead" },
+  era_evo_sportster:  { column: "era_evo_sportster" },
+  era_evolution:      { column: "era_evolution" },
+  era_twin_cam:       { column: "era_twin_cam" },
+  era_milwaukee8:     { column: "era_milwaukee8" },
+  era_chopper:        { column: "era_chopper" },
+};
+
+async function handleGenericUpdate(db: ReturnType<typeof getCatalogDb>, productId: number, body: Record<string, unknown>) {
+  const setClauses: string[] = [];
+  const values: unknown[]    = [];
+  let idx = 1;
+
+  for (const [key, val] of Object.entries(body)) {
+    const mapping = GENERIC_FIELD_MAP[key];
+    if (!mapping) continue; // ignore unknown/unwhitelisted fields silently
+    setClauses.push(`${mapping.column} = $${idx++}`);
+    values.push(mapping.cast ? mapping.cast(val) : val);
+  }
+
+  if (setClauses.length === 0) {
+    return NextResponse.json({ error: "No recognized fields to update" }, { status: 400 });
+  }
+
+  setClauses.push(`updated_at = now()`);
+  values.push(productId);
+
+  const sql = `
+    UPDATE catalog_unified
+    SET ${setClauses.join(", ")}
+    WHERE id = $${idx}
+    RETURNING *
+  `;
+
+  const result = await db.query(sql, values);
+
+  if (result.rowCount === 0) {
+    return NextResponse.json({ error: "Product not found" }, { status: 404 });
+  }
+
+  const updated = result.rows[0];
+
+  // Push changed fields to Typesense
+  const tsFields: Record<string, unknown> = {};
+  for (const key of Object.keys(body)) {
+    const mapping = GENERIC_FIELD_MAP[key];
+    if (mapping) tsFields[mapping.column] = updated[mapping.column];
+  }
+  if (Object.keys(tsFields).length > 0) {
+    typesenseUpdate(productId, tsFields).catch((e) =>
+      console.error("[AdminEdit] Typesense update error:", e)
+    );
+  }
+
+  return NextResponse.json({ ok: true, action: "updated", product: updated });
 }
 
 // ── GET — list unresolved flags (handy for admin dashboard) ────

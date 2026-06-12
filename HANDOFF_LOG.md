@@ -2,7 +2,103 @@
 
 ---
 
-# ——— FORTY-SIXTH PASS (June 10, 2026) ———
+# ——— FORTY-SEVENTH PASS (June 11–12, 2026) ———
+
+Session: Forty-Seventh Pass · June 11–12, 2026
+
+## WHERE WE ARE
+
+Fulfillment/checkout backend fully scaffolded — drop-ship architecture with PU + WPS API ordering, VTwin manual PO queue, fulfillment optimizer for vendor consolidation/margin routing. Canonical products layer live: all 90,605 active products have 1:1 canonical entries, OEM cross-vendor matching found 469 groups (1,536 proposals) now in admin review queue. Critical vendor_sku data bug found and fixed across all 90,605 product_vendors rows.
+
+⚠️ User is now working through the canonical match review queue (469 groups) — in progress, ongoing across sessions.
+⚠️ Payment gateway still undecided — only blocker for checkout going fully live.
+⚠️ Cart drawer / checkout frontend UI not yet built (backend ready).
+⚠️ Session 43 files still pending (see prior passes — unchanged).
+⚠️ ADMIN_SECRET still needs adding to Vercel (local .env.local has it: confirm value before prod deploy).
+
+## What Was Done This Session
+
+### Fulfillment Architecture — Decisions Locked ✅
+- Drop-ship model confirmed: PU + WPS via API ordering (daily inventory sync + order submission), VTwin manual PO for now
+- Own credit card merchant account (gateway TBD) — invoicing/admin visibility built into admin panel
+- Canonical product layer: one listing per real-world part, multiple vendor sources behind it, checkout-time optimizer resolves vendor routing for margin + shipping consolidation
+
+### DB Schema — Canonical Products + Orders ✅
+New tables, all live on stinkin_catalog:
+- `canonical_products` — one row per real-world product, `canonical_sku` (CP-XXXXXX), `our_price`, `match_confidence`
+- `product_vendors` — per-vendor source rows (canonical_id, catalog_unified_id, source_vendor, vendor_sku, our_cost, in_stock, stock_qty, is_preferred)
+- `canonical_match_proposals` — cross-vendor match review queue (status: pending/confirmed/rejected/applied)
+- `orders`, `order_items`, `vendor_orders` — gateway-agnostic order schema with auto-generated `SS-YYYYMMDD-NNNN` order numbers via trigger
+- `catalog_unified.canonical_product_id` FK added
+
+### Canonical Products Pipeline ✅
+- `build_canonical_products.mjs` — Phase A (1:1 init) + Phase B (OEM matching)
+- Phase A: all 90,605 active products given 1:1 canonical_products + product_vendors rows. Rewrote from per-row loop (6/s) to single bulk CTE statement per batch (3,715/s — 35,605 remaining rows done in 9.8s)
+- Phase B: OEM-based cross-vendor matching — 469 OEM groups found, 1,537 pairwise proposals written to canonical_match_proposals
+
+### Admin: Canonical Match Review UI ✅
+New pages/routes, all live:
+- `/admin/canonical-matches?token=...` — grouped-by-OEM review queue, side-by-side product cards (vendor badge, price, vendor#/part#/internal SKU, category, fitment range), bulk confirm/reject per group, "Apply confirmed merges" button
+- `/api/admin/canonical-matches` (GET list + POST confirm/reject)
+- `/api/admin/canonical-matches/bulk` (group-level confirm/reject by OEM number)
+- `/api/admin/canonical-matches/apply` (executes confirmed merges — moves product_vendors, repoints catalog_unified, deactivates duplicate canonical)
+- `/api/admin/canonical-matches/sync-fitment` — NEW: syncs union of fitment coverage (catalog_fitment_v2) across all products in a match group, independent of merge confirm/reject. Tags new rows `source='canonical_merge_sync'`
+- Page rewritten with self-contained light theme (site's global dark/uppercase CSS was bleeding through) + fitment range display + "⚠ fitment differs" badge per group
+
+### CRITICAL FIX: product_vendors.vendor_sku ✅
+- **Bug found via user cross-check against Drag Specialties PDF catalog**: Phase A had populated `product_vendors.vendor_sku` from `catalog_unified.internal_sku` (our internal CAT###### format) — NOT a real vendor ordering number. All 90,605 rows affected.
+- Root cause: catalog_unified has separate `vendor_sku` column (real per-vendor ordering #) that Phase A never read.
+- Per-vendor correct source identified:
+  - PU: `vendor_sku` (when populated) = `brand_part_number` with dashes stripped (e.g. `SF-904-02-2` → `SF904022`). 7,103 PU rows had empty `vendor_sku` — fallback to `sku` (e.g. `DS194976`, matches Drag Specialties PART# DS-194976 exactly)
+  - WPS: `vendor_sku` 100% populated, correct as-is (e.g. `72-5444M`)
+  - VTwin: `vendor_sku` populated for 37,749/38,365 — correct as-is (e.g. `12-8678`). 616 empty rows — fallback to `sku` with `VT-` prefix stripped
+- `004_fix_vendor_sku.sql` — single UPDATE across all 90,605 product_vendors rows. Verified: 0 empty vendor_sku remaining, spot-checked id=7650 now shows `DS194976` matching PDF.
+- `build_canonical_products.mjs` Phase A query corrected for future re-runs (new products added later won't repeat this bug)
+
+### Fulfillment Backend — Fully Scaffolded ✅
+- `lib/cart/CartContext.jsx` — real localStorage-persisted cart, canonical_sku-based, ready to wrap root layout
+- `lib/fulfillment/optimizer.ts` — checkout-time vendor resolution: minimizes vendor count (shipping consolidation), maximizes margin within vendor, falls back on stock, flags VTwin as manual
+- `lib/fulfillment/triggerFulfillment.ts` — vendor adapter pattern (PU/WPS/VTwin), pluggable for future vendors. PU + WPS adapters stubbed with real API call shape (need credentials wired), VTwin flags `pending_manual`
+- `app/api/checkout/prepare/route.ts` — runs optimizer, creates pending order + order_items + vendor_orders, returns totals for payment step
+- `app/api/checkout/charge/route.ts` — gateway-agnostic stub. ONE file to edit once payment gateway is chosen — single TODO block for the charge call, everything else (order marking, fulfillment trigger) wired
+
+### Chase List Quick Fixes ✅
+- FLI (Road Glide Limited) confirmed already present in harley_models from prior session — model years inserted
+- Composite indexes added: `idx_cfv2_product_modelyear` + `idx_cfv2_modelyear_product` on catalog_fitment_v2 (Engine+Dyna slowness fix)
+- "Luggage Racks" → "Racks" rename confirmed already applied from prior session
+- ANALYZE run on catalog_fitment_v2
+- `FRAMER_TRANSPARENT_FIX.md` reference doc created — palette-specific rgba() replacements for the Framer Motion transparent animation errors (not yet applied to components)
+
+## DB State After This Session
+
+| Table | Change |
+|-------|--------|
+| canonical_products | 90,605 rows created (1 per active catalog_unified product), 469 flagged for OEM-based merge review |
+| product_vendors | 90,605 rows created. vendor_sku corrected for ALL rows (was internal_sku format, now real vendor ordering numbers) |
+| canonical_match_proposals | 1,537 pending proposals across 469 OEM groups |
+| catalog_unified | canonical_product_id populated for all 90,605 active rows |
+| orders / order_items / vendor_orders | tables created, empty (no orders yet — gateway pending) |
+| catalog_fitment_v2 | +2 composite indexes, ANALYZE run |
+| harley_model_years | FLI year rows confirmed/inserted |
+
+## What Needs to Happen Next
+
+1. **User working through canonical match review queue** (469 groups, /admin/canonical-matches) — ongoing, multi-session. Use "Sync fitment" per group to reconcile fitment coverage regardless of merge decision.
+2. Once a meaningful batch of matches reviewed → click "Apply confirmed merges" to execute
+3. Decide payment gateway (Authorize.net / NMI / Braintree / etc.) — only blocker for `app/api/checkout/charge/route.ts`
+4. Wire `<CartProvider>` into root layout, build cart drawer UI
+5. Build checkout page UI (address form, order summary, payment form)
+6. Wire real PU + WPS API credentials into `triggerFulfillment.ts` adapters (endpoints currently placeholder URLs)
+7. Confirm ADMIN_SECRET value before adding to Vercel prod env
+8. Drop remaining session 43 files (unchanged from prior passes)
+9. Add FLI year range confirmation (2012–2013 assumed)
+10. Fix Framer Motion transparent errors (reference doc ready, not applied)
+11. Wire ProductQuickViewModal + BrowseBackButton (unchanged from prior passes)
+12. Shipping rate calculation + tax calculation — both currently $0 placeholders in checkout/prepare
+
+---
+
+
 
 Session: Forty-Sixth Pass · June 10, 2026
 

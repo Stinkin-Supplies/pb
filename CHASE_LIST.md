@@ -1,21 +1,38 @@
 # STINKIN' SUPPLIES — CHASE LIST
-**Last Updated: June 10, 2026 — Forty-Sixth Pass**
+**Last Updated: June 11–12, 2026 — Forty-Seventh Pass**
 
 ## 🚀 NEXT SESSION — START HERE
 
 | # | Task | Notes |
 |---|------|-------|
-| 1 | Drop remaining session 43 files | globals.css, layout.tsx, BespokeSerif-Variable.ttf, FilterSidebar.jsx, ProductQuickViewModal.jsx, BrowseBackButton.jsx, products-slug-route.ts — see files table below |
-| 2 | Add FLI to harley_models | FLI = Road Glide Limited. Need year range — likely 2012–2013. Same SQL pattern as FLHRX. |
-| 3 | Add ADMIN_SECRET to Vercel | `npx vercel env add ADMIN_SECRET` |
-| 4 | Fix Framer Motion transparent errors | Replace `transparent` with `rgba(0,0,0,0)` anywhere background animates. May be in computed variant values. |
-| 5 | Browse query performance Engine + Dyna | 3.5–7.6s. ng join removed (helps). Still needs composite index on `catalog_fitment_v2 (product_id, model_year_id)`. Run EXPLAIN ANALYZE. |
-| 6 | Wire ProductQuickViewModal into browse page | Add `quickView` state, `setQuickView(product)` on card click, render modal |
-| 7 | Wire BrowseBackButton into PDP | `import BrowseBackButton from "@/components/pdp/BrowseBackButton"` near top of PDP layout |
-| 8 | Verify null slug on /browse | Hard refresh — VTwin cards should route to real PDPs, not /browse/null |
-| 9 | Add remaining model images | 9 images: softail, dyna, sportster, fxr, shovelhead, vintage, trike, v-rod, street. 400×160px at `public/images/models/{slug}.jpg` |
-| 10 | Bulk-fix flagged products | `GET /api/admin/products/1?token=YOUR_SECRET` returns all unresolved flags |
-| 11 | Rename "Luggage Racks" subcategory to "Racks" | `UPDATE catalog_unified SET display_subcategory = 'Racks' WHERE display_category = 'Luggage & Racks' AND display_subcategory = 'Luggage Racks';` then update SUBCATEGORIES map in CategoryBentoGrid.jsx + reindex |
+| 1 | **Canonical match review** (IN PROGRESS) | 469 OEM groups / 1,536 proposals at `/admin/canonical-matches?token=...`. Confirm/reject per group, use "Sync fitment ↔" to reconcile fitment regardless of merge decision. Click "Apply confirmed merges" once a batch is reviewed. |
+| 2 | Decide payment gateway | Authorize.net / NMI / Braintree / Heartland / etc. Only blocker for `app/api/checkout/charge/route.ts` — single TODO block, everything else wired. |
+| 3 | Wire `<CartProvider>` into root layout | `lib/cart/CartContext.jsx` ready — wrap `app/layout.tsx`, then `useCart()` everywhere |
+| 4 | Build cart drawer UI | Uses `useCart()` — items, addItem, removeItem, updateQty, subtotal |
+| 5 | Build checkout page UI | Address form + order summary + payment form, posts to `/api/checkout/prepare` then `/api/checkout/charge` |
+| 6 | Wire real PU + WPS API credentials | `lib/fulfillment/triggerFulfillment.ts` — adapters stubbed with correct shapes, need `PU_API_URL/KEY`, `WPS_API_URL/KEY` env vars + endpoint confirmation |
+| 7 | Shipping + tax calculation | Both $0 placeholders in `app/api/checkout/prepare/route.ts` — `calculateShipping()` and `calculateTax()` |
+| 8 | Drop remaining session 43 files | globals.css, layout.tsx, BespokeSerif-Variable.ttf, FilterSidebar.jsx, ProductQuickViewModal.jsx, BrowseBackButton.jsx, products-slug-route.ts — see files table below |
+| 9 | Add ADMIN_SECRET to Vercel | `npx vercel env add ADMIN_SECRET` — confirm value matches local `.env.local` (`a7f3c9e2d4b8a1f6`) |
+| 10 | Fix Framer Motion transparent errors | Reference doc ready: `FRAMER_TRANSPARENT_FIX.md` — palette-specific rgba() replacements, not yet applied |
+| 11 | Wire ProductQuickViewModal into browse page | Add `quickView` state, `setQuickView(product)` on card click, render modal |
+| 12 | Wire BrowseBackButton into PDP | `import BrowseBackButton from "@/components/pdp/BrowseBackButton"` near top of PDP layout |
+| 13 | Verify null slug on /browse | Hard refresh — VTwin cards should route to real PDPs, not /browse/null |
+| 14 | Add remaining model images | 9 images: softail, dyna, sportster, fxr, shovelhead, vintage, trike, v-rod, street. 400×160px at `public/images/models/{slug}.jpg` |
+| 15 | Bulk-fix flagged products | `GET /api/admin/products/1?token=YOUR_SECRET` returns all unresolved flags |
+
+## ✅ DONE JUNE 11–12 — FORTY-SEVENTH PASS
+
+| Area | What Was Done |
+|------|---------------|
+| Fulfillment architecture | Drop-ship confirmed: PU+WPS API ordering, VTwin manual PO. Own merchant gateway (TBD), invoicing in admin panel. Canonical product layer designed: one listing per part, checkout-time optimizer for vendor routing. |
+| DB schema — canonical products | `canonical_products`, `product_vendors`, `canonical_match_proposals` tables created. `catalog_unified.canonical_product_id` FK added. |
+| DB schema — orders | `orders`, `order_items`, `vendor_orders` created. Auto `SS-YYYYMMDD-NNNN` order numbers via trigger. Gateway-agnostic payment fields. |
+| Canonical products pipeline | Phase A: all 90,605 active products → 1:1 canonical_products + product_vendors (rewritten to bulk CTE, 3,715 rows/s). Phase B: OEM matching → 469 groups / 1,537 proposals in review queue. |
+| Admin canonical match review UI | `/admin/canonical-matches` — grouped by OEM, side-by-side vendor cards, bulk confirm/reject, apply merges, fitment range display + mismatch flag, "Sync fitment ↔" action. |
+| **CRITICAL: vendor_sku fix** | All 90,605 product_vendors.vendor_sku were wrong (internal_sku format, not real vendor ordering #s) — found via PDF cross-check, fixed in single UPDATE. PU/WPS/VTwin all now have real ordering numbers. |
+| Fulfillment backend scaffolding | CartContext (real localStorage cart), optimizer.ts (vendor consolidation/margin routing), triggerFulfillment.ts (PU/WPS/VTwin adapters), checkout/prepare + checkout/charge routes (gateway stub). |
+| Chase list quick fixes | FLI model years inserted. catalog_fitment_v2 composite indexes added (Engine+Dyna fix). Luggage Racks→Racks confirmed. ANALYZE run. Framer transparent fix reference doc created. |
 
 ## Files to Drop In — Session 43 (still pending)
 
@@ -29,7 +46,7 @@
 | BrowseBackButton.jsx | components/pdp/BrowseBackButton.jsx |
 | products-slug-route.ts | app/api/products/[slug]/route.ts (new) |
 
-## ✅ DONE JUNE 10 — FORTY-SIXTH PASS
+
 
 | Area | What Was Done |
 |------|---------------|

@@ -10,9 +10,10 @@ import { updateProduct } from "./actions";
 
 const css = `
   .pd-body {
-    padding: 24px 28px;
-    background: #0a0909;
+    padding: 28px 32px;
+    background: #f5f0e8;
     min-height: calc(100vh - 46px);
+    color: #170f04;
   }
 
   /* ── breadcrumb / head ── */
@@ -22,57 +23,58 @@ const css = `
     gap: 8px;
     margin-bottom: 18px;
     font-family: var(--font-stencil), monospace;
-    font-size: 9px;
+    font-size: 11px;
     letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: #555;
+    color: #9c8a6a;
   }
-  .pd-nav a { color: #8a8784; text-decoration: none; }
-  .pd-nav a:hover { color: #e8621a; }
-  .pd-nav-sep { color: #333; }
+  .pd-nav a { color: #7a6a4f; text-decoration: none; }
+  .pd-nav a:hover { color: #c9a84c; }
+  .pd-nav-sep { color: #d8cab0; }
 
   .pd-head {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 16px;
-    margin-bottom: 20px;
+    margin-bottom: 24px;
   }
   .pd-title {
     font-family: var(--font-caesar), sans-serif;
-    letter-spacing: 0.06em;
-    font-size: 20px;
-    color: #f0ebe3;
-    line-height: 1.2;
+    letter-spacing: 0.04em;
+    font-size: 30px;
+    color: #170f04;
+    line-height: 1.25;
   }
   .pd-sku-badge {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    margin-top: 4px;
+    gap: 8px;
+    margin-top: 8px;
   }
   .pd-prefix {
-    background: rgba(232,98,26,0.1);
-    border: 1px solid rgba(232,98,26,0.25);
-    border-radius: 2px;
-    padding: 2px 7px;
+    background: rgba(201,168,76,0.14);
+    border: 1px solid rgba(201,168,76,0.4);
+    border-radius: 3px;
+    padding: 3px 9px;
     font-family: var(--font-stencil), monospace;
-    font-size: 10px;
+    font-size: 12px;
     letter-spacing: 0.1em;
-    color: #e8621a;
+    color: #a3822c;
+    font-weight: 600;
   }
   .pd-sku-num {
     font-family: var(--font-stencil), monospace;
-    font-size: 12px;
+    font-size: 14px;
     letter-spacing: 0.08em;
-    color: #8a8784;
+    color: #8a7a60;
   }
 
   /* ── layout ── */
   .pd-grid {
     display: grid;
-    grid-template-columns: 1fr 320px;
-    gap: 16px;
+    grid-template-columns: 1fr 340px;
+    gap: 18px;
     align-items: start;
   }
   @media (max-width: 1024px) {
@@ -81,32 +83,34 @@ const css = `
 
   /* ── card ── */
   .pd-card {
-    border: 1px solid #2a2828;
-    background: rgba(16,15,15,0.85);
-    border-radius: 2px;
+    border: 1px solid #e3d6bd;
+    background: #fffdf8;
+    border-radius: 6px;
     overflow: hidden;
+    box-shadow: 0 1px 3px rgba(23,15,4,0.04);
   }
   .pd-card-head {
-    padding: 10px 14px;
-    border-bottom: 1px solid #2a2828;
-    background: rgba(10,9,9,0.5);
+    padding: 13px 16px;
+    border-bottom: 1px solid #e3d6bd;
+    background: #f0e6d2;
     font-family: var(--font-stencil), monospace;
-    font-size: 9px;
+    font-size: 12px;
     letter-spacing: 0.16em;
     text-transform: uppercase;
-    color: #8a8784;
+    color: #8a7540;
+    font-weight: 700;
     display: flex;
     align-items: center;
     justify-content: space-between;
   }
-  .pd-card-body { padding: 14px; }
+  .pd-card-body { padding: 18px; }
 
   /* ── form fields ── */
   .field-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-bottom: 10px;
+    gap: 12px;
+    margin-bottom: 14px;
   }
   .field-row.full { grid-template-columns: 1fr; }
   .field-row.thirds { grid-template-columns: 1fr 1fr 1fr; }
@@ -115,25 +119,26 @@ const css = `
   .field {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
   }
   .field label {
     font-family: var(--font-stencil), monospace;
-    font-size: 8px;
-    letter-spacing: 0.16em;
+    font-size: 11px;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: #555;
+    color: #9c8a6a;
+    font-weight: 600;
   }
   .field input[type=text],
   .field input[type=number],
   .field textarea,
   .field select {
-    background: #0e0d0d;
-    border: 1px solid #252424;
-    color: #f0ebe3;
-    padding: 7px 9px;
-    border-radius: 2px;
-    font-size: 12px;
+    background: #ffffff;
+    border: 1px solid #ddd0b8;
+    color: #170f04;
+    padding: 10px 12px;
+    border-radius: 4px;
+    font-size: 14px;
     outline: none;
     width: 100%;
     box-sizing: border-box;
@@ -141,37 +146,38 @@ const css = `
   }
   .field input:focus,
   .field textarea:focus,
-  .field select:focus { border-color: rgba(232,98,26,0.55); }
-  .field textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
-  .field input[readonly] { color: #555; cursor: not-allowed; }
+  .field select:focus { border-color: #c9a84c; box-shadow: 0 0 0 2px rgba(201,168,76,0.18); }
+  .field textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
+  .field input[readonly] { color: #a3987f; background: #f7f1e6; cursor: not-allowed; }
 
   /* ── toggle ── */
   .toggle-row {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
     margin-bottom: 10px;
   }
   .toggle-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 7px 10px;
-    border: 1px solid #1f1e1e;
-    border-radius: 2px;
-    background: #0e0d0d;
+    padding: 10px 13px;
+    border: 1px solid #e3d6bd;
+    border-radius: 4px;
+    background: #fbf6ec;
   }
   .toggle-label {
     font-family: var(--font-stencil), monospace;
-    font-size: 9px;
+    font-size: 12px;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: #8a8784;
+    color: #5a4f3a;
+    font-weight: 600;
   }
   .toggle-item input[type=checkbox] {
-    width: 14px;
-    height: 14px;
-    accent-color: #e8621a;
+    width: 18px;
+    height: 18px;
+    accent-color: #c9a84c;
     cursor: pointer;
   }
 
@@ -180,26 +186,26 @@ const css = `
     width: 100%;
     aspect-ratio: 1;
     object-fit: contain;
-    background: #0e0d0d;
-    border: 1px solid #1f1e1e;
-    border-radius: 2px;
-    margin-bottom: 10px;
-    padding: 12px;
+    background: #ffffff;
+    border: 1px solid #e3d6bd;
+    border-radius: 4px;
+    margin-bottom: 12px;
+    padding: 14px;
     box-sizing: border-box;
   }
   .pd-img-placeholder {
     width: 100%;
     aspect-ratio: 1;
-    background: #0e0d0d;
-    border: 1px solid #1f1e1e;
-    border-radius: 2px;
-    margin-bottom: 10px;
+    background: #fbf6ec;
+    border: 1px solid #e3d6bd;
+    border-radius: 4px;
+    margin-bottom: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #333;
+    color: #c4b896;
     font-family: var(--font-stencil), monospace;
-    font-size: 9px;
+    font-size: 11px;
     letter-spacing: 0.14em;
     text-transform: uppercase;
   }
@@ -208,65 +214,68 @@ const css = `
   .info-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 8px;
+    gap: 10px;
   }
   .info-item {
     display: flex;
     flex-direction: column;
-    gap: 3px;
-    padding: 8px 10px;
-    background: #0e0d0d;
-    border: 1px solid #1a1919;
-    border-radius: 2px;
+    gap: 4px;
+    padding: 10px 12px;
+    background: #fbf6ec;
+    border: 1px solid #ece1cc;
+    border-radius: 4px;
   }
   .info-item-label {
     font-family: var(--font-stencil), monospace;
-    font-size: 8px;
+    font-size: 10px;
     letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: #444;
+    color: #ad9c7c;
+    font-weight: 600;
   }
   .info-item-val {
-    font-size: 12px;
-    color: #f0ebe3;
+    font-size: 14px;
+    color: #170f04;
   }
-  .info-item-val.muted { color: #555; }
+  .info-item-val.muted { color: #b3a890; }
 
   /* ── pills ── */
   .pill {
     display: inline-flex;
     align-items: center;
-    border: 1px solid #2a2828;
-    border-radius: 2px;
-    padding: 1px 6px;
+    border: 1px solid #ddd0b8;
+    border-radius: 3px;
+    padding: 2px 8px;
     font-family: var(--font-stencil), monospace;
-    font-size: 9px;
+    font-size: 11px;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: #8a8784;
+    color: #8a7a60;
+    font-weight: 600;
   }
-  .pill-on  { border-color: rgba(60,190,120,0.3);  color: #62d18c; }
-  .pill-off { border-color: rgba(255,90,90,0.25);  color: #ff7a7a; }
-  .pill-pu    { border-color: rgba(139,92,246,0.4); color: #a78bfa; }
-  .pill-wps   { border-color: rgba(59,130,246,0.4); color: #60a5fa; }
-  .pill-vtwin { border-color: rgba(232,98,26,0.4);  color: #e8621a; }
+  .pill-on  { border-color: rgba(60,150,90,0.4);   background: rgba(60,150,90,0.08);  color: #2f8552; }
+  .pill-off { border-color: rgba(200,70,70,0.35);  background: rgba(200,70,70,0.06);  color: #c0453f; }
+  .pill-pu    { border-color: rgba(139,92,246,0.4); background: rgba(139,92,246,0.07); color: #7c5fd6; }
+  .pill-wps   { border-color: rgba(59,130,246,0.4); background: rgba(59,130,246,0.07); color: #3b78d8; }
+  .pill-vtwin { border-color: rgba(201,168,76,0.5); background: rgba(201,168,76,0.12); color: #a3822c; }
 
   /* ── fitment tags ── */
   .fitment-tags {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
-    margin-top: 4px;
+    gap: 6px;
+    margin-top: 6px;
   }
   .fitment-tag {
-    background: rgba(232,98,26,0.06);
-    border: 1px solid rgba(232,98,26,0.15);
-    border-radius: 2px;
-    padding: 2px 6px;
+    background: rgba(201,168,76,0.10);
+    border: 1px solid rgba(201,168,76,0.3);
+    border-radius: 3px;
+    padding: 3px 8px;
     font-family: var(--font-stencil), monospace;
-    font-size: 8px;
-    letter-spacing: 0.08em;
-    color: #8a8784;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: #8a7540;
+    font-weight: 600;
   }
 
   /* ── action bar ── */
@@ -274,71 +283,76 @@ const css = `
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 8px;
-    padding: 12px 14px;
-    border-top: 1px solid #2a2828;
-    background: rgba(10,9,9,0.5);
+    gap: 10px;
+    padding: 16px 18px;
+    border-top: 1px solid #e3d6bd;
+    background: #f0e6d2;
   }
   .btn {
-    border: 1px solid rgba(232,98,26,0.35);
+    border: 1px solid #c9a84c;
     background: transparent;
-    color: #f0ebe3;
-    padding: 7px 14px;
-    border-radius: 2px;
+    color: #170f04;
+    padding: 10px 20px;
+    border-radius: 4px;
     cursor: pointer;
     font-family: var(--font-stencil), monospace;
-    font-size: 10px;
+    font-size: 12px;
     letter-spacing: 0.14em;
     text-transform: uppercase;
+    font-weight: 700;
     white-space: nowrap;
     text-decoration: none;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    transition: all 0.15s;
   }
-  .btn:hover { border-color: rgba(232,98,26,0.85); color: #e8621a; }
+  .btn:hover { background: rgba(201,168,76,0.12); }
   .btn-primary {
-    background: rgba(232,98,26,0.15);
-    border-color: rgba(232,98,26,0.6);
+    background: #c9a84c;
+    border-color: #c9a84c;
+    color: #1a1306;
   }
-  .btn-primary:hover { background: rgba(232,98,26,0.25); }
-  .btn-ghost { border-color: #2a2828; color: #8a8784; }
-  .btn-ghost:hover { border-color: #444; color: #f0ebe3; }
+  .btn-primary:hover { background: #d9bc66; }
+  .btn-ghost { border-color: #ddd0b8; color: #8a7a60; }
+  .btn-ghost:hover { border-color: #c9a84c; color: #8a7540; background: rgba(201,168,76,0.08); }
 
   /* ── warehouse grid ── */
   .wh-grid {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
-    gap: 6px;
-    margin-top: 8px;
+    gap: 8px;
+    margin-top: 10px;
   }
   .wh-item {
-    background: #0e0d0d;
-    border: 1px solid #1a1919;
-    border-radius: 2px;
-    padding: 6px 8px;
+    background: #fbf6ec;
+    border: 1px solid #ece1cc;
+    border-radius: 4px;
+    padding: 9px 10px;
     text-align: center;
   }
   .wh-label {
     font-family: var(--font-stencil), monospace;
-    font-size: 8px;
+    font-size: 10px;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: #444;
-    margin-bottom: 3px;
+    color: #ad9c7c;
+    margin-bottom: 4px;
+    font-weight: 600;
   }
   .wh-val {
     font-family: var(--font-stencil), monospace;
-    font-size: 13px;
+    font-size: 16px;
     letter-spacing: 0.04em;
-    color: #f0ebe3;
+    color: #170f04;
+    font-weight: 600;
   }
-  .wh-val.zero { color: #333; }
+  .wh-val.zero { color: #c4b896; }
 
   .divider {
     border: none;
-    border-top: 1px solid #1a1919;
-    margin: 12px 0;
+    border-top: 1px solid #ece1cc;
+    margin: 14px 0;
   }
 `;
 
@@ -707,11 +721,11 @@ export default async function ProductDetailPage({ params }) {
                   </div>
                   <div className="info-item">
                     <div className="info-item-label">Brand Part #</div>
-                    <div className="info-item-val" style={{fontSize:11}}>{p.brand_part_number || <span className="muted">—</span>}</div>
+                    <div className="info-item-val" style={{fontSize:13}}>{p.brand_part_number || <span className="muted">—</span>}</div>
                   </div>
                   <div className="info-item">
                     <div className="info-item-label">OEM Part #</div>
-                    <div className="info-item-val" style={{fontSize:11}}>{p.oem_numbers?.[0] || <span className="muted">—</span>}</div>
+                    <div className="info-item-val" style={{fontSize:13}}>{p.oem_numbers?.[0] || <span className="muted">—</span>}</div>
                   </div>
                   <div className="info-item">
                     <div className="info-item-label">Dropship Fee</div>
@@ -723,13 +737,13 @@ export default async function ProductDetailPage({ params }) {
                   </div>
                   <div className="info-item">
                     <div className="info-item-label">Added</div>
-                    <div className="info-item-val" style={{fontSize:10}}>
+                    <div className="info-item-val" style={{fontSize:12}}>
                       {p.part_add_date ? new Date(p.part_add_date).toLocaleDateString() : "—"}
                     </div>
                   </div>
                   <div className="info-item">
                     <div className="info-item-label">Updated</div>
-                    <div className="info-item-val" style={{fontSize:10}}>
+                    <div className="info-item-val" style={{fontSize:12}}>
                       {p.updated_at ? new Date(p.updated_at).toLocaleDateString() : "—"}
                     </div>
                   </div>

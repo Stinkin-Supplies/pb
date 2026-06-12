@@ -271,6 +271,7 @@ const COLS = [
   { key: 'category',label: 'Category', flex: 1,    editable: true },
   { key: 'vendor',  label: 'Vendor',   width: 80,  fixed: true },
   { key: 'price',   label: 'Price',    width: 80,  fixed: true, editable: true },
+  { key: 'pack_qty',label: 'Pack',     width: 56,  fixed: true, editable: true },
   { key: 'stock',   label: 'Stock',    width: 68,  fixed: true },
   { key: 'status',  label: 'Status',   width: 72,  fixed: true },
   { key: 'fitment', label: 'Fitment',  width: 76,  fixed: true },
@@ -318,7 +319,7 @@ function ProductsTable({ products, selected, onToggleSelect, onToggleAll, onEdit
     setEditingCell(null);
     if (String(val) === String(product[col] ?? '')) return;
     try {
-      const body = { [col]: col === 'price' ? parseFloat(val) || null : val };
+      const body = { [col]: col === 'price' ? (parseFloat(val) || null) : col === 'pack_qty' ? (Math.max(1, parseInt(val, 10) || 1)) : val };
       const res  = await fetch(`/api/admin/products/${product.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -337,7 +338,7 @@ function ProductsTable({ products, selected, onToggleSelect, onToggleAll, onEdit
   for (let i = firstVisible; i <= lastVisible; i++) visibleItems.push(i);
 
   // Dummy widths — flex layout handles actual sizing
-  const FIXED_WIDTHS = [40, 44, 120, 0, 0, 0, 80, 80, 68, 72, 76, 60];
+  const FIXED_WIDTHS = [40, 44, 120, 0, 0, 0, 80, 80, 56, 68, 72, 76, 60];
 
   return (
     <div className="pm-vt-wrap">
@@ -420,6 +421,8 @@ function ProductsTable({ products, selected, onToggleSelect, onToggleAll, onEdit
                 <div className="pm-vt-cell" style={{ width: 80, flexShrink: 0 }}>{vendorBadge(p.source_vendor)}</div>
                 {/* Price — editable */}
                 {editCell('price', <span>{p.price!=null?`$${Number(p.price).toFixed(2)}`:'—'}</span>)}
+                {/* Pack qty — editable */}
+                {editCell('pack_qty', <span style={{ color: (p.pack_qty ?? 1) > 1 ? 'var(--text)' : 'var(--muted)' }}>{(p.pack_qty ?? 1) > 1 ? `${p.pack_qty}×` : '1×'}</span>)}
                 {/* Stock */}
                 <div className="pm-vt-cell" style={{ width: 68, flexShrink: 0 }}>
                   <span style={{ fontSize:11, color: p.stock_quantity>10?'var(--green)':p.stock_quantity>0?'var(--yellow)':'var(--muted)' }}>{p.stock_quantity??0}</span>
@@ -563,6 +566,7 @@ function EditModal({ product, families, onClose, onSaved, onToast }) {
     category:        product.category        || '',
     msrp:            product.msrp            != null ? String(product.msrp)     : '',
     map_price:       product.map_price       != null ? String(product.map_price): '',
+    pack_qty:        product.pack_qty        != null ? String(product.pack_qty) : '1',
     is_active:       product.is_active       !== false,
     is_discontinued: !!product.is_discontinued,
     is_harley_fitment: !!product.is_harley_fitment,
@@ -643,6 +647,7 @@ function EditModal({ product, families, onClose, onSaved, onToast }) {
         category:          form.category,
         msrp:              form.msrp !== '' ? parseFloat(form.msrp) : null,
         map_price:         form.map_price !== '' ? parseFloat(form.map_price) : null,
+        pack_qty:          Math.max(1, parseInt(form.pack_qty, 10) || 1),
         features:          form.features.filter(Boolean),
         is_active:         form.is_active,
         is_discontinued:   form.is_discontinued,
@@ -738,6 +743,11 @@ function EditModal({ product, families, onClose, onSaved, onToast }) {
                 <div className="pm-field">
                   <label className="pm-label">MAP Price</label>
                   <input className="pm-input" type="number" step="0.01" value={form.map_price} onChange={e => setField('map_price', e.target.value)} placeholder="0.00" />
+                </div>
+                <div className="pm-field">
+                  <label className="pm-label">Pack Qty</label>
+                  <input className="pm-input" type="number" step="1" min="1" value={form.pack_qty} onChange={e => setField('pack_qty', e.target.value)} placeholder="1" />
+                  <div className="pm-toggle-sub" style={{ marginTop: 4 }}>Units per listing — shown on PDP as &quot;Pack of N&quot;</div>
                 </div>
               </div>
               <hr className="pm-divider" />

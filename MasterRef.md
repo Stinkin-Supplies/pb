@@ -341,6 +341,31 @@ Fallback: https://www.vtwinmfg.com/WebPics/{first-segment}/{raw-sku}.jpg
 | browse.ts dash-suffix regex | Fixed session 42 — open-ended dash strip replaced with finish-word list |
 | import_vtwin_fitment_full.mjs | Wrong schema — uses harley_model_id not model_year_id. Do not use. |
 | harley_models duplicate codes | OK to have same model_code with different year ranges (different eras). NOT ok to duplicate same year range. |
+| catalog_unified.vendor_sku | THE real per-vendor ordering number. internal_sku is OUR format (CAT###/TRN###.p) — never use for vendor API calls. PU: vendor_sku = brand_part_number minus dashes (fallback: sku for ~7,103 empty rows). WPS: vendor_sku 100% populated, use as-is. VTwin: vendor_sku populated for 37,749/38,365 (fallback: sku minus 'VT-' prefix). |
+| product_vendors.vendor_sku | Fixed June 11–12 (pass 47) — was wrongly populated from internal_sku. Now correct per above. Any future bulk product_vendors inserts MUST source from catalog_unified.vendor_sku with the fallback logic, NOT internal_sku. |
+| canonical_products / product_vendors | New layer (pass 47) sitting on top of catalog_unified. One canonical_product per real-world part; product_vendors links it to 1+ catalog_unified rows (one per vendor). catalog_unified.canonical_product_id FK. Browse/search still query catalog_unified directly — canonical layer is for checkout/fulfillment only (for now). |
+| canonical_match_proposals | OEM-based cross-vendor match review queue. Status flow: pending → confirmed/rejected → applied (merge executed). Review at /admin/canonical-matches?token=... |
+
+---
+
+## FULFILLMENT & CHECKOUT ARCHITECTURE (Pass 47)
+
+**Model:** Drop-ship. PU + WPS via API (daily inventory sync + order submission). VTwin manual PO (no API yet) — payment captured, order flagged `pending_manual` in `vendor_orders`, admin submits PO manually.
+
+**Canonical product layer:** Customer never sees vendor identity. `canonical_products.canonical_sku` (CP-XXXXXX) is what's in the cart. `product_vendors` links each canonical product to 1+ `catalog_unified` rows (one per vendor offering that part). The fulfillment optimizer (`lib/fulfillment/optimizer.ts`) resolves vendor routing **at checkout time**, not at add-to-cart:
+1. Minimize vendor count (one shipping charge > two)
+2. Maximize margin within the chosen vendor
+3. Fall back to next vendor if out of stock
+4. VTwin items always flagged `is_manual_fulfillment = true`
+
+**Order flow:**
+`CartContext` (localStorage, canonical_sku-based) → `/api/checkout/prepare` (runs optimizer, creates `orders`/`order_items`/`vendor_orders`, returns totals) → `/api/checkout/charge` (gateway-agnostic — ONE TODO block for the actual charge call) → `triggerFulfillment.ts` (vendor adapter pattern: PU/WPS API submission, VTwin → manual queue).
+
+**Adding a new vendor (e.g. VTwin API later):** write an adapter implementing `submitOrder(items, shipping, ourRef)` in `triggerFulfillment.ts`, register it in `ADAPTERS`. No other changes needed.
+
+**Payment gateway:** Not yet chosen. `app/api/checkout/charge/route.ts` has the full order-marking + fulfillment-trigger logic already wired; only the actual gateway charge call (TODO block) needs filling in once decided. Shape examples for Authorize.net and NMI are commented inline.
+
+**Shipping/tax:** Currently $0 placeholders (`calculateShipping`, `calculateTax` in `checkout/prepare/route.ts`) — need real logic before launch.
 
 ---
 
@@ -423,4 +448,4 @@ GROUP BY cvg.display_name, cvg.family_key, cvg.id ORDER BY cvg.display_name;
 
 ---
 
-*Master Reference — Last update: June 8, 2026 · Forty-Fifth Pass (display_subcategory taxonomy COMPLETE across all 20 categories, ~78,000 products mapped 87–97% coverage, ~2,000 misclassified products relocated, subcategory facets live in Typesense)*
+*Master Reference — Last update: June 11–12, 2026 · Forty-Seventh Pass (canonical products layer + fulfillment/checkout backend scaffolded, critical product_vendors.vendor_sku data fix across all 90,605 rows, OEM match review queue live at /admin/canonical-matches)*
