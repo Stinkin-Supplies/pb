@@ -290,7 +290,9 @@ export default async function ProductDetailPage({ params }) {
         const neighbors = await getChronologicalNeighbors(
           unifiedId,
           productRow.category ?? null,
+          productRow.display_subcategory ?? null,  // ← add this
         );
+        
         prevPart          = neighbors.prev;
         nextPart          = neighbors.next;
         timelineYearStart = neighbors.currentYearStart;

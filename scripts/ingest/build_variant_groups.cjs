@@ -42,19 +42,30 @@ const ATTRIBUTE_RULES = [
   { name: 'Rise',
     pattern: /\b(\d{1,2}(?:\.\d+)?)[""]\s*(?:ape|rise|tall)/i,
     extract: m => m[1] + '" Rise' },
-  // FINISH — multi-word before plain color
+  // FINISH — multi-word before plain color. "Brushed SS" / "Brushed" must
+  // come before Color so exhaust finish variants get the right axis name.
+  // Alternation order matters: longer phrases first (brushed ss before brushed).
   { name: 'Finish',
-    pattern: /\b(matte black|gloss black|satin black|flat black|polished chrome|show chrome|powder coat(?:ed)?|zinc(?: plated)?|cadmium(?: plated)?|nickel(?: plated)?|hard chrome|chrome plated)\b/i,
-    extract: m => toTitleCase(m[1]) },
+    pattern: /\b(brushed ss|brushed stainless|brushed|raw ss|raw stainless|matte black|gloss black|satin black|flat black|polished chrome|show chrome|powder coat(?:ed)?|zinc(?: plated)?|cadmium(?: plated)?|nickel(?: plated)?|hard chrome|chrome plated)\b/i,
+    extract: m => {
+      const v = m[1].toLowerCase();
+      if (v === 'brushed ss') return 'Brushed SS';
+      if (v === 'raw ss') return 'Raw SS';
+      if (v === 'brushed stainless') return 'Brushed Stainless';
+      if (v === 'raw stainless') return 'Raw Stainless';
+      if (v === 'brushed') return 'Brushed';
+      return toTitleCase(m[1]);
+    } },
   // THROTTLE
   { name: 'Throttle',
     pattern: /\b(push-?pull|pull-?only|single cable|dual cable|single throttle|dual throttle)\b/i,
     extract: m => toTitleCase(m[1]) },
   // COLOR — vinyl excluded (material not color); no number guard needed since
-  // displacement numbers like "128" are just context, black/chrome IS the variant axis
+  // displacement numbers like "128" are just context, black/chrome IS the variant axis.
+  // SS alone (without Brushed prefix) treated as Stainless.
   { name: 'Color',
-    pattern: /\b(black|chrome|red|blue|brown|silver|gold|white|yellow|green|orange|purple|gr[ae]y|clear|natural|stainless)\b/i,
-    extract: m => toTitleCase(m[1]) },
+    pattern: /\b(black|chrome|red|blue|brown|silver|gold|white|yellow|green|orange|purple|gr[ae]y|clear|natural|stainless|\bSS\b)\b/i,
+    extract: m => m[1].toUpperCase() === 'SS' ? 'Stainless' : toTitleCase(m[1]) },
 ];
 
 function extractAttribute(name) {
@@ -66,8 +77,16 @@ function extractAttribute(name) {
   return null;
 }
 
+// Treat Color and Finish as the same axis — both describe visual/material
+// variants (Black, Chrome, Brushed SS). Normalising here prevents 50/50
+// splits when a group has e.g. 2 Color + 2 Finish members.
+function normalizeAxisName(name) {
+  if (name === 'Finish') return 'Color';
+  return name;
+}
+
 function detectGroupAxis(memberAttrs) {
-  const types = memberAttrs.filter(Boolean).map(a => a.name);
+  const types = memberAttrs.filter(Boolean).map(a => normalizeAxisName(a.name));
   if (types.length === 0) return null;
   const counts = {};
   types.forEach(t => counts[t] = (counts[t] || 0) + 1);
@@ -247,23 +266,12 @@ async function main() {
 
     for (let idx = 0; idx < g.unified_ids.length; idx++) {
       const unifiedId = g.unified_ids[idx];
-      // Try to get fitment label
-      const fitRows = await q(`
-        SELECT hf.name as family, MIN(hmy.year) as min_year, MAX(hmy.year) as max_year
-        FROM catalog_fitment_v2 cfv
-        JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id
-        JOIN harley_models hm ON hm.id = hmy.model_id
-        JOIN harley_families hf ON hf.id = hm.family_id
-        WHERE cfv.product_id = $1
-        GROUP BY hf.name ORDER BY hf.name LIMIT 3
-      `, [unifiedId]);
-
-      const fitLabel = fitRows.length > 0
-        ? fitRows.map(r => `${r.family} ${r.min_year}–${r.max_year}`).join(', ')
-        : null;
-
+      // Variant axis only — fitment is display info on the PDP, not a selectable
+      // variant dimension. Storing fitment strings here caused the VariantSelector
+      // to surface "Fits: Dyna 1991-2017..." as a selector axis when two members
+      // in the same group had slightly different fitment ranges (WPS data artifact).
       const attr = memberAttrs[idx];
-      const useAttr = attr && (!axis || attr.name === axis);
+      const useAttr = attr && (!axis || normalizeAxisName(attr.name) === axis);
 
       await q(`
         INSERT INTO catalog_variant_members
@@ -272,8 +280,10 @@ async function main() {
         ON CONFLICT (group_id, product_id) DO UPDATE SET
           option_1_name = EXCLUDED.option_1_name, option_1_value = EXCLUDED.option_1_value,
           option_2_name = EXCLUDED.option_2_name, option_2_value = EXCLUDED.option_2_value
-      `, [grp.id, unifiedId, fitLabel ? 'Fits' : null, fitLabel,
-          useAttr ? attr.name : null, useAttr ? attr.value : null, idx]);
+      `, [grp.id, unifiedId,
+          useAttr ? normalizeAxisName(attr.name) : null, useAttr ? attr.value : null,
+          null, null,
+          idx]);
       membersInserted++;
     }
     if (groupsInserted % 100 === 0) console.log(`  ${groupsInserted}/${groups.length} groups, ${membersInserted} members`);
