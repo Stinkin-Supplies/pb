@@ -97,6 +97,12 @@ function getRenderMode(variants) {
   const hasFitment  = hasFitmentData(variants);
   if (hasOptions && hasFitment) return 'fitment+color';
   if (!hasOptions && hasFitment) return 'fitment';
+  // Mode D: two separate radio groups when variants differ by BOTH color and pack qty
+  if (hasOptions) {
+    const colors = new Set(variants.map(v => v.option_1_value).filter(Boolean));
+    const qtys   = new Set(variants.map(v => v.pack_qty).filter(q => q && q > 1));
+    if (colors.size > 1 && qtys.size > 1) return 'color+qty';
+  }
   return 'options';
 }
 
@@ -214,8 +220,9 @@ function FitmentColorSelector({ variants, currentId, onSelect, groupDisplayName 
                   const isSelected = v.id === selectedId || v.id === currentId;
                   const inStock    = v.stock_qty > 0;
                   const price      = v.offer_price || v.msrp;
+                  const vPackQty   = v.pack_qty && v.pack_qty > 1 ? v.pack_qty : null;
                   const label      = v.option_1_value
-                    ? [v.option_1_value, v.option_2_value].filter(Boolean).join(' · ')
+                    ? [v.option_1_value, v.option_2_value, vPackQty ? `${vPackQty}pk` : null].filter(Boolean).join(' · ')
                     : makeShortLabel(v.name, groupDisplayName) || v.sku;
 
                   return (
@@ -434,6 +441,159 @@ function OptionList({ variants, currentId, onSelect, groupDisplayName }) {
   );
 }
 
+// ── MODE D: Color + Qty two-radio-group selector ─────────────────────────────
+function ColorQtySelector({ variants, currentId, onSelect }) {
+  // Find current product's color and qty to init selection
+  const current = variants.find(v => v.id === currentId) ?? variants[0];
+
+  const [selectedColor, setSelectedColor] = useState(current?.option_1_value ?? null);
+  const [selectedQty,   setSelectedQty]   = useState(current?.pack_qty ?? null);
+
+  // Unique colors sorted alphabetically
+  const colors = [...new Set(variants.map(v => v.option_1_value).filter(Boolean))].sort();
+  // Unique qtys sorted numerically
+  const qtys = [...new Set(variants.map(v => v.pack_qty).filter(q => q && q > 1))].sort((a, b) => a - b);
+
+  // Best variant for a color+qty combo: cheapest in-stock, else cheapest overall
+  function bestVariant(color, qty) {
+    const matches = variants.filter(v => v.option_1_value === color && v.pack_qty === qty);
+    if (!matches.length) return null;
+    const inStock = matches.filter(v => v.stock_qty > 0);
+    const pool = inStock.length ? inStock : matches;
+    return pool.reduce((best, v) => {
+      const p = parseFloat(v.offer_price || v.msrp || 0);
+      const bp = parseFloat(best.offer_price || best.msrp || 0);
+      return p < bp ? v : best;
+    });
+  }
+
+  function handleColorChange(color) {
+    setSelectedColor(color);
+    if (selectedQty) {
+      const v = bestVariant(color, selectedQty);
+      if (v) onSelect(v);
+    }
+  }
+
+  function handleQtyChange(qty) {
+    setSelectedQty(qty);
+    if (selectedColor) {
+      const v = bestVariant(selectedColor, qty);
+      if (v) onSelect(v);
+    }
+  }
+
+  const activeVariant = selectedColor && selectedQty ? bestVariant(selectedColor, selectedQty) : null;
+  const activePrice   = activeVariant ? parseFloat(activeVariant.offer_price || activeVariant.msrp || 0) : null;
+  const activeStock   = activeVariant?.stock_qty ?? 0;
+
+  const pillBase = {
+    display: 'inline-flex', alignItems: 'center', gap: 7,
+    padding: '8px 14px', borderRadius: 6, cursor: 'pointer',
+    fontFamily: "var(--font-stencil,'Barlow Condensed',monospace)",
+    fontSize: 12, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase',
+    border: `1px solid ${BORDER}`, background: 'white', color: DARK,
+    transition: 'all 0.13s',
+  };
+  const pillActive = {
+    border: `1px solid ${GOLD}`, background: '#fffbf0',
+    boxShadow: `0 0 0 2px ${GOLD}33`, color: DARK,
+  };
+
+  return (
+    <div style={{ padding: '14px 14px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+      {/* Color */}
+      <div>
+        <div style={{
+          fontFamily: "var(--font-stencil,'Barlow Condensed',monospace)",
+          fontSize: 9, letterSpacing: '0.14em', color: '#9a8870',
+          textTransform: 'uppercase', marginBottom: 8,
+        }}>
+          Color
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {colors.map(color => {
+            const isActive = selectedColor === color;
+            return (
+              <button
+                key={color}
+                onClick={() => handleColorChange(color)}
+                style={{ ...pillBase, ...(isActive ? pillActive : {}) }}
+              >
+                <ColorDot value={color} selected={isActive} />
+                {color}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Quantity */}
+      <div>
+        <div style={{
+          fontFamily: "var(--font-stencil,'Barlow Condensed',monospace)",
+          fontSize: 9, letterSpacing: '0.14em', color: '#9a8870',
+          textTransform: 'uppercase', marginBottom: 8,
+        }}>
+          Quantity
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {qtys.map(qty => {
+            const isActive   = selectedQty === qty;
+            const candidate  = selectedColor ? bestVariant(selectedColor, qty) : null;
+            const available  = !selectedColor || !!candidate;
+            const priceLabel = candidate
+              ? `$${parseFloat(candidate.offer_price || candidate.msrp || 0).toFixed(2)}`
+              : null;
+            return (
+              <button
+                key={qty}
+                onClick={() => available && handleQtyChange(qty)}
+                style={{
+                  ...pillBase,
+                  ...(isActive ? pillActive : {}),
+                  opacity: available ? 1 : 0.35,
+                  cursor: available ? 'pointer' : 'not-allowed',
+                }}
+              >
+                <span>{qty} pack</span>
+                {priceLabel && (
+                  <span style={{ color: isActive ? GOLD : '#9a8870', fontSize: 11 }}>
+                    {priceLabel}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Selected summary */}
+      {activeVariant && (
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: '8px 12px',
+          background: '#f5f0e8', border: `1px solid ${BORDER}`, borderRadius: 6,
+          fontFamily: "var(--font-stencil,'Barlow Condensed',monospace)",
+        }}>
+          <span style={{ fontSize: 11, color: '#6b5c40', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            {selectedColor} · {selectedQty} pack
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 9, color: activeStock > 0 ? '#4a8c5c' : '#b05a40', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              {activeStock > 0 ? 'In stock' : 'Out of stock'}
+            </span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: DARK }}>
+              ${activePrice?.toFixed(2)}
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
 export default function VariantSelector({ productId }) {
   const router = useRouter();
@@ -559,6 +719,13 @@ export default function VariantSelector({ productId }) {
           groupDisplayName={group?.displayName}
         />
       )}
+      {mode === 'color+qty' && (
+        <ColorQtySelector
+          variants={variants}
+          currentId={currentId}
+          onSelect={handleSelect}
+        />
+      )}
       {mode === 'options' && (
         <OptionList
           variants={variants}
@@ -649,8 +816,9 @@ function VariantCard({ variant, isSelected, isCurrent, onSelect, groupDisplayNam
   const price   = variant.offer_price || variant.msrp;
   const active  = isSelected || isCurrent;
 
+  const packQty = variant.pack_qty && variant.pack_qty > 1 ? variant.pack_qty : null;
   const shortLabel = (variant.option_1_value
-    ? [variant.option_1_value, variant.option_2_value].filter(Boolean).join(' · ')
+    ? [variant.option_1_value, variant.option_2_value, packQty ? `${packQty}pk` : null].filter(Boolean).join(' · ')
     : makeShortLabel(variant.name, groupDisplayName))
     || variant.name || variant.sku;
 

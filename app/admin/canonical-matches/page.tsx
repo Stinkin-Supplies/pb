@@ -29,6 +29,7 @@ interface ProductSide {
   brand_part: string | null;
   oem_numbers: string[] | null;
   is_kit: boolean;
+  pack_qty: number;
   computed_price: number;
   image_url: string | null;
   display_category: string;
@@ -44,12 +45,12 @@ interface Proposal {
   status: string;
   a_id: number; a_name: string; a_vendor: string; a_sku: string;
   a_vendor_sku: string | null; a_brand_part: string | null; a_fits_all: boolean;
-  a_oem_numbers: string[] | null; a_is_kit: boolean;
+  a_oem_numbers: string[] | null; a_is_kit: boolean; a_pack_qty: number;
   a_price: number; a_image: string | null; a_category: string; a_subcategory: string | null;
   a_canonical_sku: string;
   b_id: number; b_name: string; b_vendor: string; b_sku: string;
   b_vendor_sku: string | null; b_brand_part: string | null; b_fits_all: boolean;
-  b_oem_numbers: string[] | null; b_is_kit: boolean;
+  b_oem_numbers: string[] | null; b_is_kit: boolean; b_pack_qty: number;
   b_price: number; b_image: string | null; b_category: string; b_subcategory: string | null;
   b_canonical_sku: string;
 }
@@ -98,6 +99,32 @@ function parsePackQty(name: string): number {
   return 1;
 }
 
+// Real pack_qty column wins if set (>1); otherwise fall back to parsing
+// the name for products not yet covered by the bulk migration.
+function effectivePackQty(p: { pack_qty?: number; name: string }): number {
+  if (p.pack_qty && p.pack_qty > 1) return p.pack_qty;
+  return parsePackQty(p.name);
+}
+
+// Extracts a finish/color keyword from a product name, e.g.
+// "Cam Cover - Chrome - Big Twin" → "chrome", "Black Nose Cone Cam Cover" → "black".
+// Used to detect when "matches" are actually different sellable finish
+// variants of the same base part (not duplicates) — merging these would
+// mean a customer who picks "Chrome" could get swapped to "Natural".
+const FINISH_KEYWORDS = [
+  'wrinkle black', 'powder coat', 'gunmetal', 'titanium', 'stainless steel',
+  'chrome', 'black', 'polished', 'natural', 'satin', 'zinc', 'stainless',
+  'brushed', 'anodized', 'smooth', 'machine', 'gloss',
+  'matte', 'billet', 'raw', 'silver', 'gold',
+];
+function parseFinish(name: string): string | null {
+  const lower = name.toLowerCase();
+  for (const kw of FINISH_KEYWORDS) {
+    if (lower.includes(kw)) return kw;
+  }
+  return null;
+}
+
 export default function CanonicalMatchesPage() {
   const params = useSearchParams();
   const token  = params.get('token') ?? '';
@@ -109,9 +136,10 @@ export default function CanonicalMatchesPage() {
   const [error, setError]         = useState<string | null>(null);
   const [busyGroups, setBusyGroups] = useState<Set<string>>(new Set());
   const [syncMsgs, setSyncMsgs]   = useState<Record<string, string>>({});
+  const [groupSelections, setGroupSelections] = useState<Record<string, Set<number>>>({});
   const [appliedMsg, setAppliedMsg] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [editForm, setEditForm]   = useState<{ vendor_sku: string; brand_part: string; oem_numbers: string; is_kit: boolean; name: string; computed_price: string; image_url: string }>({ vendor_sku: '', brand_part: '', oem_numbers: '', is_kit: false, name: '', computed_price: '', image_url: '' });
+  const [editForm, setEditForm]   = useState<{ vendor_sku: string; brand_part: string; oem_numbers: string; is_kit: boolean; name: string; computed_price: string; image_url: string; pack_qty: string }>({ vendor_sku: '', brand_part: '', oem_numbers: '', is_kit: false, name: '', computed_price: '', image_url: '', pack_qty: '1' });
   const [saveMsgs, setSaveMsgs]   = useState<Record<number, string>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<ProductSide[]>([]);
@@ -158,6 +186,61 @@ export default function CanonicalMatchesPage() {
     groups.get(key)!.push(p);
   }
 
+  function toggleGroupProduct(oem: string, productId: number, allIds: number[]) {
+    setGroupSelections(prev => {
+      const current = new Set(prev[oem] ?? allIds); // default: all selected
+      if (current.has(productId)) {
+        current.delete(productId);
+      } else {
+        current.add(productId);
+      }
+      return { ...prev, [oem]: current };
+    });
+  }
+
+  function initGroupSelection(oem: string, allIds: number[]) {
+    setGroupSelections(prev => {
+      if (prev[oem]) return prev; // already initialized
+      return { ...prev, [oem]: new Set(allIds) };
+    });
+  }
+
+  async function selectiveAction(oem: string, group: Proposal[], selectedIds: Set<number>, action: 'confirm' | 'reject') {
+    setBusyGroups(prev => new Set(prev).add(oem));
+    try {
+      // Find proposal IDs where both products are in the selected set
+      const proposalIds = group
+        .filter(p => selectedIds.has(p.a_id) && selectedIds.has(p.b_id))
+        .map(p => p.id);
+
+      // Find proposal IDs where at least one product is NOT selected
+      const rejectIds = group
+        .filter(p => !selectedIds.has(p.a_id) || !selectedIds.has(p.b_id))
+        .map(p => p.id);
+
+      if (action === 'confirm' && proposalIds.length > 0) {
+        await fetch('/api/admin/canonical-matches/select', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, proposal_ids: proposalIds, action: 'confirm' }),
+        });
+      }
+      // Always reject the non-selected pairs
+      if (rejectIds.length > 0) {
+        await fetch('/api/admin/canonical-matches/select', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, proposal_ids: rejectIds, action: 'reject' }),
+        });
+      }
+
+      setProposals(prev => prev.filter(p => p.shared_oem_number !== oem));
+      setGroupSelections(prev => { const next = { ...prev }; delete next[oem]; return next; });
+    } finally {
+      setBusyGroups(prev => { const next = new Set(prev); next.delete(oem); return next; });
+    }
+  }
+
   async function bulkAction(oem: string, action: 'confirm' | 'reject') {
     setBusyGroups(prev => new Set(prev).add(oem));
     try {
@@ -165,6 +248,24 @@ export default function CanonicalMatchesPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, shared_oem_number: oem, action }),
+      });
+      setProposals(prev => prev.filter(p => p.shared_oem_number !== oem));
+    } finally {
+      setBusyGroups(prev => {
+        const next = new Set(prev);
+        next.delete(oem);
+        return next;
+      });
+    }
+  }
+
+  async function flagAsVariant(oem: string, productIds: number[], reason: string) {
+    setBusyGroups(prev => new Set(prev).add(oem));
+    try {
+      await fetch('/api/admin/canonical-matches/variant-candidates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, group_key: oem, product_ids: productIds, reason }),
       });
       setProposals(prev => prev.filter(p => p.shared_oem_number !== oem));
     } finally {
@@ -210,6 +311,7 @@ export default function CanonicalMatchesPage() {
       name: p.name ?? '',
       computed_price: String(p.computed_price ?? ''),
       image_url: p.image_url ?? '',
+      pack_qty: String(p.pack_qty ?? 1),
     });
   }
 
@@ -236,6 +338,7 @@ export default function CanonicalMatchesPage() {
           name: editForm.name,
           computed_price: Number.isFinite(priceNum) ? priceNum : undefined,
           image_url: editForm.image_url,
+          pack_qty: Number.isFinite(parseInt(editForm.pack_qty, 10)) ? parseInt(editForm.pack_qty, 10) : undefined,
         }),
       });
       const data = await res.json();
@@ -264,7 +367,7 @@ export default function CanonicalMatchesPage() {
         setSearchResults(data.results.map((r: any) => ({
           id: r.id, name: r.name, source_vendor: r.source_vendor, internal_sku: r.internal_sku,
           vendor_sku: r.vendor_sku, brand_part: r.brand_part_number, oem_numbers: r.oem_numbers,
-          is_kit: r.is_kit, computed_price: r.computed_price, image_url: r.image_url,
+          is_kit: r.is_kit, pack_qty: r.pack_qty, computed_price: r.computed_price, image_url: r.image_url,
           display_category: r.display_category, display_subcategory: r.display_subcategory,
           fits_all: false,
         })));
@@ -346,6 +449,17 @@ export default function CanonicalMatchesPage() {
             <span style={{ fontSize: 13, color: '#555' }}>
               pending <b>{counts.pending ?? 0}</b> · confirmed <b>{counts.confirmed ?? 0}</b> · applied <b>{counts.applied ?? 0}</b> · rejected <b>{counts.rejected ?? 0}</b>
             </span>
+            <a
+              href={`/admin/variant-candidates?token=${encodeURIComponent(token)}`}
+              style={{
+                border: '1px solid #534AB7', color: '#534AB7', background: '#eeedfe',
+                fontWeight: 700, fontSize: 13, padding: '9px 16px',
+                borderRadius: 6, textTransform: 'none', textDecoration: 'none',
+                display: 'inline-flex', alignItems: 'center',
+              }}
+            >
+              Variant candidates
+            </a>
             <button
               onClick={applyMerges}
               style={{
@@ -474,14 +588,14 @@ export default function CanonicalMatchesPage() {
             productsMap.set(p.a_id, {
               id: p.a_id, name: p.a_name, source_vendor: p.a_vendor, internal_sku: p.a_sku,
               vendor_sku: p.a_vendor_sku, brand_part: p.a_brand_part, fits_all: p.a_fits_all,
-              oem_numbers: p.a_oem_numbers, is_kit: p.a_is_kit,
+              oem_numbers: p.a_oem_numbers, is_kit: p.a_is_kit, pack_qty: p.a_pack_qty,
               computed_price: p.a_price, image_url: p.a_image, display_category: p.a_category,
               display_subcategory: p.a_subcategory,
             });
             productsMap.set(p.b_id, {
               id: p.b_id, name: p.b_name, source_vendor: p.b_vendor, internal_sku: p.b_sku,
               vendor_sku: p.b_vendor_sku, brand_part: p.b_brand_part, fits_all: p.b_fits_all,
-              oem_numbers: p.b_oem_numbers, is_kit: p.b_is_kit,
+              oem_numbers: p.b_oem_numbers, is_kit: p.b_is_kit, pack_qty: p.b_pack_qty,
               computed_price: p.b_price, image_url: p.b_image, display_category: p.b_category,
               display_subcategory: p.b_subcategory,
             });
@@ -491,13 +605,34 @@ export default function CanonicalMatchesPage() {
           const isBusy = busyGroups.has(oem);
           const syncMsg = syncMsgs[oem];
 
+          // Per-product selection within this group
+          const sel = groupSelections[oem] ?? new Set(productIds);
+          const isPartialSelection = sel.size > 0 && sel.size < products.length;
+          const selectedPairCount = group.filter(p => sel.has(p.a_id) && sel.has(p.b_id)).length;
+
           const fitmentSets = products.map(p => overallYearRange(fitment[p.id]));
           const distinctRanges = new Set(fitmentSets.filter(Boolean));
           const fitmentMismatch = distinctRanges.size > 1;
 
-          const packQtys = products.map(p => parsePackQty(p.name));
+          const packQtys = products.map(p => effectivePackQty(p));
           const distinctPackQtys = new Set(packQtys);
           const packMismatch = distinctPackQtys.size > 1;
+
+          const prices = products.map(p => Number(p.computed_price)).filter(p => p > 0);
+          const priceMin = prices.length ? Math.min(...prices) : 0;
+          const priceMax = prices.length ? Math.max(...prices) : 0;
+          const priceRatio = priceMin > 0 ? priceMax / priceMin : 1;
+          // Flag if the priciest item is 3x+ the cheapest AND it's not already
+          // explained by a detected pack-size difference
+          const priceMismatch = priceRatio >= 3 && !packMismatch;
+
+          const finishes = products.map(p => parseFinish(p.name));
+          const distinctFinishes = new Set(finishes.filter(Boolean));
+          // Only flag if MOST products have a detected finish AND they differ —
+          // avoids false positives on groups where only one item happens to
+          // mention e.g. "black" incidentally.
+          const finishMismatch = distinctFinishes.size > 1
+            && finishes.filter(Boolean).length >= products.length - 1;
 
           return (
             <div key={oem} style={{
@@ -515,7 +650,7 @@ export default function CanonicalMatchesPage() {
                   ) : (
                     <>OEM <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1a1a1a', fontSize: 14 }}>{oem}</span></>
                   )}
-                  {' · '}{products.length} vendors · score {group[0].match_score}
+                  {' · '}{products.length} item{products.length !== 1 ? 's' : ''} ({new Set(products.map(p => p.source_vendor)).size} vendor{new Set(products.map(p => p.source_vendor)).size !== 1 ? 's' : ''}) · score {group[0].match_score}
                   {fitmentMismatch && (
                     <span style={{
                       marginLeft: 10, fontSize: 11, fontWeight: 700, color: '#9a5a0c',
@@ -530,6 +665,22 @@ export default function CanonicalMatchesPage() {
                       background: '#f5d9cf', padding: '2px 8px', borderRadius: 10,
                     }}>
                       ⚠ pack size differs ({packQtys.map(q => `${q}x`).join(' vs ')})
+                    </span>
+                  )}
+                  {priceMismatch && (
+                    <span style={{
+                      marginLeft: 6, fontSize: 11, fontWeight: 700, color: '#993C1D',
+                      background: '#f5d9cf', padding: '2px 8px', borderRadius: 10,
+                    }}>
+                      ⚠ price differs {priceRatio.toFixed(1)}× (${priceMin.toFixed(2)}–${priceMax.toFixed(2)})
+                    </span>
+                  )}
+                  {finishMismatch && (
+                    <span style={{
+                      marginLeft: 6, fontSize: 11, fontWeight: 700, color: '#534AB7',
+                      background: '#eeedfe', padding: '2px 8px', borderRadius: 10,
+                    }}>
+                      ⚠ different finishes ({[...distinctFinishes].join(' vs ')}) — likely separate variants, not duplicates
                     </span>
                   )}
                 </div>
@@ -549,6 +700,28 @@ export default function CanonicalMatchesPage() {
                   >
                     Sync fitment ↔
                   </button>
+                  {!oem.startsWith('MANUAL-') && (
+                    <button
+                      disabled={isBusy}
+                      onClick={() => flagAsVariant(
+                        oem, productIds,
+                        finishMismatch
+                          ? `different finishes (${[...distinctFinishes].join(' vs ')})`
+                          : packMismatch
+                          ? `different pack sizes (${packQtys.map(q => `${q}x`).join(' vs ')})`
+                          : priceMismatch
+                          ? `different sizes/lengths — price differs ${priceRatio.toFixed(1)}x ($${priceMin.toFixed(2)}–$${priceMax.toFixed(2)})`
+                          : 'flagged for variant review'
+                      )}
+                      style={{
+                        fontSize: 12, padding: '6px 12px', borderRadius: 5,
+                        border: '1px solid #534AB7', background: '#eeedfe', color: '#534AB7',
+                        fontWeight: 600, cursor: isBusy ? 'default' : 'pointer', opacity: isBusy ? 0.5 : 1, textTransform: 'none',
+                      }}
+                    >
+                      Flag as variant set
+                    </button>
+                  )}
                   <button
                     disabled={isBusy}
                     onClick={() => bulkAction(oem, 'reject')}
@@ -560,17 +733,36 @@ export default function CanonicalMatchesPage() {
                   >
                     Reject all
                   </button>
-                  <button
-                    disabled={isBusy}
-                    onClick={() => bulkAction(oem, 'confirm')}
-                    style={{
-                      fontSize: 12, padding: '6px 12px', borderRadius: 5,
-                      border: '1px solid #3B6D11', background: '#e6f4d9', color: '#3B6D11',
-                      fontWeight: 700, cursor: isBusy ? 'default' : 'pointer', opacity: isBusy ? 0.5 : 1, textTransform: 'none',
-                    }}
-                  >
-                    Confirm all ({group.length})
-                  </button>
+                  {isPartialSelection ? (
+                    <button
+                      disabled={isBusy}
+                      onClick={() => selectiveAction(oem, group, sel, 'confirm')}
+                      style={{
+                        fontSize: 12, padding: '6px 12px', borderRadius: 5,
+                        border: '1px solid #3B6D11',
+                        background: selectedPairCount > 0 ? '#e6f4d9' : '#fff3e0',
+                        color: selectedPairCount > 0 ? '#3B6D11' : '#8a5a00',
+                        fontWeight: 700, cursor: isBusy ? 'default' : 'pointer',
+                        opacity: isBusy ? 0.5 : 1, textTransform: 'none',
+                      }}
+                    >
+                      {selectedPairCount > 0
+                        ? `Confirm ${selectedPairCount} pair${selectedPairCount !== 1 ? 's' : ''} · reject rest`
+                        : 'Reject deselected'}
+                    </button>
+                  ) : (
+                    <button
+                      disabled={isBusy}
+                      onClick={() => bulkAction(oem, 'confirm')}
+                      style={{
+                        fontSize: 12, padding: '6px 12px', borderRadius: 5,
+                        border: '1px solid #3B6D11', background: '#e6f4d9', color: '#3B6D11',
+                        fontWeight: 700, cursor: isBusy ? 'default' : 'pointer', opacity: isBusy ? 0.5 : 1, textTransform: 'none',
+                      }}
+                    >
+                      Confirm all ({group.length} pair{group.length !== 1 ? 's' : ''})
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -579,12 +771,25 @@ export default function CanonicalMatchesPage() {
                   const ranges = fitment[p.id];
                   const isEditing = editingId === p.id;
                   const saveMsg = saveMsgs[p.id];
+                  const isSelected = sel.has(p.id);
                   return (
                     <div key={p.id} style={{
                       display: 'flex', gap: 12, alignItems: 'flex-start',
-                      border: '1px solid #eee', borderRadius: 8, padding: 12,
-                      flex: '1 1 320px', minWidth: 300, background: '#fcfbf8',
+                      border: `1px solid ${isSelected ? '#cfe8bd' : '#f5c6c0'}`,
+                      borderRadius: 8, padding: 12,
+                      flex: '1 1 320px', minWidth: 300,
+                      background: isSelected ? '#f9fdf6' : '#fdf6f5',
                     }}>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => {
+                          initGroupSelection(oem, productIds);
+                          toggleGroupProduct(oem, p.id, productIds);
+                        }}
+                        title={isSelected ? 'Uncheck to exclude from merge' : 'Check to include in merge'}
+                        style={{ marginTop: 4, width: 16, height: 16, flexShrink: 0, cursor: 'pointer', accentColor: '#3B6D11' }}
+                      />
                       {p.image_url ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={p.image_url} alt="" style={{ width: 56, height: 56, objectFit: 'contain', borderRadius: 4, background: '#fff', border: '1px solid #eee', flexShrink: 0 }} />
@@ -601,9 +806,9 @@ export default function CanonicalMatchesPage() {
                             {p.source_vendor}
                           </span>
                           <span style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a' }}>${Number(p.computed_price).toFixed(2)}</span>
-                          {parsePackQty(p.name) > 1 && (
+                          {effectivePackQty(p) > 1 && (
                             <span style={{ fontSize: 10, fontWeight: 700, color: '#534AB7', background: '#eeedfe', padding: '2px 7px', borderRadius: 10 }}>
-                              {parsePackQty(p.name)}×
+                              {effectivePackQty(p)}×
                             </span>
                           )}
                           {p.fits_all && (
@@ -651,6 +856,15 @@ export default function CanonicalMatchesPage() {
                                   value={editForm.computed_price}
                                   onChange={e => setEditForm(f => ({ ...f, computed_price: e.target.value }))}
                                   inputMode="decimal"
+                                  style={{ display: 'block', width: '100%', fontFamily: 'monospace', fontSize: 12, padding: '4px 6px', marginTop: 2, border: '1px solid #ccc', borderRadius: 4 }}
+                                />
+                              </label>
+                              <label style={{ fontSize: 11, color: '#888', flex: '0 0 70px' }}>
+                                pack qty
+                                <input
+                                  value={editForm.pack_qty}
+                                  onChange={e => setEditForm(f => ({ ...f, pack_qty: e.target.value }))}
+                                  inputMode="numeric"
                                   style={{ display: 'block', width: '100%', fontFamily: 'monospace', fontSize: 12, padding: '4px 6px', marginTop: 2, border: '1px solid #ccc', borderRadius: 4 }}
                                 />
                               </label>

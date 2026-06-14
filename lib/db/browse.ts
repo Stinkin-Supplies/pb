@@ -285,6 +285,59 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
     ? [family]
     : [];
 
+  // Normalise model codes into a single array early — used by chain pre-fetch
+  // AND by the fitment conditions below (replaces the separate modelCode /
+  // modelCodes branches later in this function).
+  const effectiveModelCodes: string[] = modelCodes?.length
+    ? modelCodes
+    : modelCode
+    ? [modelCode]
+    : [];
+
+  // ── OEM chain pre-fetch ────────────────────────────────────────────────────
+  // When an exact year + model is specified (ModelFinder path), surface products
+  // reachable via the OEM supersession chain: their OEM number covers this
+  // model-year through a predecessor/successor relationship even though they lack
+  // a direct catalog_fitment_v2 row for it.
+  //
+  // mv_oem_fitment_coverage.has_direct_match = FALSE → coverage comes entirely
+  // from chain members, not from a direct crossref entry for this model-year.
+  //
+  // Non-fatal: if the matview is missing or the query fails, chainProductIds
+  // stays empty and the rest of browseProducts runs identically to before.
+  let chainProductIds: number[] = [];
+
+  if (year && effectiveModelCodes.length > 0) {
+    try {
+      const { rows: chainRows } = await pool.query<{ product_id: number }>(`
+        WITH target_my AS (
+          SELECT my.id AS model_year_id
+          FROM harley_model_years my
+          JOIN harley_models hm ON hm.id = my.model_id
+          WHERE my.year = $1
+            AND hm.model_code = ANY($2::text[])
+        ),
+        chain_oems AS (
+          SELECT DISTINCT fc.oem_number
+          FROM mv_oem_fitment_coverage fc
+          JOIN target_my tm ON tm.model_year_id = fc.model_year_id
+          WHERE fc.has_direct_match = FALSE
+        )
+        SELECT DISTINCT x.product_id
+        FROM catalog_oem_crossref x
+        JOIN chain_oems co ON x.oem_number = co.oem_number
+        WHERE x.oem_format IN ('hd_oem', 'hd_oem_nodash')
+          AND x.expanded_from = FALSE
+      `, [year, effectiveModelCodes]);
+      chainProductIds = chainRows.map(r => r.product_id);
+      if (chainProductIds.length > 0) {
+        console.log(`[browse] OEM chain: ${chainProductIds.length} chain products for ${year} ${effectiveModelCodes.join(',')}`);
+      }
+    } catch (err) {
+      console.error('[browse] OEM chain pre-fetch failed (non-fatal):', err);
+    }
+  }
+
   let fitmentJoin = "";
 
   // Always filter to active products only
@@ -298,7 +351,7 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
   } else if (universal) {
     // Universal/chopper era — products not tied to a specific H-D family.
     conditions.push(`(cu.is_harley_fitment = false OR cu.is_universal = true)`);
-  } else if (effectiveFamilies.length > 0 || modelCode || modelCodes?.length || year || yearMin || yearMax) {
+  } else if (effectiveFamilies.length > 0 || effectiveModelCodes.length > 0 || year || yearMin || yearMax) {
     // yearMin/yearMax are pushed into a subquery so they filter BEFORE the
     // LEFT JOIN, rather than living in the WHERE clause (which would break the
     // is_harley_fitment fallback — the fallback arm would ignore year bounds and
@@ -343,18 +396,30 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
       params.push(effectiveFamilies);
     }
 
-    if (modelCodes && modelCodes.length > 0) {
-      conditions.push(`hm.model_code = ANY($${p++}::text[])`);
-      params.push(modelCodes);
-    } else if (modelCode) {
-      conditions.push(`hm.model_code = $${p++}`);
-      params.push(modelCode);
+    // Model code filter — chain-aware.
+    // When chain products exist, OR them in so they bypass the model_code JOIN
+    // (chain products may not have a cfv_yr row for the target model, so hm is NULL).
+    if (effectiveModelCodes.length > 0) {
+      if (chainProductIds.length > 0) {
+        conditions.push(`(hm.model_code = ANY($${p++}::text[]) OR cu.id = ANY($${p++}::int[]))`);
+        params.push(effectiveModelCodes, chainProductIds);
+      } else {
+        conditions.push(`hm.model_code = ANY($${p++}::text[])`);
+        params.push(effectiveModelCodes);
+      }
     }
 
-    // Exact year (user dropdown — not era range)
+    // Exact year (user dropdown — not era range) — chain-aware.
+    // Chain products are OR'd in so they bypass the year constraint: their fitment
+    // rows cover ADJACENT years, not the target year, but they're valid via OEM chain.
     if (year) {
-      conditions.push(`cfv_yr.year = $${p++}`);
-      params.push(year);
+      if (chainProductIds.length > 0) {
+        conditions.push(`(cfv_yr.year = $${p++} OR cu.id = ANY($${p++}::int[]))`);
+        params.push(year, chainProductIds);
+      } else {
+        conditions.push(`cfv_yr.year = $${p++}`);
+        params.push(year);
+      }
     }
 
     if (familyConditions.length > 0) {

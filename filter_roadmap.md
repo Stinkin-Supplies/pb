@@ -83,12 +83,12 @@ catalog_oem_crossref is single source of truth. product_id FK added. Unique inde
 
 | Layer | Issue | Status |
 |-------|-------|--------|
-| Browse query | Engine+Dyna 3.5–7.6s | ⏳ Investigate catalog_fitment_v2 composite index |
-| Framer Motion | transparent animation errors | ⏳ May be in computed variant values |
-| Model codes | FLHRX + FLI missing | ⏳ Add to harley_models |
-| Typesense | No reindex automation | ⏳ Future |
+| Browse query | Engine+Dyna composite index | ✅ Added session 47 — idx_cfv2_product_modelyear + idx_cfv2_modelyear_product |
+| Framer Motion | transparent animation errors | ⏳ FRAMER_TRANSPARENT_FIX.md ready, not yet applied |
+| Model codes | FLHRX + FLI missing | ✅ Both added session 47 |
+| Typesense | No reindex automation | 🔵 Future |
 | display_subcategory | Accessories & Misc 94% NULL | Accepted — catch-all by design |
 
 ---
 
-*Filter Roadmap — Last updated June 8, 2026 · Session 45 — display_subcategory taxonomy COMPLETE*
+*Filter Roadmap — Last updated June 13, 2026 · Session 48 — open issues updated*

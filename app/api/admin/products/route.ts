@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
   let pi = 1;
 
   if (q) {
-    conditions.push(`(cu.name ILIKE $${pi} OR cu.sku ILIKE $${pi})`);
+    conditions.push(`(cu.name ILIKE $${pi} OR cu.sku ILIKE $${pi} OR cu.internal_sku ILIKE $${pi} OR cu.brand_part_number ILIKE $${pi})`);
     params.push(`%${q}%`);
     pi++;
   }
@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
       SELECT
         cu.id,
         cu.sku,
+        cu.internal_sku,
         cu.source_vendor,
         cu.name,
         cu.brand,
@@ -67,6 +68,9 @@ export async function GET(request: NextRequest) {
         cu.is_active,
         cu.is_discontinued,
         cu.in_stock,
+        cu.pack_qty,
+        cu.computed_price AS price,
+        cu.stock_quantity,
         COUNT(cfv.id)::int AS fitment_count
       FROM catalog_unified cu
       LEFT JOIN catalog_fitment_v2 cfv ON cfv.product_id = cu.id

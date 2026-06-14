@@ -76,7 +76,11 @@ export default async function ProductDetailPage({ params }) {
         cu.height_in,
         cu.length_in,
         cu.width_in,
-        cu.id        AS unified_id
+        cu.id        AS unified_id,
+        cu.pack_qty,
+        cu.display_category,
+        cu.display_subcategory,
+        cu.fits_all_models
       FROM public.catalog_products cp
       INNER JOIN public.catalog_unified cu ON cu.sku = cp.sku
       WHERE cp.slug = $1
@@ -141,7 +145,11 @@ export default async function ProductDetailPage({ params }) {
           cu.height_in,
           cu.length_in,
           cu.width_in,
-          cu.id        AS unified_id
+          cu.id        AS unified_id,
+          cu.pack_qty,
+          cu.display_category,
+          cu.display_subcategory,
+          cu.fits_all_models
         FROM public.catalog_unified cu
         LEFT JOIN public.catalog_products cp ON cp.sku = cu.sku
         WHERE cu.slug = $1
@@ -306,7 +314,9 @@ export default async function ProductDetailPage({ params }) {
     .map(s => ({ label: s.attribute, value: s.value }));
 
   const normalized = normalizeProductRow(productRow);
-  const resolvedOemNumbers = oemNumbers.length ? oemNumbers : normalized.oemNumbers;
+  // Only use real OEM numbers from catalog_oem_crossref — never fall back to
+  // cu.oem_numbers, which stores vendor catalog numbers (e.g. K&L "32-XXXX").
+  const resolvedOemNumbers = oemNumbers;
 
   return (
     <ProductDetailClient
@@ -388,6 +398,11 @@ function normalizeProductRow(row) {
     inHarddrive:       false,
     shipping:          price >= 99,
     pointsEarned:      Math.floor(price * 10),
+    packQty:           row.pack_qty && row.pack_qty > 1 ? Number(row.pack_qty) : 1,
+    displayCategory:   row.display_category    ?? null,
+    displaySubcategory: row.display_subcategory ?? null,
+    fitsAllModels:     row.fits_all_models     ?? false,
+    sourceVendor:      row.source_vendor       ?? null,
   };
 }
 

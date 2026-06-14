@@ -121,6 +121,7 @@ export default function AdminEditPanel({ product }) {
   const [category,    setCategory]    = useState(product.displayCategory    ?? "");
   const [subcategory, setSubcategory] = useState(product.displaySubcategory ?? "");
   const [fitsAll,     setFitsAll]     = useState(product.fitsAllModels      ?? false);
+  const [packQty,     setPackQty]     = useState(String(product.packQty ?? 1));
 
   // Flag fields
   const [flagType,  setFlagType]  = useState("wrong_category");
@@ -142,7 +143,8 @@ export default function AdminEditPanel({ product }) {
   const hints = SUBCATEGORY_HINTS[category] ?? [];
   const dirty = category    !== (product.displayCategory    ?? "")
              || subcategory !== (product.displaySubcategory ?? "")
-             || fitsAll     !== (product.fitsAllModels      ?? false);
+             || fitsAll     !== (product.fitsAllModels      ?? false)
+             || packQty     !== String(product.packQty ?? 1);
 
   async function handleSave() {
     setSaving(true);
@@ -161,6 +163,7 @@ export default function AdminEditPanel({ product }) {
             display_category:    category,
             display_subcategory: subcategory,
             fits_all_models:     fitsAll,
+            pack_qty:            parseInt(packQty, 10) || 1,
           };
 
           const token = new URLSearchParams(window.location.search).get("token")
@@ -442,6 +445,33 @@ export default function AdminEditPanel({ product }) {
                   {fitsAll ? "Universal fit" : "Model-specific"}
                 </span>
               </button>
+            </div>
+
+            {/* pack_qty */}
+            <div>
+              <FieldLabel>Pack Qty</FieldLabel>
+              <input
+                type="number"
+                min="1"
+                max="500"
+                value={packQty}
+                onChange={(e) => setPackQty(e.target.value)}
+                style={{
+                  width: 100,
+                  padding: "10px 12px",
+                  background: C.cream,
+                  border: `1px solid ${packQty !== String(product.packQty ?? 1) ? C.gold : C.border}`,
+                  fontFamily: MONO,
+                  fontSize: 13,
+                  color: C.black,
+                  letterSpacing: "0.04em",
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+              <div style={{ fontFamily: MONO, fontSize: 10, color: C.inkLight, letterSpacing: "0.08em", marginTop: 4 }}>
+                Units sold per listing (1 = individual)
+              </div>
             </div>
 
             {/* Current raw category (read-only reference) */}

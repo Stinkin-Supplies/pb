@@ -8,11 +8,10 @@
  */
 
 import { useState, useEffect, useCallback, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { getProductImage } from "@/lib/getProductImage";
 import FilterSidebar from "@/components/browse/FilterSidebar";
-import ProductQuickViewModal from "@/components/browse/ProductQuickViewModal";
 
 const GOLD     = "#b8922a";
 const CREAM    = "#faf7f2";
@@ -32,7 +31,8 @@ const SORT_OPTIONS = [
 
 // ─── Product Card ─────────────────────────────────────────────────────────────
 
-function ProductCard({ product, index, onOpen }) {
+function ProductCard({ product, index }) {
+  const router = useRouter();
   const [imgErr, setImgErr] = useState(false);
   const imageSrc = getProductImage({
     image: product.image_url ?? null,
@@ -47,12 +47,12 @@ function ProductCard({ product, index, onOpen }) {
       transition={{ delay: index * 0.03, type: "spring", stiffness: 300, damping: 24 }}
       role="button"
       tabIndex={0}
-      aria-label={`Quick view ${product.name}`}
-      onClick={() => onOpen(product)}
+      aria-label={product.name}
+      onClick={() => router.push(`/browse/${product.slug}`)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          onOpen(product);
+          router.push(`/browse/${product.slug}`);
         }
       }}
       style={{ position: "relative", cursor: "pointer", outline: "none" }}
@@ -125,7 +125,7 @@ function ProductCard({ product, index, onOpen }) {
               whileTap={{ scale: 0.95 }}
               onClick={(e) => {
                 e.stopPropagation();
-                onOpen(product);
+                router.push(`/browse/${product.slug}`);
               }}
               style={{ background: CREAM2, border: `1px solid rgba(184,146,42,0.3)`, color: GOLD, width: 30, height: 30, fontSize: "18px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s, color 0.15s" }}
             >+</motion.button>
@@ -153,7 +153,6 @@ function BrowsePageInner() {
   const [loading, setLoading]     = useState(true);
   const [page, setPage]           = useState(1);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [quickView, setQuickView] = useState(null);
   const [searchInput, setSearchInput] = useState(searchParams.get("q") || "");
 
   const [filters, setFilters] = useState({
@@ -384,7 +383,7 @@ function BrowsePageInner() {
           ) : (
             <>
             <div className="product-grid">
-                {products.map((p, i) => <ProductCard key={p.id} product={p} index={i} onOpen={setQuickView} />)}
+                {products.map((p, i) => <ProductCard key={p.id} product={p} index={i} />)}
               </div>
 
               {totalPages > 1 && (
@@ -404,10 +403,6 @@ function BrowsePageInner() {
           )}
         </div>
       </div>
-
-      {quickView && (
-        <ProductQuickViewModal product={quickView} onClose={() => setQuickView(null)} />
-      )}
 
       {/* ── Floating filter pill — mobile only, sits above bottom nav ── */}
       <div className="mobile-filter-pill">

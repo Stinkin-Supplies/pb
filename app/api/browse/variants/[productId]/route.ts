@@ -68,7 +68,8 @@ export async function GET(
            ORDER BY cm.priority ASC, cm.id ASC LIMIT 1),
           cu.image_url
         ) AS image_url,
-        cu.oem_numbers
+        cu.oem_numbers,
+        cu.pack_qty
       FROM catalog_variant_members cvm
       JOIN catalog_unified cu ON cu.id = cvm.product_id
       LEFT JOIN vendor_offers vo ON vo.catalog_product_id = cu.id

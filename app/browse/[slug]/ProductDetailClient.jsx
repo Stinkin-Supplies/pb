@@ -638,6 +638,12 @@ export default function ProductDetailClient({
                 <div style={{ fontFamily: MONO, fontSize: 11, color: C.inkLight, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Map policy applies</div>
               )}
               <Stock inStock={product.inStock} qty={product.stockQty} />
+              {product.packQty > 1 && (
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 8 }}>
+                  <span style={{ background: C.gold, color: C.black, fontFamily: MONO, fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", padding: "3px 8px", textTransform: "uppercase" }}>PACK</span>
+                  <span style={{ background: C.cream, border: `1px solid ${C.border}`, borderLeft: "none", fontFamily: MONO, fontSize: 13, color: C.black, padding: "3px 10px", letterSpacing: "0.05em" }}>Sold as {product.packQty}</span>
+                </div>
+              )}
             </div>
 
             {/* OEM inline — if present */}
