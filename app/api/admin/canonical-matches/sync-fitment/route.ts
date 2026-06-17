@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
             AND cf.model_year_id = t.model_year_id
         )
       )
-      INSERT INTO catalog_fitment_v2 (product_id, model_year_id, confidence, source)
+      INSERT INTO catalog_fitment_v2 (product_id, model_year_id, confidence_score, fitment_source)
       SELECT product_id, model_year_id, 0.90, 'canonical_merge_sync'
       FROM missing
       RETURNING product_id

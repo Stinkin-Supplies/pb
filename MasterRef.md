@@ -345,6 +345,13 @@ Fallback: https://www.vtwinmfg.com/WebPics/{first-segment}/{raw-sku}.jpg
 | product_vendors.vendor_sku | Fixed June 11–12 (pass 47) — was wrongly populated from internal_sku. Now correct per above. Any future bulk product_vendors inserts MUST source from catalog_unified.vendor_sku with the fallback logic, NOT internal_sku. |
 | canonical_products / product_vendors | New layer (pass 47) sitting on top of catalog_unified. One canonical_product per real-world part; product_vendors links it to 1+ catalog_unified rows (one per vendor). catalog_unified.canonical_product_id FK. Browse/search still query catalog_unified directly — canonical layer is for checkout/fulfillment only (for now). |
 | canonical_match_proposals | OEM-based cross-vendor match review queue. Status flow: pending → confirmed/rejected → applied (merge executed). Review at /admin/canonical-matches?token=... |
+| Shared params array across differently-shaped queries | NEVER share one params array across queries whose WHERE clauses differ (e.g. product/count/facet variants that each drop a different condition). If a condition's $N placeholder is dropped from one query's text but the params array still has a value at that position, Postgres throws "could not determine data type of parameter $N". Each query needs its own freshly-renumbered params array. (browse.ts fixed June 16 — tagged-condition + renderWhere() pattern.) |
+| Dead-link checks must verify Content-Type, not just HTTP status | A URL can return a healthy 200 while serving something completely unusable as an image (confirmed: zip archives at `application/x-zip`). Status-only checks are blind to this. Always check the real Content-Type header. |
+| PU image data — image_url / product_image / pu_brand_enrichment.image_uri can ALL be the same bad zip | Confirmed June 16: ~13,790 active PU products (37.6%) have every image-related field across `pu_catalog`, `catalog_unified`, and `pu_brand_enrichment` independently resolving to the same zip archive. Not a column-mixup bug — PU's feed never shipped a direct image for these. See PU_ZIP_EXTRACTION_TODO.md. |
+| catalog_media for PU sourced from pu_brand_enrichment.image_uri | Any `catalog_media` fallback logic does NOT independently rescue PU products affected by the zip contamination above — it's the same underlying source. |
+| pu_brand_enrichment SKU join | Use the normalized join from `import_pu_brand_catalogs_WORKING.js`: `replace(cu.sku, '-', '') = replace(replace(pbe.sku, '-', ''), '.', '')` — NOT a plain exact `sku = sku` match, which under-matches. |
+| Standalone Node scripts (scripts/ingest/*.mjs) and env vars | These do NOT get Next.js's automatic `.env.local` loading. Either `export` the var in the shell first, or load it manually in the script (see `check_dead_images.mjs` for a minimal loader pattern). |
+| Server components needing onError image fallback | A server component (e.g. `app/browse/[slug]/page.jsx`) can't hold `useState` directly. Extract a small client component (see `components/browse/ProductImage.jsx`) that takes `src`/`alt` props and handles the `onError` fallback internally. |
 
 ---
 
@@ -449,3 +456,5 @@ GROUP BY cvg.display_name, cvg.family_key, cvg.id ORDER BY cvg.display_name;
 ---
 
 *Master Reference — Last update: June 11–12, 2026 · Forty-Seventh Pass (canonical products layer + fulfillment/checkout backend scaffolded, critical product_vendors.vendor_sku data fix across all 90,605 rows, OEM match review queue live at /admin/canonical-matches)*
+
+*Operational Gotchas table appended June 16, 2026 (Fifty-First Pass) with findings from that session — params-array query bug, PU image zip contamination, and related patterns. Executive summary stats and main status line above are NOT refreshed past June 11–12 — sessions 48–50's stat changes aren't reflected here yet; cross-reference HANDOFF_LOG.md and ROADMAP.md for current figures.*

@@ -27,6 +27,49 @@ const pool = new Pool({ connectionString: process.env.CATALOG_DATABASE_URL ?? pr
 
 const BATCH_SIZE = 2000;
 
+// ─── Mismatch detection (ported from app/admin/canonical-matches/page.tsx) ────
+// Same exact logic as the admin review UI badges, so a pair that would show
+// a pack-size or finish mismatch badge never becomes a proposal at all,
+// instead of relying on a reviewer to catch the badge every time.
+
+function parsePackQty(name) {
+  const patterns = [
+    /(\d+)\s*[- ]?pack/i,
+    /pack\s*of\s*(\d+)/i,
+    /set\s*of\s*(\d+)/i,
+    /\((\d+)\)\s*$/,
+    /\bx\s*(\d+)\b/i,
+  ];
+  for (const re of patterns) {
+    const m = name.match(re);
+    if (m) {
+      const n = parseInt(m[1], 10);
+      if (n > 1 && n <= 500) return n;
+    }
+  }
+  return 1;
+}
+
+function effectivePackQty(packQty, name) {
+  if (packQty && packQty > 1) return packQty;
+  return parsePackQty(name);
+}
+
+const FINISH_KEYWORDS = [
+  'wrinkle black', 'powder coat', 'gunmetal', 'titanium', 'stainless steel',
+  'chrome', 'black', 'polished', 'natural', 'satin', 'zinc', 'stainless',
+  'brushed', 'anodized', 'smooth', 'machine', 'gloss',
+  'matte', 'billet', 'raw', 'silver', 'gold',
+];
+
+function parseFinish(name) {
+  const lower = name.toLowerCase();
+  for (const kw of FINISH_KEYWORDS) {
+    if (lower.includes(kw)) return kw;
+  }
+  return null;
+}
+
 // ─── Progress bar ─────────────────────────────────────────────────────────────
 
 function progressBar(current, total, startTime) {
@@ -183,8 +226,24 @@ async function phaseB(client) {
 
   console.log(`  Found ${candidates.length} OEM match candidates`);
 
+  // Fetch name + pack_qty for every product involved, once, so we can
+  // mismatch-check pairs without a query per pair.
+  const allProductIds = [...new Set(candidates.flatMap(c => c.product_ids.filter(Boolean)))];
+  const productInfo = new Map(); // id -> { name, pack_qty }
+
+  if (allProductIds.length > 0) {
+    const { rows: infoRows } = await client.query(`
+      SELECT id, name, pack_qty FROM catalog_unified WHERE id = ANY($1)
+    `, [allProductIds]);
+    for (const r of infoRows) {
+      productInfo.set(r.id, { name: r.name, pack_qty: r.pack_qty });
+    }
+  }
+
   let proposed = 0;
   let alreadyExists = 0;
+  let skippedPackQty = 0;
+  let skippedFinish = 0;
 
   for (const c of candidates) {
     const productIds = c.product_ids.filter(Boolean);
@@ -195,6 +254,32 @@ async function phaseB(client) {
       for (let j = i + 1; j < productIds.length; j++) {
         const a = Math.min(productIds[i], productIds[j]);
         const b = Math.max(productIds[i], productIds[j]);
+
+        const infoA = productInfo.get(a);
+        const infoB = productInfo.get(b);
+
+        // Skip pairs that the admin UI would flag with a pack-size mismatch
+        // badge — these are different sellable quantities of the same base
+        // part, not duplicates.
+        if (infoA && infoB) {
+          const qtyA = effectivePackQty(infoA.pack_qty, infoA.name);
+          const qtyB = effectivePackQty(infoB.pack_qty, infoB.name);
+          if (qtyA !== qtyB) {
+            skippedPackQty++;
+            continue;
+          }
+
+          // Skip pairs that the admin UI would flag with a finish/color
+          // mismatch badge — only skip when BOTH sides have a recognized
+          // finish keyword and they differ; absence of a keyword on either
+          // side isn't evidence of a mismatch, so don't exclude on that alone.
+          const finishA = parseFinish(infoA.name);
+          const finishB = parseFinish(infoB.name);
+          if (finishA && finishB && finishA !== finishB) {
+            skippedFinish++;
+            continue;
+          }
+        }
 
         try {
           await client.query(`
@@ -213,6 +298,8 @@ async function phaseB(client) {
 
   console.log(`  Proposed: ${proposed} new matches`);
   console.log(`  Skipped (already exists): ${alreadyExists}`);
+  console.log(`  Skipped (pack-qty mismatch): ${skippedPackQty}`);
+  console.log(`  Skipped (finish/color mismatch): ${skippedFinish}`);
   console.log(`\n  Review proposals in the admin panel at /admin/canonical-matches`);
   console.log(`  or with: SELECT * FROM canonical_match_proposals WHERE status = 'pending' LIMIT 50;`);
 }

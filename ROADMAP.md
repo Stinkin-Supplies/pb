@@ -1,5 +1,5 @@
 # STINKIN' SUPPLIES — PROJECT ROADMAP
-**Last Updated: June 14, 2026 (Forty-Ninth Pass)**
+**Last Updated: June 16, 2026 (Fifty-First Pass)**
 
 ---
 
@@ -96,6 +96,11 @@
 | Item | Status |
 |------|--------|
 | browse.ts — disjunctive faceting, count fix, Typesense pagination, variant dedup | ✅ |
+| browse.ts — multi-word search (per-word AND matching across name/brand/sku) | ✅ |
+| browse.ts — per-query params rendering (fixed shared-array bug across product/count/3 facet queries) | ✅ |
+| browse.ts / pdp-page.jsx — catalog_media image fallback when image_url null/empty | ✅ (does not cover PU zip-contaminated rows — see Phase 16) |
+| ProductCard.jsx / pdp-page.jsx — cream theme conversion | ✅ |
+| ProductImage.jsx — graceful broken-image fallback (client component for server-component pages) | ✅ |
 | FilterSidebar — active filter chips, section indicators, mobile bottom sheet | ✅ |
 | BrowseBackButton (sessionStorage) | ✅ |
 | Typesense group_by: variant_group_id | ✅ |
@@ -103,6 +108,9 @@
 | PDP (/browse/[slug]) — LeMans image proxy, fitment tab, OEM tab | ✅ |
 | QuickView modal removed — cards navigate directly to PDP | ✅ |
 | Placeholder "400×400" image removed — returns null when no real image | ✅ |
+| OEM supersession chain — oem_supersession (283 pairs), mv_oem_fitment_coverage (683K rows) | ✅ |
+| browse.ts OEM chain pre-fetch — surfaces chain products when year+model set (1.3ms warm) | ✅ |
+| getChronologicalNeighbors — tightened to display_subcategory, timeline shows same part type | ✅ |
 
 ---
 
@@ -132,6 +140,9 @@
 | apply_oversize_variants.cjs — cross-oversize grouping (73 groups, 332 members) | ✅ |
 | Oversize variant Typesense reindex (90,605 docs, 0 errors) | ✅ |
 | catalog_variant_candidates table | ✅ |
+| Fits axis removed from WPS variant members — no more year ranges as selectable options | ✅ |
+| Brushed SS / Brushed / Raw SS added to Finish rule in extractAttribute | ✅ |
+| normalizeAxisName() — Finish→Color normalization prevents mixed-axis splits | ✅ |
 
 ---
 
@@ -258,7 +269,7 @@ All DB tables are correct. Can start this immediately.
 
 | Item | Notes |
 |------|-------|
-| PU multi-image | image_zip column — multiple angles not yet fetched |
+| PU image zip contamination | **Confirmed June 16** — not "not yet fetched," confirmed broken. ~13,790 active PU products (37.6%) have `image_url` resolving to `application/x-zip` across three independent sources (`catalog_unified.image_url`, `pu_catalog.product_image`, `pu_brand_enrichment.image_uri`). PU's feed never shipped a direct image for these — only a zip archive. Stopgap (null + placeholder) and real fix (extract from zip) both scoped in `PU_ZIP_EXTRACTION_TODO.md`. |
 | Hard Drive book crossref | Same pattern as FatBook/OldBook |
 | WPS API enrichment | features+blocks hit rate testing |
 | Browse/Brand tabs | Data ready, UI unbuilt |
@@ -269,8 +280,6 @@ All DB tables are correct. Can start this immediately.
 | Tools & Chemicals coverage | 547 NULL — WPS abbreviations |
 | display_subcategory master script | Consolidate all mapping SQL into one place |
 | Typesense reindex automation | Auto-run as post-step in ingest scripts |
-| SKU display on PDP | Show internal_sku |
-| PU multi-image gallery | image_zip multiple angles |
 
 ---
 
@@ -282,7 +291,8 @@ All DB tables are correct. Can start this immediately.
 | Typesense | No reindex automation | 🔵 Future |
 | Admin | ADMIN_SECRET not in Vercel | ⏳ |
 | PU | Portal spot-check 3-4 SKUs | ⏳ Recommended |
+| PU | ~13,790 active products have zip-contaminated image_url (confirmed June 16) | ⏳ See PU_ZIP_EXTRACTION_TODO.md |
 
 ---
 
-*Last updated June 14, 2026 · Session 49*
+*Last updated June 16, 2026 · Session 51*

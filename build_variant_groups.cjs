@@ -356,6 +356,8 @@ async function main() {
     }
 
     bump(axisStats, result.axis);
+    totalGroups++;
+    totalMembers += result.members.length;
 
     if (DRY) {
       console.log(`  GROUP [${result.axis}] wps_product_id=${g.wps_product_id} — ${result.members.length} members`);
@@ -394,8 +396,6 @@ async function main() {
       wpsMembers_created++;
     }
 
-    totalGroups++;
-    totalMembers += result.members.length;
   }
 
   if (!DRY) {
@@ -475,7 +475,7 @@ async function main() {
 
     // All members in a name group share the same attribute name by construction,
     // but double-check axis coherence.
-    const axes = group.members.map(m => m.attr.name);
+    const axes = group.members.map(m => normalizeAxisName(m.attr.name));
     const dominantAxis = axes[0];
     if (!axes.every(a => a === dominantAxis)) { bump(puSkipReasons, 'mixed_axes'); continue; }
 
@@ -487,6 +487,8 @@ async function main() {
     if (result.members.length < 2) { bump(puSkipReasons, 'too_few_after_filter'); continue; }
 
     bump(axisStats, result.axis);
+    totalGroups++;
+    totalMembers += result.members.length;
 
     if (DRY) {
       console.log(`  GROUP [${result.axis}] "${group.baseName}" (${group.source_vendor}) — ${result.members.length} members`);
@@ -537,8 +539,6 @@ async function main() {
       puMembersCreated++;
     }
 
-    totalGroups++;
-    totalMembers += unique.length;
   }
 
   if (!DRY) {

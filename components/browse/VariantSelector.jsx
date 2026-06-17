@@ -368,6 +368,12 @@ function FitmentList({ variants, currentId, onSelect, groupDisplayName }) {
   });
   const display = expanded ? sorted : sorted.slice(0, SHOW);
 
+  // When multiple variants share the same year-range label, fall back to product names
+  const labels = sorted.map(v => yearRangeLabel(v));
+  const hasDupeLabels = labels.some((l, i) => labels.indexOf(l) !== i);
+  const packQtys = new Set(sorted.map(v => v.pack_qty ?? 1));
+  const hasQtyVariation = packQtys.size > 1;
+
   return (
     <>
       <div style={{ padding: '10px 10px 4px', display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -378,6 +384,9 @@ function FitmentList({ variants, currentId, onSelect, groupDisplayName }) {
             isSelected={v.id === currentId}
             isCurrent={v.id === currentId}
             onSelect={() => onSelect(v)}
+            groupDisplayName={groupDisplayName}
+            useNameLabel={hasDupeLabels || hasQtyVariation}
+            showQtyBadge={hasQtyVariation}
           />
         ))}
       </div>
@@ -739,16 +748,24 @@ export default function VariantSelector({ productId }) {
 }
 
 // ── FitmentVariantCard (Mode B) ───────────────────────────────────────────────
-function FitmentVariantCard({ variant, isSelected, isCurrent, onSelect }) {
+function FitmentVariantCard({ variant, isSelected, isCurrent, onSelect, groupDisplayName, useNameLabel = false, showQtyBadge = false }) {
   const [hovered, setHovered] = useState(false);
   const inStock = variant.stock_qty > 0;
   const price   = variant.offer_price || variant.msrp;
   const active  = isSelected || isCurrent;
   const yearLabel = yearRangeLabel(variant);
   const families  = variant.fitment_by_family ?? [];
-  const subLabel  = families.length > 1
-    ? families.map(f => f.family).join(' · ')
-    : variant.sku;
+
+  const qty = variant.pack_qty ?? 1;
+  const qtyLabel = qty > 1 ? `${qty}-Pack` : '1 pc';
+
+  // When year labels duplicate across the group, use product name as primary
+  const primaryLabel = useNameLabel
+    ? (makeShortLabel(variant.name, groupDisplayName) || variant.name || variant.sku)
+    : (yearLabel ?? variant.name ?? variant.sku);
+  const subLabel = useNameLabel
+    ? (yearLabel ? `${yearLabel} · ${variant.sku}` : variant.sku)
+    : (families.length > 1 ? families.map(f => f.family).join(' · ') : variant.sku);
 
   return (
     <button
@@ -768,12 +785,25 @@ function FitmentVariantCard({ variant, isSelected, isCurrent, onSelect }) {
       }}
     >
       <div style={{ minWidth: 0 }}>
-        <div style={{
-          fontFamily: "var(--font-caesar,'Bebas Neue',sans-serif)",
-          fontSize: 18, color: active ? GOLD : DARK,
-          letterSpacing: '0.04em', lineHeight: 1.1, transition: 'color 0.15s',
-        }}>
-          {yearLabel ?? variant.name ?? variant.sku}
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{
+            fontFamily: "var(--font-caesar,'Bebas Neue',sans-serif)",
+            fontSize: 18, color: active ? GOLD : DARK,
+            letterSpacing: '0.04em', lineHeight: 1.1, transition: 'color 0.15s',
+          }}>
+            {primaryLabel}
+          </div>
+          {showQtyBadge && (
+            <span style={{
+              fontFamily: "var(--font-stencil,'Barlow Condensed',monospace)",
+              fontSize: 9, fontWeight: 700, letterSpacing: '0.12em',
+              textTransform: 'uppercase', color: active ? GOLD : '#6b5c40',
+              background: active ? `${GOLD}18` : '#f0ebe0',
+              padding: '2px 7px', borderRadius: 3, flexShrink: 0,
+            }}>
+              {qtyLabel}
+            </span>
+          )}
         </div>
         <div style={{
           fontFamily: "var(--font-stencil,'Barlow Condensed',monospace)",

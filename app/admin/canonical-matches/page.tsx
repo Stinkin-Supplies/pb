@@ -178,10 +178,21 @@ export default function CanonicalMatchesPage() {
     );
   }
 
-  // Group proposals by shared_oem_number
+  // Group proposals by shared_oem_number. Not every proposal has one —
+  // 'upc' and 'brand_part_number' matches (from a separate matching pass)
+  // never had a shared identifier column to store, so they're null. Each
+  // of those becomes its own singleton group via a per-proposal fallback
+  // key rather than colliding under a single literal `null` bucket.
+  function groupKeyOf(p: Proposal): string {
+    return p.shared_oem_number ?? `__pair_${p.id}`;
+  }
+  function isRealOemGroup(oem: string): boolean {
+    return !oem.startsWith('__pair_');
+  }
+
   const groups = new Map<string, Proposal[]>();
   for (const p of proposals) {
-    const key = p.shared_oem_number;
+    const key = groupKeyOf(p);
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(p);
   }
@@ -234,7 +245,26 @@ export default function CanonicalMatchesPage() {
         });
       }
 
-      setProposals(prev => prev.filter(p => p.shared_oem_number !== oem));
+      setProposals(prev => prev.filter(p => groupKeyOf(p) !== oem));
+      setGroupSelections(prev => { const next = { ...prev }; delete next[oem]; return next; });
+    } finally {
+      setBusyGroups(prev => { const next = new Set(prev); next.delete(oem); return next; });
+    }
+  }
+
+  // For groups with no real shared OEM number, bulkAction can't work — the
+  // server-side bulk route matches on shared_oem_number, which is null for
+  // these. Route them through the same proposal-ID-based endpoint
+  // selectiveAction already uses instead.
+  async function actOnGroupByIds(oem: string, group: Proposal[], action: 'confirm' | 'reject') {
+    setBusyGroups(prev => new Set(prev).add(oem));
+    try {
+      await fetch('/api/admin/canonical-matches/select', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, proposal_ids: group.map(p => p.id), action }),
+      });
+      setProposals(prev => prev.filter(p => groupKeyOf(p) !== oem));
       setGroupSelections(prev => { const next = { ...prev }; delete next[oem]; return next; });
     } finally {
       setBusyGroups(prev => { const next = new Set(prev); next.delete(oem); return next; });
@@ -249,7 +279,7 @@ export default function CanonicalMatchesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, shared_oem_number: oem, action }),
       });
-      setProposals(prev => prev.filter(p => p.shared_oem_number !== oem));
+      setProposals(prev => prev.filter(p => groupKeyOf(p) !== oem));
     } finally {
       setBusyGroups(prev => {
         const next = new Set(prev);
@@ -267,7 +297,7 @@ export default function CanonicalMatchesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, group_key: oem, product_ids: productIds, reason }),
       });
-      setProposals(prev => prev.filter(p => p.shared_oem_number !== oem));
+      setProposals(prev => prev.filter(p => groupKeyOf(p) !== oem));
     } finally {
       setBusyGroups(prev => {
         const next = new Set(prev);
@@ -647,6 +677,12 @@ export default function CanonicalMatchesPage() {
                 <div style={{ fontSize: 13, color: '#555', textTransform: 'none' }}>
                   {oem.startsWith('MANUAL-') ? (
                     <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#534AB7', fontSize: 14 }}>Manual match</span>
+                  ) : !isRealOemGroup(oem) ? (
+                    <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#888', fontSize: 14 }}>
+                      {group[0].match_reason === 'upc' ? 'UPC match'
+                        : group[0].match_reason === 'brand_part_number' ? 'Brand part # match'
+                        : 'Match (no shared OEM)'}
+                    </span>
                   ) : (
                     <>OEM <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1a1a1a', fontSize: 14 }}>{oem}</span></>
                   )}
@@ -724,7 +760,7 @@ export default function CanonicalMatchesPage() {
                   )}
                   <button
                     disabled={isBusy}
-                    onClick={() => bulkAction(oem, 'reject')}
+                    onClick={() => isRealOemGroup(oem) ? bulkAction(oem, 'reject') : actOnGroupByIds(oem, group, 'reject')}
                     style={{
                       fontSize: 12, padding: '6px 12px', borderRadius: 5,
                       border: '1px solid #ddd', background: '#fff', color: '#993C1D',
@@ -753,7 +789,7 @@ export default function CanonicalMatchesPage() {
                   ) : (
                     <button
                       disabled={isBusy}
-                      onClick={() => bulkAction(oem, 'confirm')}
+                      onClick={() => isRealOemGroup(oem) ? bulkAction(oem, 'confirm') : actOnGroupByIds(oem, group, 'confirm')}
                       style={{
                         fontSize: 12, padding: '6px 12px', borderRadius: 5,
                         border: '1px solid #3B6D11', background: '#e6f4d9', color: '#3B6D11',
