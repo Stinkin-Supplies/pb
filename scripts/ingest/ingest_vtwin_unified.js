@@ -73,7 +73,7 @@ function buildRow(p) {
     sku,
     sku_normalized:    skuNorm,
     vendor_sku:        sku,
-    source_vendor:     'VTwin',
+    source_vendor:     'VTWIN',
     name:              p.name || sku,
     description:       null,
     features:          null,
@@ -122,7 +122,7 @@ async function main() {
 
   // ── Check existing ────────────────────────────────────────────
   const { rows: [{ existing }] } = await client.query(
-    `SELECT COUNT(*) as existing FROM catalog_unified WHERE source_vendor = 'VTwin'`
+    `SELECT COUNT(*) as existing FROM catalog_unified WHERE source_vendor IN ('VTWIN', 'VTwin')`
   );
   console.log(`   Existing VTwin rows in catalog_unified: ${existing}\n`);
 

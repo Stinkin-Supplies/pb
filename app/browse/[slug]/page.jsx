@@ -4,6 +4,7 @@ import { getCatalogDb } from '@/lib/db/catalog';
 import { getChronologicalNeighbors } from '@/lib/db/browse';
 import BrowseBackButton from '@/components/browse/BrowseBackButton';
 import ProductImage from '@/components/browse/ProductImage';
+import OemAlternativesPanel from '@/components/browse/OemAlternativesPanel';
 
 // ── Data fetching ─────────────────────────────────────────────────────────────
 
@@ -18,6 +19,7 @@ async function getProduct(slug) {
       cu.display_category, cu.display_subcategory, cu.category,
       cu.is_universal, cu.is_kit, cu.pack_qty,
       cu.variant_group_id, cu.oem_numbers,
+      cu.product_details,
       COALESCE(vcnt.cnt, 0)::int AS variant_count
     FROM catalog_unified cu
     LEFT JOIN LATERAL (
@@ -65,6 +67,73 @@ async function getOemRows(productId) {
     FROM catalog_oem_crossref
     WHERE product_id = $1
     ORDER BY oem_format, oem_number
+  `, [productId]);
+  return rows;
+}
+
+/** All other active products that share at least one HD OEM number with this product,
+ *  plus one-hop supersession chain products. Excludes the current product. */
+async function getOemAlternatives(productId) {
+  const db = getCatalogDb();
+  const { rows } = await db.query(`
+    WITH my_oems AS (
+      SELECT oem_number
+      FROM catalog_oem_crossref
+      WHERE product_id = $1
+        AND oem_format IN ('hd_oem', 'hd_oem_nodash')
+        AND expanded_from = FALSE
+    ),
+    direct AS (
+      SELECT DISTINCT ON (cu.id)
+        cu.id, cu.name, cu.slug, cu.brand,
+        cu.computed_price::numeric AS price,
+        cu.source_vendor, cu.is_kit,
+        cu.image_url,
+        cu.product_details,
+        coc.oem_number,
+        FALSE AS via_chain
+      FROM my_oems mo
+      JOIN catalog_oem_crossref coc
+        ON coc.oem_number = mo.oem_number
+        AND coc.oem_format IN ('hd_oem', 'hd_oem_nodash')
+        AND coc.expanded_from = FALSE
+      JOIN catalog_unified cu ON cu.id = coc.product_id
+      WHERE coc.product_id <> $1 AND cu.is_active = true
+      ORDER BY cu.id, cu.computed_price ASC
+      LIMIT 16
+    ),
+    chain AS (
+      SELECT DISTINCT ON (cu.id)
+        cu.id, cu.name, cu.slug, cu.brand,
+        cu.computed_price::numeric AS price,
+        cu.source_vendor, cu.is_kit,
+        cu.image_url,
+        cu.product_details,
+        coc.oem_number,
+        TRUE AS via_chain
+      FROM my_oems mo
+      JOIN oem_supersession os
+        ON os.from_oem_norm = normalize_oem(mo.oem_number)
+        OR os.to_oem_norm   = normalize_oem(mo.oem_number)
+      JOIN catalog_oem_crossref coc
+        ON normalize_oem(coc.oem_number) IN (os.from_oem_norm, os.to_oem_norm)
+        AND coc.oem_format IN ('hd_oem', 'hd_oem_nodash')
+        AND coc.expanded_from = FALSE
+      JOIN catalog_unified cu ON cu.id = coc.product_id
+      WHERE cu.is_active = true
+        AND coc.product_id <> $1
+        AND cu.id NOT IN (SELECT id FROM direct)
+      ORDER BY cu.id, cu.computed_price ASC
+      LIMIT 8
+    )
+    SELECT id, name, slug, brand, price, source_vendor, is_kit,
+           image_url, product_details, oem_number, via_chain
+    FROM direct
+    UNION ALL
+    SELECT id, name, slug, brand, price, source_vendor, is_kit,
+           image_url, product_details, oem_number, via_chain
+    FROM chain
+    ORDER BY via_chain, price ASC
   `, [productId]);
   return rows;
 }
@@ -128,7 +197,7 @@ export default async function ProductDetailPage({ params }) {
   const unifiedId = productRow.id;
 
   // Parallel fetches
-  const [fitment, oemRows, variants, related, timeline] = await Promise.all([
+  const [fitment, oemRows, variants, related, timeline, oemAlternatives] = await Promise.all([
     getFitmentRows(unifiedId),
     getOemRows(unifiedId),
     getVariantMembers(productRow.variant_group_id, unifiedId),
@@ -143,6 +212,7 @@ export default async function ProductDetailPage({ params }) {
       productRow.category ?? '',
       productRow.display_subcategory ?? null,
     ),
+    getOemAlternatives(unifiedId),
   ]);
 
   const hasVariants = variants.length > 1;
@@ -404,13 +474,6 @@ export default async function ProductDetailPage({ params }) {
             {productRow.is_kit && (
               <span style={badge('#eaeaf5', '#5a5ab0')}>KIT</span>
             )}
-            {oemRows
-              .filter(r => r.oem_format?.startsWith('hd_oem') && !r.expanded_from)
-              .map(oem => (
-                <span key={oem.oem_number} style={badge('#fdf6e3', '#7a5810')}>
-                  OEM {oem.oem_number}
-                </span>
-              ))}
           </div>
         </div>
       </div>
@@ -419,6 +482,12 @@ export default async function ProductDetailPage({ params }) {
       <div style={{ maxWidth: 1100, margin: '32px auto 0', padding: '0 24px' }}>
         <DataTabs fitment={fitment} oemRows={oemRows} />
       </div>
+
+      {/* ── Product details ── */}
+      <ProductDetailsSection details={productRow.product_details} />
+
+      {/* ── OEM alternatives ── */}
+      <OemAlternativesPanel alternatives={oemAlternatives} oemRows={oemRows} />
 
       {/* ── Chronological timeline ── */}
       {timeline.length > 0 && (
@@ -605,6 +674,169 @@ function SectionHeader({ children }) {
 }
 
 // ── Style helpers ─────────────────────────────────────────────────────────────
+
+function ProductDetailsSection({ details }) {
+  if (!details) return null;
+
+  const { description, features, attributes, tech_note } = details;
+  const hasContent = description || features?.length || attributes || tech_note;
+  if (!hasContent) return null;
+
+  return (
+    <section style={{ maxWidth: 1100, margin: '32px auto 0', padding: '0 24px' }}>
+      <div style={{
+        fontFamily: 'var(--font-tanker)',
+        fontSize: 22,
+        letterSpacing: '0.04em',
+        color: '#1a1208',
+        textTransform: 'uppercase',
+        marginBottom: 14,
+      }}>
+        Product Details
+      </div>
+
+      <div style={{
+        background: '#ffffff',
+        border: '1px solid #e6dcc0',
+        borderRadius: 10,
+        padding: '20px 24px',
+        display: 'grid',
+        gridTemplateColumns: attributes ? '1fr auto' : '1fr',
+        gap: 24,
+        alignItems: 'start',
+      }}>
+
+        {/* Left: description + features + tech_note */}
+        <div>
+          {description && (
+            <p style={{
+              fontFamily: 'var(--font-bespoke)',
+              fontSize: 14,
+              color: '#2a2010',
+              lineHeight: 1.65,
+              margin: '0 0 16px',
+            }}>
+              {description}
+            </p>
+          )}
+
+          {features?.length > 0 && (
+            <ul style={{
+              margin: description ? '0' : '0',
+              padding: 0,
+              listStyle: 'none',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 7,
+            }}>
+              {features.map((f, i) => (
+                <li key={i} style={{
+                  display: 'flex',
+                  gap: 10,
+                  alignItems: 'flex-start',
+                }}>
+                  <span style={{
+                    color: '#c9a84c',
+                    fontSize: 12,
+                    lineHeight: '1.6',
+                    flexShrink: 0,
+                    marginTop: 1,
+                  }}>
+                    ›
+                  </span>
+                  <span style={{
+                    fontFamily: 'var(--font-bespoke)',
+                    fontSize: 13,
+                    color: '#3a2e1a',
+                    lineHeight: 1.55,
+                  }}>
+                    {f}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {tech_note && (
+            <div style={{
+              marginTop: (description || features?.length) ? 16 : 0,
+              padding: '10px 14px',
+              background: '#fdf6e3',
+              border: '1px solid #e6dcc0',
+              borderLeft: '3px solid #c9a84c',
+              borderRadius: 6,
+            }}>
+              <div style={{
+                fontFamily: 'var(--font-stencil)',
+                fontSize: 9,
+                color: '#8a7040',
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                marginBottom: 5,
+              }}>
+                Tech Note
+              </div>
+              <div style={{
+                fontFamily: 'var(--font-bespoke)',
+                fontSize: 13,
+                color: '#2a2010',
+                lineHeight: 1.55,
+              }}>
+                {tech_note}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right: attributes key-value grid */}
+        {attributes && Object.keys(attributes).length > 0 && (
+          <div style={{
+            minWidth: 180,
+            borderLeft: '1px solid #e6dcc0',
+            paddingLeft: 24,
+          }}>
+            <div style={{
+              fontFamily: 'var(--font-stencil)',
+              fontSize: 9,
+              color: '#8a7040',
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              marginBottom: 10,
+            }}>
+              Specifications
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {Object.entries(attributes).map(([key, val]) => (
+                <div key={key}>
+                  <div style={{
+                    fontFamily: 'var(--font-stencil)',
+                    fontSize: 9,
+                    color: '#a89878',
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                    marginBottom: 2,
+                  }}>
+                    {key}
+                  </div>
+                  <div style={{
+                    fontFamily: 'var(--font-bespoke)',
+                    fontSize: 13,
+                    color: '#2a2010',
+                    fontWeight: 600,
+                  }}>
+                    {val}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+
 
 const tabHeader = {
   fontFamily: 'var(--font-stencil)',

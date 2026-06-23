@@ -1,5 +1,24 @@
 # PU Image Zip Extraction — To-Do
 
+> **STATUS (updated June 17, 2026): Superseded — keep for reference only.**
+> A working zip-extraction proxy (`app/api/image-proxy/route.ts`) was found already
+> in the codebase, validated, and wired into both the browse grid (`ProductCard.jsx`)
+> and PDP (`ProductImage.jsx`). This serves the same outcome as the offline pipeline
+> described below — extracting the first image from each LeMans zip — but live,
+> on-demand, with no batch job required. Confirmed working on both the live grid and
+> PDP, deployed with a 1-year immutable edge cache.
+>
+> The original ~13,790 figure below was the count of all zip-contaminated products
+> before investigation. After the stopgap (null + restore) and the live proxy fix,
+> the real remaining gap is **3,573 active PU products with no recoverable image
+> anywhere** (no `image_url`, no match in `pu_brand_enrichment`) — these have no
+> source photo to extract from regardless of pipeline, live or offline, and stay on
+> the NO IMAGE placeholder until PU provides better data.
+>
+> This doc's offline-pipeline plan (steps 0–9 below) is not currently needed. Keep
+> it only as a reference for the "which file is the real photo" selection question
+> if the proxy's first-file-in-zip rule ever turns out wrong on a wider sample.
+
 ## Background (confirmed via investigation, June 16 2026)
 
 ~13,790 active PU products (out of 36,684 total active PU rows) have no usable
@@ -20,15 +39,15 @@ fallback (added session 50/51) does NOT rescue these products, because
 `catalog_media` rows for PU are themselves populated from `pu_brand_enrichment.image_uri`
 — the same contaminated source. Don't assume the fallback fixes this category.
 
-## Immediate stopgap (separate, smaller task — do this first regardless)
+## Immediate stopgap (DONE — see status banner above)
 
-Before building the extraction pipeline, null out `image_url` /  remove the bad
-`catalog_media` rows for confirmed zip-contaminated products so the site shows
-the clean "NO IMAGE" placeholder instead of a broken-image icon. This requires a
-full (non-sampled) scan of both `image_url` and `catalog_media.url` for all active
-products — not just a sample — to build one authoritative list. See prior session
-for `check_dead_images.mjs` / `check_brand_enrichment_images.mjs` as starting points
-for the scan logic (Content-Type check, not status-only).
+~~Before building the extraction pipeline, null out `image_url` / remove the bad~~
+~~`catalog_media` rows for confirmed zip-contaminated products so the site shows~~
+~~the clean "NO IMAGE" placeholder instead of a broken-image icon.~~ Completed June 16
+(31,730 nulled, 31,396 bad `catalog_media` rows deleted) and superseded June 17 —
+the live proxy now restores real photos for the vast majority instead of leaving
+them on the placeholder. Only the 3,573 genuinely source-less products remain on
+NO IMAGE.
 
 ## Zip Extraction Project
 

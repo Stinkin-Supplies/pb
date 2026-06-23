@@ -12,6 +12,10 @@
  *   5. WPS members must share a meaningful base name after stripping the
  *      variant attribute — catches kits/unrelated SKUs sharing a wps_product_id
  *   6. Groups > MAX_VARIANT_MEMBERS are product lines, not variants → dissolved
+ *   7. (Added June 18) A detected axis must produce at least 2 distinct values
+ *      across members — otherwise it isn't really distinguishing anything
+ *      (e.g. fitment-only SKUs that all happen to share one color word in the
+ *      name) and the group is dissolved rather than shown as a fake variant set
  *
  * Usage:
  *   node build_variant_groups.cjs            # live run
@@ -23,12 +27,12 @@ const { Pool } = require('pg');
 
 const DRY              = process.argv.includes('--dry');
 const MAX_VARIANT_MEMBERS = 20;
-const WPS_TOKEN        = 'eceGqPuosZVzZeZ74vBIWUqNwPbG1aP2YUL24fBO';
+const WPS_TOKEN = process.env.WPS_TOKEN;
 const WPS_BASE         = 'http://api.wps-inc.com';
 
 const pool = new Pool({
   host: '2a01:4ff:f0:fa6f::1', port: 5432,
-  database: 'stinkin_catalog', user: 'catalog_app', password: 'smelly',
+  database: 'stinkin_catalog', user: 'catalog_app', password: process.env.CATALOG_DB_PASSWORD,
 });
 const q = async (sql, p = []) => { const { rows } = await pool.query(sql, p); return rows; };
 
@@ -205,7 +209,22 @@ function classifyGroup(candidates) {
     const similar = baseNames.every(b => b === anchor || wordSimilarity(b, anchor) >= 0.65);
     if (!similar) return null;
 
-    return { axis: normalizeAxisName(axis), members, memberAttrs: attrs };
+    // NEW (June 18): the axis must actually distinguish members from each other.
+    // Without this check, N products that differ only by fitment — never encoded
+    // in the name at all, only in catalog_fitment_v2 — all extract the SAME
+    // attribute value (e.g. 12 different rear-brake-line SKUs that all say
+    // "...Black") and get grouped as if Black/Black/Black/... were meaningful
+    // variant options. It isn't; there's nothing for the customer to pick between.
+    // Don't return a group here — fall through to the Pack Size check below, and
+    // if that also fails, the members stay standalone (correct: they aren't
+    // meaningfully variants of each other if nothing tells them apart).
+    const distinctValues = new Set(attrs.filter(Boolean).map(a => a.value));
+    if (distinctValues.size >= 2) {
+      return { axis: normalizeAxisName(axis), members, memberAttrs: attrs };
+    }
+    if (DRY) {
+      console.log(`  [non_distinguishing_axis] "${axis}"="${[...distinctValues][0]}" shared by all ${members.length} members — dissolving, trying Pack Size fallback`);
+    }
   }
 
   // ── Try Pack Size axis ────────────────────────────────────────────────────

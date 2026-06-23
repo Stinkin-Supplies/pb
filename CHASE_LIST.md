@@ -1,33 +1,33 @@
 # STINKIN' SUPPLIES — CHASE LIST
-**Last Updated: June 16, 2026 — Fifty-Second Pass**
+**Last Updated: June 22, 2026 — Fifty-Fourth Pass**
 
 ## 🚀 NEXT SESSION — START HERE
 
 | # | Task | Notes |
 |---|------|-------|
-| 1 | **Payment gateway decision** | Authorize.net / NMI / Braintree / Heartland. ⚠️ BLOCKING — reminder set for Wed June 17. Only blocker for checkout going live. |
-| 2 | **Variant groups missing a real distinguishing axis** (NEW) | 668 groups where every member shares an identical `option_1_value` and has no `option_2` at all — UI shows e.g. "Chrome vs Chrome" with no way to tell products apart. Found via PDP spot-check (VT-29-1169 vs VT-29-1190, "True Dual Exhaust Pipe System Chrome," different year fitment, same display name/finish). Product-count total not yet pulled — run `SUM(members)` on the affected-groups query below. Root cause likely mixed: (a) session 49's deliberate removal of the Fits axis from `build_variant_groups.cjs` left fitment-differentiated products with no remaining axis to show, and/or (b) some groups may be bad Jaccard name-similarity matches unrelated to the Fits-axis change — one group has 12 members with zero distinguishing axis, worth checking if that's even a legitimate variant set before assuming it's all the same root cause. Repro query: `SELECT group_id, COUNT(*) AS members FROM catalog_variant_members GROUP BY group_id HAVING COUNT(DISTINCT option_1_value) = 1 AND bool_and(option_2_name IS NULL OR option_2_name = '') AND COUNT(*) > 1 ORDER BY members DESC;`. Possible fixes once root cause is confirmed: re-add Fits/year-range as a fallback axis when no other axis differentiates, or route affected groups into a manual review queue like canonical-matches. |
-| 3 | **Canonical match review — apply the 855 already-confirmed merges** | Queue currently: pending 2,246 · confirmed 855 · applied 0 · rejected 1,081. The 855 confirmed ones are sitting unapplied — click "Apply confirmed merges" (or confirm that's intentional before doing so) before continuing the manual pass on the remaining 2,246 pending. |
-| 4 | **PU image-proxy: add a persistent cache layer** | `app/api/image-proxy/route.ts` has zero server-side caching — every unique zip gets downloaded + unzipped fresh from LeMans on first request (HTTP `Cache-Control` headers help across repeat requests for the *same* URL via Vercel's edge, but don't help the first hit per image). Fine for tonight's validation traffic; needs a real fix (Vercel Blob/S3/R2-backed cache, written once on first extraction) before this carries full browse-grid production traffic for 31,000+ products. |
-| 5 | **PU image-proxy: confirm browse grid visually** | PDP (`ProductImage.jsx`) confirmed working live with real photos (two exhaust kits spot-checked). `ProductCard.jsx` got the identical fix applied and deployed but was not visually re-confirmed on `/browse` itself before session end — quick spot check needed. |
-| 6 | **PU image-proxy: consolidate duplicate implementations** | Two separate zip-extraction proxies exist: `app/api/img/route.ts` (uses `AdmZip`, Node-only, disk-cached, only wired into the dead `ProductDetailClient.jsx`) and `app/api/image-proxy/route.ts` (uses `fflate`, edge-compatible, handles WPS/VTwin hotlink-protection too, now wired into `ProductCard.jsx`/`ProductImage.jsx`/quick-view/admin). Worth deciding if `/api/img` should be deleted entirely now that `/api/image-proxy` is the one actually in the critical path. |
-| 7 | **PU products with no recoverable image anywhere** | 19 of the 31,415 PU products nulled tonight didn't have a usable `pu_brand_enrichment.image_uri` to restore from either (no match, null, or excluded as a coming-soon placeholder) — these stay on the "NO IMAGE" placeholder regardless of the image-proxy fix. Repro: `SELECT cu.id, cu.sku, cu.name FROM catalog_unified cu LEFT JOIN pu_brand_enrichment pbe ON replace(cu.sku,'-','') = replace(replace(pbe.sku,'-',''),'.','') WHERE cu.source_vendor='PU' AND cu.is_active=true AND cu.image_url IS NULL;` — low priority, just needs the list pulled for awareness. |
-| 8 | **Find the unknown match-generation pipeline** | Canonical match revert surfaced 2,433 pending proposals with `match_reason = 'upc'` or `'brand_part_number'` and a null `shared_oem_number` — neither comes from `build_canonical_products.mjs` (Phase B only ever writes `match_reason = 'oem'`). Some other script generates these; never identified tonight. Worth finding so we know whether it has the same pack-qty/finish blind spot Phase B had before tonight's fix. |
-| 9 | **Review oem_supersession confidence=1 rows** | `SELECT * FROM oem_supersession_review LIMIT 30;` — 283 pairs pending, untouched tonight. Bulk-promote reliable ones, reject false positives. |
-| 10 | **Confirm Softail + Suspension + Triple Trees & Stems filter fix** | Still untested since the session 51 structural params fix — retest this exact combo returns 131 results, not 0. |
-| 11 | **Verify PU vendor SKUs in portal** | Run `09344715`, `09251068`, `10101765`, `DS196011` through PU's ordering portal to confirm migration 010 fixed the ordering pipeline. |
-| 12 | **Variant candidates** | `/admin/variant-candidates?token=...` — groups flagged as finish/size/pack variants. Mark resolved once variant group built. |
-| 13 | Wire `<CartProvider>` into root layout | `lib/cart/CartContext.jsx` ready — wrap `app/layout.tsx`, then `useCart()` everywhere |
-| 14 | Build cart drawer UI | Uses `useCart()` — items, addItem, removeItem, updateQty, subtotal |
-| 15 | Build checkout page UI | Address form + order summary + payment form → `/api/checkout/prepare` then `/api/checkout/charge` |
-| 16 | Wire real PU + WPS API credentials | `lib/fulfillment/triggerFulfillment.ts` — need `PU_API_URL/KEY`, `WPS_API_URL/KEY` env vars |
-| 17 | Shipping + tax calculation | Both $0 placeholders in `app/api/checkout/prepare/route.ts` |
-| 18 | Drop remaining session 43 files | globals.css, layout.tsx, BespokeSerif-Variable.ttf, FilterSidebar.jsx, ProductQuickViewModal.jsx, BrowseBackButton.jsx, products-slug-route.ts |
-| 19 | Add ADMIN_SECRET to Vercel | `npx vercel env add ADMIN_SECRET` |
-| 20 | Fix Framer Motion transparent errors | `FRAMER_TRANSPARENT_FIX.md` — palette rgba() replacements, not yet applied |
-| 21 | Add remaining model images | 9 images at `public/images/models/{slug}.jpg` (400×160px) |
-| 22 | TC/M8 platform dedup in variant groups | WPS `wps_product_id` groups can mix Twin Cam and Milwaukee-8 platform variants. Need platform-aware split in `build_variant_groups.cjs` — detect "TC"/"M8" token in names and create sub-groups. |
-| 23 | PU zip extraction project (deprioritized) | `PU_ZIP_EXTRACTION_TODO.md`'s extraction pipeline is now mostly moot — `image-proxy` already does live zip extraction and was validated tonight across 6 sample products. Keep this doc around only as reference for the "which file is the real photo" selection question if image-proxy's first-file rule ever turns out wrong on a wider sample. |
+| 1 | **🔴 URGENT: Rotate WPS token + DB password** | `eceGqPuosZVzZeZ74vBIWUqNwPbG1aP2YUL24fBO` and `smelly` were hardcoded in `build_variant_groups.cjs` — replaced with env vars this session but values are live in shell history. Rotate both before next build run. |
+| 2 | **Payment gateway decision** | Authorize.net / NMI / Braintree / Heartland. ⚠️ BLOCKING — pending merchant account meeting. Only blocker for checkout going live. Recommendation: Braintree (no monthly fee, best API, direct signup). |
+| 3 | **Canonical match review — apply the 1,956 confirmed merges** | Queue currently: pending 1,263 · confirmed 1,956 · applied 0 · rejected 1,082. Hit "Apply confirmed merges" before continuing the manual pass. Review ongoing — was 2,246 pending at session start. |
+| 4 | **PU image-proxy: add a persistent cache layer** | `app/api/image-proxy/route.ts` has zero server-side caching — every unique zip gets downloaded + unzipped fresh from LeMans on first request. Fine for now; needs Vercel Blob/S3/R2-backed cache before this carries full browse-grid production traffic for 31,000+ products. |
+| 5 | **PU image-proxy: confirm browse grid visually** | PDP confirmed working. `ProductCard.jsx` got the identical fix but was not visually re-confirmed on `/browse` itself. Quick spot check needed. |
+| 6 | **Find the unknown match-generation pipeline** | Canonical match revert surfaced proposals with `match_reason = 'upc'` or `'brand_part_number'` and null `shared_oem_number` — neither comes from `build_canonical_products.mjs` Phase B. Some other script generates these; never identified. Worth finding so we know whether it has the same pack-qty/finish blind spot. |
+| 7 | **Review oem_supersession confidence=1 rows** | `SELECT * FROM oem_supersession_review LIMIT 30;` — 283 pairs pending, untouched. Bulk-promote reliable ones, reject false positives. |
+| 8 | **Confirm Softail + Suspension + Triple Trees & Stems filter fix** | Still untested since session 51 structural params fix — retest this exact combo returns 131 results, not 0. |
+| 9 | **Verify PU vendor SKUs in portal** | Run `09344715`, `09251068`, `10101765`, `DS196011` through PU's ordering portal to confirm migration 010 fixed the ordering pipeline. |
+| 10 | **Variant candidates** | `/admin/variant-candidates?token=...` — groups flagged as finish/size/pack variants. Mark resolved once variant group built. |
+| 11 | Wire `<CartProvider>` into root layout | `lib/cart/CartContext.jsx` ready — wrap `app/layout.tsx`, then `useCart()` everywhere |
+| 12 | Build cart drawer UI | Uses `useCart()` — items, addItem, removeItem, updateQty, subtotal |
+| 13 | Build checkout page UI | Address form + order summary + payment form → `/api/checkout/prepare` then `/api/orders/create` |
+| 14 | Wire real PU + WPS API credentials | `lib/fulfillment/triggerFulfillment.ts` — need `PU_API_URL/KEY`, `WPS_API_URL/KEY` env vars |
+| 15 | Shipping + tax calculation | Both `$0` placeholders in `app/api/checkout/prepare/route.ts` and `app/api/orders/create/route.ts` |
+| 16 | Drop remaining session 43 files | globals.css, layout.tsx, BespokeSerif-Variable.ttf, FilterSidebar.jsx, ProductQuickViewModal.jsx, BrowseBackButton.jsx, products-slug-route.ts |
+| 17 | Add ADMIN_SECRET to Vercel | `npx vercel env add ADMIN_SECRET` |
+| 18 | Fix Framer Motion transparent errors | `FRAMER_TRANSPARENT_FIX.md` — palette rgba() replacements, not yet applied |
+| 19 | Add remaining model images | 9 images at `public/images/models/{slug}.jpg` (400×160px) |
+| 20 | TC/M8 platform dedup in variant groups | WPS `wps_product_id` groups can mix Twin Cam and Milwaukee-8 platform variants. Need platform-aware split in `build_variant_groups.cjs`. |
+| 21 | PU products with no recoverable image | 3,573 active PU products have no source photo anywhere — stay on NO IMAGE placeholder. Low priority, no fix possible without new PU vendor data. |
+| 22 | Backfill vendor_offers from product_vendors | PU and VTwin cost/stock needs to flow into `vendor_offers` (currently only 22,278 WPS rows). Optimizer currently reads `product_vendors` as workaround — swap to `vendor_offers` once backfilled. |
+| 23 | PU zip extraction project (deprioritized) | `PU_ZIP_EXTRACTION_TODO.md` offline pipeline is moot — `image-proxy` does live zip extraction. Keep as reference only. |
 
 ## Files to Drop In — Session 43 (still pending)
 
@@ -40,6 +40,20 @@
 | ProductQuickViewModal.jsx | components/browse/ |
 | BrowseBackButton.jsx | components/pdp/ |
 | products-slug-route.ts | app/api/products/[slug]/route.ts |
+
+## ✅ DONE JUNE 22 — FIFTY-FOURTH PASS
+
+| Area | What Was Done |
+|------|---------------|
+| **`lib/fulfillment/optimizer.ts` — written** | Resolves vendor routing from `product_vendors` (all three vendors, 90,605 rows — `vendor_offers` only has 22,278 WPS rows). Minimizes vendor count first, breaks ties by margin, routes VTwin to `isManual=true` always. Single-vendor coverage attempted first; greedy minimum-vendor-count cover as fallback. Returns `OptimizerResult { groups[], unfulfillable[] }`. All column names confirmed against real schema. |
+| **`lib/fulfillment/triggerFulfillment.ts` — written** | Inserts `vendor_orders` row, dispatches to adapter. VTwin: no adapter call, `status='pending'`, surfaces in admin manual queue. PU/WPS: checks env vars, degrades to `status='manual_required'` with `error_message` if missing (not a crash). Adapter stubs are real plumbing — swap in fetch() once creds land. |
+| **`app/api/checkout/prepare/route.ts` — written** | Pre-payment quote. Validates cart against `canonical_products`, runs optimizer for stock check, returns customer-safe response (no vendor/cost/margin leakage). `shipping_total` and `tax_total` both `$0` placeholder. |
+| **`app/api/orders/create/route.ts` — written** | Full order flow. Re-validates stock, refuses if anything dropped out since quote. Charges via `chargeGateway()` stub (always fails on purpose until gateway chosen). Writes `orders` + `order_items` atomically; dispatches `triggerFulfillment` per group after commit. Uses `client.release()` — never `.end()` on pool. |
+| **`build_variant_groups.cjs` — non-distinguishing axis fix** | Added invariant #7: detected axis must produce ≥2 distinct values across members. Without this, fitment-only SKUs sharing one color word (e.g. 12 rear brake line SKUs all named "...Black") formed fake variant groups with nothing for a customer to pick between. Fix: if `distinctValues.size < 2`, fall through to Pack Size check; if that also fails, group dissolves. Legitimate groups (e.g. Ultima TC Cylinder Black + Silver) pass through untouched. Credentials moved to `process.env.WPS_TOKEN` / `process.env.CATALOG_DB_PASSWORD`. |
+| **Variant rebuild + Typesense reindex** | Live rebuild: 2,763 groups / 8,109 members (was 3,757 / 10,872). 994 false groups / 2,763 products dissolved. 0 kits. Reindex: 89,203 docs, 0 errors. |
+| **`/api/img` deleted** | Dead duplicate zip-extraction proxy (AdmZip, Node-only, only wired into dead `ProductDetailClient.jsx`) removed. `/api/image-proxy` is the sole proxy now. |
+| **Canonical review — continued** | Pending queue: 2,246 → 1,263. Pack-qty cross-vendor pairs (brand_part_number pipeline) correctly routed to variant-candidates. 1,956 confirmed, 0 applied. |
+| **Variant blast-radius quantified** | 668 groups / 1,768 members confirmed before fix. Post-fix both fully resolved by the non-distinguishing-axis dissolve. |
 
 ## ✅ DONE JUNE 16 — FIFTY-SECOND PASS
 

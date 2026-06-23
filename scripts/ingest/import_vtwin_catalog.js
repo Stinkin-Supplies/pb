@@ -13,8 +13,13 @@ import pg from 'pg';
 const { Pool } = pg;
 
 const VTWIN_DIR  = path.resolve('scripts/data/vtwin');
-const MASTER     = path.join(VTWIN_DIR, 'vtwin-master.csv');
 const CATEGORIES = path.join(VTWIN_DIR, 'vtwin_catagory.csv');
+
+// Accept --file <path> to specify the CSV, default to vtwin-master.csv
+const fileArgIdx = process.argv.indexOf('--file');
+const MASTER = fileArgIdx !== -1
+  ? path.resolve(process.argv[fileArgIdx + 1])
+  : path.join(VTWIN_DIR, 'vtwin-master.csv');
 
 const pool = new Pool({
   connectionString: process.env.CATALOG_DATABASE_URL ||
@@ -49,9 +54,12 @@ function cleanStr(val) {
 }
 
 // Build page → {category, family} map from vtwin_catagory.csv
-// Format: ,Category,Pg_Number,FAMILY
-// FAMILY rows have no page, category rows have page ranges like "94-105"
+// Optional — if file missing, products get no category (infer_vtwin_categories handles it)
 function loadCategoryMap() {
+  if (!fs.existsSync(CATEGORIES)) {
+    console.warn('⚠️  vtwin_catagory.csv not found — skipping category mapping');
+    return new Map();
+  }
   const raw = fs.readFileSync(CATEGORIES, 'utf8');
   const rows = parse(raw, { columns: false, skip_empty_lines: true, trim: true });
 
@@ -124,8 +132,6 @@ async function main() {
         full_pic2           TEXT,
         full_pic3           TEXT,
         full_pic4           TEXT,
-        category            VARCHAR(200),
-        family              VARCHAR(200),
         update_date         DATE,
         date_added          DATE,
         created_at          TIMESTAMPTZ   DEFAULT now(),
@@ -133,8 +139,6 @@ async function main() {
       );
       CREATE INDEX IF NOT EXISTS idx_vtwin_catalog_sku ON vtwin_catalog(sku);
       CREATE INDEX IF NOT EXISTS idx_vtwin_catalog_manufacturer ON vtwin_catalog(manufacturer);
-      CREATE INDEX IF NOT EXISTS idx_vtwin_catalog_category ON vtwin_catalog(category);
-      CREATE INDEX IF NOT EXISTS idx_vtwin_catalog_family ON vtwin_catalog(family);
     `);
 
     console.log('Loading category map...');
@@ -168,19 +172,37 @@ async function main() {
             weight_lbs, length_in, width_in, height_in,
             oem_xref1, oem_xref2, oem_xref3,
             thumb_pic, full_pic1, full_pic2, full_pic3, full_pic4,
-            category, family,
             update_date, date_added
           ) VALUES (
             $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
             $11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
-            $21,$22,$23,$24,$25,$26,$27
+            $21,$22,$23,$24,$25
           )
           ON CONFLICT (sku) DO UPDATE SET
-            dealer_price = EXCLUDED.dealer_price,
-            retail_price = EXCLUDED.retail_price,
-            has_stock = EXCLUDED.has_stock,
-            update_date = EXCLUDED.update_date,
-            updated_at = now()
+            name               = EXCLUDED.name,
+            dealer_price       = EXCLUDED.dealer_price,
+            retail_price       = EXCLUDED.retail_price,
+            has_stock          = EXCLUDED.has_stock,
+            uom                = EXCLUDED.uom,
+            this_yr_catpage    = EXCLUDED.this_yr_catpage,
+            last_yr_catpage    = EXCLUDED.last_yr_catpage,
+            vendor_part_no     = EXCLUDED.vendor_part_no,
+            manufacturer       = EXCLUDED.manufacturer,
+            country_of_origin  = EXCLUDED.country_of_origin,
+            weight_lbs         = EXCLUDED.weight_lbs,
+            length_in          = EXCLUDED.length_in,
+            width_in           = EXCLUDED.width_in,
+            height_in          = EXCLUDED.height_in,
+            oem_xref1          = EXCLUDED.oem_xref1,
+            oem_xref2          = EXCLUDED.oem_xref2,
+            oem_xref3          = EXCLUDED.oem_xref3,
+            thumb_pic          = EXCLUDED.thumb_pic,
+            full_pic1          = EXCLUDED.full_pic1,
+            full_pic2          = EXCLUDED.full_pic2,
+            full_pic3          = EXCLUDED.full_pic3,
+            full_pic4          = EXCLUDED.full_pic4,
+            update_date        = EXCLUDED.update_date,
+            updated_at         = now()
         `, [
           sku,                                                    // $1
           cleanStr(row['DESCRIPTION']),                           // $2
@@ -205,8 +227,6 @@ async function main() {
           cleanStr(row['FULL_PIC2']),                             // $21
           cleanStr(row['FULL_PIC3']),                             // $22
           cleanStr(row['FULL_PIC4']),                             // $23
-          catInfo.category || null,                               // $24
-          catInfo.family || null,                                 // $25
           parseDate(row['UPDATE_DATE']),                          // $26
           parseDate(row['DATE_ADDED']),                           // $27
         ]);
@@ -223,11 +243,28 @@ async function main() {
 
     console.log(`\n✅ Done — ${inserted} rows inserted into vtwin_catalog, ${errors} errors`);
 
+    // Build oem_numbers array from xref columns
+    console.log('\nBuilding oem_numbers from xref columns...');
+    const { rowCount: oemUpdated } = await client.query(`
+      UPDATE vtwin_catalog
+      SET oem_numbers = ARRAY(
+        SELECT x FROM unnest(ARRAY[
+          NULLIF(TRIM(oem_xref1), ''),
+          NULLIF(TRIM(oem_xref2), ''),
+          NULLIF(TRIM(oem_xref3), '')
+        ]) AS x
+        WHERE x IS NOT NULL
+      )
+      WHERE oem_xref1 IS NOT NULL
+         OR oem_xref2 IS NOT NULL
+         OR oem_xref3 IS NOT NULL
+    `);
+    console.log(`✅ oem_numbers built for ${oemUpdated} products`);
+
     // Quick summary
     const res = await client.query(`
       SELECT 
         COUNT(*) as total,
-        COUNT(category) as has_category,
         COUNT(CASE WHEN has_stock THEN 1 END) as in_stock,
         COUNT(oem_xref1) as has_oem
       FROM vtwin_catalog

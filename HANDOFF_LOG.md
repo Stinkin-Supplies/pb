@@ -2,6 +2,102 @@
 
 ---
 
+# ——— FIFTY-FOURTH PASS (June 22, 2026) ———
+
+## WHERE WE ARE
+
+Fulfillment pipeline fully drafted (optimizer, triggerFulfillment, checkout/prepare, orders/create) — all four files schema-confirmed against real DB, ready to drop in. Variant group non-distinguishing-axis bug fixed and rebuilt live: 994 false groups / 2,763 products dissolved, clean reindex at 89,203 docs. Canonical review continuing in background (1,263 pending, 1,956 confirmed, 0 applied). Gateway decision deferred to merchant account meeting.
+
+⚠️ **URGENT: Rotate WPS API token and DB password** — both were hardcoded in `build_variant_groups.cjs` (now replaced with env vars), but the values are live in shell history and must be rotated: WPS token `eceGqPuosZVzZeZ74vBIWUqNwPbG1aP2YUL24fBO` and DB password `smelly`.
+⚠️ 1,956 confirmed canonical merges sitting unapplied — click "Apply confirmed merges" before continuing review.
+⚠️ Payment gateway still undecided — only blocker for checkout going live. Merchant account meeting pending.
+
+## What Was Done This Session
+
+### Fulfillment Pipeline — Four Files Written ✅
+
+All four files drafted from scratch, schema-confirmed iteratively via `\d` output:
+
+**`lib/fulfillment/optimizer.ts`**
+- Reads from `product_vendors` (not `vendor_offers` — vendor_offers only has 22,278 WPS rows; product_vendors covers all three vendors, 90,605 rows).
+- Priority: (1) minimize vendor count, (2) maximize margin within that, (3) stock check at resolution time, (4) VTwin always → `isManual=true`.
+- Single-vendor coverage attempted first; falls back to greedy minimum-vendor-count cover (heuristic, fine for real-world order sizes).
+- Returns `OptimizerResult` with `groups[]` and `unfulfillable[]`.
+
+**`lib/fulfillment/triggerFulfillment.ts`**
+- Inserts `vendor_orders` row, then dispatches to vendor adapter.
+- VTwin: no adapter call, writes `status='pending'` and returns — surfaces in `/admin/fulfillment/vtwin`.
+- PU/WPS: checks env vars first (`PU_API_URL/KEY`, `WPS_API_URL/KEY`); if missing, degrades to `status='manual_required'` with clear `error_message` rather than crashing.
+- Adapter stubs are real plumbing around no-op bodies — swap in the actual API fetch once creds land, nothing else changes.
+
+**`app/api/checkout/prepare/route.ts`**
+- Pre-payment quote only, no DB writes, no gateway call.
+- Returns customer-safe quote (no `resolvedVendor`, `unitCost`, `marginPct` in response).
+- Shipping and tax both `$0` placeholder (Chase list item 17).
+
+**`app/api/orders/create/route.ts`**
+- Re-validates stock (doesn't trust the quote), refuses if anything dropped out.
+- Calls `chargeGateway()` — stub that always returns failure on purpose until gateway is chosen.
+- Writes `orders` + `order_items` atomically in a DB transaction; dispatches `triggerFulfillment` per group **after commit** (adapter failures don't roll back a paid order).
+- Uses `client.release()` back to pool — never `.end()` on the shared pool.
+
+All four files confirmed against: `canonical_products`, `product_vendors`, `vendor_offers`, `orders`, `order_items`, `vendor_orders`.
+
+### `build_variant_groups.cjs` — Non-Distinguishing Axis Fix ✅
+
+**Root cause confirmed:** `classifyGroup()` was returning a valid group any time a named attribute axis was detected, even if all members shared the *same* attribute value (e.g. 12 different rear-brake-line SKUs all named "...Black" — different fitments, but fitment isn't encoded in the name). The VariantSelector had nothing real to show, just "Black vs Black vs Black."
+
+**Fix (invariant #7 added to file header):** After base-name similarity check, count `distinctValues` from the extracted attrs. If `< 2`, fall through to Pack Size fallback instead of returning — and if Pack Size also fails, group dissolves entirely (members stay standalone, which is correct).
+
+**Credentials moved to env vars** in the same pass: `WPS_TOKEN` → `process.env.WPS_TOKEN`, `password: 'smelly'` → `process.env.CATALOG_DB_PASSWORD`.
+
+**Live rebuild results:**
+
+| | Before | After | Delta |
+|--|--------|-------|-------|
+| Groups | 3,757 | 2,763 | −994 |
+| Members | 10,872 | 8,109 | −2,763 |
+| Kits in groups | 0 | 0 | — |
+
+**Typesense reindex:** 89,203 docs, 0 errors, 5m 7s.
+
+Note: the Ultima Complete Cylinder Heads group (9 members: 5×Black + 4×Natural) passes correctly — it has 2 distinct values and represents genuinely distinct products. The duplicate SKUs within each color value are a pre-existing VTwin data quality issue, not a pipeline bug.
+
+### `/api/img` Route Deleted ✅
+
+Dead duplicate zip-extraction proxy (Node-only, AdmZip, only wired into the dead `ProductDetailClient.jsx`) removed. `/api/image-proxy` is the sole image proxy now.
+
+### Variant Blast-Radius Confirmed ✅
+
+668 groups / 1,768 member products had no real distinguishing axis. Distribution: 480 pairs, 88 triplets, 44 quad, 20 five-member, down to 2 groups of 12. All dissolved by the fix above.
+
+### Canonical Review — Continued ✅
+
+Pending queue down from 2,246 → 1,263. Pack-qty cross-vendor pairs (brand_part_number pipeline, item #8) being correctly routed to variant-candidates rather than rejected. 1,956 confirmed and queued for apply.
+
+## DB State After This Session
+
+| Table | State |
+|-------|-------|
+| `catalog_variant_groups` | 2,763 rows (was 3,757) |
+| `catalog_variant_members` | 8,109 rows (was 10,872) |
+| `catalog_unified.variant_group_id` | 8,109 tagged (was 10,872) |
+| `canonical_match_proposals` | pending 1,263 · confirmed 1,956 · applied 0 · rejected 1,082 |
+| `vendor_orders` / `orders` / `order_items` | schema unchanged, no new rows (order pipeline not live yet) |
+
+## Files Written/Changed This Session
+
+| File | Status |
+|------|--------|
+| `lib/fulfillment/optimizer.ts` | NEW — drop in, confirm `@/lib/db/catalog` import path |
+| `lib/fulfillment/triggerFulfillment.ts` | NEW — drop in |
+| `app/api/checkout/prepare/route.ts` | NEW — drop in |
+| `app/api/orders/create/route.ts` | NEW — drop in |
+| `scripts/ingest/build_variant_groups.cjs` | PATCHED — invariant #7, env vars for creds |
+| `app/api/img/route.ts` | DELETED |
+
+---
+
 # ——— FORTY-EIGHTH PASS (June 12–13, 2026) ———
 
 ## WHERE WE ARE

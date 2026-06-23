@@ -143,6 +143,17 @@ function transform(row) {
     ? row.image_urls.filter(Boolean)
     : row.image_url ? [row.image_url] : [];
 
+  // product_details is the normalized, vendor-agnostic content column.
+  // Use it as primary source for description + features; fall back to raw
+  // columns for products not yet backfilled (or non-active-vendor products).
+  const details     = row.product_details || {};
+  const description = details.description
+    || row.description
+    || undefined;
+  const features    = details.features?.length
+    ? details.features
+    : (Array.isArray(row.features) && row.features.length ? row.features : undefined);
+
   // Sort priority: has image + in stock = highest
   const sortPriority =
     (hasImage ? 4 : 0) +
@@ -159,8 +170,8 @@ function transform(row) {
     variant_group_id: row.variant_group_id ? parseInt(row.variant_group_id) : undefined,
 
     name:             row.name,
-    description:      row.description || undefined,
-    features:         Array.isArray(row.features) && row.features.length ? row.features : undefined,
+    description:      description,
+    features:         features,
     brand:            row.brand || undefined,
     category:         row.category || undefined,
     subcategory:      row.subcategory || undefined,

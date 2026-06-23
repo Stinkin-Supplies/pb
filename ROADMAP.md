@@ -1,5 +1,5 @@
 # STINKIN' SUPPLIES — PROJECT ROADMAP
-**Last Updated: June 16, 2026 (Fifty-First Pass)**
+**Last Updated: June 22, 2026 (Fifty-Fourth Pass)**
 
 ---
 
@@ -143,6 +143,7 @@
 | Fits axis removed from WPS variant members — no more year ranges as selectable options | ✅ |
 | Brushed SS / Brushed / Raw SS added to Finish rule in extractAttribute | ✅ |
 | normalizeAxisName() — Finish→Color normalization prevents mixed-axis splits | ✅ |
+| Non-distinguishing axis fix (invariant #7) — groups where all members share the same attribute value are dissolved. 994 false groups / 2,763 products removed. Live state: 2,763 groups / 8,109 members. Credentials moved to env vars. | ✅ |
 
 ---
 
@@ -201,9 +202,9 @@ Schema is complete. Only blocker is gateway decision.
 | CartContext (localStorage, canonical_sku-based) | ✅ |
 | CartProvider wired into root layout | ✅ |
 | Checkout page skeleton (app/checkout/page.jsx) with address form + MAP pricing | ✅ |
-| checkout/prepare route (optimizer + order creation stub) | ✅ |
-| **Payment gateway decision** — Authorize.net / NMI / Heartland / Braintree? | ⚠️ BLOCKING — reminder set for Wed June 17 |
-| **POST /api/orders/create** — validate cart, compute totals, write orders + order_items, charge gateway, return order number | ⏳ After gateway |
+| `app/api/checkout/prepare/route.ts` — validates cart, runs optimizer, returns customer-safe quote | ✅ |
+| `app/api/orders/create/route.ts` — re-validates stock, charges gateway (stub), writes orders+order_items atomically, dispatches fulfillment | ✅ (gateway stub — always fails until gateway chosen) |
+| **Payment gateway decision** — Authorize.net / NMI / Heartland / Braintree? | ⚠️ BLOCKING — pending merchant account meeting |
 | **Order confirmation page** — /checkout/success needs real order data + email receipt | ⏳ |
 | Tax calculation — TaxJar or flat rate table | ⏳ |
 | Shipping estimate — UPS/FedEx API or flat rate by zone | ⏳ |
@@ -211,20 +212,19 @@ Schema is complete. Only blocker is gateway decision.
 
 ---
 
-## ⏳ PHASE 12 — FULFILLMENT OPTIMIZER (Ready to build now)
-
-All DB tables are correct. Can start this immediately.
+## ✅ PHASE 12 — FULFILLMENT OPTIMIZER (Complete — awaiting API creds)
 
 | Item | Status |
 |------|--------|
 | vendor_orders table — all fields present (vendor, is_manual, api_payload, retry_count) | ✅ |
 | order_items.is_manual_fulfillment — VTwin flag in schema | ✅ |
-| triggerFulfillment.ts — PU/WPS/VTwin adapters stubbed | ✅ |
-| **lib/fulfillment/optimizer.ts** — given order items, return vendor routing: (1) minimize vendor count, (2) maximize margin within vendor, (3) live stock check at resolution time, (4) VTwin → manual queue | ⏳ |
-| Live stock check at checkout — query vendor_offers before charging, auto-fallback to next vendor | ⏳ |
-| PU API order submission — auto-submit, capture vendor order number | ⏳ Needs API creds |
-| WPS API order submission — scaffolding exists, needs creds | ⏳ Needs API creds |
-| VTwin → manual queue — write vendor_orders row with is_manual=true | ⏳ |
+| `lib/fulfillment/optimizer.ts` — minimize vendor count, maximize margin, VTwin→manual, stock from product_vendors | ✅ |
+| `lib/fulfillment/triggerFulfillment.ts` — inserts vendor_orders, dispatches adapters, VTwin→manual queue, PU/WPS→manual_required until creds added | ✅ |
+| Live stock check at checkout — queries product_vendors at resolution time (not cached) | ✅ (via optimizer) |
+| PU API order submission | ⏳ Needs `PU_API_URL`/`PU_API_KEY` env vars |
+| WPS API order submission | ⏳ Needs `WPS_API_URL`/`WPS_API_KEY` env vars |
+| VTwin → manual queue — vendor_orders row with is_manual=true | ✅ |
+| **Backfill vendor_offers from product_vendors** — PU/VTwin cost/stock not in vendor_offers yet (only 22,278 WPS rows). Optimizer currently reads product_vendors as correct workaround; swap once backfilled. | ⏳ |
 
 ---
 
@@ -269,7 +269,7 @@ All DB tables are correct. Can start this immediately.
 
 | Item | Notes |
 |------|-------|
-| PU image zip contamination | **Confirmed June 16** — not "not yet fetched," confirmed broken. ~13,790 active PU products (37.6%) have `image_url` resolving to `application/x-zip` across three independent sources (`catalog_unified.image_url`, `pu_catalog.product_image`, `pu_brand_enrichment.image_uri`). PU's feed never shipped a direct image for these — only a zip archive. Stopgap (null + placeholder) and real fix (extract from zip) both scoped in `PU_ZIP_EXTRACTION_TODO.md`. |
+| PU image zip contamination | **✅ RESOLVED June 17** (was confirmed-broken June 16). ~13,790 active PU products (37.6%) had `image_url` resolving to `application/x-zip` across three independent sources. Fix: a live zip-extraction proxy (`app/api/image-proxy/route.ts`) already existed unwired in the codebase — found, validated, and wired into the browse grid + PDP, recovering real photos on the fly for the large majority. Genuine remainder with no source image anywhere: **3,573** (not 13,790 — that was the pre-fix contaminated-row count, not the unrecoverable count). `PU_ZIP_EXTRACTION_TODO.md`'s offline pipeline is now reference-only, superseded by the live proxy. |
 | Hard Drive book crossref | Same pattern as FatBook/OldBook |
 | WPS API enrichment | features+blocks hit rate testing |
 | Browse/Brand tabs | Data ready, UI unbuilt |
@@ -291,8 +291,8 @@ All DB tables are correct. Can start this immediately.
 | Typesense | No reindex automation | 🔵 Future |
 | Admin | ADMIN_SECRET not in Vercel | ⏳ |
 | PU | Portal spot-check 3-4 SKUs | ⏳ Recommended |
-| PU | ~13,790 active products have zip-contaminated image_url (confirmed June 16) | ⏳ See PU_ZIP_EXTRACTION_TODO.md |
+| PU | 3,573 active products have no recoverable image anywhere — corrected June 17 from a stale "~13,790 zip-contaminated" framing (that was the pre-fix count, not the unrecoverable count; the zip-extraction proxy now recovers the rest live) | 🔵 Low priority — no fix possible without new PU vendor data |
 
 ---
 
-*Last updated June 16, 2026 · Session 51*
+*Last updated June 22, 2026 · Session 54*
