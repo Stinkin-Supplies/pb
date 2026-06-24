@@ -39,19 +39,19 @@ const ERA_FLAGS = [
 // ─── CSS ──────────────────────────────────────────────────────────────────────
 const css = `
   :root {
-    --bg: #0e0e0f;
-    --surface: #161618;
-    --surface2: #1e1e21;
-    --border: #2a2a2e;
-    --border2: #38383e;
-    --text: #e8e8ea;
-    --muted: #6e6e7a;
-    --accent: #ff4d00;
-    --accent2: #ff7a3d;
-    --green: #22c55e;
-    --yellow: #eab308;
-    --red: #ef4444;
-    --blue: #3b82f6;
+    --bg: #f5f0e8;
+    --surface: #ffffff;
+    --surface2: #fbf6ec;
+    --border: #ddd0b8;
+    --border2: #9c8a6a;
+    --text: #1a1208;
+    --muted: #7a6a4f;
+    --accent: #c9a84c;
+    --accent2: #a3822c;
+    --green: #2f8552;
+    --yellow: #9a5a0c;
+    --red: #c0392b;
+    --blue: #3b78d8;
     --radius: 6px;
     --font: 'DM Mono', 'Fira Mono', monospace;
   }
@@ -90,7 +90,7 @@ const css = `
   /* Buttons */
   .pm-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 7px 13px; color: var(--text); font-family: var(--font); font-size: 12px; letter-spacing: 0.04em; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
   .pm-btn:hover { border-color: var(--border2); background: var(--border); }
-  .pm-btn.accent { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .pm-btn.accent { background: var(--accent); border-color: var(--accent); color: #1a1208; font-weight: 600; }
   .pm-btn.accent:hover { background: var(--accent2); border-color: var(--accent2); }
   .pm-btn.danger { background: transparent; border-color: var(--red); color: var(--red); }
   .pm-btn.danger:hover { background: var(--red); color: #fff; }
@@ -114,22 +114,22 @@ const css = `
   /* Virtualized rows */
   .pm-vt-row { display: flex; align-items: center; border-bottom: 1px solid var(--border); transition: background 0.1s; }
   .pm-vt-row:hover { background: var(--surface2) !important; }
-  .pm-vt-row.selected { background: rgba(255,77,0,0.06) !important; }
+  .pm-vt-row.selected { background: rgba(201,168,76,0.12) !important; }
   .pm-vt-cell { padding: 0 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; flex-shrink: 0; display: flex; align-items: center; height: 100%; }
 
   /* Inline edit cell */
   .pm-vt-cell.editable { cursor: text; }
-  .pm-vt-cell.editable:hover { background: rgba(255,255,255,0.03); outline: 1px solid var(--border2); outline-offset: -1px; }
+  .pm-vt-cell.editable:hover { background: rgba(201,168,76,0.07); outline: 1px solid var(--border2); outline-offset: -1px; }
   .pm-inline-input { background: var(--surface2); border: 1px solid var(--accent); border-radius: 3px; color: var(--text); font-family: var(--font); font-size: 12px; padding: 2px 6px; width: 100%; outline: none; }
 
   /* Badges */
   .pm-badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 10px; letter-spacing: 0.06em; font-weight: 600; text-transform: uppercase; }
-  .badge-wps   { background: rgba(59,130,246,0.15); color: #60a5fa; }
-  .badge-pu    { background: rgba(168,85,247,0.15); color: #c084fc; }
-  .badge-vtwin { background: rgba(234,179,8,0.15);  color: #fbbf24; }
-  .badge-active   { background: rgba(34,197,94,0.12);  color: var(--green); }
-  .badge-inactive { background: rgba(239,68,68,0.12);  color: var(--red); }
-  .badge-disc     { background: rgba(107,114,128,0.15); color: #9ca3af; }
+  .badge-wps   { background: rgba(59,120,216,0.15); color: #3b78d8; }
+  .badge-pu    { background: rgba(124,95,214,0.15); color: #7c5fd6; }
+  .badge-vtwin { background: rgba(154,90,12,0.15);  color: #9a5a0c; }
+  .badge-active   { background: rgba(47,133,82,0.12);  color: var(--green); }
+  .badge-inactive { background: rgba(192,57,43,0.12);  color: var(--red); }
+  .badge-disc     { background: rgba(122,106,79,0.15); color: #7a6a4f; }
 
   .pm-img-thumb { width: 28px; height: 28px; object-fit: cover; border-radius: 3px; background: var(--surface2); }
   .pm-img-ph { width: 28px; height: 28px; border-radius: 3px; background: var(--surface2); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--border2); font-size: 12px; }
@@ -396,7 +396,7 @@ function ProductsTable({ products, selected, onToggleSelect, onToggleAll, onEdit
                 style={{
                   position: 'absolute', top: i * ROW_HEIGHT, left: 0, right: 0,
                   height: ROW_HEIGHT, display: 'flex', alignItems: 'center',
-                  background: isSel ? 'rgba(255,77,0,0.06)' : i % 2 === 0 ? 'var(--surface)' : 'var(--bg)',
+                  background: isSel ? 'rgba(201,168,76,0.12)' : i % 2 === 0 ? 'var(--surface)' : 'var(--bg)',
                 }}
               >
                 {/* Check */}

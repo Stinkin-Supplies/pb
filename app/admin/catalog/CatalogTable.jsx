@@ -170,7 +170,7 @@ export default function CatalogTable({ initialItems }) {
                     <span style={{
                       fontFamily: "var(--font-stencil), monospace",
                       fontSize: "10px",
-                      color: (p.stock_quantity ?? 0) > 0 ? "#62d18c" : "#555",
+                      color: (p.stock_quantity ?? 0) > 0 ? "#2f8552" : "#8a7a60",
                     }}>
                       {p.stock_quantity ?? 0}
                     </span>
@@ -200,7 +200,7 @@ export default function CatalogTable({ initialItems }) {
                       <Link
                         href={`/browse/${p.slug}`}
                         target="_blank"
-                        style={{fontSize:9, letterSpacing:"0.1em", color:"#444", textDecoration:"none"}}
+                        style={{fontSize:9, letterSpacing:"0.1em", color:"#8a7a60", textDecoration:"none"}}
                       >
                         ↗ View
                       </Link>
@@ -222,8 +222,8 @@ export default function CatalogTable({ initialItems }) {
       {toast && (
         <div style={{
           position:"fixed", bottom:24, right:24,
-          background:"#111010", border:`1px solid ${toast.type === "error" ? "rgba(185,28,28,0.4)" : "rgba(34,197,94,0.35)"}`,
-          color: toast.type === "error" ? "#ff7a7a" : "#62d18c",
+          background:"#ffffff", border:`1px solid ${toast.type === "error" ? "rgba(192,57,43,0.4)" : "rgba(47,133,82,0.35)"}`,
+          color: toast.type === "error" ? "#c0392b" : "#2f8552",
           padding:"10px 18px", fontFamily:"var(--font-stencil), monospace",
           fontSize:10, letterSpacing:"0.12em", zIndex:300, borderRadius:2,
         }}>

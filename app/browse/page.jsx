@@ -57,9 +57,8 @@ function BrowsePageInner() {
     model:              searchParams.get("model")            || null,
     modelCodes:         searchParams.getAll("model_code").length > 0 ? searchParams.getAll("model_code") : null,
     year:               searchParams.get("year")             ? parseInt(searchParams.get("year")) : null,
-    category:           searchParams.get("category")         || null,
-    subcategory:        searchParams.get("subcategory")      || null,
-    display_category:   searchParams.get("display_category") || null,
+    // ?category is the legacy param — fold it into display_category so old links still work
+    display_category:   searchParams.get("display_category") || searchParams.get("category") || null,
     display_subcategory:searchParams.get("display_subcategory") || null,
     year_min:           searchParams.get("year_min")          ? parseInt(searchParams.get("year_min")) : null,
     year_max:           searchParams.get("year_max")          ? parseInt(searchParams.get("year_max")) : null,
@@ -101,8 +100,6 @@ function BrowsePageInner() {
       if (f.display_subcategory)  params.set("display_subcategory",f.display_subcategory);
       if (f.year_min)             params.set("year_min",           f.year_min);
       if (f.year_max)             params.set("year_max",           f.year_max);
-      if (f.category)             params.set("category",           f.category);
-      if (f.subcategory)          params.set("subcategory",        f.subcategory);
       if (f.brand)                params.set("brand",              f.brand);
       if (f.q)                    params.set("q",                  f.q);
       if (f.in_stock)             params.set("in_stock",           "true");
@@ -144,8 +141,6 @@ function BrowsePageInner() {
     if (next.display_subcategory)  p.set("display_subcategory",next.display_subcategory);
     if (next.year_min)             p.set("year_min",           next.year_min);
     if (next.year_max)             p.set("year_max",           next.year_max);
-    if (next.category)             p.set("category",           next.category);
-    if (next.subcategory)          p.set("subcategory",        next.subcategory);
     if (next.brand)                p.set("brand",              next.brand);
     if (next.q)                    p.set("q",                  next.q);
     if (next.in_stock)             p.set("in_stock",           "true");
@@ -256,7 +251,7 @@ function BrowsePageInner() {
                     {contextLabel}
                   </span>
                   <button
-                    onClick={() => handleFilterChange({ family: null, model: null, year: null, era: null, display_category: null, display_subcategory: null, year_min: null, year_max: null, category: null, subcategory: null, brand: null, min_price: null, max_price: null, in_stock: false, modelCodes: null, q: null })}
+                    onClick={() => handleFilterChange({ family: null, model: null, year: null, era: null, display_category: null, display_subcategory: null, year_min: null, year_max: null, brand: null, min_price: null, max_price: null, in_stock: false, modelCodes: null, q: null })}
                     style={{ background: "none", border: "none", color: GOLD, cursor: "pointer", fontSize: "13px", lineHeight: 1, padding: 0 }}
                   >×</button>
                 </div>

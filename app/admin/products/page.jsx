@@ -15,7 +15,7 @@ const VENDORS = ["PU","WPS","VTWIN"];
 const css = `
   .pm-body {
     padding: 24px 28px;
-    background: #0a0909;
+    background: #f5f0e8;
     min-height: calc(100vh - 46px);
   }
 
@@ -31,13 +31,13 @@ const css = `
     font-family: var(--font-caesar), sans-serif;
     letter-spacing: 0.08em;
     font-size: 18px;
-    color: #f0ebe3;
+    color: #1a1208;
   }
   .pm-sub {
     font-family: var(--font-stencil), monospace;
     font-size: 9px;
     letter-spacing: 0.16em;
-    color: #8a8784;
+    color: #7a6a4f;
     text-transform: uppercase;
   }
 
@@ -47,8 +47,8 @@ const css = `
     align-items: center;
     flex-wrap: wrap;
     gap: 8px;
-    border: 1px solid #2a2828;
-    background: rgba(16,15,15,0.85);
+    border: 1px solid #ddd0b8;
+    background: #ffffff;
     border-radius: 2px;
     padding: 10px 12px;
     margin-bottom: 10px;
@@ -56,19 +56,19 @@ const css = `
   .pm-toolbar input[type=text] {
     flex: 1;
     min-width: 200px;
-    background: #111010;
-    border: 1px solid #2a2828;
-    color: #f0ebe3;
+    background: #fbf6ec;
+    border: 1px solid #ddd0b8;
+    color: #1a1208;
     padding: 7px 10px;
     border-radius: 2px;
     font-size: 12px;
     outline: none;
   }
-  .pm-toolbar input[type=text]:focus { border-color: rgba(232,98,26,0.65); }
+  .pm-toolbar input[type=text]:focus { border-color: rgba(201,168,76,0.65); }
   .pm-toolbar select {
-    background: #111010;
-    border: 1px solid #2a2828;
-    color: #8a8784;
+    background: #fbf6ec;
+    border: 1px solid #ddd0b8;
+    color: #7a6a4f;
     padding: 7px 8px;
     border-radius: 2px;
     font-family: var(--font-stencil), monospace;
@@ -78,13 +78,13 @@ const css = `
     outline: none;
     cursor: pointer;
   }
-  .pm-toolbar select:focus { border-color: rgba(232,98,26,0.65); }
+  .pm-toolbar select:focus { border-color: rgba(201,168,76,0.65); }
 
   /* ── buttons ── */
   .btn {
-    border: 1px solid rgba(232,98,26,0.35);
+    border: 1px solid rgba(201,168,76,0.35);
     background: transparent;
-    color: #f0ebe3;
+    color: #1a1208;
     padding: 7px 12px;
     border-radius: 2px;
     cursor: pointer;
@@ -98,17 +98,17 @@ const css = `
     align-items: center;
     justify-content: center;
   }
-  .btn:hover { border-color: rgba(232,98,26,0.85); color: #e8621a; }
+  .btn:hover { border-color: rgba(201,168,76,0.85); color: #a3822c; }
   .btn-ghost {
-    border-color: #2a2828;
-    color: #8a8784;
+    border-color: #ddd0b8;
+    color: #7a6a4f;
   }
-  .btn-ghost:hover { border-color: #444; color: #f0ebe3; }
+  .btn-ghost:hover { border-color: #9c8a6a; color: #1a1208; }
 
   /* ── table ── */
   .pm-table-wrap {
-    border: 1px solid #2a2828;
-    background: rgba(16,15,15,0.85);
+    border: 1px solid #ddd0b8;
+    background: #ffffff;
     border-radius: 2px;
     overflow: hidden;
   }
@@ -117,61 +117,61 @@ const css = `
     font-family: var(--font-stencil), monospace;
     font-size: 9px;
     letter-spacing: 0.14em;
-    color: #8a8784;
+    color: #7a6a4f;
     text-transform: uppercase;
     text-align: left;
     padding: 9px 12px;
-    border-bottom: 1px solid #2a2828;
-    background: rgba(10,9,9,0.65);
+    border-bottom: 1px solid #ddd0b8;
+    background: #fbf6ec;
     white-space: nowrap;
   }
   tbody td {
     padding: 9px 12px;
-    border-bottom: 1px solid #1a1919;
-    color: #f0ebe3;
+    border-bottom: 1px solid #e6dcc0;
+    color: #1a1208;
     font-size: 12px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
   tbody tr:last-child td { border-bottom: none; }
-  tbody tr:hover td { background: rgba(232,98,26,0.05); }
+  tbody tr:hover td { background: rgba(201,168,76,0.05); }
 
-  .muted { color: #8a8784; font-size: 10px; }
+  .muted { color: #7a6a4f; font-size: 10px; }
 
   /* ── pills ── */
   .pill {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid #2a2828;
+    border: 1px solid #ddd0b8;
     border-radius: 2px;
     padding: 1px 6px;
     font-family: var(--font-stencil), monospace;
     font-size: 9px;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: #8a8784;
+    color: #7a6a4f;
   }
-  .pill-on  { border-color: rgba(60,190,120,0.3); color: #62d18c; }
-  .pill-off { border-color: rgba(255,90,90,0.25); color: #ff7a7a; }
-  .pill-pu    { border-color: rgba(139,92,246,0.4); color: #a78bfa; }
-  .pill-wps   { border-color: rgba(59,130,246,0.4); color: #60a5fa; }
-  .pill-vtwin { border-color: rgba(232,98,26,0.4);  color: #e8621a; }
+  .pill-on  { border-color: rgba(47,133,82,0.3); color: #2f8552; }
+  .pill-off { border-color: rgba(192,57,43,0.25); color: #c0392b; }
+  .pill-pu    { border-color: rgba(124,95,214,0.4); color: #7c5fd6; }
+  .pill-wps   { border-color: rgba(59,120,216,0.4); color: #3b78d8; }
+  .pill-vtwin { border-color: rgba(201,168,76,0.4);  color: #a3822c; }
 
   /* ── prefix badge ── */
   .prefix-badge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: rgba(232,98,26,0.08);
-    border: 1px solid rgba(232,98,26,0.2);
+    background: rgba(201,168,76,0.1);
+    border: 1px solid rgba(201,168,76,0.3);
     border-radius: 2px;
     padding: 1px 5px;
     font-family: var(--font-stencil), monospace;
     font-size: 9px;
     letter-spacing: 0.1em;
-    color: #e8621a;
+    color: #a3822c;
     margin-right: 5px;
   }
 
@@ -180,11 +180,11 @@ const css = `
     font-family: var(--font-stencil), monospace;
     font-size: 11px;
     letter-spacing: 0.06em;
-    color: #f0ebe3;
+    color: #1a1208;
   }
   .sku-vendor {
     font-size: 9px;
-    color: #555;
+    color: #8a7a60;
     margin-top: 1px;
   }
 
@@ -194,14 +194,14 @@ const css = `
     font-size: 9px;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: #555;
+    color: #8a7a60;
     text-decoration: none;
-    border: 1px solid #222;
+    border: 1px solid #ddd0b8;
     border-radius: 2px;
     padding: 3px 8px;
     white-space: nowrap;
   }
-  .edit-link:hover { color: #e8621a; border-color: rgba(232,98,26,0.4); }
+  .edit-link:hover { color: #a3822c; border-color: rgba(201,168,76,0.4); }
 
   /* ── pager ── */
   .pm-pager {
@@ -219,9 +219,9 @@ const css = `
     font-size: 10px;
     letter-spacing: 0.06em;
   }
-  .stock-ok  { color: #62d18c; }
-  .stock-low { color: #f59e0b; }
-  .stock-out { color: #555; }
+  .stock-ok  { color: #2f8552; }
+  .stock-low { color: #9a5a0c; }
+  .stock-out { color: #8a7a60; }
 `;
 
 function toInt(v, fb) {

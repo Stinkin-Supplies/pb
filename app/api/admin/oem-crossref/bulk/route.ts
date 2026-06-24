@@ -152,10 +152,16 @@ export async function POST(req: NextRequest) {
       insertParams.push(sku, oem_number.trim(), oem_manufacturer.trim(), source_file);
     }
 
+    // No conflict target named: the live unique constraint on this table has
+    // drifted between (sku, oem_number, oem_manufacturer) and (sku, oem_number)
+    // across past ingestion passes. An unqualified DO NOTHING skips a row on
+    // ANY unique-constraint violation, so it works regardless of which shape
+    // is currently live — unlike a hardcoded target, which throws if it
+    // doesn't match.
     const insertResult = await db.query(
       `INSERT INTO catalog_oem_crossref (sku, oem_number, oem_manufacturer, source_file)
        VALUES ${valueRows.join(", ")}
-       ON CONFLICT (sku, oem_number, oem_manufacturer) DO NOTHING`,
+       ON CONFLICT DO NOTHING`,
       insertParams
     );
 

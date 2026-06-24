@@ -217,8 +217,8 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
       const values: unknown[] = [];
       for (const w of words) {
         const pat = `%${w}%`;
-        groups.push('(cu.name ILIKE ?? OR cu.brand ILIKE ?? OR cu.vendor_sku ILIKE ?? OR cu.internal_sku ILIKE ??)');
-        values.push(pat, pat, pat, pat);
+        groups.push('(cu.name ILIKE ?? OR cu.brand ILIKE ?? OR cu.vendor_sku ILIKE ?? OR cu.internal_sku ILIKE ?? OR EXISTS (SELECT 1 FROM unnest(cu.oem_numbers) AS oem WHERE oem ILIKE ??))');
+        values.push(pat, pat, pat, pat, pat);
       }
       conds.push({ tag: 'other', sql: `(${groups.join(' AND ')})`, values });
     }

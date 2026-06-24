@@ -174,13 +174,13 @@ export default function DocumentsPage() {
   }
 
   return (
-    <div className="flex h-screen">
-      <div className="w-64 border-r p-4">
+    <div className="flex h-screen bg-[#f5f0e8]">
+      <div className="w-64 border-r border-[#ddd0b8] bg-[#fbf6ec] p-4">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">Folders</h2>
+          <h2 className="text-lg font-semibold text-[#1a1208]">Folders</h2>
           <button
             onClick={() => createFolder(currentFolder?.id ?? null)}
-            className="text-xs px-2 py-1 rounded border hover:bg-gray-50"
+            className="text-xs px-2 py-1 rounded border border-[#ddd0b8] text-[#7a6a4f] hover:bg-[#f0e9d6] hover:text-[#1a1208]"
             title={currentFolder ? "Create subfolder" : "Create folder"}
           >
             New
@@ -204,7 +204,7 @@ export default function DocumentsPage() {
       <div className="flex-1 p-6">
         <div className="flex justify-between items-center mb-4">
           <div>
-            <h1 className="text-xl font-bold">
+            <h1 className="text-xl font-bold text-[#1a1208]">
               {currentFolder ? currentFolder.name : "All Documents"}
             </h1>
             <Breadcrumb
@@ -218,7 +218,7 @@ export default function DocumentsPage() {
             />
           </div>
 
-          <label className="cursor-pointer bg-black text-white px-4 py-2 rounded">
+          <label className="cursor-pointer bg-[#c9a84c] text-[#1a1208] font-medium px-4 py-2 rounded hover:bg-[#a3822c]">
             Upload PDF
             <input
               type="file"
@@ -230,7 +230,7 @@ export default function DocumentsPage() {
         </div>
 
         {error ? (
-          <div className="mb-4 text-sm text-red-600">{error}</div>
+          <div className="mb-4 text-sm text-[#c0392b]">{error}</div>
         ) : null}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -249,8 +249,8 @@ function Breadcrumb({ folders, currentFolderId, onSelectRoot, onSelectFolder }) 
   if (!crumbs.length) return null;
 
   return (
-    <div className="text-xs text-gray-500 mt-1">
-      <button onClick={onSelectRoot} className="underline">
+    <div className="text-xs text-[#7a6a4f] mt-1">
+      <button onClick={onSelectRoot} className="underline text-[#a3822c] hover:text-[#1a1208]">
         All Documents
       </button>
       {crumbs.map((f) => (
@@ -259,7 +259,7 @@ function Breadcrumb({ folders, currentFolderId, onSelectRoot, onSelectFolder }) 
           /{" "}
           <button
             onClick={() => onSelectFolder(f)}
-            className="underline"
+            className="underline text-[#a3822c] hover:text-[#1a1208]"
             title={f.name}
           >
             {f.name}
@@ -311,8 +311,8 @@ function FolderTree({
           const draggedId = e.dataTransfer.getData("text/plain");
           if (draggedId) void handleDrop({ draggedId, targetParentId: null });
         }}
-        className={`cursor-pointer hover:bg-gray-100 p-2 rounded ${
-          !currentFolderId ? "bg-gray-100" : ""
+        className={`cursor-pointer hover:bg-[#f0e9d6] text-[#1a1208] p-2 rounded ${
+          !currentFolderId ? "bg-[#f0e9d6]" : ""
         }`}
         title="Drop here to move to root"
       >
@@ -370,8 +370,8 @@ function FolderTreeItem({
           const draggedId = e.dataTransfer.getData("text/plain");
           if (draggedId) void onDropOnFolder(draggedId, folder.id);
         }}
-        className={`flex items-center gap-1 cursor-pointer hover:bg-gray-100 p-2 rounded ${
-          currentFolderId === folder.id ? "bg-gray-100" : ""
+        className={`flex items-center gap-1 cursor-pointer hover:bg-[#f0e9d6] p-2 rounded ${
+          currentFolderId === folder.id ? "bg-[#f0e9d6]" : ""
         }`}
         style={{ paddingLeft: 8 + level * 14 }}
         title="Drag to move, drop to make subfolder"
@@ -382,14 +382,14 @@ function FolderTreeItem({
             e.stopPropagation();
             if (hasChildren) toggle(folder.id);
           }}
-          className="w-5 h-5 flex items-center justify-center text-gray-500"
+          className="w-5 h-5 flex items-center justify-center text-[#7a6a4f]"
           aria-label={isExpanded ? "Collapse folder" : "Expand folder"}
         >
           {hasChildren ? (isExpanded ? "▾" : "▸") : <span className="opacity-30">•</span>}
         </button>
         <div
           onClick={() => onSelectFolder(folder)}
-          className="flex-1 truncate"
+          className="flex-1 truncate text-[#1a1208]"
         >
           📁 {folder.name}
         </div>
@@ -433,18 +433,18 @@ function DocumentCard({ doc }) {
   }
 
   return (
-    <div className="border rounded-2xl p-3 shadow-sm">
-      <div className="h-40 bg-gray-100 flex items-center justify-center mb-2 overflow-hidden rounded-xl">
+    <div className="border border-[#ddd0b8] bg-[#ffffff] rounded-2xl p-3 shadow-sm">
+      <div className="h-40 bg-[#fbf6ec] flex items-center justify-center mb-2 overflow-hidden rounded-xl">
         {url ? (
           <iframe title={doc.name ?? "Preview"} src={url} className="w-full h-full" />
         ) : (
-          <button onClick={loadPreview} className="text-sm underline">
+          <button onClick={loadPreview} className="text-sm underline text-[#a3822c] hover:text-[#1a1208]">
             Preview
           </button>
         )}
       </div>
-      {error ? <div className="text-xs text-red-600 mb-1">{error}</div> : null}
-      <div className="text-sm font-medium truncate">{doc.name}</div>
+      {error ? <div className="text-xs text-[#c0392b] mb-1">{error}</div> : null}
+      <div className="text-sm font-medium truncate text-[#1a1208]">{doc.name}</div>
     </div>
   );
 }

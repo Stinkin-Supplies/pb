@@ -15,14 +15,60 @@ const css = `
     --gold: #c9a84c;
     --green: #22c55e;
     --blue: #3b82f6;
+    --surface-tint: rgba(255,255,255,0.02);
+    --surface-tint-strong: rgba(255,255,255,0.06);
+    --track-tint: rgba(255,255,255,0.05);
+    --ring-track: rgba(255,255,255,0.07);
+    --ring-border: rgba(255,255,255,0.04);
+    --hero-grad-1: rgba(255,255,255,0.032);
+    --hero-grad-2: rgba(255,255,255,0.014);
+    --gauge-inner-1: rgba(17,16,16,0.96);
+    --gauge-inner-2: rgba(10,9,9,0.96);
+    --page-grad:
+      radial-gradient(circle at top left, rgba(232,98,26,0.14), transparent 28%),
+      radial-gradient(circle at 88% 4%, rgba(201,168,76,0.10), transparent 22%),
+      linear-gradient(180deg, #0c0b0b 0%, #090808 100%);
+    --bar-blue-grad: linear-gradient(90deg, rgba(59,130,246,0.9), rgba(34,197,94,0.9));
+    --bar-gold-grad: linear-gradient(90deg, rgba(201,168,76,0.95), rgba(232,98,26,0.9));
+    --bar-orange-grad: linear-gradient(90deg, rgba(232,98,26,0.95), rgba(201,168,76,0.85));
+    --card-shadow: rgba(0,0,0,0.28);
+  }
+
+  .db-wrap.db-admin {
+    --bg: #f5f0e8;
+    --panel: rgba(255,255,255,0.92);
+    --panel-strong: #ffffff;
+    --line: #ddd0b8;
+    --line-soft: rgba(26,18,8,0.05);
+    --text: #1a1208;
+    --muted: #7a6a4f;
+    --orange: #a3822c;
+    --orange-deep: #a3822c;
+    --gold: #a3822c;
+    --green: #2f8552;
+    --blue: #3b78d8;
+    --surface-tint: rgba(26,18,8,0.035);
+    --surface-tint-strong: rgba(26,18,8,0.08);
+    --track-tint: rgba(26,18,8,0.07);
+    --ring-track: rgba(26,18,8,0.1);
+    --ring-border: rgba(26,18,8,0.08);
+    --hero-grad-1: rgba(26,18,8,0.05);
+    --hero-grad-2: rgba(26,18,8,0.02);
+    --gauge-inner-1: rgba(255,255,255,0.98);
+    --gauge-inner-2: rgba(251,246,236,0.98);
+    --page-grad:
+      radial-gradient(circle at top left, rgba(201,168,76,0.16), transparent 28%),
+      radial-gradient(circle at 88% 4%, rgba(163,130,44,0.1), transparent 22%),
+      linear-gradient(180deg, #f5f0e8 0%, #efe7d6 100%);
+    --bar-blue-grad: linear-gradient(90deg, rgba(59,120,216,0.9), rgba(47,133,82,0.9));
+    --bar-gold-grad: linear-gradient(90deg, rgba(201,168,76,0.95), rgba(163,130,44,0.9));
+    --bar-orange-grad: linear-gradient(90deg, rgba(163,130,44,0.95), rgba(201,168,76,0.85));
+    --card-shadow: rgba(26,18,8,0.12);
   }
 
   .db-wrap {
     min-height: 100vh;
-    background:
-      radial-gradient(circle at top left, rgba(232,98,26,0.14), transparent 28%),
-      radial-gradient(circle at 88% 4%, rgba(201,168,76,0.10), transparent 22%),
-      linear-gradient(180deg, #0c0b0b 0%, #090808 100%);
+    background: var(--page-grad);
     color: var(--text);
     font-family: var(--font-stencil), sans-serif;
     position: relative;
@@ -54,9 +100,9 @@ const css = `
     align-items: stretch;
     padding: 24px;
     border: 1px solid var(--line);
-    background: linear-gradient(180deg, rgba(255,255,255,0.032), rgba(255,255,255,0.014));
+    background: linear-gradient(180deg, var(--hero-grad-1), var(--hero-grad-2));
     border-radius: 6px;
-    box-shadow: 0 30px 90px rgba(0,0,0,0.28);
+    box-shadow: 0 30px 90px var(--card-shadow);
     margin-bottom: 18px;
   }
 
@@ -98,7 +144,7 @@ const css = `
     justify-content: center;
     gap: 8px;
     border: 1px solid var(--line);
-    background: rgba(255,255,255,0.02);
+    background: var(--surface-tint);
     color: var(--text);
     padding: 10px 14px;
     border-radius: 3px;
@@ -124,7 +170,7 @@ const css = `
   .hero-card {
     border: 1px solid var(--line);
     border-radius: 6px;
-    background: rgba(255,255,255,0.02);
+    background: var(--surface-tint);
     padding: 16px;
   }
 
@@ -136,7 +182,7 @@ const css = `
     aspect-ratio: 1;
     margin: 0 auto;
     border-radius: 50%;
-    background: conic-gradient(var(--gold) 0 var(--pct), rgba(255,255,255,0.07) var(--pct) 100%);
+    background: conic-gradient(var(--gold) 0 var(--pct), var(--ring-track) var(--pct) 100%);
     padding: 14px;
   }
 
@@ -145,8 +191,8 @@ const css = `
     position: absolute;
     inset: 14px;
     border-radius: 50%;
-    background: linear-gradient(180deg, rgba(17,16,16,0.96), rgba(10,9,9,0.96));
-    border: 1px solid rgba(255,255,255,0.04);
+    background: linear-gradient(180deg, var(--gauge-inner-1), var(--gauge-inner-2));
+    border: 1px solid var(--ring-border);
   }
 
   .gauge-inner {
@@ -189,7 +235,7 @@ const css = `
     padding: 12px;
     border: 1px solid var(--line);
     border-radius: 4px;
-    background: rgba(255,255,255,0.02);
+    background: var(--surface-tint);
   }
 
   .mini-label {
@@ -315,7 +361,7 @@ const css = `
   .fitment-card {
     border: 1px solid var(--line);
     border-radius: 6px;
-    background: rgba(255,255,255,0.02);
+    background: var(--surface-tint);
     padding: 16px;
   }
 
@@ -324,7 +370,7 @@ const css = `
     overflow: hidden;
     height: 12px;
     border-radius: 999px;
-    background: rgba(255,255,255,0.06);
+    background: var(--surface-tint-strong);
   }
 
   .source-segment {
@@ -352,7 +398,7 @@ const css = `
     padding: 12px;
     border: 1px solid var(--line);
     border-radius: 4px;
-    background: rgba(255,255,255,0.02);
+    background: var(--surface-tint);
   }
 
   .detail-chip-label {
@@ -403,7 +449,7 @@ const css = `
     position: relative;
     height: 12px;
     border-radius: 999px;
-    background: rgba(255,255,255,0.05);
+    background: var(--track-tint);
     overflow: hidden;
   }
 
@@ -416,15 +462,15 @@ const css = `
   }
 
   .bar-fill.blue {
-    background: linear-gradient(90deg, rgba(59,130,246,0.9), rgba(34,197,94,0.9));
+    background: var(--bar-blue-grad);
   }
 
   .bar-fill.gold {
-    background: linear-gradient(90deg, rgba(201,168,76,0.95), rgba(232,98,26,0.9));
+    background: var(--bar-gold-grad);
   }
 
   .bar-fill.orange {
-    background: linear-gradient(90deg, rgba(232,98,26,0.95), rgba(201,168,76,0.85));
+    background: var(--bar-orange-grad);
   }
 
   .bar-value {
@@ -460,7 +506,7 @@ const css = `
   .vendor-card {
     padding: 14px;
     border: 1px solid var(--line);
-    background: rgba(255,255,255,0.02);
+    background: var(--surface-tint);
     border-radius: 4px;
   }
 
@@ -554,7 +600,7 @@ function SourceStack({ rows, total }) {
       <div className="source-stack">
         {rows.map((row, index) => {
           const width = total ? Math.max(8, (row.rows / total) * 100) : 0;
-          const palette = ["var(--orange)", "var(--gold)", "rgba(59,130,246,0.9)"];
+          const palette = ["var(--orange)", "var(--gold)", "var(--blue)"];
           return (
             <div
               key={String(row.vendor ?? index)}
@@ -621,7 +667,7 @@ export default function DatabaseSnapshotView({ snapshot, variant = "public" }) {
   );
 
   return (
-    <div className="db-wrap">
+    <div className={variant === "admin" ? "db-wrap db-admin" : "db-wrap"}>
       <style>{css}</style>
       <div className="db-shell">
         <section className="db-hero">

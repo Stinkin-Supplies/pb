@@ -51,8 +51,8 @@ function computePrice(cost, retail) {
 }
 
 function buildRow(p) {
-  // VTwin SKUs are like "VT-01-0101" — use as-is for sku, strip for sku_normalized
-  const sku           = (p.sku || '').trim();
+  const vendorSku     = (p.sku || '').trim();
+  const sku           = 'VT-' + vendorSku;
   const skuNorm       = sku.replace(/[^a-zA-Z0-9]/g, '');
   const computedPrice = computePrice(p.dealer_price, p.retail_price);
   const brand         = (p.manufacturer || 'V-Twin').trim() || 'V-Twin';
@@ -72,7 +72,7 @@ function buildRow(p) {
   return {
     sku,
     sku_normalized:    skuNorm,
-    vendor_sku:        sku,
+    vendor_sku:        vendorSku,
     source_vendor:     'VTWIN',
     name:              p.name || sku,
     description:       null,
@@ -265,7 +265,7 @@ async function main() {
       COUNT(*) FILTER (WHERE array_length(oem_numbers,1) > 0) as has_oem,
       ROUND(AVG(computed_price) FILTER (WHERE computed_price > 0), 2) as avg_price
     FROM catalog_unified
-    WHERE source_vendor = 'VTwin'
+    WHERE source_vendor IN ('VTWIN', 'VTwin')
   `);
 
   const { rows: [{ grand_total }] } = await client.query(

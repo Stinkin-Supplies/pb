@@ -13,10 +13,10 @@ import { useState, useEffect, useCallback, useRef } from "react";
 const css = `
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    --black:  #0a0909; --coal:   #111010; --iron:  #1a1919;
-    --steel:  #2a2828; --chrome: #8a8784; --cream: #f0ebe3;
-    --orange: #e8621a; --gold:   #c9a84c; --red:   #b91c1c;
-    --green:  #22c55e; --blue:   #3b82f6;
+    --black:  #f5f0e8; --coal:   #ffffff; --iron:  #fbf6ec;
+    --steel:  #ddd0b8; --chrome: #7a6a4f; --cream: #1a1208;
+    --orange: #c9a84c; --gold:   #c9a84c; --red:   #c0392b;
+    --green:  #2f8552; --blue:   #3b78d8;
   }
 
   .fm-wrap { background: var(--black); min-height: 100vh; color: var(--cream); font-family: var(--font-stencil), monospace; }
@@ -30,11 +30,11 @@ const css = `
   /* STAT BAR */
   .fm-stats { display: flex; gap: 1px; background: var(--steel); border-bottom: 1px solid var(--steel); }
   .fm-stat { flex: 1; background: var(--coal); padding: 14px 20px; cursor: pointer; transition: background 0.15s; }
-  .fm-stat:hover { background: #161515; }
-  .fm-stat.active { background: rgba(232,98,26,0.08); border-bottom: 2px solid var(--orange); }
+  .fm-stat:hover { background: #fbf6ec; }
+  .fm-stat.active { background: rgba(201,168,76,0.1); border-bottom: 2px solid var(--orange); }
   .fm-stat-val { font-family: var(--font-caesar), sans-serif; font-size: 28px; letter-spacing: 0.04em; line-height: 1; }
   .fm-stat-val.orange { color: var(--orange); }
-  .fm-stat-val.red { color: #ff7a7a; }
+  .fm-stat-val.red { color: var(--red); }
   .fm-stat-val.green { color: var(--green); }
   .fm-stat-val.gold { color: var(--gold); }
   .fm-stat-label { font-size: 8px; color: var(--chrome); letter-spacing: 0.16em; margin-top: 3px; }
@@ -43,7 +43,7 @@ const css = `
   .fm-tabs { display: flex; gap: 1px; background: var(--steel); border-bottom: 1px solid var(--steel); }
   .fm-tab { padding: 10px 20px; font-size: 9px; letter-spacing: 0.16em; color: var(--chrome); cursor: pointer; background: var(--coal); border-bottom: 2px solid transparent; transition: all 0.15s; user-select: none; }
   .fm-tab:hover { color: var(--cream); }
-  .fm-tab.active { color: var(--orange); border-bottom-color: var(--orange); background: rgba(232,98,26,0.05); }
+  .fm-tab.active { color: var(--orange); border-bottom-color: var(--orange); background: rgba(201,168,76,0.06); }
 
   /* TOOLBAR */
   .fm-toolbar { padding: 12px 28px; background: var(--black); border-bottom: 1px solid var(--iron); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
@@ -58,28 +58,28 @@ const css = `
   .btn { font-family: var(--font-stencil), monospace; font-size: 9px; letter-spacing: 0.14em; padding: 8px 16px; border-radius: 2px; border: 1px solid; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
   .btn-ghost { background: none; border-color: var(--steel); color: var(--chrome); }
   .btn-ghost:hover { border-color: var(--orange); color: var(--orange); }
-  .btn-primary { background: var(--orange); border-color: var(--orange); color: var(--black); font-weight: 700; }
-  .btn-primary:hover { background: #c94f0f; }
+  .btn-primary { background: var(--orange); border-color: var(--orange); color: #1a1208; font-weight: 700; }
+  .btn-primary:hover { background: #a3822c; }
   .btn-sm { padding: 4px 10px; font-size: 8px; }
-  .btn-danger { background: none; border-color: rgba(185,28,28,0.4); color: #ff7a7a; }
-  .btn-danger:hover { background: rgba(185,28,28,0.08); border-color: #ff7a7a; }
+  .btn-danger { background: none; border-color: rgba(192,57,43,0.4); color: var(--red); }
+  .btn-danger:hover { background: rgba(192,57,43,0.1); border-color: var(--red); }
   .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
   /* TABLE */
   .fm-table-wrap { overflow-x: auto; min-height: 300px; }
   .fm-table { width: 100%; border-collapse: collapse; font-size: 12px; }
   .fm-table th { background: var(--coal); border-bottom: 1px solid var(--steel); padding: 10px 14px; text-align: left; font-size: 8px; color: var(--chrome); letter-spacing: 0.18em; font-weight: normal; white-space: nowrap; }
-  .fm-table td { padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,0.03); vertical-align: middle; white-space: nowrap; }
-  .fm-table tr:hover td { background: rgba(255,255,255,0.015); }
+  .fm-table td { padding: 10px 14px; border-bottom: 1px solid rgba(26,18,8,0.08); vertical-align: middle; white-space: nowrap; }
+  .fm-table tr:hover td { background: rgba(201,168,76,0.05); }
 
   .cell-name { font-size: 12px; color: var(--cream); max-width: 260px; overflow: hidden; text-overflow: ellipsis; display: block; }
-  .cell-sku { font-family: var(--font-stencil), monospace; font-size: 9px; color: #555; margin-top: 2px; display: block; }
+  .cell-sku { font-family: var(--font-stencil), monospace; font-size: 9px; color: #8a7a60; margin-top: 2px; display: block; }
   .cell-brand { font-size: 11px; color: var(--chrome); }
 
   .badge { display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--steel); border-radius: 2px; padding: 2px 7px; font-size: 9px; letter-spacing: 0.1em; color: var(--chrome); }
-  .badge-ok { border-color: rgba(34,197,94,0.35); color: var(--green); }
-  .badge-warn { border-color: rgba(245,158,11,0.35); color: #f59e0b; }
-  .badge-none { border-color: rgba(255,90,90,0.25); color: #ff7a7a; }
+  .badge-ok { border-color: rgba(47,133,82,0.35); color: var(--green); }
+  .badge-warn { border-color: rgba(154,90,12,0.35); color: #9a5a0c; }
+  .badge-none { border-color: rgba(192,57,43,0.25); color: var(--red); }
   .badge-gold { border-color: rgba(201,168,76,0.35); color: var(--gold); }
 
   .edit-btn { background: none; border: 1px solid var(--steel); border-radius: 2px; color: var(--chrome); font-family: var(--font-stencil), monospace; font-size: 8px; letter-spacing: 0.1em; padding: 4px 10px; cursor: pointer; transition: all 0.15s; }
@@ -92,11 +92,11 @@ const css = `
   .page-btns { display: flex; gap: 4px; }
   .page-btn { background: none; border: 1px solid var(--steel); color: var(--chrome); padding: 5px 10px; border-radius: 2px; font-family: var(--font-stencil), monospace; font-size: 9px; letter-spacing: 0.1em; cursor: pointer; transition: all 0.15s; }
   .page-btn:hover:not(:disabled) { border-color: var(--orange); color: var(--orange); }
-  .page-btn.active { background: var(--orange); border-color: var(--orange); color: var(--black); }
+  .page-btn.active { background: var(--orange); border-color: var(--orange); color: #1a1208; }
   .page-btn:disabled { opacity: 0.3; cursor: default; }
 
   /* EMPTY / LOADING */
-  .fm-empty { text-align: center; padding: 60px 20px; font-size: 9px; color: #3a3838; letter-spacing: 0.2em; }
+  .fm-empty { text-align: center; padding: 60px 20px; font-size: 9px; color: #8a7a60; letter-spacing: 0.2em; }
   .fm-loading { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 60px; color: var(--chrome); font-size: 9px; letter-spacing: 0.18em; }
   .spinner { width: 16px; height: 16px; border: 2px solid var(--steel); border-top-color: var(--orange); border-radius: 50%; animation: spin 0.6s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -127,12 +127,12 @@ const css = `
   .oem-row { display: flex; align-items: center; gap: 10px; background: var(--iron); border: 1px solid var(--steel); padding: 8px 12px; border-radius: 2px; }
   .oem-number { font-family: var(--font-caesar), sans-serif; font-size: 16px; letter-spacing: 0.06em; color: var(--orange); flex: 1; }
   .oem-mfr { font-size: 10px; color: var(--chrome); }
-  .oem-source { font-size: 9px; color: #444; letter-spacing: 0.08em; }
+  .oem-source { font-size: 9px; color: #8a7a60; letter-spacing: 0.08em; }
 
   /* FITMENT LIST */
   .fitment-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; max-height: 260px; overflow-y: auto; }
   .fitment-row { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border: 1px solid var(--steel); border-radius: 2px; font-size: 11px; }
-  .fitment-row:nth-child(odd) { background: rgba(255,255,255,0.01); }
+  .fitment-row:nth-child(odd) { background: rgba(201,168,76,0.04); }
   .fit-family { font-size: 9px; color: var(--gold); letter-spacing: 0.1em; width: 80px; flex-shrink: 0; }
   .fit-model { flex: 1; color: var(--cream); }
   .fit-code { font-family: var(--font-stencil), monospace; font-size: 9px; color: var(--chrome); width: 70px; }
@@ -157,11 +157,11 @@ const css = `
 
   /* TOAST */
   .toast { position: fixed; bottom: 24px; right: 24px; background: var(--coal); border: 1px solid var(--steel); padding: 12px 20px; font-size: 10px; letter-spacing: 0.12em; z-index: 300; animation: toastIn 0.2s ease; border-radius: 2px; }
-  .toast.success { border-color: rgba(34,197,94,0.4); color: var(--green); }
-  .toast.error { border-color: rgba(185,28,28,0.4); color: #ff7a7a; }
+  .toast.success { border-color: rgba(47,133,82,0.4); color: var(--green); }
+  .toast.error { border-color: rgba(192,57,43,0.4); color: var(--red); }
   @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
-  .modal-error { background: rgba(185,28,28,0.1); border: 1px solid rgba(185,28,28,0.3); color: #ff7a7a; padding: 8px 12px; font-size: 10px; letter-spacing: 0.1em; border-radius: 2px; margin-bottom: 14px; }
+  .modal-error { background: rgba(192,57,43,0.1); border: 1px solid rgba(192,57,43,0.3); color: var(--red); padding: 8px 12px; font-size: 10px; letter-spacing: 0.1em; border-radius: 2px; margin-bottom: 14px; }
 `;
 
 const TABS = ["PRODUCTS", "REPORTS"];
@@ -344,7 +344,7 @@ export default function AdminFitmentPage() {
                         </span>
                       </td>
                       <td>
-                        <span style={{fontFamily:"var(--font-stencil),monospace", fontSize:10, color:"#8a8784", letterSpacing:"0.06em"}}>
+                        <span style={{fontFamily:"var(--font-stencil),monospace", fontSize:10, color:"#7a6a4f", letterSpacing:"0.06em"}}>
                           {p.source_vendor === "WPS"
                             ? (p.vendor_sku || p.sku)
                             : p.sku
@@ -448,7 +448,7 @@ function ReportsTab({ stats }) {
         <div className="report-card">
           <div className="report-card-header">
             <div className="report-card-title">MISSING FITMENT</div>
-            <div className="report-card-count" style={{color:"#ff7a7a"}}>
+            <div className="report-card-count" style={{color:"var(--red)"}}>
               {(stats.total - stats.withFitment).toLocaleString()}
             </div>
           </div>
@@ -540,7 +540,7 @@ function ReportsTab({ stats }) {
                       </td>
                     )}
                     {reportData.type === "flag_mismatch" && (
-                      <td style={{fontSize:10, color: r.fitment_count > 0 ? "var(--green)" : "#ff7a7a"}}>
+                      <td style={{fontSize:10, color: r.fitment_count > 0 ? "var(--green)" : "var(--red)"}}>
                         {r.fitment_count ?? 0} ROWS
                       </td>
                     )}
@@ -733,7 +733,7 @@ function ProductFitmentModal({ product, onClose, onSaved, showToast }) {
               onClick={() => { setActiveTab(t); setFormError(""); }}
               style={{
                 padding:"9px 20px", fontSize:9, letterSpacing:"0.16em",
-                cursor:"pointer", background: activeTab === t ? "rgba(232,98,26,0.08)" : "var(--coal)",
+                cursor:"pointer", background: activeTab === t ? "rgba(201,168,76,0.1)" : "var(--coal)",
                 borderBottom: activeTab === t ? "2px solid var(--orange)" : "2px solid transparent",
                 color: activeTab === t ? "var(--orange)" : "var(--chrome)",
                 transition:"all 0.15s",
@@ -757,15 +757,15 @@ function ProductFitmentModal({ product, onClose, onSaved, showToast }) {
                   <div style={{
                     display:"flex", alignItems:"center", justifyContent:"space-between",
                     padding:"10px 14px", marginBottom:16,
-                    background: fitsAllModels ? "rgba(34,197,94,0.06)" : "rgba(255,255,255,0.02)",
-                    border: `1px solid ${fitsAllModels ? "rgba(34,197,94,0.25)" : "var(--steel)"}`,
+                    background: fitsAllModels ? "rgba(47,133,82,0.08)" : "rgba(26,18,8,0.02)",
+                    border: `1px solid ${fitsAllModels ? "rgba(47,133,82,0.3)" : "var(--steel)"}`,
                     borderRadius:2,
                   }}>
                     <div>
                       <div style={{fontSize:10, color: fitsAllModels ? "var(--green)" : "var(--chrome)", letterSpacing:"0.12em", marginBottom:2}}>
                         FITS ALL MODELS / UNIVERSAL
                       </div>
-                      <div style={{fontSize:9, color:"#444", letterSpacing:"0.08em"}}>
+                      <div style={{fontSize:9, color:"#8a7a60", letterSpacing:"0.08em"}}>
                         {fitsAllModels
                           ? "Marked as universal fit — excluded from missing fitment reports"
                           : "Enable to mark as universal fit — removes from missing fitment report"}
@@ -791,7 +791,8 @@ function ProductFitmentModal({ product, onClose, onSaved, showToast }) {
                           position:"absolute", top:3,
                           left: fitsAllModels ? 20 : 3,
                           width:16, height:16, borderRadius:"50%",
-                          background:"#f0ebe3",
+                          background:"#ffffff",
+                          boxShadow:"0 1px 3px rgba(26,18,8,0.35)",
                           transition:"left 0.2s",
                         }} />
                       </button>

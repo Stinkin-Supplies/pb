@@ -1,229 +1,170 @@
 /**
  * generate_vtwin_skus.js
- * Generates internal SKUs for VTwin products and populates vendor.vtwin_sku_staging
+ * Assigns internal_sku values to VTwin products that don't have one yet.
+ * Reads display_category → prefix mapping, allocates from sku_counter,
+ * and writes directly to catalog_unified.internal_sku.
  *
- * Usage: node scripts/ingest/generate_vtwin_skus.js
+ * Usage:
+ *   node scripts/ingest/generate_vtwin_skus.js            # dry run
+ *   node scripts/ingest/generate_vtwin_skus.js --apply    # writes to DB
  */
 
 import pg from 'pg';
-import { ProgressBar } from './progress_bar.js';
 
 const { Pool } = pg;
+const APPLY = process.argv.includes('--apply');
 
 const db = new Pool({
-  connectionString: 'postgresql://catalog_app:smelly@5.161.100.126:5432/stinkin_catalog',
+  connectionString: process.env.CATALOG_DATABASE_URL,
 });
 
-// ---------------------------------------------------------------------------
-// Step 1: Fetch all VTwin products with their resolved category + prefix
-// Pre-aggregates best category per page in a CTE to avoid correlated subqueries
-// ---------------------------------------------------------------------------
-async function fetchProducts() {
-  console.log('\n[Step 1] Fetching VTwin products with resolved categories...');
+// display_category → SKU prefix
+// Verify these match your sku_counter.prefix rows before running --apply.
+const DISPLAY_CATEGORY_TO_PREFIX = {
+  'Engine':                 'ENG',
+  'Exhaust':                'EXH',
+  'Brakes':                 'BRK',
+  'Electrical':             'ELC',
+  'Suspension':             'SUS',
+  'Transmission & Clutch':  'DRV',
+  'Wheels & Tires':         'WHL',
+  'Fenders & Body':         'BDY',
+  'Handlebar & Controls':   'HBR',
+  'Lighting':               'LGT',
+  'Carburetion & Fuel':     'FUL',
+  'Frame & Hardware':       'FRM',
+  'Foot Controls':          'FTC',
+  'Seating':                'STG',
+  'Instrumentation':        'INS',
+  'Luggage & Racks':        'LUG',
+  'Security & Covers':      'SEC',
+  'Accessories & Misc':     'ACC',
+  'Riding Gear & Apparel':  'RGA',
+  'Tools & Chemicals':      'TLC',
+};
 
-  const { rows } = await db.query(`
-    WITH page_best_category AS (
-      SELECT DISTINCT ON (cp.page_number)
-        cp.page_number,
-        m.catalog_category,
-        m.sku_prefix
-      FROM vendor.vtwin_category_pages cp
-      JOIN vendor.vtwin_category_to_catalog m ON m.vtwin_category = cp.category
-      ORDER BY cp.page_number,
-        CASE cp.source WHEN 'this_yr' THEN 1 ELSE 2 END,
-        cp.category
-    )
-    SELECT
-      p.sku        AS vtwin_sku,
-      pc.catalog_category,
-      pc.sku_prefix
-    FROM vendor.vtwinmtc_products p
-    JOIN page_best_category pc ON pc.page_number = p.this_yr_catpage
+const FALLBACK_PREFIX = 'MSC'; // used when display_category is null or unmapped
+
+async function main() {
+  console.log(`=== VTwin SKU Generation (${APPLY ? 'APPLY' : 'DRY RUN'}) ===\n`);
+
+  // Step 1: Products needing SKUs
+  const { rows: products } = await db.query(`
+    SELECT id, name, display_category
+    FROM catalog_unified
+    WHERE source_vendor = 'VTWIN'
+      AND is_active = true
+      AND internal_sku IS NULL
+    ORDER BY id
   `);
+  console.log(`Products needing SKUs: ${products.length.toLocaleString()}`);
 
-  console.log(`  Found ${rows.length.toLocaleString()} products with resolved categories`);
-
-  // Products with page=0 or unresolved pages — assign ACC as fallback
-  const { rows: unmatched } = await db.query(`
-    SELECT sku        AS vtwin_sku,
-           'General'  AS catalog_category,
-           'ACC'      AS sku_prefix
-    FROM vendor.vtwinmtc_products
-    WHERE this_yr_catpage NOT IN (
-      SELECT page_number FROM vendor.vtwin_category_pages
-    )
-  `);
-
-  console.log(`  Found ${unmatched.length.toLocaleString()} unmatched products (will use ACC)`);
-
-  return [...rows, ...unmatched];
-}
-
-// ---------------------------------------------------------------------------
-// Step 2: Load current sku_counter values
-// ---------------------------------------------------------------------------
-async function loadSkuCounters() {
-  const { rows } = await db.query(`SELECT prefix, last_val FROM sku_counter`);
-  const counters = {};
-  for (const row of rows) {
-    counters[row.prefix.trim()] = row.last_val;
+  if (products.length === 0) {
+    console.log('Nothing to do.');
+    await db.end();
+    return;
   }
-  return counters;
-}
 
-// ---------------------------------------------------------------------------
-// Step 3: Generate SKUs in memory
-// ---------------------------------------------------------------------------
-async function generateSkus(products, counters) {
-  console.log('\n[Step 2] Generating internal SKUs...');
+  // Step 2: Load current sku_counter values
+  const { rows: counterRows } = await db.query(
+    `SELECT prefix, last_val FROM sku_counter ORDER BY prefix`
+  );
+  const counters = Object.fromEntries(counterRows.map(r => [r.prefix.trim(), r.last_val]));
+  console.log(`Loaded ${Object.keys(counters).length} sku_counter prefixes: ${Object.keys(counters).join(', ')}\n`);
 
-  const bar = new ProgressBar(products.length, 'Generating');
-  const staged = [];
-  const finalCounters = { ...counters };
+  // Step 3: Assign SKUs in memory
+  const assignments = [];
+  const fallbackRows = [];
 
-  for (let i = 0; i < products.length; i++) {
-    const p = products[i];
-    const prefix = p.sku_prefix.trim();
-
-    finalCounters[prefix] = (finalCounters[prefix] || 100000) + 1;
-
-    staged.push({
-      vtwin_sku:        p.vtwin_sku,
-      internal_sku:     prefix + finalCounters[prefix],
-      catalog_category: p.catalog_category,
-      sku_prefix:       prefix,
+  for (const p of products) {
+    const prefix = DISPLAY_CATEGORY_TO_PREFIX[p.display_category] ?? FALLBACK_PREFIX;
+    if (!DISPLAY_CATEGORY_TO_PREFIX[p.display_category]) {
+      fallbackRows.push({ name: p.name, display_category: p.display_category });
+    }
+    counters[prefix] = (counters[prefix] ?? 100000) + 1;
+    assignments.push({
+      id:           p.id,
+      internal_sku: `${prefix}${counters[prefix]}.v`,
+      prefix,
     });
+  }
 
-    if (i % 500 === 0 || i === products.length - 1) {
-      bar.update(i + 1);
+  // Step 4: Summary
+  const byPrefix = {};
+  for (const a of assignments) byPrefix[a.prefix] = (byPrefix[a.prefix] ?? 0) + 1;
+
+  console.log('SKUs to assign by prefix:');
+  for (const [pfx, cnt] of Object.entries(byPrefix).sort()) {
+    console.log(`  ${pfx.padEnd(6)} ${cnt.toLocaleString()}`);
+  }
+
+  if (fallbackRows.length > 0) {
+    console.log(`\n⚠️  ${fallbackRows.length} products have null/unmapped display_category → assigned ${FALLBACK_PREFIX}`);
+    fallbackRows.slice(0, 10).forEach(p =>
+      console.log(`     [${p.display_category ?? 'NULL'}] ${p.name}`)
+    );
+    if (fallbackRows.length > 10) console.log(`     … and ${fallbackRows.length - 10} more`);
+    console.log('  → Run infer_vtwin_categories.mjs --live first to fix this.');
+  }
+
+  // Step 5: Validate all prefixes exist in sku_counter
+  const missingPrefixes = Object.keys(byPrefix).filter(p => !(p in counters));
+  if (missingPrefixes.length > 0) {
+    console.error(`\n❌ Prefixes missing from sku_counter: ${missingPrefixes.join(', ')}`);
+    console.error('   Add them with: INSERT INTO sku_counter (prefix, last_val) VALUES (\'XXX\', 100000);');
+    if (APPLY) {
+      await db.end();
+      process.exit(1);
     }
   }
 
-  bar.finish();
-  return { staged, finalCounters };
-}
+  if (!APPLY) {
+    console.log('\nDry run — pass --apply to write to DB.');
+    await db.end();
+    return;
+  }
 
-// ---------------------------------------------------------------------------
-// Step 4: Bulk insert into vtwin_sku_staging + update sku_counter
-// ---------------------------------------------------------------------------
-async function persistSkus(staged, finalCounters) {
-  console.log('\n[Step 3] Persisting SKUs to vtwin_sku_staging...');
-
+  // Step 6: Write SKUs + update counters in a transaction
   const client = await db.connect();
   try {
     await client.query('BEGIN');
 
-    // Truncate staging table for clean run
-    await client.query('TRUNCATE vendor.vtwin_sku_staging');
-
-    const BATCH_SIZE = 1000;
-    const bar = new ProgressBar(staged.length, 'Inserting');
-
-    for (let i = 0; i < staged.length; i += BATCH_SIZE) {
-      const batch = staged.slice(i, i + BATCH_SIZE);
-
-      const values = batch.map((_, j) => {
-        const base = j * 4;
-        return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4})`;
-      }).join(', ');
-
-      const params = batch.flatMap(r => [
-        r.vtwin_sku,
-        r.internal_sku,
-        r.catalog_category,
-        r.sku_prefix,
-      ]);
-
-      await client.query(`
-        INSERT INTO vendor.vtwin_sku_staging
-          (vtwin_sku, internal_sku, catalog_category, sku_prefix)
-        VALUES ${values}
-        ON CONFLICT (vtwin_sku) DO NOTHING
-      `, params);
-
-      bar.update(Math.min(i + BATCH_SIZE, staged.length));
+    const BATCH = 500;
+    let updated = 0;
+    for (let i = 0; i < assignments.length; i += BATCH) {
+      const batch  = assignments.slice(i, i + BATCH);
+      const cases  = batch.map((_, j) => `WHEN id = $${j * 2 + 1} THEN $${j * 2 + 2}`).join(' ');
+      const ids    = batch.map((_, j) => `$${j * 2 + 1}`).join(', ');
+      const flat   = batch.flatMap(a => [a.id, a.internal_sku]);
+      const res    = await client.query(
+        `UPDATE catalog_unified SET internal_sku = CASE ${cases} END WHERE id IN (${ids})`, flat
+      );
+      updated += res.rowCount ?? 0;
+      process.stdout.write(`  … ${Math.min(i + BATCH, assignments.length)} / ${assignments.length}\r`);
     }
+    console.log(`\n  catalog_unified updated: ${updated.toLocaleString()} rows`);
 
-    bar.finish();
-
-    // Update sku_counter for all prefixes touched
-    console.log('\n[Step 4] Updating sku_counter...');
-    for (const [prefix, newVal] of Object.entries(finalCounters)) {
-      await client.query(`
-        UPDATE sku_counter
-        SET last_val = $1, updated_at = now()
-        WHERE prefix = $2
-      `, [newVal, prefix]);
+    // Upsert sku_counter for all touched prefixes
+    for (const [prefix, newVal] of Object.entries(counters)) {
+      await client.query(
+        `INSERT INTO sku_counter (prefix, last_val, updated_at)
+         VALUES ($1, $2, now())
+         ON CONFLICT (prefix) DO UPDATE SET last_val = $2, updated_at = now()`,
+        [prefix, newVal]
+      );
     }
-
-    await client.query('COMMIT');
     console.log('  sku_counter updated ✅');
 
+    await client.query('COMMIT');
+    console.log('\n✅ Done.\n');
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
   } finally {
     client.release();
   }
+
+  await db.end();
 }
 
-// ---------------------------------------------------------------------------
-// Step 5: Summary
-// ---------------------------------------------------------------------------
-async function printSummary() {
-  console.log('\n[Step 5] Summary...');
-
-  const { rows } = await db.query(`
-    SELECT sku_prefix, COUNT(*) AS products,
-           MIN(internal_sku) AS first_sku,
-           MAX(internal_sku) AS last_sku
-    FROM vendor.vtwin_sku_staging
-    GROUP BY sku_prefix
-    ORDER BY sku_prefix
-  `);
-
-  const { rows: total } = await db.query(
-    `SELECT COUNT(*) AS total FROM vendor.vtwin_sku_staging`
-  );
-
-  console.log('\n  SKUs generated by prefix:');
-  console.log('  ' + '-'.repeat(56));
-  for (const r of rows) {
-    console.log(
-      `  ${r.sku_prefix.trim().padEnd(6)} ${String(r.products).padStart(6)} products` +
-      `  ${r.first_sku} → ${r.last_sku}`
-    );
-  }
-  console.log('  ' + '-'.repeat(56));
-  console.log(`  TOTAL: ${Number(total[0].total).toLocaleString()} SKUs generated`);
-
-  const { rows: counters } = await db.query(
-    `SELECT prefix, last_val FROM sku_counter ORDER BY prefix`
-  );
-  console.log('\n  Updated sku_counter:');
-  for (const r of counters) {
-    console.log(`  ${r.prefix.trim().padEnd(6)} last_val = ${r.last_val}`);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Main
-// ---------------------------------------------------------------------------
-async function main() {
-  console.log('=== VTwin SKU Generation ===');
-  try {
-    const products                   = await fetchProducts();
-    const counters                   = await loadSkuCounters();
-    const { staged, finalCounters }  = await generateSkus(products, counters);
-    await persistSkus(staged, finalCounters);
-    await printSummary();
-    console.log('\n✅ Done. Ready for unified catalog merge.\n');
-  } catch (err) {
-    console.error('\n❌ Error:', err.message);
-    process.exit(1);
-  } finally {
-    await db.end();
-  }
-}
-
-main();
+main().catch(err => { console.error('❌', err.message); process.exit(1); });

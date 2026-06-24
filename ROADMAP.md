@@ -1,5 +1,5 @@
 # STINKIN' SUPPLIES — PROJECT ROADMAP
-**Last Updated: June 22, 2026 (Fifty-Fourth Pass)**
+**Last Updated: June 24, 2026 (Fifty-Seventh Pass)**
 
 ---
 
@@ -9,10 +9,10 @@
 |------|--------|
 | Stack: Next.js 15 / Postgres (Hetzner 5.161.100.126) / Typesense / Vercel | ✅ |
 | Three vendor staging tables: pu_catalog, wps_catalog, vtwin_catalog | ✅ |
-| catalog_unified — single source of truth (90,605 active rows) | ✅ |
+| catalog_unified — single source of truth (**89,153 active rows**) | ✅ |
 | Internal SKU taxonomy (17 prefixes: ACC, BDY, BRK, DRV, ELC, ENG, EXH, etc.) | ✅ |
 | harley_families / harley_models / harley_model_years (~360 models, ~2,070 year rows) | ✅ |
-| Typesense schema + index (~90K docs) | ✅ |
+| Typesense schema + index (**89,153 docs**, 0 errors) | ✅ |
 
 ---
 
@@ -42,11 +42,18 @@
 | product_id FK backfilled (20,836 rows) | ✅ |
 | PU XML enrichment pipeline (catalog_media, features, dimensions) | ✅ |
 | OEM cleanup: 4,122 PU catalog numbers removed from crossref | ✅ |
-| VTwin OEM sync: 15,723 products synced | ✅ |
+| VTwin OEM crossref — **16,752 rows** (+8,326 from vtwin_catalog.oem_numbers import) | ✅ |
+| WPS OEM crossref — 1,665 rows (from wps-cross-fitment.csv) | ✅ |
+| **PU OEM crossref — 15,330 rows** (source=`PU_PIES`, OSP supplier numbers from brand XML files) | ✅ |
 | OEM badge on PDP sourced only from catalog_oem_crossref (vendor catalog numbers excluded) | ✅ |
-| pack_qty column — 1,026 rows populated via regex bulk pass | ✅ |
+| pack_qty column — **2,171 active non-kit products with pack_qty > 1** | ✅ |
+| scan_pack_qty_from_names.mjs — 12 auto-apply patterns; 254 corrections applied | ✅ |
 | Pack qty badge on PDP | ✅ |
 | AdminEditPanel pack_qty field | ✅ |
+| product_details JSONB column — GIN index; **~68,593 populated (~77%)** after PU description pass | ✅ |
+| VTwin scrape data synced — 87 descriptions + 3,165 pdp_payload entries | ✅ |
+| **PU multi-image extraction** — `extract_pu_images.mjs` parses 133 brand XML files; **~35,990 catalog_media rows**; **8,828 PU descriptions** added; **22,253 PU products** with multi-angle galleries | ✅ |
+| sku_counter table — created and seeded | ✅ |
 
 ---
 
@@ -97,20 +104,28 @@
 |------|--------|
 | browse.ts — disjunctive faceting, count fix, Typesense pagination, variant dedup | ✅ |
 | browse.ts — multi-word search (per-word AND matching across name/brand/sku) | ✅ |
-| browse.ts — per-query params rendering (fixed shared-array bug across product/count/3 facet queries) | ✅ |
-| browse.ts / pdp-page.jsx — catalog_media image fallback when image_url null/empty | ✅ (does not cover PU zip-contaminated rows — see Phase 16) |
+| browse.ts — per-query params rendering (fixed shared-array bug) | ✅ |
+| browse.ts — **OEM number search via `unnest(cu.oem_numbers) ILIKE`** — OEM queries now surface all crossref-linked products | ✅ |
+| browse.ts / pdp-page.jsx — catalog_media image fallback | ✅ |
 | ProductCard.jsx / pdp-page.jsx — cream theme conversion | ✅ |
-| ProductImage.jsx — graceful broken-image fallback (client component for server-component pages) | ✅ |
+| ProductImage.jsx — graceful broken-image fallback | ✅ |
+| **ProductImageGallery.jsx** — multi-image thumbnail strip on PDP; reads `image_urls` (VTwin) or `catalog_media.all_urls` (PU); single-image renders as before | ✅ |
 | FilterSidebar — active filter chips, section indicators, mobile bottom sheet | ✅ |
+| **FilterSidebar + page.jsx — `?category=` URL param bug fixed** — old nav links using `?category=X` now correctly fold into `display_category`; category never persists invisibly in URL | ✅ |
 | BrowseBackButton (sessionStorage) | ✅ |
 | Typesense group_by: variant_group_id | ✅ |
 | Era pages (era_* boolean column lookups) | ✅ |
 | PDP (/browse/[slug]) — LeMans image proxy, fitment tab, OEM tab | ✅ |
 | QuickView modal removed — cards navigate directly to PDP | ✅ |
-| Placeholder "400×400" image removed — returns null when no real image | ✅ |
 | OEM supersession chain — oem_supersession (283 pairs), mv_oem_fitment_coverage (683K rows) | ✅ |
 | browse.ts OEM chain pre-fetch — surfaces chain products when year+model set (1.3ms warm) | ✅ |
-| getChronologicalNeighbors — tightened to display_subcategory, timeline shows same part type | ✅ |
+| getChronologicalNeighbors — tightened to display_subcategory | ✅ |
+| Browse inline panel — InlinePanel.jsx + panel API route + ProductCard selected/onSelect props | ✅ |
+| PDP — ProductDetailsSection — description, gold-bulleted features, tech note, attributes grid (above fitment tabs) | ✅ |
+| PDP — OemAlternativesPanel — removed (session 57) | ✅ |
+| PDP — breadcrumb link fixed (`?category=` → `?display_category=`) | ✅ |
+| index_unified.js — uses product_details as primary source; WPS HTML stripped from Typesense | ✅ |
+| **getProduct() SQL — catalog_media multi-image fetch** — lateral now returns `primary_url` + `all_urls[]`; `image_urls` falls back to `catalog_media.all_urls` for PU | ✅ |
 
 ---
 
@@ -134,16 +149,14 @@
 |------|--------|
 | catalog_variant_groups + catalog_variant_members tables | ✅ |
 | build_variant_groups.cjs — name-based grouping for PU/VTwin | ✅ |
-| Wire spool groups merged | ✅ |
-| VariantSelector Mode A (fitment+color), B (fitment only), C (options list), D (color+qty) | ✅ |
-| ColorQtySelector — two radio pill sections, auto-navigates to cheapest in-stock | ✅ |
+| VariantSelector Mode A/B/C/D | ✅ |
+| ColorQtySelector — two radio pill sections | ✅ |
 | apply_oversize_variants.cjs — cross-oversize grouping (73 groups, 332 members) | ✅ |
-| Oversize variant Typesense reindex (90,605 docs, 0 errors) | ✅ |
 | catalog_variant_candidates table | ✅ |
-| Fits axis removed from WPS variant members — no more year ranges as selectable options | ✅ |
-| Brushed SS / Brushed / Raw SS added to Finish rule in extractAttribute | ✅ |
-| normalizeAxisName() — Finish→Color normalization prevents mixed-axis splits | ✅ |
-| Non-distinguishing axis fix (invariant #7) — groups where all members share the same attribute value are dissolved. 994 false groups / 2,763 products removed. Live state: 2,763 groups / 8,109 members. Credentials moved to env vars. | ✅ |
+| Fits axis removed from WPS variant members | ✅ |
+| normalizeAxisName() — Finish→Color normalization | ✅ |
+| Non-distinguishing axis fix (invariant #7) — 994 false groups dissolved. Live: 2,763 groups / 8,109 members | ✅ |
+| build_pack_size_groups.mjs — **148 MULTI pack-size groups**; sync/evict; dedupByPackQty | ✅ |
 
 ---
 
@@ -173,21 +186,19 @@
 
 ---
 
-## ⏳ PHASE 10 — CANONICAL PRODUCTS: MULTI-VENDOR MATCHING (In Progress)
+## ✅ PHASE 10 — CANONICAL PRODUCTS: MULTI-VENDOR MATCHING (Complete)
 
-The foundation exists. The work now is promoting reviewed pairs into real multi-vendor canonicals.
+All 2,407 confirmed canonical merges applied and drained. Variant candidates remain for ongoing human review.
 
 | Item | Status |
 |------|--------|
-| canonical_products table (90,605 rows, schema correct) | ✅ |
-| product_vendors table (90,605 rows, one per unified row) | ✅ |
-| canonical_match_proposals (1,537 initial reviewed down to ~37 groups remaining) | ✅ In Progress |
+| canonical_products table (89,153 rows, schema correct) | ✅ |
+| product_vendors table (89,153 rows, one per unified row) | ✅ |
 | build_canonical_products.mjs Phase A + Phase B | ✅ |
 | is_kit column, pack_qty column | ✅ |
-| **Finish admin review** — ~37 groups / ~187 pairs remaining at /admin/canonical-matches | ⏳ |
-| **Promote confirmed merges** — script to merge winning pairs into shared canonical records with 2–3 product_vendors rows each. Currently 0 multi-vendor canonicals exist. | ⏳ |
-| **Backfill vendor_offers from product_vendors** — PU and VTwin cost/stock needs to flow into vendor_offers (currently only 22,278 WPS rows). Optimizer needs one unified pricing table. | ⏳ |
-| Variant candidates flagged for later variant building | ⏳ Ongoing |
+| **All confirmed merges applied** — 2,407 applied / 0 confirmed / 0 pending / 1,772 rejected | ✅ |
+| **62 variant candidates remaining** — /admin/variant-candidates; finish/size/length groups needing human judgment | ⏳ |
+| **Backfill vendor_offers from product_vendors** — PU/VTwin cost/stock not in vendor_offers (only 22,278 WPS rows). Optimizer reads product_vendors as correct workaround. | ⏳ |
 
 ---
 
@@ -201,11 +212,11 @@ Schema is complete. Only blocker is gateway decision.
 | Auto order numbers SS-YYYYMMDD-NNNN trigger | ✅ |
 | CartContext (localStorage, canonical_sku-based) | ✅ |
 | CartProvider wired into root layout | ✅ |
-| Checkout page skeleton (app/checkout/page.jsx) with address form + MAP pricing | ✅ |
-| `app/api/checkout/prepare/route.ts` — validates cart, runs optimizer, returns customer-safe quote | ✅ |
-| `app/api/orders/create/route.ts` — re-validates stock, charges gateway (stub), writes orders+order_items atomically, dispatches fulfillment | ✅ (gateway stub — always fails until gateway chosen) |
-| **Payment gateway decision** — Authorize.net / NMI / Heartland / Braintree? | ⚠️ BLOCKING — pending merchant account meeting |
-| **Order confirmation page** — /checkout/success needs real order data + email receipt | ⏳ |
+| Checkout page skeleton with address form + MAP pricing | ✅ |
+| `app/api/checkout/prepare/route.ts` — validates cart, runs optimizer | ✅ |
+| `app/api/orders/create/route.ts` — charges gateway (stub), writes orders atomically, dispatches fulfillment | ✅ (gateway stub) |
+| **Payment gateway decision** — Authorize.net / NMI / Heartland / Braintree? | ⚠️ BLOCKING |
+| Order confirmation page — /checkout/success | ⏳ |
 | Tax calculation — TaxJar or flat rate table | ⏳ |
 | Shipping estimate — UPS/FedEx API or flat rate by zone | ⏳ |
 | PU + WPS API credentials for order submission | ⏳ |
@@ -216,15 +227,13 @@ Schema is complete. Only blocker is gateway decision.
 
 | Item | Status |
 |------|--------|
-| vendor_orders table — all fields present (vendor, is_manual, api_payload, retry_count) | ✅ |
-| order_items.is_manual_fulfillment — VTwin flag in schema | ✅ |
-| `lib/fulfillment/optimizer.ts` — minimize vendor count, maximize margin, VTwin→manual, stock from product_vendors | ✅ |
-| `lib/fulfillment/triggerFulfillment.ts` — inserts vendor_orders, dispatches adapters, VTwin→manual queue, PU/WPS→manual_required until creds added | ✅ |
-| Live stock check at checkout — queries product_vendors at resolution time (not cached) | ✅ (via optimizer) |
-| PU API order submission | ⏳ Needs `PU_API_URL`/`PU_API_KEY` env vars |
-| WPS API order submission | ⏳ Needs `WPS_API_URL`/`WPS_API_KEY` env vars |
+| `lib/fulfillment/optimizer.ts` — minimize vendor count, maximize margin, VTwin→manual | ✅ |
+| `lib/fulfillment/triggerFulfillment.ts` — inserts vendor_orders, dispatches adapters | ✅ |
+| Live stock check at checkout via product_vendors | ✅ |
+| PU API order submission | ⏳ Needs `PU_API_URL`/`PU_API_KEY` |
+| WPS API order submission | ⏳ Needs `WPS_API_URL`/`WPS_API_KEY` |
 | VTwin → manual queue — vendor_orders row with is_manual=true | ✅ |
-| **Backfill vendor_offers from product_vendors** — PU/VTwin cost/stock not in vendor_offers yet (only 22,278 WPS rows). Optimizer currently reads product_vendors as correct workaround; swap once backfilled. | ⏳ |
+| Backfill vendor_offers from product_vendors | ⏳ |
 
 ---
 
@@ -232,12 +241,12 @@ Schema is complete. Only blocker is gateway decision.
 
 | Item | Status |
 |------|--------|
-| /admin/orders — list all orders; filter by status/vendor/date; sale price, cost, margin | ⏳ |
-| /admin/orders/[id] — order detail: items, vendor routing, gateway txn ID, timeline; actions: refund/cancel/resubmit | ⏳ |
-| /admin/fulfillment/vtwin — manual PO queue: customer address, vendor cost; mark submitted, enter tracking; customer auto-notified | ⏳ |
-| /admin/inventory — per-vendor stock levels, last sync time, drift warnings, manual resync trigger | ⏳ |
-| /admin/margins — margin by vendor / category / product; optimizer savings tracker | ⏳ |
-| Invoice PDF generation — one PDF per order tied to gateway txn ID, attached to confirmation email | ⏳ |
+| /admin/orders — list all orders; filter by status/vendor/date | ⏳ |
+| /admin/orders/[id] — order detail + actions | ⏳ |
+| /admin/fulfillment/vtwin — manual PO queue | ⏳ |
+| /admin/inventory — per-vendor stock levels | ⏳ |
+| /admin/margins — margin by vendor / category / product | ⏳ |
+| Invoice PDF generation | ⏳ |
 
 ---
 
@@ -245,10 +254,10 @@ Schema is complete. Only blocker is gateway decision.
 
 | Item | Status |
 |------|--------|
-| Daily price/stock sync cron — app/api/cron/ exists; add PU + WPS jobs; update vendor_offers; flag drift | ⏳ |
-| Order status webhooks — app/api/webhooks/ exists; add PU/WPS shipment handlers; auto-update tracking | ⏳ |
-| Customer email notifications — order confirmation, shipped (with tracking), delivered via Resend or Postmark | ⏳ |
-| Typesense stock sync — patch in_stock after vendor_offers update without full reindex | ⏳ |
+| Daily price/stock sync cron — PU + WPS jobs | ⏳ |
+| Order status webhooks — PU/WPS shipment handlers | ⏳ |
+| Customer email notifications — confirmation, shipped, delivered | ⏳ |
+| Typesense stock sync without full reindex | ⏳ |
 
 ---
 
@@ -265,21 +274,40 @@ Schema is complete. Only blocker is gateway decision.
 
 ---
 
-## 🔵 PHASE 16 — FUTURE / LOW PRIORITY
+## ⏳ PHASE 16 — VTWIN CATALOG GAPS (Ongoing)
+
+| Item | Status |
+|------|--------|
+| **VTwin OEM scrape expansion** — ~21,000 products still have zero OEM crossref; web scraper captured 7,277 OEM numbers in `vtwin_scrape_data.oem_no` — import those, then consider targeted re-scrape | ⏳ |
+| **Fix `build_product_details.mjs` VTwin attributes** — `extra_attributes` stored as stringified JSON; add `JSON.parse()` before write | ⏳ |
+| VTwin product_details gap (23K+ products) — no description/pdp_payload; vtwinmfg.com scrape is the only self-serve path | 🔵 Future |
+
+---
+
+## 🔵 PHASE 17 — FUTURE / LOW PRIORITY
 
 | Item | Notes |
 |------|-------|
-| PU image zip contamination | **✅ RESOLVED June 17** (was confirmed-broken June 16). ~13,790 active PU products (37.6%) had `image_url` resolving to `application/x-zip` across three independent sources. Fix: a live zip-extraction proxy (`app/api/image-proxy/route.ts`) already existed unwired in the codebase — found, validated, and wired into the browse grid + PDP, recovering real photos on the fly for the large majority. Genuine remainder with no source image anywhere: **3,573** (not 13,790 — that was the pre-fix contaminated-row count, not the unrecoverable count). `PU_ZIP_EXTRACTION_TODO.md`'s offline pipeline is now reference-only, superseded by the live proxy. |
-| Hard Drive book crossref | Same pattern as FatBook/OldBook |
-| WPS API enrichment | features+blocks hit rate testing |
+| PU image zip contamination | ✅ RESOLVED. Live proxy recovers zipped photos. Genuine unrecoverable remainder: 3,573 products with no source image. |
+| PU image-proxy: persistent cache | Zero server-side caching — needs Vercel Blob/S3/R2 before full browse-grid traffic. |
+| PU image-proxy: browse grid spot-check | PDP confirmed. Browse grid needs visual re-confirm. |
+| PU product_details remaining gap | ~3,500 products — brands that never shipped XML content. Only fixable with updated PU files. |
+| Re-run `extract_pu_images.mjs` | After each new PU XML drop — idempotent. |
+| Hard Drive book crossref | Import when file available |
+| WPS API enrichment | Test features+blocks hit rate |
+| WPS OEM crossref — 662 unmatched rows | Revisit after next WPS ingest |
 | Browse/Brand tabs | Data ready, UI unbuilt |
-| Admin flag batch resolver | Bulk resolve unreviewed flags |
+| TC/M8 platform dedup in variant groups | Platform-aware split in build_variant_groups.cjs |
 | Harden admin auth | ?token= → session cookie |
-| Size variant grouping | Valve guides, rocker shims, helmet pads, cam lock washers |
+| oem_supersession PDP timeline | Show chain on OEM tab: "replaced X in [year]" |
+| oem_supersession review | 283 pairs pending — SELECT * FROM oem_supersession_review LIMIT 30 |
 | Accessories & Misc subcategory | 3,809 NULL — catch-all, low ROI |
 | Tools & Chemicals coverage | 547 NULL — WPS abbreviations |
-| display_subcategory master script | Consolidate all mapping SQL into one place |
 | Typesense reindex automation | Auto-run as post-step in ingest scripts |
+| Auto-reject variant proposals on apply | When canonical merges applied, auto-reject proposals where both share same variant_group_id |
+| Unknown match pipeline | Proposals with match_reason='upc' or 'brand_part_number' and null shared_oem_number — source never identified |
+| Drop session 43 files | globals.css, layout.tsx, BespokeSerif-Variable.ttf, FilterSidebar.jsx, ProductQuickViewModal.jsx, BrowseBackButton.jsx, products-slug-route.ts |
+| /models in nav | Add to main nav + home page tile |
 
 ---
 
@@ -291,8 +319,9 @@ Schema is complete. Only blocker is gateway decision.
 | Typesense | No reindex automation | 🔵 Future |
 | Admin | ADMIN_SECRET not in Vercel | ⏳ |
 | PU | Portal spot-check 3-4 SKUs | ⏳ Recommended |
-| PU | 3,573 active products have no recoverable image anywhere — corrected June 17 from a stale "~13,790 zip-contaminated" framing (that was the pre-fix count, not the unrecoverable count; the zip-extraction proxy now recovers the rest live) | 🔵 Low priority — no fix possible without new PU vendor data |
+| PU | 3,573 active products with no recoverable image | 🔵 No fix without new PU vendor data |
+| Browse | Softail + Suspension + Triple Trees & Stems filter combo — untested since session 51 | ⏳ Retest |
 
 ---
 
-*Last updated June 22, 2026 · Session 54*
+*Last updated June 24, 2026 · Session 57*

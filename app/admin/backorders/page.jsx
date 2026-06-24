@@ -15,13 +15,13 @@ const css = `
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   .bo-wrap {
-    background: #0a0909; min-height: 100vh;
-    color: #f0ebe3; font-family: var(--font-stencil), sans-serif;
+    background: #f5f0e8; min-height: 100vh;
+    color: #1a1208; font-family: var(--font-stencil), sans-serif;
   }
 
   /* ── HEADER ── */
   .bo-header {
-    background: #111010; border-bottom: 1px solid #2a2828;
+    background: #ffffff; border-bottom: 1px solid #ddd0b8;
     padding: 20px 32px; display: flex; align-items: center;
     justify-content: space-between; gap: 16px; flex-wrap: wrap;
   }
@@ -29,60 +29,60 @@ const css = `
     font-family: var(--font-caesar), sans-serif;
     font-size: 28px; letter-spacing: 0.05em;
   }
-  .bo-title span { color: #e8621a; }
+  .bo-title span { color: #a3822c; }
   .bo-subtitle {
     font-family: var(--font-stencil), monospace;
-    font-size: 9px; color: #8a8784; letter-spacing: 0.15em; margin-top: 2px;
+    font-size: 9px; color: #7a6a4f; letter-spacing: 0.15em; margin-top: 2px;
   }
 
   /* ── STATS ── */
   .bo-stats {
     display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 1px; background: #2a2828; border-bottom: 1px solid #2a2828;
+    gap: 1px; background: #ddd0b8; border-bottom: 1px solid #ddd0b8;
   }
   .bo-stat {
-    background: #111010; padding: 18px 24px;
+    background: #ffffff; padding: 18px 24px;
   }
   .bo-stat-val {
     font-family: var(--font-caesar), sans-serif;
     font-size: 32px; line-height: 1; letter-spacing: 0.03em;
   }
-  .bo-stat-val.orange { color: #e8621a; }
-  .bo-stat-val.gold   { color: #c9a84c; }
-  .bo-stat-val.green  { color: #22c55e; }
-  .bo-stat-val.grey   { color: #8a8784; }
+  .bo-stat-val.orange { color: #a3822c; }
+  .bo-stat-val.gold   { color: #a3822c; }
+  .bo-stat-val.green  { color: #2f8552; }
+  .bo-stat-val.grey   { color: #7a6a4f; }
   .bo-stat-label {
     font-family: var(--font-stencil), monospace;
-    font-size: 8px; color: #8a8784; letter-spacing: 0.15em; margin-top: 4px;
+    font-size: 8px; color: #7a6a4f; letter-spacing: 0.15em; margin-top: 4px;
   }
 
   /* ── TOOLBAR ── */
   .bo-toolbar {
-    padding: 12px 32px; background: #0a0909;
-    border-bottom: 1px solid #1a1919;
+    padding: 12px 32px; background: #f5f0e8;
+    border-bottom: 1px solid #e6dcc0;
     display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
   }
   .bo-search {
-    background: #1a1919; border: 1px solid #2a2828;
-    color: #f0ebe3; padding: 8px 12px; border-radius: 2px;
+    background: #fbf6ec; border: 1px solid #ddd0b8;
+    color: #1a1208; padding: 8px 12px; border-radius: 2px;
     font-family: var(--font-stencil), monospace; font-size: 11px;
     letter-spacing: 0.06em; width: 260px; outline: none;
     transition: border-color 0.15s;
   }
-  .bo-search:focus { border-color: #e8621a; }
-  .bo-search::placeholder { color: #3a3838; }
+  .bo-search:focus { border-color: #a3822c; }
+  .bo-search::placeholder { color: #b8ab87; }
   .bo-filter {
-    background: none; border: 1px solid #2a2828; color: #8a8784;
+    background: none; border: 1px solid #ddd0b8; color: #7a6a4f;
     padding: 7px 14px; border-radius: 2px; cursor: pointer;
     font-family: var(--font-stencil), monospace; font-size: 9px;
     letter-spacing: 0.1em; transition: all 0.15s;
   }
-  .bo-filter:hover  { border-color: #e8621a; color: #e8621a; }
-  .bo-filter.active { border-color: #e8621a; color: #e8621a; background: rgba(232,98,26,0.08); }
+  .bo-filter:hover  { border-color: #a3822c; color: #a3822c; }
+  .bo-filter.active { border-color: #a3822c; color: #a3822c; background: rgba(201,168,76,0.1); }
   .bo-toolbar-right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
   .bo-count {
     font-family: var(--font-stencil), monospace;
-    font-size: 9px; color: #8a8784; letter-spacing: 0.1em;
+    font-size: 9px; color: #7a6a4f; letter-spacing: 0.1em;
   }
 
   /* ── TABLE ── */
@@ -93,34 +93,34 @@ const css = `
   }
   .bo-table th {
     font-family: var(--font-stencil), monospace;
-    font-size: 8px; color: #8a8784; letter-spacing: 0.15em;
+    font-size: 8px; color: #7a6a4f; letter-spacing: 0.15em;
     padding: 10px 14px; text-align: left;
-    border-bottom: 1px solid #2a2828;
-    background: #111010; white-space: nowrap;
+    border-bottom: 1px solid #ddd0b8;
+    background: #ffffff; white-space: nowrap;
   }
   .bo-table td {
-    padding: 11px 14px; border-bottom: 1px solid #1a1919;
+    padding: 11px 14px; border-bottom: 1px solid #e6dcc0;
     vertical-align: middle;
   }
-  .bo-table tr:hover td { background: rgba(255,255,255,0.01); }
+  .bo-table tr:hover td { background: rgba(201,168,76,0.05); }
 
   .sku-mono {
     font-family: var(--font-stencil), monospace;
-    font-size: 10px; color: #8a8784; letter-spacing: 0.08em;
+    font-size: 10px; color: #7a6a4f; letter-spacing: 0.08em;
   }
-  .product-name { font-weight: 600; color: #f0ebe3; }
+  .product-name { font-weight: 600; color: #1a1208; }
   .product-name small {
     display: block; font-family: var(--font-stencil), monospace;
-    font-size: 8px; color: #8a8784; letter-spacing: 0.1em;
+    font-size: 8px; color: #7a6a4f; letter-spacing: 0.1em;
     font-weight: 400; margin-top: 2px;
   }
   .email-cell {
     font-family: var(--font-stencil), monospace;
-    font-size: 10px; color: #c4c0bc; letter-spacing: 0.04em;
+    font-size: 10px; color: #5a4d38; letter-spacing: 0.04em;
   }
   .date-cell {
     font-family: var(--font-stencil), monospace;
-    font-size: 9px; color: #8a8784; letter-spacing: 0.06em;
+    font-size: 9px; color: #7a6a4f; letter-spacing: 0.06em;
     white-space: nowrap;
   }
 
@@ -129,51 +129,51 @@ const css = `
     font-family: var(--font-stencil), monospace; font-size: 8px;
     letter-spacing: 0.1em; padding: 3px 8px; border-radius: 1px; border: 1px solid;
   }
-  .source-pill.pdp      { color: #3b82f6; border-color: rgba(59,130,246,0.3);  background: rgba(59,130,246,0.06); }
-  .source-pill.cart     { color: #e8621a; border-color: rgba(232,98,26,0.3);   background: rgba(232,98,26,0.06); }
-  .source-pill.wishlist { color: #c9a84c; border-color: rgba(201,168,76,0.3);  background: rgba(201,168,76,0.06); }
+  .source-pill.pdp      { color: #3b78d8; border-color: rgba(59,120,216,0.3);  background: rgba(59,120,216,0.08); }
+  .source-pill.cart     { color: #a3822c; border-color: rgba(201,168,76,0.3);   background: rgba(201,168,76,0.08); }
+  .source-pill.wishlist { color: #a3822c; border-color: rgba(201,168,76,0.35);  background: rgba(201,168,76,0.08); }
 
   .status-pill {
     display: inline-block;
     font-family: var(--font-stencil), monospace; font-size: 8px;
     letter-spacing: 0.1em; padding: 3px 8px; border-radius: 1px; border: 1px solid;
   }
-  .status-pill.waiting          { color: #c9a84c; border-color: rgba(201,168,76,0.3);  background: rgba(201,168,76,0.06); }
-  .status-pill.notified_pending { color: #3b82f6; border-color: rgba(59,130,246,0.3);  background: rgba(59,130,246,0.06); }
-  .status-pill.notified         { color: #22c55e; border-color: rgba(34,197,94,0.3);   background: rgba(34,197,94,0.06); }
-  .status-pill.cancelled        { color: #8a8784; border-color: #2a2828;               background: #1a1919; }
+  .status-pill.waiting          { color: #9a5a0c; border-color: rgba(154,90,12,0.35);  background: rgba(154,90,12,0.08); }
+  .status-pill.notified_pending { color: #3b78d8; border-color: rgba(59,120,216,0.3);  background: rgba(59,120,216,0.08); }
+  .status-pill.notified         { color: #2f8552; border-color: rgba(47,133,82,0.3);   background: rgba(47,133,82,0.08); }
+  .status-pill.cancelled        { color: #7a6a4f; border-color: #ddd0b8;               background: #fbf6ec; }
 
   .vendor-pill {
     display: inline-block;
     font-family: var(--font-stencil), monospace; font-size: 8px;
     letter-spacing: 0.12em; padding: 3px 8px; border-radius: 1px; border: 1px solid;
   }
-  .vendor-pill.wps { color: #3b82f6; border-color: rgba(59,130,246,0.3); background: rgba(59,130,246,0.06); }
-  .vendor-pill.pu  { color: #c9a84c; border-color: rgba(201,168,76,0.3); background: rgba(201,168,76,0.06); }
+  .vendor-pill.wps { color: #3b78d8; border-color: rgba(59,120,216,0.3); background: rgba(59,120,216,0.08); }
+  .vendor-pill.pu  { color: #a3822c; border-color: rgba(201,168,76,0.35); background: rgba(201,168,76,0.08); }
 
   .cancel-btn {
-    background: none; border: 1px solid #2a2828; color: #8a8784;
+    background: none; border: 1px solid #ddd0b8; color: #7a6a4f;
     font-family: var(--font-stencil), monospace; font-size: 8px;
     letter-spacing: 0.1em; padding: 4px 10px; border-radius: 2px;
     cursor: pointer; transition: all 0.15s;
   }
-  .cancel-btn:hover { border-color: #b91c1c; color: #ef4444; }
+  .cancel-btn:hover { border-color: #c0392b; color: #c0392b; }
 
   /* ── EMPTY / LOADING ── */
   .bo-empty {
     text-align: center; padding: 80px 20px;
     font-family: var(--font-stencil), monospace;
-    font-size: 10px; color: #3a3838; letter-spacing: 0.15em;
+    font-size: 10px; color: #b8ab87; letter-spacing: 0.15em;
   }
   .bo-loading {
     display: flex; align-items: center; justify-content: center;
     padding: 80px; gap: 12px;
     font-family: var(--font-stencil), monospace;
-    font-size: 9px; color: #8a8784; letter-spacing: 0.12em;
+    font-size: 9px; color: #7a6a4f; letter-spacing: 0.12em;
   }
   .spinner {
     width: 18px; height: 18px; border-radius: 50%;
-    border: 2px solid #2a2828; border-top-color: #e8621a;
+    border: 2px solid #ddd0b8; border-top-color: #a3822c;
     animation: spin 0.6s linear infinite; flex-shrink: 0;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -182,16 +182,16 @@ const css = `
   .bo-pagination {
     display: flex; align-items: center; justify-content: space-between;
     padding: 20px 0; margin-top: 8px;
-    border-top: 1px solid #2a2828; flex-wrap: wrap; gap: 12px;
+    border-top: 1px solid #ddd0b8; flex-wrap: wrap; gap: 12px;
   }
   .page-btn {
     font-family: var(--font-stencil), monospace; font-size: 9px;
-    letter-spacing: 0.08em; background: #111010;
-    border: 1px solid #2a2828; color: #8a8784;
+    letter-spacing: 0.08em; background: #ffffff;
+    border: 1px solid #ddd0b8; color: #7a6a4f;
     padding: 6px 12px; border-radius: 2px; cursor: pointer; transition: all 0.15s;
   }
-  .page-btn:hover:not(:disabled) { border-color: #e8621a; color: #e8621a; }
-  .page-btn.active { background: #e8621a; border-color: #e8621a; color: #0a0909; }
+  .page-btn:hover:not(:disabled) { border-color: #a3822c; color: #a3822c; }
+  .page-btn.active { background: #c9a84c; border-color: #c9a84c; color: #1a1208; }
   .page-btn:disabled { opacity: 0.3; cursor: default; }
 `;
 
@@ -296,13 +296,13 @@ export default function BackordersPage() {
         <button
           onClick={load}
           style={{
-            background: "none", border: "1px solid #2a2828", color: "#8a8784",
+            background: "none", border: "1px solid #ddd0b8", color: "#7a6a4f",
             fontFamily: "var(--font-stencil), monospace", fontSize: 9,
             letterSpacing: "0.12em", padding: "8px 16px", borderRadius: 2,
             cursor: "pointer", transition: "all 0.15s",
           }}
-          onMouseOver={e => { e.target.style.borderColor = "#e8621a"; e.target.style.color = "#e8621a"; }}
-          onMouseOut={e =>  { e.target.style.borderColor = "#2a2828"; e.target.style.color = "#8a8784"; }}
+          onMouseOver={e => { e.target.style.borderColor = "#a3822c"; e.target.style.color = "#a3822c"; }}
+          onMouseOut={e =>  { e.target.style.borderColor = "#ddd0b8"; e.target.style.color = "#7a6a4f"; }}
         >
           ↻ REFRESH
         </button>
@@ -316,7 +316,7 @@ export default function BackordersPage() {
             <div className="bo-stat-label">WAITING</div>
           </div>
           <div className="bo-stat">
-            <div className="bo-stat-val" style={{ color: "#3b82f6" }}>{stats.notified_pending.toLocaleString()}</div>
+            <div className="bo-stat-val" style={{ color: "#3b78d8" }}>{stats.notified_pending.toLocaleString()}</div>
             <div className="bo-stat-label">NOTIFY PENDING</div>
           </div>
           <div className="bo-stat">
@@ -328,7 +328,7 @@ export default function BackordersPage() {
             <div className="bo-stat-label">CANCELLED</div>
           </div>
           <div className="bo-stat">
-            <div className="bo-stat-val" style={{ color: "#3b82f6" }}>{stats.wps.toLocaleString()}</div>
+            <div className="bo-stat-val" style={{ color: "#3b78d8" }}>{stats.wps.toLocaleString()}</div>
             <div className="bo-stat-label">WPS WAITING</div>
           </div>
           <div className="bo-stat">
@@ -336,7 +336,7 @@ export default function BackordersPage() {
             <div className="bo-stat-label">PU WAITING</div>
           </div>
           <div className="bo-stat">
-            <div className="bo-stat-val" style={{ color: "#f0ebe3" }}>{stats.total.toLocaleString()}</div>
+            <div className="bo-stat-val" style={{ color: "#1a1208" }}>{stats.total.toLocaleString()}</div>
             <div className="bo-stat-label">TOTAL ALL TIME</div>
           </div>
         </div>
@@ -360,7 +360,7 @@ export default function BackordersPage() {
           </button>
         ))}
 
-        <div style={{ width: 1, height: 20, background: "#2a2828", margin: "0 2px" }}/>
+        <div style={{ width: 1, height: 20, background: "#ddd0b8", margin: "0 2px" }}/>
 
         {/* Vendor filters */}
         {["all", "wps", "pu"].map(v => (
@@ -371,7 +371,7 @@ export default function BackordersPage() {
           </button>
         ))}
 
-        <div style={{ width: 1, height: 20, background: "#2a2828", margin: "0 2px" }}/>
+        <div style={{ width: 1, height: 20, background: "#ddd0b8", margin: "0 2px" }}/>
 
         {/* Source filters */}
         {["all", "pdp", "cart", "wishlist"].map(s => (
@@ -472,7 +472,7 @@ export default function BackordersPage() {
               <div className="bo-pagination">
                 <span style={{
                   fontFamily: "var(--font-stencil), monospace", fontSize: 9,
-                  color: "#8a8784", letterSpacing: "0.1em",
+                  color: "#7a6a4f", letterSpacing: "0.1em",
                 }}>
                   SHOWING {(page * PAGE_SIZE + 1).toLocaleString()}–
                   {Math.min((page + 1) * PAGE_SIZE, total).toLocaleString()} OF {total.toLocaleString()}

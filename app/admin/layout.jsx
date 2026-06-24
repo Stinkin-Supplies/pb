@@ -5,21 +5,21 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 const css = `
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   ::-webkit-scrollbar { width: 4px; }
-  ::-webkit-scrollbar-thumb { background: #e8621a; }
+  ::-webkit-scrollbar-thumb { background: #c9a84c; }
 
   .admin-shell {
     display: grid;
     grid-template-columns: 220px 1fr;
     min-height: 100vh;
-    background: #0a0909;
-    color: #f0ebe3;
+    background: #f5f0e8;
+    color: #1a1208;
     font-family: var(--font-stencil), sans-serif;
   }
 
   /* ── SIDEBAR ── */
   .admin-sidebar {
-    background: #0d0c0c;
-    border-right: 1px solid #1a1919;
+    background: #ffffff;
+    border-right: 1px solid #e6dcc0;
     display: flex;
     flex-direction: column;
     position: sticky;
@@ -30,20 +30,20 @@ const css = `
 
   .sidebar-logo {
     padding: 20px 18px 16px;
-    border-bottom: 1px solid #1a1919;
+    border-bottom: 1px solid #e6dcc0;
   }
   .sidebar-logo-title {
     font-family: var(--font-caesar), sans-serif;
     font-size: 18px;
     letter-spacing: 0.08em;
-    color: #f0ebe3;
+    color: #1a1208;
     line-height: 1;
   }
-  .sidebar-logo-title span { color: #e8621a; }
+  .sidebar-logo-title span { color: #c9a84c; }
   .sidebar-logo-sub {
     font-family: var(--font-stencil), monospace;
     font-size: 8px;
-    color: #e8621a;
+    color: #c9a84c;
     letter-spacing: 0.2em;
     margin-top: 4px;
   }
@@ -54,7 +54,7 @@ const css = `
   .sidebar-section-label {
     font-family: var(--font-stencil), monospace;
     font-size: 8px;
-    color: #3a3838;
+    color: #9c8a6a;
     letter-spacing: 0.2em;
     padding: 0 18px;
     margin-bottom: 4px;
@@ -68,21 +68,21 @@ const css = `
     font-family: var(--font-stencil), monospace;
     font-size: 10px;
     letter-spacing: 0.12em;
-    color: #8a8784;
+    color: #7a6a4f;
     text-decoration: none;
     transition: all 0.15s;
     border-left: 2px solid transparent;
     position: relative;
   }
   .sidebar-link:hover {
-    color: #f0ebe3;
-    background: rgba(255,255,255,0.02);
-    border-left-color: #2a2828;
+    color: #1a1208;
+    background: rgba(201,168,76,0.05);
+    border-left-color: #ddd0b8;
   }
   .sidebar-link.active {
-    color: #e8621a;
-    background: rgba(232,98,26,0.06);
-    border-left-color: #e8621a;
+    color: #a3822c;
+    background: rgba(201,168,76,0.12);
+    border-left-color: #c9a84c;
   }
   .sidebar-link-icon {
     font-size: 13px;
@@ -94,12 +94,12 @@ const css = `
   .sidebar-footer {
     margin-top: auto;
     padding: 14px 18px;
-    border-top: 1px solid #1a1919;
+    border-top: 1px solid #e6dcc0;
   }
   .sidebar-footer-email {
     font-family: var(--font-stencil), monospace;
     font-size: 8px;
-    color: #3a3838;
+    color: #9c8a6a;
     letter-spacing: 0.1em;
     margin-bottom: 8px;
     overflow: hidden;
@@ -110,12 +110,12 @@ const css = `
     display: block;
     font-family: var(--font-stencil), monospace;
     font-size: 9px;
-    color: #8a8784;
+    color: #7a6a4f;
     letter-spacing: 0.12em;
     text-decoration: none;
     transition: color 0.15s;
   }
-  .sidebar-footer-link:hover { color: #e8621a; }
+  .sidebar-footer-link:hover { color: #a3822c; }
 
   /* ── MAIN CONTENT ── */
   .admin-main {
@@ -125,8 +125,8 @@ const css = `
 
   /* ── TOP BAR ── */
   .admin-topbar {
-    background: #0d0c0c;
-    border-bottom: 1px solid #1a1919;
+    background: #ffffff;
+    border-bottom: 1px solid #e6dcc0;
     padding: 12px 28px;
     display: flex;
     align-items: center;
@@ -138,13 +138,13 @@ const css = `
   .topbar-breadcrumb {
     font-family: var(--font-stencil), monospace;
     font-size: 9px;
-    color: #8a8784;
+    color: #7a6a4f;
     letter-spacing: 0.15em;
     display: flex;
     align-items: center;
     gap: 8px;
   }
-  .topbar-breadcrumb span { color: #f0ebe3; }
+  .topbar-breadcrumb span { color: #1a1208; }
   .topbar-right {
     display: flex;
     align-items: center;
@@ -153,15 +153,15 @@ const css = `
   .topbar-store-link {
     font-family: var(--font-stencil), monospace;
     font-size: 9px;
-    color: #8a8784;
+    color: #7a6a4f;
     letter-spacing: 0.12em;
     text-decoration: none;
-    border: 1px solid #2a2828;
+    border: 1px solid #ddd0b8;
     padding: 5px 12px;
     border-radius: 2px;
     transition: all 0.15s;
   }
-  .topbar-store-link:hover { border-color: #e8621a; color: #e8621a; }
+  .topbar-store-link:hover { border-color: #c9a84c; color: #a3822c; }
 
   @media (max-width: 768px) {
     .admin-shell { grid-template-columns: 1fr; }
@@ -259,7 +259,7 @@ export default async function AdminLayout({ children }) {
           <div className="admin-main">
             <div className="admin-topbar">
               <div className="topbar-breadcrumb">
-                ADMIN <span style={{ color: "#3a3838" }}>/ </span>
+                ADMIN <span style={{ color: "#9c8a6a" }}>/ </span>
                 <span>STINKIN&apos; SUPPLIES</span>
               </div>
               <div className="topbar-right">

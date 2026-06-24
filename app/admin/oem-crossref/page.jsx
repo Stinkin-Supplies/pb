@@ -16,10 +16,10 @@ const css = `
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --black:  #0a0909; --coal:   #111010; --iron:  #1a1919;
-    --steel:  #2a2828; --chrome: #8a8784; --cream: #f0ebe3;
-    --orange: #e8621a; --gold:   #c9a84c; --red:   #b91c1c;
-    --green:  #22c55e; --blue:   #3b82f6;
+    --black:  #f5f0e8; --coal:   #ffffff; --iron:  #fbf6ec;
+    --steel:  #ddd0b8; --chrome: #7a6a4f; --cream: #1a1208;
+    --orange: #c9a84c; --gold:   #c9a84c; --red:   #c0392b;
+    --green:  #2f8552; --blue:   #3b78d8;
   }
 
   .xref-wrap {
@@ -135,16 +135,16 @@ const css = `
   }
   .btn-ghost  { background: none; border-color: var(--steel); color: var(--chrome); }
   .btn-ghost:hover { border-color: var(--orange); color: var(--orange); }
-  .btn-primary { background: var(--orange); border-color: var(--orange); color: var(--black); font-weight: 700; }
-  .btn-primary:hover { background: #c94f0f; }
-  .btn-danger  { background: none; border-color: rgba(185,28,28,0.4); color: var(--red); }
-  .btn-danger:hover { background: rgba(185,28,28,0.1); border-color: var(--red); }
+  .btn-primary { background: var(--orange); border-color: var(--orange); color: #1a1208; font-weight: 700; }
+  .btn-primary:hover { background: #a3822c; }
+  .btn-danger  { background: none; border-color: rgba(192,57,43,0.4); color: var(--red); }
+  .btn-danger:hover { background: rgba(192,57,43,0.12); border-color: var(--red); }
   .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
   /* ── BULK ACTION BAR ── */
   .bulk-bar {
-    background: #1a1400;
-    border-bottom: 1px solid #3d2e00;
+    background: #fff3e0;
+    border-bottom: 1px solid #e8d5a8;
     padding: 10px 28px;
     display: flex;
     align-items: center;
@@ -167,7 +167,7 @@ const css = `
   .bulk-bar-divider {
     width: 1px;
     height: 20px;
-    background: #3d2e00;
+    background: #e8d5a8;
     flex-shrink: 0;
   }
   .bulk-bar-actions { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -184,11 +184,11 @@ const css = `
     background: none;
   }
   .btn-bulk-brand  { border-color: rgba(201,168,76,0.4); color: var(--gold); }
-  .btn-bulk-brand:hover  { background: rgba(201,168,76,0.1); border-color: var(--gold); }
-  .btn-bulk-oem    { border-color: rgba(59,130,246,0.4); color: var(--blue); }
-  .btn-bulk-oem:hover    { background: rgba(59,130,246,0.1); border-color: var(--blue); }
-  .btn-bulk-delete { border-color: rgba(185,28,28,0.4); color: var(--red); }
-  .btn-bulk-delete:hover { background: rgba(185,28,28,0.1); border-color: var(--red); }
+  .btn-bulk-brand:hover  { background: rgba(201,168,76,0.14); border-color: var(--gold); }
+  .btn-bulk-oem    { border-color: rgba(59,120,216,0.4); color: var(--blue); }
+  .btn-bulk-oem:hover    { background: rgba(59,120,216,0.14); border-color: var(--blue); }
+  .btn-bulk-delete { border-color: rgba(192,57,43,0.4); color: var(--red); }
+  .btn-bulk-delete:hover { background: rgba(192,57,43,0.14); border-color: var(--red); }
   .btn-bulk:disabled { opacity: 0.3; cursor: not-allowed; }
   .bulk-bar-clear {
     margin-left: auto;
@@ -206,8 +206,8 @@ const css = `
 
   /* ── SELECT-ALL BANNER ── */
   .select-all-banner {
-    background: #0d1a0d;
-    border-bottom: 1px solid #1a3a1a;
+    background: #eef7e6;
+    border-bottom: 1px solid #cfe8bd;
     padding: 9px 28px;
     display: flex;
     align-items: center;
@@ -219,7 +219,7 @@ const css = `
   .select-all-banner strong { color: var(--green); }
   .btn-select-all-match {
     background: none;
-    border: 1px solid rgba(34,197,94,0.4);
+    border: 1px solid rgba(47,133,82,0.4);
     color: var(--green);
     font-family: var(--font-stencil), monospace;
     font-size: 9px;
@@ -229,7 +229,7 @@ const css = `
     cursor: pointer;
     transition: all 0.15s;
   }
-  .btn-select-all-match:hover { background: rgba(34,197,94,0.1); border-color: var(--green); }
+  .btn-select-all-match:hover { background: rgba(47,133,82,0.12); border-color: var(--green); }
   .btn-select-all-clear {
     background: none;
     border: none;
@@ -277,14 +277,14 @@ const css = `
 
   .xref-table td {
     padding: 10px 14px;
-    border-bottom: 1px solid rgba(255,255,255,0.03);
+    border-bottom: 1px solid rgba(26,18,8,0.06);
     vertical-align: middle;
     white-space: nowrap;
   }
   .xref-table td.col-check { padding: 10px 8px 10px 14px; }
-  .xref-table tr:hover td { background: rgba(255,255,255,0.015); }
-  .xref-table tr.row-selected td { background: rgba(201,168,76,0.06); }
-  .xref-table tr.row-selected:hover td { background: rgba(201,168,76,0.09); }
+  .xref-table tr:hover td { background: rgba(201,168,76,0.05); }
+  .xref-table tr.row-selected td { background: rgba(201,168,76,0.12); }
+  .xref-table tr.row-selected:hover td { background: rgba(201,168,76,0.18); }
 
   /* custom checkbox */
   .xref-checkbox {
@@ -309,7 +309,7 @@ const css = `
     position: absolute;
     top: 1px; left: 4px;
     width: 4px; height: 7px;
-    border: 2px solid var(--black);
+    border: 2px solid #1a1208;
     border-top: none; border-left: none;
     transform: rotate(45deg);
   }
@@ -330,13 +330,13 @@ const css = `
   .cell-oem   { font-family: var(--font-caesar), 'Bebas Neue', sans-serif; font-size: 15px; letter-spacing: 0.06em; color: var(--orange); }
   .cell-wps   { font-family: var(--font-stencil), monospace; font-size: 11px; color: var(--cream); letter-spacing: 0.05em; }
   .cell-brand { font-size: 11px; color: var(--chrome); }
-  .cell-bpn   { font-family: var(--font-stencil), monospace; font-size: 10px; color: #5a5856; letter-spacing: 0.06em; }
-  .cell-src   { font-size: 9px; color: #3a3838; letter-spacing: 0.1em; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+  .cell-bpn   { font-family: var(--font-stencil), monospace; font-size: 10px; color: #8a7a60; letter-spacing: 0.06em; }
+  .cell-src   { font-size: 9px; color: #b3a890; letter-spacing: 0.1em; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
 
   .delete-btn {
     background: none;
     border: 1px solid transparent;
-    color: #3a3838;
+    color: #b3a890;
     cursor: pointer;
     font-size: 14px;
     line-height: 1;
@@ -344,14 +344,14 @@ const css = `
     border-radius: 2px;
     transition: all 0.15s;
   }
-  .delete-btn:hover { border-color: rgba(185,28,28,0.4); color: var(--red); }
+  .delete-btn:hover { border-color: rgba(192,57,43,0.4); color: var(--red); }
 
   /* ── EMPTY / LOADING ── */
   .xref-empty {
     text-align: center;
     padding: 60px 20px;
     font-size: 9px;
-    color: #3a3838;
+    color: #b3a890;
     letter-spacing: 0.2em;
   }
   .xref-loading {
@@ -450,8 +450,8 @@ const css = `
   .modal-label .req { color: var(--orange); }
   .modal-actions { display: flex; gap: 8px; margin-top: 20px; justify-content: flex-end; }
   .modal-error {
-    background: rgba(185,28,28,0.1);
-    border: 1px solid rgba(185,28,28,0.3);
+    background: rgba(192,57,43,0.1);
+    border: 1px solid rgba(192,57,43,0.3);
     color: var(--red);
     padding: 8px 12px;
     border-radius: 2px;
@@ -460,13 +460,13 @@ const css = `
     letter-spacing: 0.06em;
   }
   .modal-warn {
-    background: rgba(185,28,28,0.08);
-    border: 1px solid rgba(185,28,28,0.25);
+    background: rgba(192,57,43,0.08);
+    border: 1px solid rgba(192,57,43,0.25);
     border-radius: 2px;
     padding: 14px 16px;
     margin-bottom: 20px;
     font-size: 10px;
-    color: #e8a0a0;
+    color: #993C1D;
     letter-spacing: 0.06em;
     line-height: 1.6;
   }
@@ -533,13 +533,20 @@ export default function OemCrossRefPage() {
   const [bulkModal, setBulkModal] = useState(null); // "delete" | "brand" | "oem"
   const [bulkWorking, setBulkWorking] = useState(false);
 
-  const searchRef   = useRef(null);
-  const searchTimer = useRef(null);
+  const searchRef    = useRef(null);
+  const searchTimer  = useRef(null);
+  const metaLoadedRef = useRef(false); // tracks whether brand/source dropdown lists have been fetched yet
 
   // ── Fetch ──
+  // Brand/source lists are full-table DISTINCT scans on the backend — only
+  // requested on first load, explicit refresh, or after a mutation that could
+  // change them (add/bulk add/bulk brand change/bulk delete). Plain
+  // pagination/sort/search changes skip them via metaLoadedRef.
   const fetchData = useCallback(async (overrides = {}) => {
     setLoading(true);
-    const p = { page, limit, search, brand, source, sort, dir, ...overrides };
+    const { includeMeta: includeMetaOverride, ...rest } = overrides;
+    const p = { page, limit, search, brand, source, sort, dir, ...rest };
+    const includeMeta = includeMetaOverride ?? !metaLoadedRef.current;
     const qs = new URLSearchParams({
       page:   String(p.page),
       limit:  String(p.limit),
@@ -548,6 +555,7 @@ export default function OemCrossRefPage() {
       source: p.source,
       sort:   p.sort,
       dir:    p.dir,
+      ...(includeMeta ? { meta: "1" } : {}),
     }).toString();
     try {
       const res  = await fetch(`/api/admin/oem-crossref?${qs}`);
@@ -555,8 +563,8 @@ export default function OemCrossRefPage() {
       if (!res.ok) throw new Error(data.error ?? "Request failed");
       setRows(data.rows ?? []);
       setTotal(data.total ?? 0);
-      if (data.brands)  setBrands(data.brands);
-      if (data.sources) setSources(data.sources);
+      if (data.brands)  { setBrands(data.brands); metaLoadedRef.current = true; }
+      if (data.sources) { setSources(data.sources); metaLoadedRef.current = true; }
     } catch (err) {
       showToast(err.message, "error");
     } finally {
@@ -617,7 +625,7 @@ export default function OemCrossRefPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Delete failed");
       showToast("Entry removed", "success");
-      fetchData();
+      fetchData({ includeMeta: true });
     } catch (err) {
       showToast(err.message, "error");
     } finally {
@@ -687,7 +695,7 @@ export default function OemCrossRefPage() {
       showToast(`${data.deleted.toLocaleString()} entries deleted`, "success");
       clearSelection();
       setBulkModal(null);
-      fetchData();
+      fetchData({ includeMeta: true });
     } catch (err) {
       showToast(err.message, "error");
     } finally {
@@ -708,7 +716,7 @@ export default function OemCrossRefPage() {
       showToast(`${data.updated.toLocaleString()} entries updated`, "success");
       clearSelection();
       setBulkModal(null);
-      fetchData();
+      fetchData({ includeMeta: true });
     } catch (err) {
       showToast(err.message, "error");
     } finally {
@@ -734,7 +742,7 @@ export default function OemCrossRefPage() {
       showToast(`${data.inserted.toLocaleString()} entries added (${data.skipped ?? 0} skipped as dupes)`, "success");
       clearSelection();
       setBulkModal(null);
-      fetchData();
+      fetchData({ includeMeta: true });
     } catch (err) {
       showToast(err.message, "error");
     } finally {
@@ -771,7 +779,7 @@ export default function OemCrossRefPage() {
           <div className="xref-subtitle">HARDDRIVE → WPS PART NUMBER LOOKUP TABLE</div>
         </div>
         <div className="xref-header-right">
-          <button className="btn btn-ghost" onClick={() => fetchData()}>↺ REFRESH</button>
+          <button className="btn btn-ghost" onClick={() => fetchData({ includeMeta: true })}>↺ REFRESH</button>
           <button className="btn btn-primary" onClick={() => setShowAdd(true)}>+ ADD ENTRY</button>
         </div>
       </div>
@@ -1019,7 +1027,7 @@ export default function OemCrossRefPage() {
       {showAdd && (
         <AddModal
           onClose={() => setShowAdd(false)}
-          onSuccess={() => { setShowAdd(false); fetchData(); showToast("Entry added"); }}
+          onSuccess={() => { setShowAdd(false); fetchData({ includeMeta: true }); showToast("Entry added"); }}
         />
       )}
 
@@ -1065,7 +1073,7 @@ export default function OemCrossRefPage() {
 
 // ── Shared field style ────────────────────────────────────────────────────────
 const fieldStyle = {
-  background: "#1a1919", border: "1px solid #2a2828", color: "#f0ebe3",
+  background: "#fbf6ec", border: "1px solid #ddd0b8", color: "#1a1208",
   padding: "8px 12px", borderRadius: 2, width: "100%",
   fontFamily: "var(--font-stencil), monospace", fontSize: 12, letterSpacing: "0.05em",
   outline: "none",
@@ -1241,7 +1249,7 @@ function BulkAddOemModal({ count, allMatching, working, onClose, onConfirm }) {
         <div className="modal-subtitle">
           ADDING TO SKUS OF <strong>{count.toLocaleString()}</strong> {allMatching ? "ALL MATCHING" : "SELECTED"} ROW{count !== 1 ? "S" : ""}
         </div>
-        <p style={{ fontSize: 10, color: "#8a8784", letterSpacing: "0.08em", marginBottom: 16, lineHeight: 1.6 }}>
+        <p style={{ fontSize: 10, color: "#7a6a4f", letterSpacing: "0.08em", marginBottom: 16, lineHeight: 1.6 }}>
           A new <code>catalog_oem_crossref</code> row will be inserted for each unique SKU in your
           selection with this OEM # + manufacturer. Duplicate (sku, oem_number, oem_manufacturer)
           combinations are silently skipped.

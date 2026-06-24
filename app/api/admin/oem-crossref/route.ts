@@ -43,6 +43,10 @@ export async function GET(req: Request) {
   const sortKey = searchParams.get("sort") ?? "oem_number";
   const dir     = searchParams.get("dir")  === "asc" ? "ASC" : "DESC";
   const safeSort = SORT_MAP[sortKey] ?? "oem_number";
+  // Brand/source filter-dropdown lists are full-table DISTINCT scans — only
+  // worth paying for on initial load / explicit refresh, not on every
+  // keystroke, page turn, or sort click. Caller opts in with meta=1.
+  const includeMeta = searchParams.get("meta") === "1";
 
   const db = getCatalogDb();
 
@@ -96,29 +100,35 @@ export async function GET(req: Request) {
       [...params, limit, page * limit]
     );
 
-    // Unique brands for filter dropdown
-    const brandsResult = await db.query(
-      `SELECT DISTINCT oem_manufacturer
-       FROM catalog_oem_crossref
-       WHERE oem_manufacturer IS NOT NULL AND oem_manufacturer <> ''
-       ORDER BY oem_manufacturer`
-    );
+    // Brand/source dropdown lists: full-table DISTINCT scans, only run when
+    // explicitly requested (initial load / refresh), not on every filter change.
+    let brands: string[] | undefined;
+    let sources: string[] | undefined;
 
-    // Unique source files for filter dropdown
-    const sourcesResult = await db.query(
-      `SELECT DISTINCT source_file
-       FROM catalog_oem_crossref
-       WHERE source_file IS NOT NULL AND source_file <> ''
-       ORDER BY source_file`
-    );
+    if (includeMeta) {
+      const brandsResult = await db.query(
+        `SELECT DISTINCT oem_manufacturer
+         FROM catalog_oem_crossref
+         WHERE oem_manufacturer IS NOT NULL AND oem_manufacturer <> ''
+         ORDER BY oem_manufacturer`
+      );
+      const sourcesResult = await db.query(
+        `SELECT DISTINCT source_file
+         FROM catalog_oem_crossref
+         WHERE source_file IS NOT NULL AND source_file <> ''
+         ORDER BY source_file`
+      );
+      brands  = brandsResult.rows.map((r: { oem_manufacturer: string }) => r.oem_manufacturer);
+      sources = sourcesResult.rows.map((r: { source_file: string }) => r.source_file);
+    }
 
     return NextResponse.json({
-      rows:    dataResult.rows,
+      rows: dataResult.rows,
       total,
       page,
       limit,
-      brands:  brandsResult.rows.map((r: { oem_manufacturer: string }) => r.oem_manufacturer),
-      sources: sourcesResult.rows.map((r: { source_file: string }) => r.source_file),
+      ...(brands  ? { brands }  : {}),
+      ...(sources ? { sources } : {}),
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -146,17 +156,37 @@ export async function POST(req: Request) {
 
   const db = getCatalogDb();
   try {
-    const result = await db.query(
+    // Upsert without naming a conflict target: the live unique constraint on
+    // catalog_oem_crossref has drifted between a 3-column (sku, oem_number,
+    // oem_manufacturer) and 2-column (sku, oem_number) form across past
+    // ingestion passes (see HANDOFF_PATCH.md vs DB_AUDIT_REPORT.md), and a
+    // hardcoded ON CONFLICT (...) target throws "no unique or exclusion
+    // constraint matching the ON CONFLICT specification" if it doesn't match
+    // whichever constraint is actually live. Insert-then-fallback-update
+    // works correctly regardless of which constraint shape is in place.
+    const inserted = await db.query(
       `INSERT INTO catalog_oem_crossref
          (sku, oem_number, oem_manufacturer, page_reference, source_file)
        VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT (sku, oem_number, oem_manufacturer) DO UPDATE
-         SET page_reference = EXCLUDED.page_reference,
-             source_file    = EXCLUDED.source_file
+       ON CONFLICT DO NOTHING
        RETURNING *`,
       [sku, oem_number, oem_manufacturer, page_reference ?? null, source_file ?? "manual"]
     );
-    return NextResponse.json({ row: result.rows[0] }, { status: 201 });
+
+    if (inserted.rows[0]) {
+      return NextResponse.json({ row: inserted.rows[0] }, { status: 201 });
+    }
+
+    // Row already existed (conflict skipped) — update it to match the new values.
+    const updated = await db.query(
+      `UPDATE catalog_oem_crossref
+         SET page_reference = $4,
+             source_file    = $5
+       WHERE sku = $1 AND oem_number = $2 AND oem_manufacturer = $3
+       RETURNING *`,
+      [sku, oem_number, oem_manufacturer, page_reference ?? null, source_file ?? "manual"]
+    );
+    return NextResponse.json({ row: updated.rows[0] ?? null }, { status: 200 });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[oem-crossref POST]", msg);

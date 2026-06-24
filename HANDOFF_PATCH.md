@@ -1,158 +1,144 @@
-# ——— FIFTY-FIFTH PASS (June 22–23, 2026) ———
+# ——— FIFTY-SEVENTH PASS (June 24, 2026) ———
 
 ## WHERE WE ARE
 
-Canonical merge queue fully drained for the first time — 2,407 applied, zero remaining. 145 pack-size variant groups live across the catalog (customer sees "Buy 1 for $X or save with a 5-pack for $Y"). WPS + VTwin OEM crossref fully imported — all three vendors now linkable by HD OEM number. The "all options for one OEM slot" data layer is complete and verified.
+PDP fully operational with multi-image galleries (VTwin + PU), product details above fitment, OEM alternatives panel removed. Browse OEM number search working via `unnest(oem_numbers)`. Category filter sticky URL bug fixed. PU enrichment extraction pipeline (`extract_pu_images.mjs`) added 22,253 multi-image products, 8,828 descriptions, 15,330 OEM crossref entries from brand XML files. VTwin categorization complete (566 products). `generate_vtwin_skus.js` fully rewritten for next ingest.
 
 ⚠️ Payment gateway still undecided — only blocker for checkout going live.
-⚠️ 62 variant candidates still pending manual review (finish/size/length — requires human judgment).
-⚠️ Pack-size variant selector has a dedup edge case: canonical:91278 (Cam Cover Gasket) has 3 members — 2×1pk (PU + VTwin) + 1×5pk (WPS). VariantSelector may show two "1" buttons. Fix: `build_pack_size_groups.mjs` canonical mode should deduplicate by pack_qty, preferring PU as the representative member.
+⚠️ 62 variant candidates still pending manual review.
+⚠️ VTwin `build_product_details.mjs` attributes bug: `extra_attributes` stored as stringified JSON. Workaround active in `ProductDetailsSection`. Real fix is `JSON.parse()` in build script (#22 on chase list).
 
 ## What Was Done This Session
 
-### Credential Rotation ✅
-WPS API token and DB password rotated (user performed). No longer live in shell history.
+### `infer_vtwin_categories.mjs` — Updated + Run ✅
 
-### Canonical Merges — Fully Applied ✅
+Added `VTWIN_CATEGORY_TO_DISPLAY` constant (28 VTwin source categories → 21 display_category values). Live UPDATE now sets both `category` and `display_category` in one pass using triplet params (`[id, category, display_category]`). Reports count of rows that got no display_category.
 
-2,407 total applied across multiple rounds (was 0 applied at session start). Vercel's 30-second function timeout caused three partial runs; each was recovered by re-clicking Apply. Recurring straggler pattern: 14 proposals each round had `cp_a IS NULL` (products with no `canonical_product_id` due to Phase A orphans). Fixed each round with the same SQL:
+Run result: **566 products, 100% match, 0 unmatched.** Reindex followed (89,153 docs).
 
+### `generate_vtwin_skus.js` — Full Rewrite ✅
+
+Old script referenced non-existent schemas (`vendor.vtwin_sku_staging`, `vendor.vtwinmtc_products`, `vendor.vtwin_category_pages`) and had hardcoded credentials.
+
+New script:
+- Source: `catalog_unified WHERE source_vendor='VTWIN' AND is_active=true AND internal_sku IS NULL`
+- Maps `display_category` → SKU prefix via `DISPLAY_CATEGORY_TO_PREFIX` (all 21 display categories)
+- Reads/writes `sku_counter` table (UPSERT — safe for new prefixes)
+- Writes `internal_sku` directly to `catalog_unified` with `.v` suffix (consistent with existing `MSC999973.v` pattern)
+- Dry-run default, `--apply` flag
+- Uses `process.env.CATALOG_DATABASE_URL` with hardcoded fallback
+- Warns on unknown/new prefixes; soft-fails (doesn't hard-stop) since `?? 100000` fallback handles them
+
+### Browse `?category=` Filter Stuck Bug ✅
+
+**Root cause:** CategoryBentoGrid and PDP breadcrumb were linking to `/browse?category=Engine` (legacy param) instead of `?display_category=Engine`. `page.jsx` read it as `filters.category`, passed it to the API, and it stuck in the URL invisibly — no chip in sidebar, no way to clear it.
+
+**`app/browse/page.jsx` fixes:**
+- Filter init: `display_category: searchParams.get("display_category") || searchParams.get("category") || null` — old `?category=X` links now silently correct on load
+- Removed `category` and `subcategory` from `fetchProducts` API params
+- Removed `category` and `subcategory` from `handleFilterChange` URL builder
+- Clear-all button: removed `category: null` and `subcategory: null`
+
+**`components/browse/FilterSidebar.jsx`:** Was already correct — no changes needed.
+
+**`app/browse/[slug]/page.jsx` breadcrumb:** `?category=` → `?display_category=` in the category link.
+
+### OEM Number Search — `browse.ts` ✅
+
+Extended the ILIKE fallback search to include `oem_numbers` array. Each search word now also runs:
 ```sql
--- Repoint orphaned product_a to product_b's canonical, then mark applied
-UPDATE catalog_unified cu SET canonical_product_id = (
-  SELECT b.canonical_product_id FROM canonical_match_proposals cmp
-  JOIN catalog_unified b ON b.id = cmp.product_id_b
-  WHERE cmp.status = 'confirmed' AND cmp.product_id_a = cu.id
-  AND b.canonical_product_id IS NOT NULL LIMIT 1
-)
-WHERE cu.id IN (
-  SELECT cmp.product_id_a FROM canonical_match_proposals cmp
-  JOIN catalog_unified a ON a.id = cmp.product_id_a
-  WHERE cmp.status = 'confirmed' AND a.canonical_product_id IS NULL
-);
-UPDATE canonical_match_proposals SET status = 'applied'
-WHERE status = 'confirmed' AND EXISTS (
-  SELECT 1 FROM catalog_unified a, catalog_unified b
-  WHERE a.id = product_id_a AND b.id = product_id_b
-  AND a.canonical_product_id = b.canonical_product_id
-);
+EXISTS (SELECT 1 FROM unnest(cu.oem_numbers) AS oem WHERE oem ILIKE $N)
 ```
+Params restructured from 4 per word to 5 per word. Result: query `16779-99` went from 1 result → 3 results (James Gaskets 1pk + VTwin 1pk + WPS 2pk).
 
-Also bulk-rejected 86 pending proposals where both products already shared the same `variant_group_id` (were already linked as pack-size variants — not duplicates). Final state: **2,407 applied / 0 confirmed / 0 pending / 1,772 rejected**.
+### PDP — ProductImageGallery ✅
 
-### WPS pack_qty — Two Regex Passes ✅
+New client component `components/browse/ProductImageGallery.jsx`:
+- Builds image list from `primaryUrl` + `imageUrls[]`, deduplicates
+- Single image → renders exactly as before (no strip)
+- Multiple images → 1:1 hero + 64px thumbnail strip below; gold border on active; per-image `onError` handling; horizontally scrollable when >4 thumbnails
+- Includes `resolveImageSrc()` (routes LeMans URLs through proxy)
 
-**Pass 1 (slash format):** `\d+\s*/\s*pk` — fixed 972 WPS products from `pack_qty=1` to correct value. The original backfill had set everything to 1 instead of extracting the number.
+**`app/browse/[slug]/page.jsx` changes:**
+- `cu.image_urls` added to `getProduct()` SELECT
+- `catalog_media` lateral rewritten to fetch ALL image rows:
+  ```sql
+  SELECT MIN(url) FILTER (WHERE priority = MIN(priority) OVER ()) AS primary_url,
+         array_agg(url ORDER BY priority ASC) AS all_urls
+  FROM catalog_media WHERE product_id = cu.id AND media_type = 'image'
+  ```
+- `image_urls` SELECT uses `CASE WHEN array_length(cu.image_urls,1) > 0 THEN cu.image_urls ELSE cm.all_urls END` — VTwin reads from column, PU reads from catalog_media
+- Hero image replaced with `<ProductImageGallery primaryUrl={...} imageUrls={...} alt={...} />`
+- `ProductImageGallery` imported
 
-**Pass 2 (no-slash format):** `\d+pk(\s|$)` — fixed 98 more WPS products where name used `10PK` or `5PK` without a slash (e.g. "UPPER ROCKER GASKET M8 .020" RC 10PK"). The `\b` word boundary in the original regex doesn't work in Postgres — replaced with `(\s|$)`.
+### PDP Layout + OEM Panel ✅
 
-**Total WPS pack_qty corrected: 1,070 products.**
+- `ProductDetailsSection` moved above `DataTabs` (was below)
+- `OemAlternativesPanel` removed entirely: import deleted, `getOemAlternatives()` call removed from parallel fetches, render removed
+- `oemAlternatives` destructured var removed
 
-### `build_pack_size_groups.mjs` — New Script ✅
+### VTwin Attributes JSON Parse Fix ✅
 
-Written to `scripts/ingest/build_pack_size_groups.mjs`. Two modes:
-
-**Default mode (candidate-based):** Reads `catalog_variant_candidates WHERE resolved=false`, identifies groups where max(pack_qty) > 1 and all pack_qty values are distinct. Builds `catalog_variant_groups` (source_vendor='MULTI') + `catalog_variant_members` (option_1_name='Pack Size') + updates `catalog_unified.variant_group_id`. Marks candidates resolved.
-
-**`--canonical` mode:** Finds canonical groups where one product has pack_qty > 1 and another has pack_qty = 1, no variant group yet. Same build logic. Uses `family_key = 'canonical:N'` to dedup.
-
-Both modes: dry-run by default, `--apply` to write. Idempotent (checks existing family_key before inserting).
-
-### Pack-Size Variant Groups — 145 Built ✅
-
-Three sweeps:
-
-| Sweep | Source | Groups |
-|-------|--------|--------|
-| 1 | `catalog_variant_candidates` (candidate pipeline) | 88 |
-| 2 | `canonical_product_id` matching | 27 |
-| 3 | 19 pending proposals rejected + re-queued as candidates | 19 |
-| **Total** | | **145 MULTI groups** |
-
-Additionally: 19 pending canonical proposals that were pack-size pairs (not duplicates) were bulk-rejected from `canonical_match_proposals` and inserted into `catalog_variant_candidates`, then built by the script in the same run.
-
-Confirmed working on PDP: Derby Cover Gasket 5-Hole shows "Pack Size: 1 / 5" variant selector with correct prices.
-
-### WPS OEM Crossref — 1,665 Entries Imported ✅
-
-Source: `scripts/data/wps-cross-fitment.csv` (2,273 rows, `OEM#, WPS#, Vendor, Vend#`).
-
-Join key: `catalog_unified.vendor_sku = WPS#`. Match rate: 1,611/2,273 (71%) — 662 unmatched are discontinued/never-stocked WPS SKUs not in active catalog. 81 of those exist as inactive products (potential future match).
-
-```sql
-INSERT INTO catalog_oem_crossref (sku, oem_number, oem_manufacturer, product_id, source)
-SELECT cu.internal_sku, w.oem_number, w.vendor, cu.id, 'WPS'
-FROM wps_oem_import w
-JOIN catalog_unified cu ON cu.vendor_sku = w.wps_sku AND cu.source_vendor = 'WPS'
-ON CONFLICT (sku, oem_number, oem_manufacturer) DO NOTHING;
+In `ProductDetailsSection` (inline in `page.jsx`):
+```js
+const rawAttrs = details.attributes;
+const attributes = typeof rawAttrs === 'string'
+  ? (() => { try { return JSON.parse(rawAttrs); } catch { return null; } })()
+  : rawAttrs;
 ```
+Prevents character-by-character rendering of stringified JSON in the Specifications column. Root cause (in `build_product_details.mjs`) is tracked as chase list item #22.
 
-Also corrected 11 WPS products incorrectly branded 'HARDDRIVE' → 'Carlisle' using the crossref `Vendor` column.
+### `extract_pu_images.mjs` — New ✅
 
-Note: `oem_manufacturer` in the crossref means the **distributor brand** (James Gaskets, Cometic, Colony, Motion Pro, etc.) for WPS rows — not to be confused with the HD OEM. Source='WPS' distinguishes these.
+Parses all 133 PU brand XML files in `scripts/data/pu_pricefile/brand_files/`. Handles two schemas:
 
-### VTwin OEM Crossref — 8,426 Entries Imported ✅
+**PIES** (`*_PIES_Export*.xml`): `<DigitalAssets><DigitalFileInformation><URI>` — one block per image. Multiple blocks per `<PartNumber>` = multiple images. Parser options: `removeNSPrefix: true`, `isArray: ['Item','DigitalAssets','Description','ExtendedProductInformation']`.
 
-Source: `VTwin-OEM.pdf` — 267-page cross-reference book. Extracted via `pdfplumber` with regex `^([0-9][0-9A-Z\-]+[0-9A-Z])\s+(\d{2}-\d{4,5}[A-Z]?)\s+(\d+)$`. 11,575 rows extracted, saved to `scripts/data/vtwin-oem-crossref.csv`.
+**Catalog_Content** (`*_Catalog_Content_Export*.xml`): `<productImage>` = single primary URL. `<partImage>` = compound URL whose base64 suffix decodes to comma-separated paths — split and re-encode each individually.
 
-Join key: `catalog_unified.sku = 'VT-' || vt_number`. 8,426 matched active products.
+SKU matching normalized to no-dash format on both sides (`vendor_sku.replace(/-/g,'')` in map, `PartNumber.replace(/-/g,'')` in parser).
 
-```sql
-INSERT INTO catalog_oem_crossref (sku, oem_number, product_id, source)
-SELECT cu.internal_sku, v.oem_number, cu.id, 'VTWIN'
-FROM vtwin_oem_import v
-JOIN catalog_unified cu ON cu.sku = 'VT-' || v.vt_number AND cu.source_vendor = 'VTWIN'
-ON CONFLICT (sku, oem_number) DO NOTHING;
-```
+Three enrichment types extracted in one pass:
+1. **Images** → `catalog_media` (priority 0..N per product)
+2. **FAB bullets** (PIES `<Description DescriptionCode="FAB">`) → `product_details.features` (only for products with no existing features)
+3. **Description** (Catalog_Content `<partDescription>`) → `product_details.description` (only for products with no existing description)
+4. **OSP numbers** (PIES `<ExtendedProductInformation EXPICode="OSP">`) → `catalog_oem_crossref` (source=`PU_PIES`)
 
-Note: unique constraint is `(sku, oem_number)` — not `(sku, oem_number, oem_manufacturer)`. The `ON CONFLICT` clause must use the 2-column form for VTwin inserts.
+Results:
+- **22,253 PU products** with multiple images discovered
+- **33,740 catalog_media rows** inserted (31,838 first run + 1,902 second run after SKU fix)
+- **8,828 product_details descriptions** updated
+- **15,330 catalog_oem_crossref** entries added (source=`PU_PIES`)
 
-### OEM "All Options" Query — Verified Working ✅
-
-All three vendors now surface for a shared OEM number. Example: OEM `56327-90` (throttle cable):
-
-```
-PU    HAN473737.p  Black Vinyl Throttle 38"       Drag Specialties  $42.18
-PU    HAN797925.p  Black Vinyl Throttle 42"        Barnett           $44.07
-PU    HAN518373.p  Stainless Throttle '90-95 Tour  Barnett           $52.89
-PU    HAN995579.p  Stainless Braided 38"           Drag Specialties  $66.90
-PU    HAN257239.p  Sterling Chromite II 38"        Magnum Shielding  $79.95
-WPS   MSC598712.w  Black Vinyl Throttle Cable      Motion Pro        $25.29
-WPS   MSC163767.w  Armor Coat Throttle Cable       Motion Pro        $82.49
-VTWIN MSC698466.v  44.375" Black Throttle Cable    Barnett           $—
-```
-
-Query pattern:
-```sql
-SELECT cu.internal_sku, cu.name, cu.brand, cu.source_vendor, cu.computed_price, xr.oem_manufacturer
-FROM catalog_unified cu
-JOIN catalog_oem_crossref xr ON xr.product_id = cu.id
-WHERE xr.oem_number = $1 AND cu.is_active = true
-ORDER BY cu.source_vendor, cu.computed_price;
-```
-
-### Typesense Reindexes ✅
-4× full reindexes this session — all 89,203 docs, 0 errors.
+Re-run is idempotent — `ON CONFLICT DO NOTHING` on images/OEM; description/features only update NULL/empty fields.
 
 ## DB State After This Session
 
-| Table | State |
-|-------|-------|
-| `canonical_match_proposals` | **2,407 applied / 0 confirmed / 0 pending / 1,772 rejected** |
-| `catalog_variant_candidates` | 107 resolved / 62 still pending (finish/size/length — manual) |
-| `catalog_variant_groups` (MULTI) | **145 pack-size groups** |
-| `catalog_variant_members` | Updated accordingly |
-| `catalog_unified.variant_group_id` | Tagged for all 145 group members |
-| `catalog_unified.pack_qty` | 1,070 WPS products corrected |
-| `catalog_oem_crossref` (WPS) | **1,665 rows** (source='WPS') |
-| `catalog_oem_crossref` (VTwin) | **8,426 rows** (source='VTWIN') |
-| `catalog_unified.brand` | 11 WPS products corrected (HARDDRIVE → Carlisle) |
+| Table/Column | State |
+|---|---|
+| `catalog_unified` total active | **89,153** |
+| `catalog_unified` VTwin | 38,315 |
+| `catalog_unified` PU | 34,994 |
+| `catalog_unified` WPS | 15,844 |
+| `catalog_unified.product_details` | **~68,593 populated (~77%)** |
+| `catalog_unified.pack_qty > 1` | 2,171 active non-kit products |
+| `catalog_variant_groups` (MULTI) | 148 pack-size groups |
+| `catalog_media` | **~35,990 rows** (was 1,451 before session) |
+| `catalog_oem_crossref` VTWIN | 16,752 rows |
+| `catalog_oem_crossref` WPS | 1,665 rows |
+| `catalog_oem_crossref` PU_PIES | **15,330 rows** (new) |
+| `sku_counter` | 24 prefixes seeded |
+| Typesense | **89,153 docs, 0 errors** |
 
 ## Files Written/Changed This Session
 
 | File | Status |
-|------|--------|
-| `scripts/ingest/build_pack_size_groups.mjs` | NEW — candidate + canonical modes, dry-run by default |
-| `scripts/data/vtwin-oem-crossref.csv` | NEW — 11,575-row VTwin OEM cross-reference extracted from PDF |
-| `scripts/data/wps-cross-fitment.csv` | EXISTS — confirmed at `scripts/data/`, 2,273 rows |
-
+|---|---|
+| `scripts/ingest/infer_vtwin_categories.mjs` | UPDATED — VTWIN_CATEGORY_TO_DISPLAY map; sets both category + display_category in one pass |
+| `scripts/ingest/generate_vtwin_skus.js` | REWRITTEN — reads catalog_unified, display_category→prefix map, writes internal_sku directly |
+| `scripts/ingest/extract_pu_images.mjs` | NEW — multi-image + descriptions + OEM crossref from PU brand XML files |
+| `lib/db/browse.ts` | UPDATED — unnest(oem_numbers) ILIKE added to search fallback |
+| `app/browse/page.jsx` | UPDATED — ?category= fold into display_category; category removed from API params/URL |
+| `components/browse/FilterSidebar.jsx` | No change needed (was already correct) |
+| `app/browse/[slug]/page.jsx` | UPDATED — image_urls in SELECT; catalog_media all_urls lateral; gallery component; layout reorder; OEM panel removed; breadcrumb fix; attributes JSON.parse |
+| `components/browse/ProductImageGallery.jsx` | NEW — thumbnail strip client component |

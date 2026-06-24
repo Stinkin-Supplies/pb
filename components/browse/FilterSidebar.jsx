@@ -215,7 +215,7 @@ function FilterContent({ facets, filters, onChange, sections, setSections, colla
     filters.year       && { key: "year",     label: String(filters.year),              clear: () => onChange({ year: null }) },
     filters.model      && { key: "model",    label: filters.model,                     clear: () => onChange({ model: null, modelCodes: null }) },
     filters.era        && { key: "era",      label: filters.era.replace(/-/g," "),     clear: () => onChange({ era: null }) },
-    filters.display_category && { key: "cat",    label: filters.display_category,     clear: () => onChange({ display_category: null, display_subcategory: null }) },
+    filters.display_category && { key: "cat",    label: filters.display_category,      clear: () => onChange({ display_category: null, display_subcategory: null }) },
     filters.display_subcategory && { key: "subcat", label: filters.display_subcategory, clear: () => onChange({ display_subcategory: null }) },
     filters.brand      && { key: "brand",    label: filters.brand,                     clear: () => onChange({ brand: null }) },
     filters.in_stock   && { key: "stock",    label: "In Stock",                        clear: () => onChange({ in_stock: false }) },

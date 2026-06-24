@@ -19,6 +19,38 @@ const pool = new Pool({
     "postgresql://catalog_app:smelly@5.161.100.126:5432/stinkin_catalog",
 });
 
+// Maps VTwin source category → catalog display_category
+const VTWIN_CATEGORY_TO_DISPLAY = {
+  'ENGINE GROUP':                       'Engine',
+  'BRAKING GROUP':                      'Brakes',
+  'CARBURETION-FUEL GROUP':             'Carburetion & Fuel',
+  'TANK GROUP-GAS AND OIL':             'Fenders & Body',       // gas tanks → Fenders & Body per taxonomy
+  'ELECTRICAL SYSTEM GROUP':            'Electrical',
+  'ELECTRONICS GROUP':                  'Electrical',
+  'LIGHTING-LICENSE GROUP':             'Lighting',
+  'INSTRUMENT GROUP':                   'Instrumentation',
+  'HANDLEBAR-CONTROLS-MIRRORS GROUP':   'Handlebar & Controls',
+  'FOOT CONTROLS GROUP':                'Foot Controls',
+  'SEATING GROUP':                      'Seating',
+  'FENDER GROUP':                       'Fenders & Body',
+  'WINDSHIELD-FAIRING GROUP':           'Fenders & Body',
+  'LUGGAGE GROUP':                      'Luggage & Racks',
+  'SISSY BAR-BACKREST-RACK GROUP':      'Luggage & Racks',
+  'FRAME AND BODY GROUP':               'Frame & Hardware',
+  'HARDWARE GROUP':                     'Frame & Hardware',
+  'EXHAUST GROUP':                      'Exhaust',
+  'SUSPENSION GROUP-FRONT':             'Suspension',
+  'SUSPENSION GROUP-REAR':              'Suspension',
+  'DRIVE TRAIN GROUP':                  'Transmission & Clutch',
+  'TRANSMISSION-CLUTCH GROUP':          'Transmission & Clutch',
+  'WHEEL AND RIM GROUP':                'Wheels & Tires',
+  'TIRE AND TUBE GROUP':                'Wheels & Tires',
+  'SECURITY-COVERS-SHELTERS GROUP':     'Security & Covers',
+  'TOOLS GROUP':                        'Tools & Chemicals',
+  'MEDIA PRODUCTS GROUP':               'Accessories & Misc',
+  'COMMON MISC GROUP':                  'Accessories & Misc',
+};
+
 const RULES = [
 
   // ── SUSPENSION GROUP-FRONT ───────────────────────────────────────────────
@@ -1193,7 +1225,12 @@ async function main() {
         break;
       }
     }
-    if (matched) assignments.push({ id: p.id, name: p.name, category: matched });
+    if (matched) assignments.push({
+      id: p.id,
+      name: p.name,
+      category: matched,
+      display_category: VTWIN_CATEGORY_TO_DISPLAY[matched] ?? null,
+    });
     else unmatched.push(p);
   }
 
@@ -1235,16 +1272,25 @@ async function main() {
   let updated = 0;
   for (let i = 0; i < assignments.length; i += BATCH) {
     const batch = assignments.slice(i, i + BATCH);
-    const ids   = batch.map((_, j) => `$${j * 2 + 1}`).join(", ");
-    const cases = batch.map((_, j) => `WHEN id = $${j * 2 + 1} THEN $${j * 2 + 2}`).join(" ");
-    const flat  = batch.flatMap(a => [a.id, a.category]);
+    const catCases  = batch.map((_, j) => `WHEN id = $${j * 3 + 1} THEN $${j * 3 + 2}`).join(" ");
+    const dispCases = batch.map((_, j) => `WHEN id = $${j * 3 + 1} THEN $${j * 3 + 3}`).join(" ");
+    const ids  = batch.map((_, j) => `$${j * 3 + 1}`).join(", ");
+    const flat = batch.flatMap(a => [a.id, a.category, a.display_category]);
     const res = await pool.query(
-      `UPDATE catalog_unified SET category = CASE ${cases} END WHERE id IN (${ids})`, flat
+      `UPDATE catalog_unified
+       SET category = CASE ${catCases} END,
+           display_category = CASE ${dispCases} END
+       WHERE id IN (${ids})`, flat
     );
     updated += res.rowCount ?? 0;
     if (i % 5000 === 0) process.stdout.write(`  … ${i.toLocaleString()} / ${assignments.length.toLocaleString()}\r`);
   }
   console.log(`\n  Updated: ${updated.toLocaleString()} rows`);
+
+  // Report how many got a display_category vs fell through
+  const noDisp = assignments.filter(a => !a.display_category).length;
+  if (noDisp > 0) console.log(`  ⚠️  ${noDisp} rows got no display_category (unmapped VTwin category)`);
+
   console.log(`  Still null: ${unmatched.length.toLocaleString()} rows`);
   console.log("\nDone. Reindex Typesense when ready.");
   await pool.end();

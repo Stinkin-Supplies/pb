@@ -21,7 +21,7 @@ const VENDORS = ["PU","WPS","VTWIN"];
 const css = `
   .cm-body {
     padding: 24px 28px;
-    background: #0a0909;
+    background: #f5f0e8;
     min-height: calc(100vh - 46px);
   }
 
@@ -36,13 +36,13 @@ const css = `
     font-family: var(--font-caesar), sans-serif;
     letter-spacing: 0.08em;
     font-size: 18px;
-    color: #f0ebe3;
+    color: #1a1208;
   }
   .cm-sub {
     font-family: var(--font-stencil), monospace;
     font-size: 9px;
     letter-spacing: 0.16em;
-    color: #8a8784;
+    color: #7a6a4f;
     text-transform: uppercase;
   }
 
@@ -51,8 +51,8 @@ const css = `
     align-items: center;
     flex-wrap: wrap;
     gap: 8px;
-    border: 1px solid #2a2828;
-    background: rgba(16,15,15,0.85);
+    border: 1px solid #ddd0b8;
+    background: #ffffff;
     border-radius: 2px;
     padding: 10px 12px;
     margin-bottom: 10px;
@@ -60,19 +60,19 @@ const css = `
   .cm-toolbar input[type=text] {
     flex: 1;
     min-width: 200px;
-    background: #111010;
-    border: 1px solid #2a2828;
-    color: #f0ebe3;
+    background: #fbf6ec;
+    border: 1px solid #ddd0b8;
+    color: #1a1208;
     padding: 7px 10px;
     border-radius: 2px;
     font-size: 12px;
     outline: none;
   }
-  .cm-toolbar input[type=text]:focus { border-color: rgba(232,98,26,0.65); }
+  .cm-toolbar input[type=text]:focus { border-color: rgba(201,168,76,0.65); }
   .cm-toolbar select {
-    background: #111010;
-    border: 1px solid #2a2828;
-    color: #8a8784;
+    background: #fbf6ec;
+    border: 1px solid #ddd0b8;
+    color: #7a6a4f;
     padding: 7px 8px;
     border-radius: 2px;
     font-family: var(--font-stencil), monospace;
@@ -82,12 +82,12 @@ const css = `
     outline: none;
     cursor: pointer;
   }
-  .cm-toolbar select:focus { border-color: rgba(232,98,26,0.65); }
+  .cm-toolbar select:focus { border-color: rgba(201,168,76,0.65); }
 
   .btn {
-    border: 1px solid rgba(232,98,26,0.35);
+    border: 1px solid rgba(201,168,76,0.35);
     background: transparent;
-    color: #f0ebe3;
+    color: #1a1208;
     padding: 7px 12px;
     border-radius: 2px;
     cursor: pointer;
@@ -102,11 +102,11 @@ const css = `
     justify-content: center;
     gap: 6px;
   }
-  .btn:hover { border-color: rgba(232,98,26,0.85); color: #e8621a; }
-  .btn-ghost { border-color: #2a2828; color: #8a8784; }
-  .btn-ghost:hover { border-color: #444; color: #f0ebe3; }
-  .btn-danger { border-color: rgba(255,90,90,0.3); color: #ff7a7a; }
-  .btn-danger:hover { border-color: rgba(255,90,90,0.7); }
+  .btn:hover { border-color: rgba(201,168,76,0.85); color: #a3822c; }
+  .btn-ghost { border-color: #ddd0b8; color: #7a6a4f; }
+  .btn-ghost:hover { border-color: #9c8a6a; color: #1a1208; }
+  .btn-danger { border-color: rgba(192,57,43,0.3); color: #c0392b; }
+  .btn-danger:hover { border-color: rgba(192,57,43,0.7); }
 
   /* stat chips */
   .cm-stats {
@@ -116,33 +116,33 @@ const css = `
     flex-wrap: wrap;
   }
   .cm-stat {
-    border: 1px solid #2a2828;
+    border: 1px solid #ddd0b8;
     border-radius: 2px;
     padding: 6px 12px;
     font-family: var(--font-stencil), monospace;
     font-size: 9px;
     letter-spacing: 0.12em;
-    color: #8a8784;
+    color: #7a6a4f;
     text-transform: uppercase;
     cursor: pointer;
     text-decoration: none;
     transition: all 0.15s;
   }
-  .cm-stat:hover { border-color: #e8621a; color: #e8621a; }
-  .cm-stat.active { border-color: #e8621a; color: #e8621a; background: rgba(232,98,26,0.06); }
+  .cm-stat:hover { border-color: #a3822c; color: #a3822c; }
+  .cm-stat.active { border-color: #a3822c; color: #a3822c; background: rgba(201,168,76,0.08); }
   .cm-stat-count {
     font-family: var(--font-caesar), sans-serif;
     font-size: 14px;
     display: block;
-    color: #f0ebe3;
+    color: #1a1208;
     margin-bottom: 1px;
   }
-  .cm-stat.active .cm-stat-count { color: #e8621a; }
+  .cm-stat.active .cm-stat-count { color: #a3822c; }
 
   /* table */
   .cm-table-wrap {
-    border: 1px solid #2a2828;
-    background: rgba(16,15,15,0.85);
+    border: 1px solid #ddd0b8;
+    background: #ffffff;
     border-radius: 2px;
     overflow: hidden;
   }
@@ -151,18 +151,18 @@ const css = `
     font-family: var(--font-stencil), monospace;
     font-size: 9px;
     letter-spacing: 0.14em;
-    color: #8a8784;
+    color: #7a6a4f;
     text-transform: uppercase;
     text-align: left;
     padding: 9px 12px;
-    border-bottom: 1px solid #2a2828;
-    background: rgba(10,9,9,0.65);
+    border-bottom: 1px solid #ddd0b8;
+    background: #fbf6ec;
     white-space: nowrap;
   }
   tbody td {
     padding: 8px 12px;
-    border-bottom: 1px solid #1a1919;
-    color: #f0ebe3;
+    border-bottom: 1px solid #e6dcc0;
+    color: #1a1208;
     font-size: 12px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -170,33 +170,33 @@ const css = `
     vertical-align: middle;
   }
   tbody tr:last-child td { border-bottom: none; }
-  tbody tr:hover td { background: rgba(232,98,26,0.04); }
+  tbody tr:hover td { background: rgba(201,168,76,0.05); }
 
-  .muted { color: #8a8784; font-size: 10px; }
+  .muted { color: #7a6a4f; font-size: 10px; }
 
   .pill {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid #2a2828;
+    border: 1px solid #ddd0b8;
     border-radius: 2px;
     padding: 1px 6px;
     font-family: var(--font-stencil), monospace;
     font-size: 9px;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: #8a8784;
+    color: #7a6a4f;
   }
-  .pill-pu    { border-color: rgba(139,92,246,0.4); color: #a78bfa; }
-  .pill-wps   { border-color: rgba(59,130,246,0.4); color: #60a5fa; }
-  .pill-vtwin { border-color: rgba(232,98,26,0.4);  color: #e8621a; }
-  .pill-general { border-color: rgba(245,158,11,0.4); color: #f59e0b; }
+  .pill-pu    { border-color: rgba(124,95,214,0.4); color: #7c5fd6; }
+  .pill-wps   { border-color: rgba(59,120,216,0.4); color: #3b78d8; }
+  .pill-vtwin { border-color: rgba(201,168,76,0.4);  color: #a3822c; }
+  .pill-general { border-color: rgba(154,90,12,0.4); color: #9a5a0c; }
 
   /* inline category select */
   .cat-select {
-    background: #111010;
-    border: 1px solid #2a2828;
-    color: #f0ebe3;
+    background: #fbf6ec;
+    border: 1px solid #ddd0b8;
+    color: #1a1208;
     padding: 4px 6px;
     border-radius: 2px;
     font-family: var(--font-stencil), monospace;
@@ -207,13 +207,13 @@ const css = `
     width: 100%;
     max-width: 180px;
   }
-  .cat-select:focus { border-color: rgba(232,98,26,0.65); }
-  .cat-select.changed { border-color: rgba(232,98,26,0.65); color: #e8621a; }
+  .cat-select:focus { border-color: rgba(201,168,76,0.65); }
+  .cat-select.changed { border-color: rgba(201,168,76,0.65); color: #a3822c; }
 
   .save-btn {
-    border: 1px solid rgba(232,98,26,0.35);
+    border: 1px solid rgba(201,168,76,0.35);
     background: transparent;
-    color: #e8621a;
+    color: #a3822c;
     padding: 4px 8px;
     border-radius: 2px;
     cursor: pointer;
@@ -225,7 +225,7 @@ const css = `
     transition: all 0.15s;
   }
   .save-btn.visible { display: inline-flex; }
-  .save-btn:hover { background: rgba(232,98,26,0.1); }
+  .save-btn:hover { background: rgba(201,168,76,0.12); }
 
   /* pager */
   .cm-pager {
@@ -243,8 +243,8 @@ const css = `
     align-items: center;
     gap: 10px;
     padding: 10px 12px;
-    background: rgba(232,98,26,0.06);
-    border: 1px solid rgba(232,98,26,0.2);
+    background: rgba(201,168,76,0.08);
+    border: 1px solid rgba(201,168,76,0.25);
     border-radius: 2px;
     margin-bottom: 10px;
   }
@@ -252,13 +252,13 @@ const css = `
     font-family: var(--font-stencil), monospace;
     font-size: 9px;
     letter-spacing: 0.14em;
-    color: #e8621a;
+    color: #a3822c;
     flex: 1;
   }
   .bulk-select {
-    background: #111010;
-    border: 1px solid rgba(232,98,26,0.3);
-    color: #f0ebe3;
+    background: #fbf6ec;
+    border: 1px solid rgba(201,168,76,0.35);
+    color: #1a1208;
     padding: 5px 8px;
     border-radius: 2px;
     font-family: var(--font-stencil), monospace;
@@ -270,7 +270,7 @@ const css = `
 
   .product-name {
     font-size: 12px;
-    color: #f0ebe3;
+    color: #1a1208;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -278,12 +278,12 @@ const css = `
   .product-sku {
     font-family: var(--font-stencil), monospace;
     font-size: 9px;
-    color: #555;
+    color: #8a7a60;
     margin-top: 1px;
   }
 
   input[type=checkbox] {
-    accent-color: #e8621a;
+    accent-color: #c9a84c;
     width: 13px;
     height: 13px;
     cursor: pointer;
@@ -394,7 +394,7 @@ export default async function AdminCatalogPage({ searchParams }) {
         <div>
           <div className="cm-title">Catalog Editor</div>
           <div className="cm-sub">
-            Category management · {total.toLocaleString()} products in <strong style={{color:"#e8621a"}}>{category}</strong>
+            Category management · {total.toLocaleString()} products in <strong style={{color:"#a3822c"}}>{category}</strong>
           </div>
         </div>
         <Link className="btn btn-ghost" href="/admin/products">↖ Products</Link>

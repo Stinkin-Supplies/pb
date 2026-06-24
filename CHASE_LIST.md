@@ -1,38 +1,37 @@
 # STINKIN' SUPPLIES — CHASE LIST
-**Last Updated: June 22, 2026 — Fifty-Fourth Pass**
+**Last Updated: June 24, 2026 — Fifty-Seventh Pass**
 
 ## 🚀 NEXT SESSION — START HERE
 
 | # | Task | Notes |
 |---|------|-------|
-| 1 | **🔴 URGENT: Rotate WPS token + DB password** | `eceGqPuosZVzZeZ74vBIWUqNwPbG1aP2YUL24fBO` and `smelly` were hardcoded in `build_variant_groups.cjs` — replaced with env vars this session but values are live in shell history. Rotate both before next build run. |
-| 2 | **Payment gateway decision** | Authorize.net / NMI / Braintree / Heartland. ⚠️ BLOCKING — pending merchant account meeting. Only blocker for checkout going live. Recommendation: Braintree (no monthly fee, best API, direct signup). |
-| 3 | **Canonical match review — apply the 1,956 confirmed merges** | Queue currently: pending 1,263 · confirmed 1,956 · applied 0 · rejected 1,082. Hit "Apply confirmed merges" before continuing the manual pass. Review ongoing — was 2,246 pending at session start. |
-| 4 | **PU image-proxy: add a persistent cache layer** | `app/api/image-proxy/route.ts` has zero server-side caching — every unique zip gets downloaded + unzipped fresh from LeMans on first request. Fine for now; needs Vercel Blob/S3/R2-backed cache before this carries full browse-grid production traffic for 31,000+ products. |
-| 5 | **PU image-proxy: confirm browse grid visually** | PDP confirmed working. `ProductCard.jsx` got the identical fix but was not visually re-confirmed on `/browse` itself. Quick spot check needed. |
-| 6 | **Find the unknown match-generation pipeline** | Canonical match revert surfaced proposals with `match_reason = 'upc'` or `'brand_part_number'` and null `shared_oem_number` — neither comes from `build_canonical_products.mjs` Phase B. Some other script generates these; never identified. Worth finding so we know whether it has the same pack-qty/finish blind spot. |
-| 7 | **Review oem_supersession confidence=1 rows** | `SELECT * FROM oem_supersession_review LIMIT 30;` — 283 pairs pending, untouched. Bulk-promote reliable ones, reject false positives. |
-| 8 | **Confirm Softail + Suspension + Triple Trees & Stems filter fix** | Still untested since session 51 structural params fix — retest this exact combo returns 131 results, not 0. |
-| 9 | **Verify PU vendor SKUs in portal** | Run `09344715`, `09251068`, `10101765`, `DS196011` through PU's ordering portal to confirm migration 010 fixed the ordering pipeline. |
-| 10 | **Variant candidates** | `/admin/variant-candidates?token=...` — groups flagged as finish/size/pack variants. Mark resolved once variant group built. |
-| 11 | Wire `<CartProvider>` into root layout | `lib/cart/CartContext.jsx` ready — wrap `app/layout.tsx`, then `useCart()` everywhere |
-| 12 | Build cart drawer UI | Uses `useCart()` — items, addItem, removeItem, updateQty, subtotal |
-| 13 | Build checkout page UI | Address form + order summary + payment form → `/api/checkout/prepare` then `/api/orders/create` |
-| 14 | Wire real PU + WPS API credentials | `lib/fulfillment/triggerFulfillment.ts` — need `PU_API_URL/KEY`, `WPS_API_URL/KEY` env vars |
-| 15 | Shipping + tax calculation | Both `$0` placeholders in `app/api/checkout/prepare/route.ts` and `app/api/orders/create/route.ts` |
-| 16 | Drop remaining session 43 files | globals.css, layout.tsx, BespokeSerif-Variable.ttf, FilterSidebar.jsx, ProductQuickViewModal.jsx, BrowseBackButton.jsx, products-slug-route.ts |
-| 17 | Add ADMIN_SECRET to Vercel | `npx vercel env add ADMIN_SECRET` |
-| 18 | Fix Framer Motion transparent errors | `FRAMER_TRANSPARENT_FIX.md` — palette rgba() replacements, not yet applied |
-| 19 | Add remaining model images | 9 images at `public/images/models/{slug}.jpg` (400×160px) |
-| 20 | TC/M8 platform dedup in variant groups | WPS `wps_product_id` groups can mix Twin Cam and Milwaukee-8 platform variants. Need platform-aware split in `build_variant_groups.cjs`. |
-| 21 | PU products with no recoverable image | 3,573 active PU products have no source photo anywhere — stay on NO IMAGE placeholder. Low priority, no fix possible without new PU vendor data. |
-| 22 | Backfill vendor_offers from product_vendors | PU and VTwin cost/stock needs to flow into `vendor_offers` (currently only 22,278 WPS rows). Optimizer currently reads `product_vendors` as workaround — swap to `vendor_offers` once backfilled. |
-| 23 | PU zip extraction project (deprioritized) | `PU_ZIP_EXTRACTION_TODO.md` offline pipeline is moot — `image-proxy` does live zip extraction. Keep as reference only. |
+| 1 | **Payment gateway decision** | Authorize.net / NMI / Braintree / Heartland. ⚠️ BLOCKING — pending merchant account meeting. Only blocker for checkout going live. Recommendation: Braintree (no monthly fee, best API, direct signup). |
+| 2 | **PU image-proxy: persistent cache** | `app/api/image-proxy/route.ts` has zero server-side caching — every unique zip re-downloaded from LeMans on first request. Needs Vercel Blob/S3/R2-backed cache before carrying full browse-grid traffic for 31K+ products. |
+| 3 | **PU image-proxy: confirm browse grid visually** | PDP confirmed working. `ProductCard.jsx` got the fix but browse grid was not visually re-confirmed. Quick spot check. |
+| 4 | **Wire `<CartProvider>` into root layout** | `lib/cart/CartContext.jsx` ready — wrap `app/layout.tsx`, then `useCart()` everywhere. |
+| 5 | **Build cart drawer UI** | Uses `useCart()` — items, addItem, removeItem, updateQty, subtotal. |
+| 6 | **Build checkout page UI** | Address form + order summary + payment form → `/api/checkout/prepare` then `/api/orders/create`. |
+| 7 | **Wire real PU + WPS API credentials** | `lib/fulfillment/triggerFulfillment.ts` — need `PU_API_URL/KEY`, `WPS_API_URL/KEY` env vars. |
+| 8 | **Shipping + tax calculation** | Both `$0` placeholders in `app/api/checkout/prepare/route.ts` and `app/api/orders/create/route.ts`. |
+| 9 | **Review oem_supersession confidence=1 rows** | `SELECT * FROM oem_supersession_review LIMIT 30;` — 283 pairs pending, untouched. Bulk-promote reliable ones, reject false positives. |
+| 10 | **Confirm Softail + Suspension + Triple Trees & Stems filter fix** | Still untested since session 51 — retest this exact combo returns 131 results, not 0. |
+| 11 | **Verify PU vendor SKUs in portal** | Run `09344715`, `09251068`, `10101765`, `DS196011` through PU's ordering portal to confirm migration 010 fixed the ordering pipeline. |
+| 12 | **Variant candidates — 62 remaining** | `/admin/variant-candidates?token=...` — finish/size/length groups. Need human judgment. |
+| 13 | **Find the unknown match-generation pipeline** | Proposals with `match_reason = 'upc'` or `'brand_part_number'` and null `shared_oem_number` — source script never identified. |
+| 14 | **Drop remaining session 43 files** | globals.css, layout.tsx, BespokeSerif-Variable.ttf, FilterSidebar.jsx, ProductQuickViewModal.jsx, BrowseBackButton.jsx, products-slug-route.ts |
+| 15 | **Add ADMIN_SECRET to Vercel** | `npx vercel env add ADMIN_SECRET` |
+| 16 | **Fix Framer Motion transparent errors** | `FRAMER_TRANSPARENT_FIX.md` — palette rgba() replacements, not yet applied. |
+| 17 | **Add remaining model images** | 9 images at `public/images/models/{slug}.jpg` (400×160px). |
+| 18 | **TC/M8 platform dedup in variant groups** | WPS `wps_product_id` groups can mix Twin Cam and Milwaukee-8 platform variants. Need platform-aware split in `build_variant_groups.cjs`. |
+| 19 | **Backfill vendor_offers from product_vendors** | PU and VTwin cost/stock needs to flow into `vendor_offers` (currently only 22,278 WPS rows). Optimizer reads `product_vendors` as workaround. |
+| 20 | **VTwin OEM scrape expansion** | ~21,000 VTwin products still have zero OEM crossref. Web scraper captured OEM numbers for 7,277 products in `vtwin_scrape_data.oem_no` — import those, then consider targeted re-scrape. |
+| 21 | **WPS OEM crossref — 662 unmatched rows** | 662 WPS crossref entries have no matching active product. 81 exist as inactive. Revisit after next WPS ingest. |
+| 22 | **Fix VTwin attributes in `build_product_details.mjs`** | VTwin `extra_attributes` from `pdp_payload` is being stored as a stringified JSON string instead of a parsed object. Add `JSON.parse()` before writing to `product_details.attributes`. Workaround in `ProductDetailsSection` active in the meantime. |
 
 ## Files to Drop In — Session 43 (still pending)
 
 | File | Destination |
-|------|-------------|
+|---|---|
 | globals.css | app/globals.css |
 | layout.tsx | app/layout.tsx |
 | BespokeSerif-Variable.ttf | public/fonts/ |
@@ -41,108 +40,78 @@
 | BrowseBackButton.jsx | components/pdp/ |
 | products-slug-route.ts | app/api/products/[slug]/route.ts |
 
+## ✅ DONE JUNE 24 — FIFTY-SEVENTH PASS
+
+| Area | What Was Done |
+|---|---|
+| **`infer_vtwin_categories.mjs` — updated + run** | Added `VTWIN_CATEGORY_TO_DISPLAY` map (28 VTwin source categories → 21 display values). Live UPDATE now sets both `category` and `display_category` in one pass. Run: 566 products, 100% match, 0 unmatched. |
+| **`generate_vtwin_skus.js` — full rewrite** | Removed all `vendor.*` schema references (`vendor.vtwin_sku_staging`, `vendor.vtwinmtc_products`, `vendor.vtwin_category_pages`). Now reads from `catalog_unified WHERE source_vendor='VTWIN' AND internal_sku IS NULL`, maps `display_category` → SKU prefix, allocates from `sku_counter`, writes `internal_sku` directly with `.v` suffix. Dry-run default, `--apply` flag. |
+| **Browse `?category=` filter stuck bug** | `page.jsx`: filter init now folds `?category=X` into `display_category` (backward compat for old navigation links). Removed `category`/`subcategory` from API params, URL builder, and clear-all. `FilterSidebar.jsx`: chips and clearAll already correct. Breadcrumb link on PDP also fixed (`?category=` → `?display_category=`). |
+| **OEM number search** | `browse.ts` ILIKE fallback extended: each word now also searches `unnest(cu.oem_numbers)`. Query `16779-99` went from 1 result → 3 results. |
+| **VTwin image gallery — `ProductImageGallery.jsx`** | New client component. Builds image list from `image_url` + `image_urls` array, deduplicates. Single image → renders exactly as before. Multiple images → 1:1 hero + 64px thumbnail strip, gold border on active, per-image error handling, horizontally scrollable. `getProduct()` SQL updated: `cu.image_urls` added to SELECT; `catalog_media` lateral now fetches all images as array (`all_urls`) alongside primary. PU products read from `catalog_media.all_urls`; VTwin reads from `cu.image_urls`. |
+| **PDP layout fix** | `ProductDetailsSection` moved above `DataTabs` (was below). `OemAlternativesPanel` removed entirely (import, parallel fetch, render). `getOemAlternatives()` still in file but no longer called. |
+| **VTwin attributes JSON parse fix** | `ProductDetailsSection` in `page.jsx`: `attributes` field now parsed with `JSON.parse()` if stored as a string (VTwin `extra_attributes` write bug). Proper fix in `build_product_details.mjs` is #22 on chase list. |
+| **`extract_pu_images.mjs` — new** | Parses all 133 XML files in `scripts/data/pu_pricefile/brand_files/`. Two schemas handled: PIES (`<DigitalAssets><DigitalFileInformation><URI>`) + Catalog_Content (`<partImage>` compound URL → base64 decode → split by comma → re-encode each path). SKU matching normalized to no-dash format on both sides. Results: **22,253 PU products** with multi-image; **33,740 catalog_media rows** inserted; **8,828 PU descriptions** added to `product_details`; **15,330 OEM crossref entries** (source=`PU_PIES`). |
+| **Typesense reindex** | 89,153 docs, 0 errors. |
+
+## ✅ DONE JUNE 23 — FIFTY-SIXTH PASS
+
+| Area | What Was Done |
+|---|---|
+| **`build_pack_size_groups.mjs` — sync + dedup** | `dedupByPackQty()` added (PU wins ties). Sync/evict on re-run. Fixed canonical query dropping `variant_group_id IS NULL` filter. `canonical:91278` fixed. 148 total MULTI groups. |
+| **`scan_pack_qty_from_names.mjs` — new** | 12 auto-apply patterns + 3 review-only. 254 corrections applied. pack_qty>1 products: 1,917→2,171. |
+| **`product_details JSONB` column — new** | `build_product_details.mjs` normalizes PU features + WPS HTML→bullets + VTwin description/pdp_payload. 59,765/89,153 = 67% coverage. GIN index. |
+| **`index_unified.js` updated** | Uses `product_details` as primary source — WPS HTML now stripped from Typesense. |
+| **PDP — ProductDetailsSection** | Description, feature bullets, tech note callout, attributes grid. |
+| **PDP — OemAlternativesPanel** | Client component, expandable rows with thumbnail + overlay. (Removed session 57.) |
+| **VTwin catalog refresh** | `import_vtwin_catalog.js` + `ingest_vtwin_unified.js` fixed. 38,160 products loaded, 411 new. 566 new SKUs assigned manually (MSC999973–1000538). |
+| **VTwin OEM crossref 8,426→16,752** | `vtwin_catalog.oem_numbers` imported. |
+| **VTwin scrape data synced** | 87 descriptions + 3,165 pdp_payload entries. |
+| **`sku_counter` table created** | Seeded from existing MSC max values. |
+| **Typesense reindex** | 89,153 docs, 0 errors. |
+
+## ✅ DONE JUNE 22–23 — FIFTY-FIFTH PASS
+
+Credential rotation. Canonical merges fully drained (2,407 applied). WPS pack_qty 1,070 corrected. `build_pack_size_groups.mjs` new. 145 pack-size variant groups. WPS OEM crossref 1,665 entries. VTwin OEM crossref 8,426 entries. 4× Typesense reindexes.
+
 ## ✅ DONE JUNE 22 — FIFTY-FOURTH PASS
 
-| Area | What Was Done |
-|------|---------------|
-| **`lib/fulfillment/optimizer.ts` — written** | Resolves vendor routing from `product_vendors` (all three vendors, 90,605 rows — `vendor_offers` only has 22,278 WPS rows). Minimizes vendor count first, breaks ties by margin, routes VTwin to `isManual=true` always. Single-vendor coverage attempted first; greedy minimum-vendor-count cover as fallback. Returns `OptimizerResult { groups[], unfulfillable[] }`. All column names confirmed against real schema. |
-| **`lib/fulfillment/triggerFulfillment.ts` — written** | Inserts `vendor_orders` row, dispatches to adapter. VTwin: no adapter call, `status='pending'`, surfaces in admin manual queue. PU/WPS: checks env vars, degrades to `status='manual_required'` with `error_message` if missing (not a crash). Adapter stubs are real plumbing — swap in fetch() once creds land. |
-| **`app/api/checkout/prepare/route.ts` — written** | Pre-payment quote. Validates cart against `canonical_products`, runs optimizer for stock check, returns customer-safe response (no vendor/cost/margin leakage). `shipping_total` and `tax_total` both `$0` placeholder. |
-| **`app/api/orders/create/route.ts` — written** | Full order flow. Re-validates stock, refuses if anything dropped out since quote. Charges via `chargeGateway()` stub (always fails on purpose until gateway chosen). Writes `orders` + `order_items` atomically; dispatches `triggerFulfillment` per group after commit. Uses `client.release()` — never `.end()` on pool. |
-| **`build_variant_groups.cjs` — non-distinguishing axis fix** | Added invariant #7: detected axis must produce ≥2 distinct values across members. Without this, fitment-only SKUs sharing one color word (e.g. 12 rear brake line SKUs all named "...Black") formed fake variant groups with nothing for a customer to pick between. Fix: if `distinctValues.size < 2`, fall through to Pack Size check; if that also fails, group dissolves. Legitimate groups (e.g. Ultima TC Cylinder Black + Silver) pass through untouched. Credentials moved to `process.env.WPS_TOKEN` / `process.env.CATALOG_DB_PASSWORD`. |
-| **Variant rebuild + Typesense reindex** | Live rebuild: 2,763 groups / 8,109 members (was 3,757 / 10,872). 994 false groups / 2,763 products dissolved. 0 kits. Reindex: 89,203 docs, 0 errors. |
-| **`/api/img` deleted** | Dead duplicate zip-extraction proxy (AdmZip, Node-only, only wired into dead `ProductDetailClient.jsx`) removed. `/api/image-proxy` is the sole proxy now. |
-| **Canonical review — continued** | Pending queue: 2,246 → 1,263. Pack-qty cross-vendor pairs (brand_part_number pipeline) correctly routed to variant-candidates. 1,956 confirmed, 0 applied. |
-| **Variant blast-radius quantified** | 668 groups / 1,768 members confirmed before fix. Post-fix both fully resolved by the non-distinguishing-axis dissolve. |
+Fulfillment pipeline (`optimizer.ts`, `triggerFulfillment.ts`, `checkout/prepare`, `orders/create`). `build_variant_groups.cjs` non-distinguishing axis fix. 994 false groups dissolved. Variant rebuild + reindex.
 
-## ✅ DONE JUNE 16 — FIFTY-SECOND PASS
-
-| Area | What Was Done |
-|------|---------------|
-| **Canonical match review — full revert + rebuild** | Earlier reviews were corrupted by pack-qty/finish variant confusion (e.g. confirming a 10-pack against a single unit as a duplicate). Reverted ALL confirmed/applied merges: detached `catalog_unified.canonical_product_id`, wiped `product_vendors` + `canonical_products` (`DELETE`, not `TRUNCATE` — `canonical_products` has incoming FKs from `catalog_unified`/`order_items`, and `TRUNCATE` refuses or cascades destructively in that situation regardless of row counts). Re-ran Phase A (clean 1:1 rebuild, 89,203 products) then Phase B. |
-| **build_canonical_products.mjs — Phase B mismatch filter (new)** | Ported the exact `effectivePackQty`/`parseFinish` logic from the admin review UI's badges directly into candidate generation, so a pack-qty or finish/color mismatch never becomes a proposal at all instead of relying on a reviewer to catch the badge. Result on rerun: 1,293 new proposals, 36 skipped (pack-qty), 79 skipped (finish/color). |
-| **sweep_pending_mismatches.mjs (new script)** | One-time sweep applying the same mismatch logic against all *already-pending* proposals (including the 3,233 reopened from confirmed/applied), since Phase B's filter only covers newly-generated candidates. Dry-run by default, `--apply` to write. Auto-rejected rows tagged `reviewed_by = 'auto:pack_qty_mismatch'` / `'auto:finish_mismatch'` so they're distinguishable from human review. Result: 206 rejected (172 pack-qty + 34 finish) out of 3,313 checked. |
-| **app/admin/canonical-matches/page.tsx — null-OEM crash fixed** | `const key = p.shared_oem_number` had no fallback; any proposal with a null `shared_oem_number` (2,433 of them — see item #8 above) grouped under a literal `null` key, then `oem.startsWith(...)` crashed on render. Added `groupKeyOf()` helper with a per-proposal synthetic fallback key, used consistently in grouping AND in the three post-action state filters (`selectiveAction`, `bulkAction`, `flagAsVariant`) that previously compared directly against `p.shared_oem_number` — those would have silently failed to clear synthetic-key groups from the UI after acting on them. Also rerouted "Confirm all"/"Reject all" to a new `actOnGroupByIds()` (proposal-ID-based, same endpoint `selectiveAction` already uses) for synthetic-key groups specifically, since the existing `bulkAction` matches server-side on `shared_oem_number` and would silently no-op when that's null. Real-OEM groups untouched. |
-| **app/api/admin/canonical-matches/sync-fitment/route.ts — column name bug fixed** | `INSERT INTO catalog_fitment_v2 (..., confidence, source)` — neither column exists; real names are `confidence_score` and `fitment_source`. One-line fix. |
-| **PU image zip stopgap — full scan + apply** | New `scan_zip_contamination_full.mjs`: full non-sampled Content-Type scan covering both `catalog_unified.image_url` AND `catalog_media.url` (the existing `check_dead_images.mjs` only covered the first). Classifies bad-`image_url` products into rescued-by-catalog_media vs. no-fallback, dry-run by default. Result: 31,730 products had a bad `image_url` (31,415 PU + 315 VTwin — see VTwin note below), 31,396 `catalog_media` rows confirmed bad. Applied: nulled all 31,730, deleted all 31,396 bad `catalog_media` rows. |
-| **VTwin's 315 nulled products — investigated, confirmed NOT contamination** | Initially alarming since VTwin shouldn't be touched by PU's zip feed at all. Traced to VTwin's hotlink-protection requiring a spoofed `Referer` — but direct `curl` testing (with AND without the spoof) on 5 sample products all returned consistent `404`s from VTwin's own server. Genuinely dead images on VTwin's side, unrelated to PU, correctly nulled. No restoration needed. |
-| **PU PIES/Catalog-Content XML investigated for a hidden direct-image field** | Hypothesis: `import_pu_brand_xml.js` line 217 (`str(p.partImage) \|\| str(p.productImage)`) prefers `partImage` (multi-asset zip bundle) over `productImage`, which might be a real single-asset link. **Disproven** — both resolve to identical `Content-Type: application/x-zip` via the same `asset.lemansnet.com/z/` endpoint regardless of asset count. True PIES files (different code path, no partImage/productImage ambiguity) show the same pattern at the source: `<FileName>99013666.zip</FileName>`, `<AssetType>ZZ1</AssetType>` — PU's own data explicitly names these zips. Confirms PU's feed never ships a direct image, full stop; not a parsing/field-selection bug. |
-| **MAJOR FINDING — working zip-extraction proxy already existed, unwired from the main render path** | Two implementations found: `app/api/img/route.ts` (`AdmZip`, Node-only, disk-cached at `/tmp`, only used by the dead `ProductDetailClient.jsx`) and `app/api/image-proxy/route.ts` (`fflate`, edge-compatible, also handles WPS hotlink/mixed-content and VTwin Referer-spoofing, wired into `ProductQuickViewModal.jsx` and `admin/products/[id]/page.jsx` but never the main browse grid or live PDP). Validated "grab the first image file in the zip" against 6 real products across different brands/categories, including two genuine multi-asset (2-file) bundles — all 6 returned the correct product photo. |
-| **Restored image_url for rescued PU products** | Backfilled `catalog_unified.image_url` from `pu_brand_enrichment.image_uri` for the nulled PU rows (same normalized-SKU join + coming-soon exclusion as the import script) — 31,396 of 31,415 restored; 19 have no usable source value either (see item #7 above). Source tables (`pu_catalog`, `pu_brand_enrichment`) were never touched by the null/delete pass, so this was a safe, lossless restore. |
-| **image-proxy wired into the real render path** | `ProductCard.jsx` (browse grid) and `ProductImage.jsx` (PDP + mini cards) both got a small `resolveImageSrc()` helper added — routes `asset.lemansnet.com` URLs through `/api/image-proxy?url=...`, leaves WPS/VTwin/everything else rendering exactly as before. Deployed. PDP confirmed live with two real product photos (different chrome exhaust kits, correct fitment shown). Browse grid not yet visually re-confirmed (see item #5 above). |
-| **NEW FINDING — variant groups with no distinguishing axis** | Found via PDP spot-check: two genuinely different products (different year fitment, different price) grouped as "Color" variants, both showing `option_1_value = 'Chrome'` with no `option_2` at all — UI displayed two indistinguishable "Chrome" pills. Confirmed systemic: 668 groups match the pattern (`COUNT(DISTINCT option_1_value) = 1` with no `option_2`, 2+ members). Full writeup at item #2 above — needs root-cause investigation next session before fixing. |
-
-## ✅ DONE JUNE 16 — FIFTY-FIRST PASS
-
-| Area | What Was Done |
-|------|---------------|
-| **Six session 50 files** | Deployed and confirmed live on Vercel. All subsequent fixes this session were applied directly to these files post-deployment. |
-| **browse.ts — search fix** | Multi-word ILIKE search rewritten to split into individual words, ANDed (each word must appear somewhere in name/brand/vendor_sku/internal_sku, any order). Previously did a single ILIKE on the whole phrase, which almost never matched. |
-| **browse.ts — critical structural params bug fixed** | The 5 queries (product, count, 3 facets) shared one params array (`fp[]`), but facet queries dropped certain WHERE condition strings by string-match while still passing the FULL params array — causing intermittent "could not determine data type of parameter $N" whenever a dropped condition's placeholder no longer appeared in that specific query's text. **Root cause, not stale cache** — confirmed by reproducing the exact failing query manually. **Fixed via complete rewrite**: conditions now built as tagged `{tag, sql, values}` objects; each of the 5 queries calls a `renderWhere()` helper with its own filtered condition list, producing correctly-renumbered SQL + matching params array per query, every time. |
-| **pdp-page.jsx — getVariantMembers bug fixed** | Query had an unused `$1` (variantGroupId was being redundantly looked up via `$2` instead of used directly) — Postgres couldn't infer `$1`'s type. Simplified to use `cvm.group_id = $1` directly. |
-| **ProductCard.jsx + pdp-page.jsx — cream theme conversion** | Both converted from the dark/black theme to the cream palette matching the approved Figma-style mockup. Page backgrounds, image boxes, tab panels, mini cards, badges all switched to white/cream with gold accents; text flipped from light-on-dark to dark-on-light. |
-| **ProductImage.jsx (new)** | Small client component extracted so `pdp-page.jsx` (a server component) can still get `onError` broken-image fallback — swaps to a "NO IMAGE" placeholder instead of the browser's native broken-icon-plus-alt-text. Used for both the hero image and mini product cards. Also fixed a contrast bug in `ProductCard.jsx` where "NO IMAGE" text was unreadable against the new white background. |
-| **catalog_media fallback wired in** | `browse.ts` (main product query, `getChronologicalNeighbors`, `getProductBySlug`) and `pdp-page.jsx` (`getProduct`, `getRelatedProducts`) all now `COALESCE(image_url, catalog_media.url)` when `image_url` is null/empty. **Caveat discovered later this session**: this does NOT rescue the ~13,790 zip-contaminated PU products — `catalog_media` rows for PU are themselves sourced from `pu_brand_enrichment.image_uri`, the same contaminated feed. |
-| **OEM badge replaces "FITS X MODELS"** | PDP badge row near Add to Cart now shows one gold pill per confirmed OEM number (`OEM 12345-67`) instead of a fitment model count. |
-| **MAJOR FINDING — PU image zip contamination** | ~13,790 active PU products (37.6% of all active PU rows) have `image_url` resolving to `Content-Type: application/x-zip`, not an image. Confirmed independently across THREE separate sources — `catalog_unified.image_url`, `pu_catalog.product_image`, and `pu_brand_enrichment.image_uri` (from PU's actual PIES XML feed) — all resolve to the same zip for the same products. **Not a column-mixup/backfill bug** — PU's upstream feed never provided a direct image for these products, only a zip archive (likely multi-angle photos). Status-only dead-link checks miss this entirely since the URLs return a healthy 200. Full plan at `PU_ZIP_EXTRACTION_TODO.md` — **superseded tonight, see Fifty-Second Pass image-proxy finding above.** |
-| **New diagnostic scripts (scripts/ingest/)** | `check_dead_images.mjs` (rewritten — checks actual Content-Type, not just HTTP status; outputs separate dead vs. wrong-content-type CSVs), `summarize_bad_images.mjs` (tallies a bad-content-type CSV by content_type/vendor), `check_product_image_column.mjs` (verifies a candidate replacement column before trusting it), `check_brand_enrichment_images.mjs` (same check against `pu_brand_enrichment`, using the correct normalized SKU join from `import_pu_brand_catalogs_WORKING.js`). |
+## ✅ DONE JUNE 16 — PASSES 51–52
+browse.ts structural params fix. Canonical revert+rebuild. Phase B mismatch filter. Image proxy wired. OEM badge on PDP.
 
 ## ✅ DONE JUNE 15 — FIFTIETH PASS
-
-| Area | What Was Done |
-|------|---------------|
-| **browse.ts** | `oem_chain_match?: boolean` on `CatalogProduct`. `chainParam` added after limit/offset params — `chainProductIds` (or `[-1]` sentinel) pushed as `$N`. `(cu.id = ANY($N::int[])) AS oem_chain_match` in inner SELECT. `getChronologicalNeighbors` updated: third param `displaySubcategory?: string | null`, WHERE uses `$3`/`$4`/`$5`, subcategory-first with category fallback. |
-| **ProductCard.jsx** | Extracted from `browse/page.jsx`. Added `selected`/`onSelect` props (gold border/bg when selected, card click calls `onSelect` when provided). OEM chain badge added at `bottom: 8, right: 8` — dark bg, gold border, chain-link SVG. |
-| **browse/page.jsx** | Inline `ProductCard` removed, import added. `selectedId` state + `AnimatePresence` + `InlinePanel` wired in. Selection auto-clears on page/filter change. |
-| **PDP page.jsx** | Related products query fixed: `display_subcategory`-first with `category` fallback. Same `$3::text IS NOT NULL` guard pattern as timeline. |
-| **InlinePanel.jsx** | New component. Variants accordion (auto-opens first axis), fitment guide (model/range rows, show-all toggle), OEM cross-reference footer (direct + chain tagged). Shimmer skeleton while loading. |
-| **panel API route** | `app/api/browse/panel/route.js`. Three parallel queries: variant members, fitment (compressed to year ranges), OEM cross-ref (direct + chain via `oem_supersession` CTE). `via_chain` boolean tags chain products. Non-fatal `Promise.allSettled`. |
-| **build_variant_groups.cjs** | Complete rebuild. Kit exclusion at query + name heuristic level. Pack qty coherence check. Pack Size as valid axis. Jaccard base-name similarity validation. Normalization fix for PU/VTWIN `mixed_axes` (was comparing raw "Finish"/"Color" instead of normalized "Color"). Result: 3,757 groups / 10,872 members / 0 kits. |
-| **Typesense reindex** | Running at session end — 89,203 docs, 0 errors expected. |
+Browse OEM chain. ProductCard.jsx extracted. InlinePanel.jsx. Panel API route. Variant rebuild.
 
 ## ✅ DONE JUNE 14 — FORTY-NINTH PASS
-
-| Area | What Was Done |
-|------|---------------|
-| **OEM supersession system** | `oem_supersession` table (283 pairs), `mv_oem_fitment_coverage` matview (683K rows, forward+backward chain traversal). `catalog_oem_crossref.oem_format` generated column + `expanded_from` bool. `normalize_oem()` function. |
-| **browse.ts OEM chain** | Pre-fetch (1.3ms warm) ORs chain product IDs into fitment conditions when year+model set. `LIMIT 1` bug fixed → JOIN covers all model_year_ids. Non-fatal fallback. Proven: 7 chain products surfaced for 1984 XLH gasket search. |
-| **Variant Fits axis removed** | `build_variant_groups.cjs` WPS path no longer stores fitment year ranges as `option_1`. **Note: likely contributing root cause to the Fifty-Second Pass "no distinguishing axis" finding above — revisit when investigating that.** |
-| **Brushed SS + axis normalization** | Added `brushed ss`, `brushed`, `raw ss` to Finish rule. `normalizeAxisName()` maps Finish→Color. |
-| **Timeline tightened** | `getChronologicalNeighbors` now takes optional `displaySubcategory` param (session 49 added the call site; session 50 added the function signature). |
-| **Deployed** | All changes live on Vercel. Confirmed working. |
+OEM supersession system. mv_oem_fitment_coverage. Variant Fits axis removed. Axis normalization.
 
 ## ✅ DONE JUNE 12–13 — FORTY-EIGHTH PASS
-
-| Area | What Was Done |
-|------|---------------|
-| **CRITICAL: PU vendor_sku complete fix** | All 36,396 active PU rows now have `vendor_sku = sku`. `brand_part_number` retained as manufacturer cross-reference. |
-| is_kit, pack_qty columns | Added to `catalog_unified`. 1,026 pack_qty rows populated via regex. |
-| variant_candidates table | New table `catalog_variant_candidates`. |
-| Canonical match review | Full data-correction workbench — inline editor, manual match, mismatch badges, variant flagging. |
-| admin/products/[id] page | Cream/gold/black restyling. |
-| ProductManager.jsx + admin routes | pack_qty column, GENERIC_FIELD_MAP, Typesense sync. |
+PU vendor_sku fix. is_kit + pack_qty columns. Canonical match review workbench.
 
 ## ✅ DONE JUNE 11–12 — FORTY-SEVENTH PASS
-
-Fulfillment architecture. canonical_products / product_vendors / orders tables. Canonical pipeline Phase A+B. Admin canonical match review UI (initial). CartContext, optimizer.ts, checkout routes.
+Fulfillment architecture tables. Canonical pipeline Phase A+B. CartContext.
 
 ## ✅ DONE JUNE 5–8 — PASSES 41–46
-
-display_subcategory taxonomy. VTwin round-2 scrape. CategoryBentoGrid + ModelFinder. browse.ts fixes. FilterSidebar. VariantSelector Mode A. Font system. FlowingMenu. /models page.
+display_subcategory taxonomy. VTwin round-2 scrape. CategoryBentoGrid + ModelFinder. Font system. FlowingMenu.
 
 ## 🔵 LOW PRIORITY / FUTURE
 
 | Task | Notes |
 |------|-------|
 | Fulfillment routing live | PU + WPS API credentials needed |
-| WPS API enrichment | Test features+blocks hit rate on HardDrive products |
+| WPS API enrichment | Test features+blocks hit rate |
 | Browse/Brand tabs | Data ready, UI unbuilt |
 | flathead.webp | Missing from public/images/eras/ |
 | Hard Drive book crossref | Import when file available |
 | Harden admin auth | Replace ?token= with session cookie |
 | /models in nav | Add to main nav + home page tile |
 | Reindex automation | Wire as post-step in ingest scripts |
-| Accessories & Misc subcategory | 3,809 NULL — catch-all; low ROI |
+| Accessories & Misc subcategory | 3,809 NULL — catch-all by design |
 | Tools & Chemicals coverage | 547 NULL — WPS abbreviations; low ROI |
-| WPS vendor_sku portal check | Spot-check a few WPS numbers against their portal |
-| oem_supersession PDP timeline | Show supersession chain on OEM tab: "this part replaced X in [year], was itself replaced by Y in [year]" |
+| oem_supersession PDP timeline | Show chain on OEM tab: "replaced X in [year]" |
+| Auto-reject variant proposals on apply | When canonical merges applied, auto-reject proposals where both share same variant_group_id |
+| PU product_details remaining gap | ~3,500 products — brands that never shipped XML content at all; only fixable by requesting updated files from PU |
+| VTwin product_details gap (23K+) | No description/pdp_payload — vtwinmfg.com scrape is the only self-serve path |
+| Re-run `extract_pu_images.mjs` | After each new PU XML drop — picks up new images, descriptions, OSP crossref numbers idempotently |

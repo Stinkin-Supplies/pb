@@ -18,108 +18,108 @@ import NavBar from "@/components/NavBar";
 // ── Styles (matches sync dashboard exactly) ───────────────────
 const css = `
   *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
-  ::-webkit-scrollbar { width:4px; } ::-webkit-scrollbar-thumb { background:#e8621a; }
+  ::-webkit-scrollbar { width:4px; } ::-webkit-scrollbar-thumb { background:#c9a84c; }
   @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
   @keyframes spin   { to { transform:rotate(360deg); } }
   @keyframes pulse  { 0%,100%{opacity:1} 50%{opacity:0.4} }
   @keyframes shimmer { 0%{background-position:-400px 0} 100%{background-position:400px 0} }
 
-  .wrap  { background:#0a0909; min-height:100vh; color:#f0ebe3; font-family:var(--font-stencil),sans-serif; }
-  .hdr   { background:#111010; border-bottom:1px solid #2a2828; padding:28px 24px; }
+  .wrap  { background:#f5f0e8; min-height:100vh; color:#1a1208; font-family:var(--font-stencil),sans-serif; }
+  .hdr   { background:#ffffff; border-bottom:1px solid #ddd0b8; padding:28px 24px; }
   .body  { max-width:1100px; margin:0 auto; padding:28px 24px; }
 
-  .card  { background:#111010; border:1px solid #2a2828; border-radius:3px; margin-bottom:16px; overflow:hidden; animation:fadeUp 0.25s ease both; }
-  .card-head { padding:14px 20px; border-bottom:1px solid #2a2828; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .card  { background:#ffffff; border:1px solid #ddd0b8; border-radius:3px; margin-bottom:16px; overflow:hidden; animation:fadeUp 0.25s ease both; }
+  .card-head { padding:14px 20px; border-bottom:1px solid #ddd0b8; display:flex; align-items:center; justify-content:space-between; gap:12px; }
   .card-title { font-family:var(--font-caesar),sans-serif; font-size:20px; letter-spacing:0.05em; }
-  .card-title span { color:#e8621a; }
+  .card-title span { color:#a3822c; }
   .card-body { padding:20px; }
 
   /* Stats */
   .stat-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; }
-  .stat-box  { background:#0a0909; border:1px solid #2a2828; border-radius:2px; padding:14px 16px; }
-  .stat-box.hl  { border-color:rgba(232,98,26,0.3);  background:rgba(232,98,26,0.04); }
-  .stat-box.grn { border-color:rgba(34,197,94,0.25); background:rgba(34,197,94,0.04); }
-  .stat-box.red { border-color:rgba(185,28,28,0.25); background:rgba(185,28,28,0.04); }
-  .stat-box.yel { border-color:rgba(201,168,76,0.25);background:rgba(201,168,76,0.04); }
+  .stat-box  { background:#fbf6ec; border:1px solid #ddd0b8; border-radius:2px; padding:14px 16px; }
+  .stat-box.hl  { border-color:rgba(201,168,76,0.35); background:rgba(201,168,76,0.1); }
+  .stat-box.grn { border-color:rgba(47,133,82,0.3);   background:rgba(47,133,82,0.08); }
+  .stat-box.red { border-color:rgba(192,57,43,0.3);   background:rgba(192,57,43,0.08); }
+  .stat-box.yel { border-color:rgba(154,90,12,0.35);  background:rgba(154,90,12,0.08); }
   .stat-val   { font-family:var(--font-caesar),sans-serif; font-size:30px; letter-spacing:0.04em; line-height:1; margin-bottom:4px; }
-  .stat-label { font-family:var(--font-stencil),monospace; font-size:8px; color:#8a8784; letter-spacing:0.12em; }
+  .stat-label { font-family:var(--font-stencil),monospace; font-size:8px; color:#7a6a4f; letter-spacing:0.12em; }
 
   /* Filters */
   .filter-row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:16px; }
-  .filter-btn { font-family:var(--font-stencil),monospace; font-size:9px; letter-spacing:0.1em; padding:6px 14px; border-radius:2px; cursor:pointer; border:1px solid #2a2828; background:transparent; color:#8a8784; transition:all 0.15s; white-space:nowrap; }
-  .filter-btn:hover  { color:#f0ebe3; border-color:#4a4848; }
-  .filter-btn.active { background:rgba(232,98,26,0.1); border-color:rgba(232,98,26,0.35); color:#e8621a; }
-  .search-input { font-family:var(--font-stencil),monospace; font-size:10px; background:#0a0909; border:1px solid #2a2828; color:#f0ebe3; padding:6px 12px; border-radius:2px; width:220px; letter-spacing:0.06em; outline:none; }
-  .search-input::placeholder { color:#3a3838; }
-  .search-input:focus { border-color:#4a4848; }
+  .filter-btn { font-family:var(--font-stencil),monospace; font-size:9px; letter-spacing:0.1em; padding:6px 14px; border-radius:2px; cursor:pointer; border:1px solid #ddd0b8; background:transparent; color:#7a6a4f; transition:all 0.15s; white-space:nowrap; }
+  .filter-btn:hover  { color:#1a1208; border-color:#9c8a6a; }
+  .filter-btn.active { background:rgba(201,168,76,0.12); border-color:rgba(201,168,76,0.4); color:#a3822c; }
+  .search-input { font-family:var(--font-stencil),monospace; font-size:10px; background:#fbf6ec; border:1px solid #ddd0b8; color:#1a1208; padding:6px 12px; border-radius:2px; width:220px; letter-spacing:0.06em; outline:none; }
+  .search-input::placeholder { color:#b8ab87; }
+  .search-input:focus { border-color:#9c8a6a; }
 
   /* Table */
   .tbl { width:100%; border-collapse:collapse; }
-  .tbl th { font-family:var(--font-stencil),monospace; font-size:8px; color:#8a8784; letter-spacing:0.12em; padding:8px 14px; text-align:left; border-bottom:1px solid #2a2828; white-space:nowrap; }
-  .tbl td { padding:11px 14px; border-bottom:1px solid #1a1919; font-size:13px; }
+  .tbl th { font-family:var(--font-stencil),monospace; font-size:8px; color:#7a6a4f; letter-spacing:0.12em; padding:8px 14px; text-align:left; border-bottom:1px solid #ddd0b8; white-space:nowrap; }
+  .tbl td { padding:11px 14px; border-bottom:1px solid #e6dcc0; font-size:13px; }
   .tbl tr:last-child td { border-bottom:none; }
   .tbl tr.expandable { cursor:pointer; transition:background 0.1s; }
-  .tbl tr.expandable:hover td { background:rgba(255,255,255,0.02); }
-  .tbl tr.expanded td { background:rgba(232,98,26,0.03); border-bottom:none; }
+  .tbl tr.expandable:hover td { background:rgba(201,168,76,0.05); }
+  .tbl tr.expanded td { background:rgba(201,168,76,0.08); border-bottom:none; }
 
   /* Expanded detail row */
-  .detail-row td { padding:0; background:#0a0909; border-bottom:1px solid #2a2828; }
+  .detail-row td { padding:0; background:#fbf6ec; border-bottom:1px solid #ddd0b8; }
   .detail-inner { padding:16px 20px; display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
   .detail-field { display:flex; flex-direction:column; gap:4px; }
-  .detail-key   { font-family:var(--font-stencil),monospace; font-size:8px; color:#8a8784; letter-spacing:0.12em; }
-  .detail-val   { font-size:13px; font-weight:500; color:#f0ebe3; word-break:break-all; }
-  .detail-val.orange { color:#e8621a; }
-  .detail-val.green  { color:#22c55e; }
-  .detail-val.red    { color:#ef4444; }
-  .detail-val.muted  { color:#8a8784; }
+  .detail-key   { font-family:var(--font-stencil),monospace; font-size:8px; color:#7a6a4f; letter-spacing:0.12em; }
+  .detail-val   { font-size:13px; font-weight:500; color:#1a1208; word-break:break-all; }
+  .detail-val.orange { color:#a3822c; }
+  .detail-val.green  { color:#2f8552; }
+  .detail-val.red    { color:#c0392b; }
+  .detail-val.muted  { color:#7a6a4f; }
 
   /* Badges */
   .badge { font-family:var(--font-stencil),monospace; font-size:8px; letter-spacing:0.08em; padding:2px 8px; border-radius:1px; white-space:nowrap; }
-  .badge-submitted  { background:rgba(59,130,246,0.1);  color:#60a5fa; border:1px solid rgba(59,130,246,0.2); }
-  .badge-shipped    { background:rgba(34,197,94,0.1);   color:#22c55e; border:1px solid rgba(34,197,94,0.2); }
-  .badge-pending    { background:rgba(201,168,76,0.1);  color:#c9a84c; border:1px solid rgba(201,168,76,0.2); }
-  .badge-failed     { background:rgba(185,28,28,0.1);   color:#ef4444; border:1px solid rgba(185,28,28,0.2); }
-  .badge-none       { background:rgba(42,40,40,0.5);    color:#8a8784; border:1px solid #2a2828; }
-  .badge-processing { background:rgba(232,98,26,0.1);   color:#e8621a; border:1px solid rgba(232,98,26,0.2); }
+  .badge-submitted  { background:rgba(59,120,216,0.12);  color:#3b78d8; border:1px solid rgba(59,120,216,0.3); }
+  .badge-shipped    { background:rgba(47,133,82,0.12);   color:#2f8552; border:1px solid rgba(47,133,82,0.3); }
+  .badge-pending    { background:rgba(154,90,12,0.12);   color:#9a5a0c; border:1px solid rgba(154,90,12,0.3); }
+  .badge-failed     { background:rgba(192,57,43,0.12);   color:#c0392b; border:1px solid rgba(192,57,43,0.3); }
+  .badge-none       { background:rgba(221,208,184,0.4);  color:#7a6a4f; border:1px solid #ddd0b8; }
+  .badge-processing { background:rgba(201,168,76,0.12);  color:#a3822c; border:1px solid rgba(201,168,76,0.3); }
 
   /* Buttons */
-  .btn-primary { background:#e8621a; border:none; color:#0a0909; font-family:var(--font-caesar),sans-serif; font-size:17px; letter-spacing:0.1em; padding:11px 28px; border-radius:2px; cursor:pointer; transition:all 0.2s; white-space:nowrap; }
-  .btn-primary:hover:not(:disabled) { background:#c94f0f; transform:translateY(-1px); }
+  .btn-primary { background:#c9a84c; border:none; color:#1a1208; font-family:var(--font-caesar),sans-serif; font-size:17px; letter-spacing:0.1em; padding:11px 28px; border-radius:2px; cursor:pointer; transition:all 0.2s; white-space:nowrap; }
+  .btn-primary:hover:not(:disabled) { background:#a3822c; transform:translateY(-1px); }
   .btn-primary:disabled { opacity:0.35; cursor:not-allowed; transform:none; }
-  .btn-ghost  { background:transparent; border:1px solid #2a2828; color:#8a8784; font-family:var(--font-stencil),monospace; font-size:9px; letter-spacing:0.1em; padding:5px 12px; border-radius:2px; cursor:pointer; transition:all 0.15s; white-space:nowrap; }
-  .btn-ghost:hover:not(:disabled) { color:#f0ebe3; border-color:#4a4848; }
+  .btn-ghost  { background:transparent; border:1px solid #ddd0b8; color:#7a6a4f; font-family:var(--font-stencil),monospace; font-size:9px; letter-spacing:0.1em; padding:5px 12px; border-radius:2px; cursor:pointer; transition:all 0.15s; white-space:nowrap; }
+  .btn-ghost:hover:not(:disabled) { color:#1a1208; border-color:#9c8a6a; }
   .btn-ghost:disabled { opacity:0.35; cursor:not-allowed; }
-  .btn-danger { background:transparent; border:1px solid rgba(185,28,28,0.35); color:#ef4444; font-family:var(--font-stencil),monospace; font-size:9px; letter-spacing:0.1em; padding:5px 12px; border-radius:2px; cursor:pointer; transition:all 0.15s; }
-  .btn-danger:hover { background:rgba(185,28,28,0.08); }
+  .btn-danger { background:transparent; border:1px solid rgba(192,57,43,0.35); color:#c0392b; font-family:var(--font-stencil),monospace; font-size:9px; letter-spacing:0.1em; padding:5px 12px; border-radius:2px; cursor:pointer; transition:all 0.15s; }
+  .btn-danger:hover { background:rgba(192,57,43,0.1); }
 
   /* Text input */
-  .text-input { font-family:var(--font-stencil),monospace; font-size:11px; background:#0a0909; border:1px solid #2a2828; color:#f0ebe3; padding:9px 14px; border-radius:2px; outline:none; letter-spacing:0.06em; transition:border-color 0.15s; }
-  .text-input::placeholder { color:#3a3838; }
-  .text-input:focus { border-color:rgba(232,98,26,0.4); }
+  .text-input { font-family:var(--font-stencil),monospace; font-size:11px; background:#fbf6ec; border:1px solid #ddd0b8; color:#1a1208; padding:9px 14px; border-radius:2px; outline:none; letter-spacing:0.06em; transition:border-color 0.15s; }
+  .text-input::placeholder { color:#b8ab87; }
+  .text-input:focus { border-color:rgba(201,168,76,0.5); }
 
   /* Live log */
-  .live-log { background:#0a0909; border:1px solid #2a2828; border-radius:2px; padding:12px 14px; font-family:var(--font-stencil),monospace; font-size:10px; color:#8a8784; letter-spacing:0.06em; line-height:1.9; max-height:180px; overflow-y:auto; }
-  .log-success { color:#22c55e; }
-  .log-error   { color:#ef4444; }
-  .log-warn    { color:#c9a84c; }
-  .log-info    { color:#8a8784; }
+  .live-log { background:#fbf6ec; border:1px solid #ddd0b8; border-radius:2px; padding:12px 14px; font-family:var(--font-stencil),monospace; font-size:10px; color:#7a6a4f; letter-spacing:0.06em; line-height:1.9; max-height:180px; overflow-y:auto; }
+  .log-success { color:#2f8552; }
+  .log-error   { color:#c0392b; }
+  .log-warn    { color:#9a5a0c; }
+  .log-info    { color:#7a6a4f; }
 
   /* Spinner */
-  .spinner { width:13px; height:13px; border-radius:50%; border:2px solid rgba(10,9,9,0.3); border-top-color:#0a0909; animation:spin 0.7s linear infinite; display:inline-block; vertical-align:middle; margin-right:7px; }
-  .spinner-sm { width:11px; height:11px; border-radius:50%; border:2px solid rgba(255,255,255,0.1); border-top-color:#e8621a; animation:spin 0.7s linear infinite; display:inline-block; vertical-align:middle; }
+  .spinner { width:13px; height:13px; border-radius:50%; border:2px solid rgba(26,18,8,0.3); border-top-color:#1a1208; animation:spin 0.7s linear infinite; display:inline-block; vertical-align:middle; margin-right:7px; }
+  .spinner-sm { width:11px; height:11px; border-radius:50%; border:2px solid #ddd0b8; border-top-color:#a3822c; animation:spin 0.7s linear infinite; display:inline-block; vertical-align:middle; }
 
   /* Skeleton shimmer */
-  .skeleton { border-radius:2px; background:linear-gradient(90deg,#1a1919 25%,#222121 50%,#1a1919 75%); background-size:400px 100%; animation:shimmer 1.4s infinite; }
+  .skeleton { border-radius:2px; background:linear-gradient(90deg,#e6dcc0 25%,#f0e9d6 50%,#e6dcc0 75%); background-size:400px 100%; animation:shimmer 1.4s infinite; }
 
   /* Empty state */
   .empty { padding:48px 20px; text-align:center; }
 
   /* Info / warn banners */
-  .banner-warn { background:rgba(201,168,76,0.06); border:1px solid rgba(201,168,76,0.2); border-radius:2px; padding:11px 16px; display:flex; gap:10px; align-items:flex-start; }
-  .banner-info { background:rgba(59,130,246,0.05); border:1px solid rgba(59,130,246,0.15); border-radius:2px; padding:11px 16px; display:flex; gap:10px; align-items:flex-start; }
+  .banner-warn { background:rgba(201,168,76,0.1); border:1px solid rgba(201,168,76,0.3); border-radius:2px; padding:11px 16px; display:flex; gap:10px; align-items:flex-start; }
+  .banner-info { background:rgba(59,120,216,0.08); border:1px solid rgba(59,120,216,0.2); border-radius:2px; padding:11px 16px; display:flex; gap:10px; align-items:flex-start; }
 
   /* Pagination */
-  .pagination { display:flex; align-items:center; gap:8px; padding:14px 20px; border-top:1px solid #1a1919; }
+  .pagination { display:flex; align-items:center; gap:8px; padding:14px 20px; border-top:1px solid #e6dcc0; }
 
   @media (max-width:800px) {
     .stat-grid   { grid-template-columns:repeat(3,1fr); }
@@ -333,11 +333,11 @@ export default function AdminOrdersPage() {
 
       {/* Header */}
       <div className="hdr">
-        <div style={M({fontSize:9, color:"#e8621a", letterSpacing:"0.25em", marginBottom:6})}>ADMIN</div>
+        <div style={M({fontSize:9, color:"#a3822c", letterSpacing:"0.25em", marginBottom:6})}>ADMIN</div>
         <div style={B({fontSize:40, letterSpacing:"0.04em", lineHeight:1})}>
-          WPS <span style={{color:"#e8621a"}}>ORDERS</span>
+          WPS <span style={{color:"#a3822c"}}>ORDERS</span>
         </div>
-        <div style={{fontSize:13, color:"#8a8784", marginTop:4}}>
+        <div style={{fontSize:13, color:"#7a6a4f", marginTop:4}}>
           Purchase order tracker — WPS dropship status &amp; tracking
         </div>
       </div>
@@ -349,31 +349,31 @@ export default function AdminOrdersPage() {
           <div className="card-body" style={{paddingBottom:18}}>
             <div className="stat-grid">
               <div className="stat-box hl">
-                <div className="stat-val" style={{color:"#e8621a"}}>
+                <div className="stat-val" style={{color:"#a3822c"}}>
                   {loading && !stats ? <div className="skeleton" style={{height:28, width:60}}/> : (stats?.total ?? "—").toLocaleString()}
                 </div>
                 <div className="stat-label">TOTAL ORDERS</div>
               </div>
               <div className="stat-box yel">
-                <div className="stat-val" style={{color:"#c9a84c"}}>
+                <div className="stat-val" style={{color:"#9a5a0c"}}>
                   {loading && !stats ? <div className="skeleton" style={{height:28, width:40}}/> : (stats?.pending ?? 0)}
                 </div>
                 <div className="stat-label">PENDING PO</div>
               </div>
               <div className="stat-box">
-                <div className="stat-val" style={{color:"#60a5fa"}}>
+                <div className="stat-val" style={{color:"#3b78d8"}}>
                   {loading && !stats ? <div className="skeleton" style={{height:28, width:40}}/> : (stats?.submitted ?? 0)}
                 </div>
                 <div className="stat-label">SUBMITTED</div>
               </div>
               <div className="stat-box grn">
-                <div className="stat-val" style={{color:"#22c55e"}}>
+                <div className="stat-val" style={{color:"#2f8552"}}>
                   {loading && !stats ? <div className="skeleton" style={{height:28, width:40}}/> : (stats?.shipped ?? 0)}
                 </div>
                 <div className="stat-label">SHIPPED</div>
               </div>
               <div className="stat-box red">
-                <div className="stat-val" style={{color:"#ef4444"}}>
+                <div className="stat-val" style={{color:"#c0392b"}}>
                   {loading && !stats ? <div className="skeleton" style={{height:28, width:30}}/> : (stats?.failed ?? 0)}
                 </div>
                 <div className="stat-label">FAILED POs</div>
@@ -386,12 +386,12 @@ export default function AdminOrdersPage() {
         <div className="card">
           <div className="card-head">
             <div className="card-title">SUBMIT <span>PO</span></div>
-            <span style={M({fontSize:9, color:"#8a8784", letterSpacing:"0.1em"})}>
+            <span style={M({fontSize:9, color:"#7a6a4f", letterSpacing:"0.1em"})}>
               MANUAL TRIGGER
             </span>
           </div>
           <div className="card-body">
-            <div style={M({fontSize:9, color:"#8a8784", letterSpacing:"0.1em", marginBottom:12})}>
+            <div style={M({fontSize:9, color:"#7a6a4f", letterSpacing:"0.1em", marginBottom:12})}>
               ORDERS WITH WPS ITEMS ARE AUTO-SUBMITTED VIA STRIPE WEBHOOK. USE THIS TO RETRY FAILURES OR SUBMIT MANUALLY.
             </div>
             <div style={{display:"flex", gap:10, alignItems:"center", flexWrap:"wrap", marginBottom: poLogs.length ? 14 : 0}}>
@@ -414,12 +414,12 @@ export default function AdminOrdersPage() {
                   : "SUBMIT TO WPS →"}
               </button>
               {poStatus === "done" && (
-                <span style={M({fontSize:9, color:"#22c55e", letterSpacing:"0.12em"})}>
+                <span style={M({fontSize:9, color:"#2f8552", letterSpacing:"0.12em"})}>
                   ✓ PO SUBMITTED
                 </span>
               )}
               {poStatus === "error" && (
-                <span style={M({fontSize:9, color:"#ef4444", letterSpacing:"0.12em"})}>
+                <span style={M({fontSize:9, color:"#c0392b", letterSpacing:"0.12em"})}>
                   ✗ SUBMISSION FAILED
                 </span>
               )}
@@ -439,7 +439,7 @@ export default function AdminOrdersPage() {
         <div className="card">
           <div className="card-head">
             <div className="card-title">ALL <span>ORDERS</span></div>
-            <span style={M({fontSize:9, color:"#8a8784"})}>
+            <span style={M({fontSize:9, color:"#7a6a4f"})}>
               {loading ? "LOADING..." : `${totalCount.toLocaleString()} ORDERS`}
             </span>
           </div>
@@ -492,8 +492,8 @@ export default function AdminOrdersPage() {
                   <tr>
                     <td colSpan={8}>
                       <div className="empty">
-                        <div style={B({fontSize:28, color:"#2a2828", marginBottom:8})}>NO ORDERS</div>
-                        <div style={M({fontSize:9, color:"#3a3838"})}>
+                        <div style={B({fontSize:28, color:"#ddd0b8", marginBottom:8})}>NO ORDERS</div>
+                        <div style={M({fontSize:9, color:"#b8ab87"})}>
                           {filter !== "all" ? "TRY A DIFFERENT FILTER" : "NO ORDERS FOUND"}
                         </div>
                       </div>
@@ -512,18 +512,18 @@ export default function AdminOrdersPage() {
                         onClick={() => setExpanded(isExpanded ? null : order.id)}
                       >
                         <td>
-                          <span style={M({fontSize:10, color:"#e8621a"})}>
+                          <span style={M({fontSize:10, color:"#a3822c"})}>
                             {order.id?.slice(0, 8)}…
                           </span>
                         </td>
-                        <td style={M({fontSize:10, color:"#8a8784"})}>
+                        <td style={M({fontSize:10, color:"#7a6a4f"})}>
                           {fmtDate(order.created_at)}
                         </td>
-                        <td style={{fontSize:12, color:"#c2b9b0"}}>
+                        <td style={{fontSize:12, color:"#5a4d38"}}>
                           {order.customer_email ?? "—"}
                         </td>
                         <td>{statusBadge(order.wps_status)}</td>
-                        <td style={M({fontSize:10, color: order.wps_order_id ? "#f0ebe3" : "#3a3838"})}>
+                        <td style={M({fontSize:10, color: order.wps_order_id ? "#1a1208" : "#b8ab87"})}>
                           {order.wps_order_id ?? "—"}
                         </td>
                         <td>
@@ -532,16 +532,16 @@ export default function AdminOrdersPage() {
                               href={trackingUrl(order.wps_carrier, order.wps_tracking_number)}
                               target="_blank"
                               rel="noopener noreferrer"
-                              style={M({fontSize:10, color:"#22c55e", textDecoration:"none"})}
+                              style={M({fontSize:10, color:"#2f8552", textDecoration:"none"})}
                               onClick={e => e.stopPropagation()}
                             >
                               {order.wps_tracking_number}
                             </a>
                           ) : (
-                            <span style={M({fontSize:10, color:"#3a3838"})}>—</span>
+                            <span style={M({fontSize:10, color:"#b8ab87"})}>—</span>
                           )}
                         </td>
-                        <td style={M({fontSize:10, color:"#8a8784"})}>
+                        <td style={M({fontSize:10, color:"#7a6a4f"})}>
                           {fmtDate(order.wps_estimated_ship_date)}
                         </td>
                         <td onClick={e => e.stopPropagation()}>
@@ -630,7 +630,7 @@ export default function AdminOrdersPage() {
                                         href={trackingUrl(order.wps_carrier, order.wps_tracking_number)}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        style={{color:"#22c55e"}}
+                                        style={{color:"#2f8552"}}
                                       >
                                         {order.wps_tracking_number} ↗
                                       </a>
@@ -670,13 +670,13 @@ export default function AdminOrdersPage() {
                                     {order.wps_items.map((item, i) => (
                                       <div key={i} style={{
                                         display:"flex", gap:16, alignItems:"center",
-                                        background:"#111010", padding:"8px 12px",
-                                        borderRadius:2, border:"1px solid #2a2828",
+                                        background:"#ffffff", padding:"8px 12px",
+                                        borderRadius:2, border:"1px solid #ddd0b8",
                                       }}>
-                                        <span style={M({fontSize:10, color:"#e8621a"})}>{item.sku}</span>
-                                        <span style={{fontSize:12, color:"#c2b9b0", flex:1}}>{item.name ?? ""}</span>
-                                        <span style={M({fontSize:10, color:"#8a8784"})}>QTY: {item.quantity}</span>
-                                        <span style={M({fontSize:10, color:"#f0ebe3"})}>
+                                        <span style={M({fontSize:10, color:"#a3822c"})}>{item.sku}</span>
+                                        <span style={{fontSize:12, color:"#5a4d38", flex:1}}>{item.name ?? ""}</span>
+                                        <span style={M({fontSize:10, color:"#7a6a4f"})}>QTY: {item.quantity}</span>
+                                        <span style={M({fontSize:10, color:"#1a1208"})}>
                                           ${item.unit_price?.toFixed(2) ?? "—"}
                                         </span>
                                       </div>
@@ -705,7 +705,7 @@ export default function AdminOrdersPage() {
               >
                 ← PREV
               </button>
-              <span style={M({fontSize:9, color:"#8a8784", letterSpacing:"0.1em", margin:"0 8px"})}>
+              <span style={M({fontSize:9, color:"#7a6a4f", letterSpacing:"0.1em", margin:"0 8px"})}>
                 PAGE {page + 1} / {totalPages}
               </span>
               <button
@@ -715,7 +715,7 @@ export default function AdminOrdersPage() {
               >
                 NEXT →
               </button>
-              <span style={M({fontSize:9, color:"#3a3838", letterSpacing:"0.08em", marginLeft:"auto"})}>
+              <span style={M({fontSize:9, color:"#b8ab87", letterSpacing:"0.08em", marginLeft:"auto"})}>
                 {totalCount.toLocaleString()} TOTAL
               </span>
             </div>
