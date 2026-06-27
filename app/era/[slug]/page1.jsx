@@ -311,78 +311,15 @@ export default async function ProductDetailPage({ params }) {
               )}
             </div>
 
-            {/* Scrollable rows — current product first, then alternatives */}
+            {/* Scrollable rows */}
             <div style={{ flex: 1, overflowY: 'auto' }}>
-
-              {/* Current product — always shown at top, highlighted */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                padding: '10px 14px',
-                borderBottom: '1px solid #ede5d0',
-                borderLeft: '3px solid #c9a84c',
-                background: '#fdf8f0',
-              }}>
-                <div style={{
-                  width: 52, height: 52, flexShrink: 0,
-                  borderRadius: 6, background: '#ffffff',
-                  border: '1px solid #e6dcc0', overflow: 'hidden',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  {productRow.image_url ? (
-                    <img
-                      src={resolveImageSrc(productRow.image_url)}
-                      alt={productRow.name}
-                      style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 4 }}
-                    />
-                  ) : (
-                    <div style={{ fontFamily: 'var(--font-stencil)', fontSize: 6, color: '#c9a84c' }}>NO IMG</div>
-                  )}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{
-                    fontFamily: 'var(--font-stencil)', fontSize: 8, color: '#7a5810',
-                    background: '#fdf6e3', border: '1px solid #c9a84c',
-                    borderRadius: 3, padding: '1px 5px', display: 'inline-block',
-                    letterSpacing: '0.08em', marginBottom: 4,
-                  }}>
-                    VIEWING
-                  </div>
-                  <div style={{
-                    fontFamily: 'var(--font-bespoke)', fontSize: 12, color: '#1a1208',
-                    lineHeight: 1.3, overflow: 'hidden',
-                    display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-                  }}>
-                    {productRow.name}
-                  </div>
-                </div>
-                <div style={{
-                  fontFamily: 'var(--font-tanker)', fontSize: 15, color: '#c9a84c',
-                  flexShrink: 0, letterSpacing: '0.03em',
-                }}>
-                  ${Number(productRow.price ?? 0).toFixed(2)}
-                </div>
-              </div>
-
-              {/* Alternatives */}
-              {oemAlternatives.length === 0 ? (
-                <div style={{
-                  padding: '16px 14px',
-                  fontFamily: 'var(--font-stencil)', fontSize: 10,
-                  color: '#a89878', letterSpacing: '0.06em',
-                }}>
-                  No other options on file
-                </div>
-              ) : (
-                oemAlternatives.map((alt, i) => (
-                  <SidebarProductRow
-                    key={alt.id}
-                    product={alt}
-                    isLast={i === oemAlternatives.length - 1}
-                  />
-                ))
-              )}
+              {oemAlternatives.map((alt, i) => (
+                <SidebarProductRow
+                  key={alt.id}
+                  product={alt}
+                  isLast={i === oemAlternatives.length - 1}
+                />
+              ))}
             </div>
           </div>
         </aside>
@@ -428,8 +365,6 @@ export default async function ProductDetailPage({ params }) {
             transform: translateX(-5px) scale(0.96) !important;
             box-shadow: 0 0 8px rgba(201,168,76,0.2) !important;
           }
-          .sidebar-row { transition: background 0.12s; }
-          .sidebar-row:hover { background: #ede8df; }
         `}</style>
 
         {/* ── Product hero ── */}
@@ -692,7 +627,6 @@ function SidebarProductRow({ product, isLast }) {
   return (
     <Link
       href={`/browse/${product.slug}`}
-      className="sidebar-row"
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -700,7 +634,10 @@ function SidebarProductRow({ product, isLast }) {
         padding: '10px 14px',
         borderBottom: isLast ? 'none' : '1px solid #ede5d0',
         textDecoration: 'none',
+        transition: 'background 0.12s',
       }}
+      onMouseEnter={e => e.currentTarget.style.background = '#ede8df'}
+      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
     >
       {/* Thumbnail */}
       <div style={{

@@ -69,6 +69,56 @@ function parseHtmlFeatures(html) {
   return bullets;
 }
 
+/**
+ * Safely parse an attributes value from VTwin pdp_payload.
+ *
+ * The scraper can leave attributes in several states:
+ *   1. A proper JS object (already parsed by pg JSONB driver)     → use as-is
+ *   2. A stringified JSON object e.g. '{"Size":"10mm"}'           → JSON.parse()
+ *   3. A doubly-stringified string e.g. '"{\\"Size\\":\\"10mm\\"}"' → JSON.parse() twice
+ *   4. null / undefined / empty string / '{}'                     → return null
+ *
+ * Returns a plain object or null.
+ */
+function parseVtwinAttributes(raw) {
+  if (raw === null || raw === undefined) return null;
+
+  // Already a proper object from the pg JSONB driver
+  if (typeof raw === 'object' && !Array.isArray(raw)) {
+    return Object.keys(raw).length > 0 ? raw : null;
+  }
+
+  if (typeof raw !== 'string') return null;
+
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed === '{}' || trimmed === 'null') return null;
+
+  // First parse attempt
+  let parsed;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    return null; // not valid JSON at all
+  }
+
+  // If first parse gave us a string, it was double-encoded — parse again
+  if (typeof parsed === 'string') {
+    const inner = parsed.trim();
+    if (!inner || inner === '{}' || inner === 'null') return null;
+    try {
+      parsed = JSON.parse(inner);
+    } catch {
+      return null;
+    }
+  }
+
+  if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+    return Object.keys(parsed).length > 0 ? parsed : null;
+  }
+
+  return null;
+}
+
 // ── Ensure column exists ──────────────────────────────────────────────────────
 async function ensureColumn(client) {
   await client.query(`
@@ -210,37 +260,28 @@ async function processWPS(client) {
   return { updated, skipped: 0 };
 }
 
-// ── VTwin Pass — SQL only ─────────────────────────────────────────────────────
+// ── VTwin Pass — JS-based (handles stringified attributes + key variants) ─────
+//
+// FIX (was: pure SQL CASE with ::jsonb cast):
+//   The scraper can store pdp_payload.attributes as a stringified JSON string,
+//   causing product_details.attributes to land as a JSONB string value instead
+//   of an object. The frontend workaround (JSON.parse if typeof==='string') is
+//   removed once this script is re-run with --apply.
+//
+//   Key changes vs prior version:
+//   • Data fetched in JS, not updated in a single SQL statement
+//   • parseVtwinAttributes() handles object / string / double-string / null
+//   • Falls back to pdp_payload.extra_attributes if pdp_payload.attributes absent
+//   • Batch-writes via unnest just like processWPS
 async function processVTwin(client) {
   console.log('── VTwin ────────────────────────────────────────────────────────');
 
-  const { rows: [stats] } = await client.query(`
+  const { rows: products } = await client.query(`
     SELECT
-      COUNT(*) FILTER (WHERE description IS NOT NULL AND description <> '')          AS has_desc,
-      COUNT(*) FILTER (WHERE pdp_payload IS NOT NULL AND pdp_payload <> '{}')        AS has_payload,
-      COUNT(*) AS total
+      id,
+      description,
+      pdp_payload
     FROM catalog_unified
-    WHERE source_vendor = 'VTWIN' AND is_active = true
-  `);
-  console.log(`  ${stats.has_desc} with description, ${stats.has_payload} with pdp_payload / ${stats.total} total`);
-
-  if (DRY_RUN) {
-    console.log(`  ⚠️  DRY RUN — would populate product_details for VTwin products\n`);
-    return { updated: 0, skipped: 0 };
-  }
-
-  const { rowCount } = await client.query(`
-    UPDATE catalog_unified
-    SET product_details = jsonb_strip_nulls(jsonb_build_object(
-      'description', NULLIF(TRIM(description), ''),
-      'attributes',  CASE
-                       WHEN pdp_payload ? 'attributes'
-                        AND (pdp_payload->'attributes') <> '{}'::jsonb
-                       THEN pdp_payload->'attributes'
-                       ELSE NULL
-                     END,
-      'tech_note',   NULLIF(TRIM(pdp_payload->>'tech_note'), '')
-    ))
     WHERE source_vendor = 'VTWIN'
       AND is_active = true
       AND (
@@ -248,6 +289,80 @@ async function processVTwin(client) {
         OR (pdp_payload IS NOT NULL AND pdp_payload <> '{}')
       )
   `);
+
+  console.log(`  ${products.length} VTwin products with source data`);
+
+  // Tally what we have in the raw data
+  let hasDesc = 0, hasAttrs = 0, hasTechNote = 0, attrWasString = 0;
+
+  const prepared = products.map(p => {
+    const desc    = p.description?.trim() || null;
+    const payload = p.pdp_payload || {};
+
+    // Prefer 'attributes', fall back to 'extra_attributes'
+    const rawAttrs = payload.attributes ?? payload.extra_attributes ?? null;
+
+    // Track how many were stringified (for reporting)
+    if (typeof rawAttrs === 'string' && rawAttrs.trim()) attrWasString++;
+
+    const attrs    = parseVtwinAttributes(rawAttrs);
+    const techNote = payload.tech_note?.trim() || null;
+
+    if (desc)     hasDesc++;
+    if (attrs)    hasAttrs++;
+    if (techNote) hasTechNote++;
+
+    const details = {};
+    if (desc)     details.description = desc;
+    if (attrs)    details.attributes  = attrs;
+    if (techNote) details.tech_note   = techNote;
+
+    return {
+      id:      p.id,
+      details: Object.keys(details).length > 0 ? details : null,
+    };
+  });
+
+  console.log(`  Has description: ${hasDesc}`);
+  console.log(`  Has attributes:  ${hasAttrs}  (${attrWasString} were stringified — now fixed)`);
+  console.log(`  Has tech_note:   ${hasTechNote}`);
+
+  if (DRY_RUN) {
+    // Show a few samples including an attrs example if available
+    const withAttrs = prepared.filter(p => p.details?.attributes);
+    if (withAttrs.length > 0) {
+      const ex = withAttrs[0];
+      const keys = Object.keys(ex.details.attributes).slice(0, 3).join(', ');
+      console.log(`  Sample attrs (id=${ex.id}): { ${keys} }`);
+    }
+    console.log(`  ⚠️  DRY RUN — would populate product_details for ${prepared.filter(p => p.details).length} VTwin products\n`);
+    return { updated: 0, skipped: 0 };
+  }
+
+  // Batch write
+  const BATCH = 500;
+  let updated = 0;
+
+  for (let i = 0; i < prepared.length; i += BATCH) {
+    const chunk = prepared.slice(i, i + BATCH);
+    const ids     = chunk.map(r => r.id);
+    const details = chunk.map(r => JSON.stringify(r.details));
+
+    await client.query(`
+      UPDATE catalog_unified cu
+      SET product_details = v.details::jsonb
+      FROM (
+        SELECT unnest($1::int[]) AS id,
+               unnest($2::text[]) AS details
+      ) v
+      WHERE cu.id = v.id
+    `, [ids, details]);
+
+    updated += chunk.length;
+    if (prepared.length > BATCH) {
+      process.stdout.write(`\r  Processed ${Math.min(updated, prepared.length)} / ${prepared.length}...`);
+    }
+  }
 
   // Null out VTwin products with no data
   await client.query(`
@@ -259,8 +374,8 @@ async function processVTwin(client) {
       AND (pdp_payload IS NULL OR pdp_payload = '{}')
   `);
 
-  console.log(`  ✅ ${rowCount} VTwin products updated\n`);
-  return { updated: rowCount, skipped: 0 };
+  console.log(`\n  ✅ ${updated} VTwin products updated\n`);
+  return { updated, skipped: 0 };
 }
 
 // ── Coverage report ───────────────────────────────────────────────────────────

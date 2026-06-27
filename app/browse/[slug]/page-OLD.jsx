@@ -15,8 +15,11 @@ async function getProduct(slug) {
     SELECT
       cu.id, cu.sku, cu.internal_sku, cu.slug, cu.name, cu.brand,
       cu.computed_price AS price,
-      COALESCE(cu.image_url, cm.url) AS image_url,
-      cu.image_urls,
+      COALESCE(cu.image_url, cm.primary_url) AS image_url,
+      CASE
+        WHEN array_length(cu.image_urls, 1) > 0 THEN cu.image_urls
+        ELSE cm.all_urls
+      END AS image_urls,
       cu.vendor_sku, cu.source_vendor,
       cu.display_category, cu.display_subcategory, cu.category,
       cu.is_universal, cu.is_kit, cu.pack_qty,
@@ -30,11 +33,13 @@ async function getProduct(slug) {
       WHERE group_id = cu.variant_group_id
     ) vcnt ON true
     LEFT JOIN LATERAL (
-      SELECT url FROM catalog_media
-      WHERE product_id = cu.id AND media_type = 'image'
-      ORDER BY priority ASC
-      LIMIT 1
-    ) cm ON cu.image_url IS NULL OR cu.image_url = ''
+      SELECT urls[1] AS primary_url, urls AS all_urls
+      FROM (
+        SELECT array_agg(url ORDER BY priority ASC) AS urls
+        FROM catalog_media
+        WHERE product_id = cu.id AND media_type = 'image'
+      ) _cm
+    ) cm ON true
     WHERE cu.slug = $1
       AND cu.is_active = true
     LIMIT 1
@@ -208,7 +213,6 @@ export default async function ProductDetailPage({ params }) {
       slug,
       productRow.display_subcategory ?? null,
     ),
-    // Session 50: third arg adds display_subcategory tightening
     getChronologicalNeighbors(
       unifiedId,
       productRow.category ?? '',
@@ -470,13 +474,13 @@ export default async function ProductDetailPage({ params }) {
         </div>
       </div>
 
+      {/* ── Product details ── */}
+      <ProductDetailsSection details={productRow.product_details} />
+
       {/* ── Data tabs: Fitment / OEM ── */}
       <div style={{ maxWidth: 1100, margin: '32px auto 0', padding: '0 24px' }}>
         <DataTabs fitment={fitment} oemRows={oemRows} />
       </div>
-
-      {/* ── Product details ── */}
-      <ProductDetailsSection details={productRow.product_details} />
 
       {/* ── OEM alternatives ── */}
       <OemAlternativesPanel alternatives={oemAlternatives} oemRows={oemRows} />
@@ -670,7 +674,11 @@ function SectionHeader({ children }) {
 function ProductDetailsSection({ details }) {
   if (!details) return null;
 
-  const { description, features, attributes, tech_note } = details;
+  const { description, features, tech_note } = details;
+  const rawAttrs = details.attributes;
+  const attributes = typeof rawAttrs === 'string'
+    ? (() => { try { return JSON.parse(rawAttrs); } catch { return null; } })()
+    : rawAttrs;
   const hasContent = description || features?.length || attributes || tech_note;
   if (!hasContent) return null;
 

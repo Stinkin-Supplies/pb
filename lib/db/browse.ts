@@ -34,6 +34,8 @@ export interface CatalogProduct {
   variant_group_id: number | null;
   variant_count: number;
   oem_numbers: string[];
+  stock_quantity: number;
+  in_stock: boolean;
   /** True when surfaced via OEM supersession chain (not a direct fitment row).
    *  Only populated when year + model are active in the request. */
   oem_chain_match?: boolean;
@@ -442,6 +444,17 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
         cu.pack_qty,
         cu.variant_group_id,
         cu.oem_numbers,
+        COALESCE((
+          SELECT SUM(vo.total_qty)
+          FROM public.vendor_offers vo
+          WHERE vo.catalog_product_id = cu.id
+            AND vo.is_active = true
+        ), cu.stock_quantity, 0) AS stock_quantity,
+        COALESCE((
+          SELECT BOOL_OR(vo.is_active)
+          FROM public.vendor_offers vo
+          WHERE vo.catalog_product_id = cu.id
+        ), cu.in_stock, false) AS in_stock,
         COALESCE(vcnt.cnt, 0)::int                AS variant_count,
         (cu.id = ANY(${chainLiteral}))            AS oem_chain_match,
         (fv.product_id IS NOT NULL)               AS has_fitment

@@ -1,5 +1,5 @@
 # Stinkin' Supplies — Filtering System Roadmap
-**Created:** June 5, 2026 · **Last Updated:** June 8, 2026 (Session 45)
+**Created:** June 5, 2026 · **Last Updated:** June 26, 2026 (Session 60)
 **Scope:** browse.ts · FilterSidebar · Fitment data · Typesense facets · display_subcategory taxonomy
 
 ---
@@ -11,13 +11,21 @@ All filter architecture phases complete. display_subcategory taxonomy complete a
 ---
 
 ## Phase 1 — Quick Unblocks ✅ COMPLETE
-All browse.ts and fitment bugs fixed. See session 42 notes.
+All browse.ts and fitment bugs fixed. Sessions 42+57.
 
 ## Phase 2 — Sidebar UX ✅ COMPLETE
-All FilterSidebar improvements shipped. See session 42–43 notes.
+FilterSidebar improvements shipped (sessions 42–43). `?category=` URL param sticky bug fixed (session 57).
 
-## Phase 3 — Fitment Coverage ✅ COMPLETE (round 2)
-VTwin 48% · PU 49% · WPS 41%. Ceiling reached — remaining products are universal/generic.
+## Phase 3 — Fitment Coverage ✅ SUBSTANTIALLY COMPLETE
+
+| Vendor | Coverage | Session | Notes |
+|--------|----------|---------|-------|
+| PU | ~49% | Session 47 | Ceiling — 17,796 gap products have no fitment in pu_fitment_parsed; unfixable without new PU feed |
+| WPS | ~41% | Session 47 | Correct as-is — gap confirmed to be non-HD/universal products |
+| VTwin | **55.8%** | **Session 58** | Up from 41.1% (15,741) → 21,390 products. Two new scripts: parse_vtwin_fitment_raw.mjs + scrape_vtwin_missing.mjs |
+| EBC (via PU/WPS/VTwin) | **~89%** | **Session 60** | 554 EBC brake products matched; 3,005 net-new catalog_fitment_v2 rows (source='ebc_catalog') |
+
+**VTwin gap remaining:** 18,890 SKUs not found on vtwinmfg.com (discontinued/removed from site). ~4,035 remain with no fitment but on-site — further scraper runs could improve this marginally.
 
 ## Phase 4 — Facet Alignment ✅ NON-ISSUE
 Facets are Postgres-computed via same fitmentJoin + WHERE. No divergence.
@@ -64,18 +72,22 @@ All 20 categories mapped. Subcategory facets live in Typesense.
 2. Design 4–10 subcategory taxonomy
 3. DRY RUN SELECT with CASE → GROUP BY source_vendor, mapped_subcategory
 4. Review + fix gaps
-5. `BEGIN; UPDATE ...; COMMIT;` — `WHERE display_category = 'X' AND is_active = true` — never NULL-guard needed since CASE maps or leaves NULL
+5. `BEGIN; UPDATE ...; COMMIT;` — `WHERE display_category = 'X' AND is_active = true`
 6. Verify, iterate on blanks with name-based diagnostic query
 7. Reindex
-
-### Scripts in scripts/ingest/
-All subcategory mapping scripts: `apply_subcategory_{category}.sql` for each category.
-Full list in HANDOFF_LOG session 44–45.
 
 ---
 
 ## OEM Pipeline ✅ COMPLETE
 catalog_oem_crossref is single source of truth. product_id FK added. Unique index on (sku, oem_number).
+OEM supersession chain: oem_supersession table (**485 pairs** — 283 original inferred + 202 vtwin hardware added session 59) + mv_oem_fitment_coverage (683K rows, refreshed session 59). Recursive forward+backward chain traversal. browse.ts pre-fetches chain IDs when year+model set.
+
+⚠️ oem_supersession schema note: `from_oem_norm`/`to_oem_norm` are **GENERATED columns** — do not include in INSERT statements.
+
+**Session 60 additions to catalog_oem_crossref:**
+- vtwin_scrape: +5,511 rows (import_vtwin_oem_crossref.mjs)
+- HD_OEM battery: +63 rows (import_battery_oem_crossref.mjs)
+- Total: **65,434 rows**
 
 ---
 
@@ -83,12 +95,20 @@ catalog_oem_crossref is single source of truth. product_id FK added. Unique inde
 
 | Layer | Issue | Status |
 |-------|-------|--------|
-| Browse query | Engine+Dyna composite index | ✅ Added session 47 — idx_cfv2_product_modelyear + idx_cfv2_modelyear_product |
-| Framer Motion | transparent animation errors | ⏳ FRAMER_TRANSPARENT_FIX.md ready, not yet applied |
+| Browse query | Engine+Dyna composite index | ✅ Added session 47 |
+| Framer Motion | Transparent animation errors | ⏳ FRAMER_TRANSPARENT_FIX.md ready, not applied |
 | Model codes | FLHRX + FLI missing | ✅ Both added session 47 |
+| Model codes | 6 new 2026 codes added (session 59) | ✅ FLHXL, FLHXLSE, FLHXSTSE, FLHLT, FLHLTSE, RA1250L |
 | Typesense | No reindex automation | 🔵 Future |
+| Typesense | Reindex after session 58 VTwin fitment additions | ✅ Done session 60 |
 | display_subcategory | Accessories & Misc 94% NULL | Accepted — catch-all by design |
+| Browse ?category= param | Sticky URL bug | ✅ Fixed session 57 |
+| OEM number search | Not searching OEM arrays | ✅ Fixed session 57 (unnest ILIKE) |
+| Softail + Suspension + Triple Trees filter | Untested since session 51 | ⏳ Retest |
+| VTwin fitment | Additional ~4,035 on-site products with no fitment | 🔵 Low priority — marginal improvement |
+| VTwin attributes | Stringified JSON in product_details | ✅ Fixed session 60 at source; PDPTabs workaround removed |
+| VTwin OEM crossref | ~12,265 scraped OEM numbers not in crossref | ✅ Fixed session 60 — 5,511 rows imported |
 
 ---
 
-*Filter Roadmap — Last updated June 13, 2026 · Session 48 — open issues updated*
+*Filter Roadmap — Last updated June 26, 2026 · Session 60*

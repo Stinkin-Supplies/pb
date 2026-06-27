@@ -3,6 +3,15 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 
+// Routes LeMans/PU images through the local proxy (same as ProductImageGallery)
+function resolveImageSrc(url) {
+  if (!url) return null;
+  if (url.includes('asset.lemansnet.com') || url.includes('lemans')) {
+    return `/api/image-proxy?url=${encodeURIComponent(url)}`;
+  }
+  return url;
+}
+
 const VENDOR_COLORS = {
   PU:    { bg: '#e8edf8', color: '#2a4a7a', label: 'PU' },
   WPS:   { bg: '#fdf0e3', color: '#7a3810', label: 'WPS' },
@@ -45,8 +54,8 @@ function OemRow({ product, onExpand, isLast, isChain }) {
         width: '100%',
         transition: 'background 0.12s',
       }}
-      onMouseEnter={e => e.currentTarget.style.background = '#fdf9f0'}
-      onMouseLeave={e => e.currentTarget.style.background = 'none'}
+      onMouseEnter={e => e.currentTarget.style.background = '#ede8df'}
+      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
     >
       {/* Thumbnail */}
       <div style={{
@@ -63,7 +72,7 @@ function OemRow({ product, onExpand, isLast, isChain }) {
       }}>
         {product.image_url ? (
           <img
-            src={product.image_url}
+            src={resolveImageSrc(product.image_url)}
             alt={product.name}
             style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 6 }}
             loading="lazy"
@@ -236,7 +245,7 @@ function OemExpanded({ product, onClose }) {
         }}>
           {product.image_url ? (
             <img
-              src={product.image_url}
+              src={resolveImageSrc(product.image_url)}
               alt={product.name}
               style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 24 }}
             />
@@ -439,7 +448,7 @@ export default function OemAlternativesPanel({ alternatives, oemRows }) {
 
       {/* Direct matches */}
       {direct.length > 0 && (
-        <div style={{ background: '#ffffff', border: '1px solid #e6dcc0', borderRadius: 10, overflow: 'hidden' }}>
+        <div style={{ border: '1px solid #e6dcc0', borderRadius: 10, overflow: 'hidden' }}>
           {direct.map((p, i) => (
             <OemRow
               key={p.id}
@@ -462,7 +471,7 @@ export default function OemAlternativesPanel({ alternatives, oemRows }) {
             </span>
             <div style={{ flex: 1, height: 1, background: '#e6dcc0' }} />
           </div>
-          <div style={{ background: '#ffffff', border: '1px solid #e6dcc0', borderRadius: 10, overflow: 'hidden' }}>
+          <div style={{ border: '1px solid #e6dcc0', borderRadius: 10, overflow: 'hidden' }}>
             {chain.map((p, i) => (
               <OemRow
                 key={p.id}
