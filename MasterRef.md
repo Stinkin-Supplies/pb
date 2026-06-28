@@ -1,8 +1,8 @@
 # Stinkin' Supplies — Master Reference
-**Last Updated:** June 26, 2026 (Sixtieth Pass)
+**Last Updated:** June 27, 2026 (Sixty-First Pass)
 **Database:** Hetzner Postgres — stinkin_catalog @ 5.161.100.176:5432
 
-**Status:** Catalog rebuilt ✅ | Fitment rebuilt ✅ | Search indexed ✅ | Homepage rebuilt ✅ | Font system locked ✅ | ModelFinder built ✅ | FilterSidebar updated ✅ | VariantSelector fitment+color mode ✅ | Variant groups merged ✅ | browse.ts name-grouping ✅ | VTwin SKU dupes resolved ✅ | Filtering system audit complete ✅ | MODEL_ALIASES expanded ✅ | VTwin scraper round 2+3 complete ✅ | CategoryBentoGrid built ✅ | display_subcategory taxonomy COMPLETE ✅ | Canonical merges DRAINED ✅ | PU vendor_sku fully corrected ✅ | product_details JSONB live ✅ | Multi-image galleries live ✅ | OEM supersession table live ✅ | VTwin fitment 55.8% ✅ | HD model reference audited (2026 catalog) ✅ | OEM crossref expanded ✅ | VTwin attributes bug fixed ✅ | EBC brake fitment ingested ✅ | HD battery fitment ingested ✅
+**Status:** Catalog rebuilt ✅ | Fitment rebuilt ✅ | Search indexed ✅ | Homepage rebuilt ✅ | Font system locked ✅ | ModelFinder built ✅ | FilterSidebar updated ✅ | VariantSelector fitment+color mode ✅ | Variant groups merged ✅ | browse.ts name-grouping ✅ | VTwin SKU dupes resolved ✅ | Filtering system audit complete ✅ | MODEL_ALIASES expanded ✅ | VTwin scraper round 2+3 complete ✅ | CategoryBentoGrid built ✅ | display_subcategory taxonomy COMPLETE ✅ | Canonical merges DRAINED ✅ | PU vendor_sku fully corrected ✅ | product_details JSONB live ✅ | Multi-image galleries live ✅ | OEM supersession table live ✅ | VTwin fitment 55.8% ✅ | HD model reference audited (2026 catalog) ✅ | OEM crossref expanded ✅ | VTwin attributes bug fixed ✅ | EBC brake fitment ingested ✅ | HD battery fitment ingested ✅ | bike_specs table populated ✅
 
 ---
 
@@ -22,10 +22,11 @@
 | oem_supersession | **485 pairs** (283 original inferred + 202 vtwin hardware) | ⏳ 283 original pairs confidence=1 pending review |
 | mv_oem_fitment_coverage | 683K rows | ✅ Refreshed session 59 |
 | vtwin_scrape_data | ~31,000+ rows | ✅ +12,398 from scrape_vtwin_missing.mjs |
-| harley_model_years | **~2,062 rows** | ✅ Audited session 59 — spurious years deleted, 2026 models added |
+| harley_model_years | **~2,090 rows** | ✅ +28 gap rows added session 61 (XL883L 2005-09, FXST 2020, FXLR gaps, FLTRXS 2024-25, RA1250 2025, VRSCB 2006, FLH 1966-71/73-77) |
 | harley_models | **~365 rows** | ✅ 6 new 2026 codes added (FLHXL, FLHXLSE, FLHXSTSE, FLHLT, FLHLTSE, RA1250L); 1 orphan removed |
 | ebc_brake_fitment | **528 rows** | ✅ NEW session 60 — EBC 2026 catalog, 14 H-D families |
 | hd_battery_fitment | **22 rows** | ✅ NEW session 60 — 7 OEM battery SKUs, model/year fitment |
+| bike_specs | **1,288 rows** | ✅ NEW session 61 — DS FatBook 2026 + DS OldBook 2026; battery/plugs/belt/sprockets/tires/shock per model+year |
 | Typesense | **89,153 docs** | ✅ Reindexed session 60 |
 
 ### Fitment Coverage (June 26, 2026 — Session 60)
@@ -144,6 +145,15 @@ Single source of truth. 89,153 active rows.
 - BCI group bridge: import_battery_oem_crossref.mjs matched 64 battery products → 63 HD_OEM entries in catalog_oem_crossref
 - 65989-90B (YB16CL-B, Dyna/Softail '91-'96) — no matching products in catalog; discontinued at distributor level
 
+### bike_specs ← NEW session 61
+**1,288 rows.** DS FatBook 2026 + DS OldBook 2026 quick-reference spec data per model+year.
+- FK: `model_year_id → harley_model_years.id`
+- `source` values: `'DS_FATBOOK_2026'` (1986–2025) or `'DS_OLDBOOK_2026'` (1936–1999)
+- Columns: battery, spark_plug_ngk, spark_plug_champ, belt_pitch, belt_teeth (also used for chain link count), sprocket_front, sprocket_rear, tire_front, tire_rear, shock_length_in
+- Chain drives: belt_pitch='530' (chain size), belt_teeth=link count
+- UNIQUE(model_year_id, source) — idempotent re-run safe
+- Script: `scripts/ingest/import_bike_specs.mjs`
+
 ### canonical_products / product_vendors
 - canonical_products: 89,153 rows, one per active catalog_unified product
 - product_vendors: 89,153 rows — `vendor_sku` = correct ordering number for all vendors
@@ -192,6 +202,7 @@ Single source of truth. 89,153 active rows.
 | `scripts/ingest/import_vtwin_oem_crossref.mjs` | Imports vtwin_scrape_data.oem_no → catalog_oem_crossref (session 60, 5,511 rows) |
 | `scripts/ingest/parse_ebc.py` | Parses EBC catalog PDF → ebc_brake_fitment staging table. Reusable for future editions. |
 | `scripts/ingest/import_ebc_fitment.mjs` | Cross-references ebc_brake_fitment → catalog_unified → catalog_fitment_v2 |
+| `scripts/ingest/import_bike_specs.mjs` | DS FatBook 2026 + OldBook 2026 → bike_specs. 296 raw rows, 47-entry expansion map, century-aware year logic, --dry-run flag. 1288 rows inserted. |
 | `scripts/ingest/import_hd_battery_fitment.mjs` | Creates hd_battery_fitment table and inserts 7 OEM battery SKUs × 22 fitment rows |
 | `scripts/ingest/import_battery_oem_crossref.mjs` | Bridges battery products to H-D OEM numbers via BCI group → catalog_oem_crossref |
 | `scripts/ingest/index_unified.js` | Typesense reindex — uses product_details as primary source |
@@ -250,4 +261,4 @@ Auth: `?token=` URL param or `X-Admin-Token` header matching `ADMIN_SECRET` env 
 
 ---
 
-*Master Reference — Last updated June 26, 2026 · Session 60*
+*Master Reference — Last updated June 27, 2026 · Session 61*

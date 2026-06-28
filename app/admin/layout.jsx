@@ -169,49 +169,49 @@ const css = `
   }
 `;
 
-const NAV = [
-  {
-    section: "OVERVIEW",
-    links: [
-      { href: "/admin/build-tracker", icon: "⌁", label: "BUILD TRACKER" },
-      { href: "/admin/database", icon: "◫", label: "DATABASE SNAPSHOT" },
-      { href: "/admin",         icon: "◈", label: "DASHBOARD"   },
-    ],
-  },
-  {
-    section: "COMMERCE",
-    links: [
-      { href: "/admin/orders",  icon: "◫", label: "ORDERS"      },
-      { href: "/admin/points",  icon: "★", label: "POINTS"      },
-    ],
-  },
-  {
-    section: "PRICING",
-    links: [
-      { href: "/admin/map",        icon: "⚑", label: "MAP COMPLIANCE"  },
-      { href: "/admin/competitors", icon: "◎", label: "COMPETITOR PRICING" },
-    ],
-  },
-  {
-    section: "VENDOR",
-    links: [
-      { href: "/admin/fitment",      icon: "⇌", label: "FITMENT & OEM"  },
-      { href: "/admin/catalog",      icon: "◧", label: "CATALOG"        },
-      { href: "/admin/sync",         icon: "↺", label: "SYNC"           },
-      { href: "/admin/products",     icon: "▤", label: "PRODUCTS"       },
-      { href: "/admin/oem-crossref", icon: "⇄", label: "OEM CROSS-REF"  },
-    ],
-  },
-  {
-    section: "STORE",
-    links: [
-      { href: "/browse",   icon: "↗", label: "VIEW STORE"  },
-      { href: "/garage", icon: "⌂", label: "MY GARAGE"   },
-    ],
-  },
-];
-
 export default async function AdminLayout({ children }) {
+  const NAV = [
+    {
+      section: "OVERVIEW",
+      links: [
+        { href: "/admin/build-tracker", icon: "⌁", label: "BUILD TRACKER" },
+        { href: "/admin/database", icon: "◫", label: "DATABASE SNAPSHOT" },
+        { href: "/admin",         icon: "◈", label: "DASHBOARD"   },
+      ],
+    },
+    {
+      section: "COMMERCE",
+      links: [
+        { href: "/admin/orders",  icon: "◫", label: "ORDERS"      },
+        { href: "/admin/points",  icon: "★", label: "POINTS"      },
+      ],
+    },
+    {
+      section: "PRICING",
+      links: [
+        { href: "/admin/map",        icon: "⚑", label: "MAP COMPLIANCE"  },
+        { href: "/admin/competitors", icon: "◎", label: "COMPETITOR PRICING" },
+      ],
+    },
+    {
+      section: "VENDOR",
+      links: [
+        { href: "/admin/fitment",      icon: "⇌", label: "FITMENT & OEM"      },
+        { href: "/admin/catalog",      icon: "◧", label: "CATALOG"             },
+        { href: "/admin/sync",         icon: "↺", label: "SYNC"                },
+        { href: "/admin/products",     icon: "▤", label: "PRODUCTS"            },
+        { href: "/admin/oem-crossref", icon: "⇄", label: "OEM CROSS-REF"       },
+        { href: `/admin/canonical-matches?token=${process.env.ADMIN_SECRET}`, icon: "⇆", label: "CANONICAL MATCHES" },
+      ],
+    },
+    {
+      section: "STORE",
+      links: [
+        { href: "/browse", icon: "↗", label: "VIEW STORE" },
+        { href: "/garage", icon: "⌂", label: "MY GARAGE"  },
+      ],
+    },
+  ];
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
 

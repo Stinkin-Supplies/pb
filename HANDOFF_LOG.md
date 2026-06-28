@@ -5,6 +5,80 @@
 
 ---
 
+# ——— SIXTY-FIRST PASS (June 27, 2026) ———
+
+## WHERE WE ARE
+
+bike_specs table created and fully populated from DS FatBook 2026 + OldBook 2026 quick-reference charts. 1288 rows covering battery, spark plugs, belt/chain, sprockets, tires, and shock length per model+year. Also gap-filled 28 harley_model_years rows discovered during import matching.
+
+⚠️ Payment gateway still undecided — BLOCKING checkout.
+⚠️ 62 variant candidates still pending manual review.
+⚠️ oem_supersession 283 original inferred pairs still pending review.
+
+## What Was Done
+
+### bike_specs table — New ✅
+```sql
+CREATE TABLE bike_specs (
+  id              serial PRIMARY KEY,
+  model_year_id   int NOT NULL REFERENCES harley_model_years(id),
+  battery         text,
+  spark_plug_ngk  text,
+  spark_plug_champ text,
+  belt_pitch      text,   -- '24 mm', '1-1/8"', '530' (chain uses chain size)
+  belt_teeth      int,    -- belt tooth count OR chain link count
+  sprocket_front  int,
+  sprocket_rear   int,
+  tire_front      text,
+  tire_rear       text,
+  shock_length_in numeric, -- NULL = N/A in source
+  source          text NOT NULL DEFAULT 'DS_FATBOOK_2026',
+  created_at      timestamptz DEFAULT now(),
+  UNIQUE (model_year_id, source)
+);
+```
+
+### import_bike_specs.mjs — New ✅
+`scripts/ingest/import_bike_specs.mjs` — imports DS FatBook 2026 + DS OldBook 2026 quick-reference charts into bike_specs.
+- 296 raw source rows encoded; 1733 expanded (model, year) pairs after year-range + model-code expansion
+- Sources: `DS_FATBOOK_2026` (1986–2025: Dresser, Trike, Softail, Dyna, V-Rod, Sportster, Street, Pan America, LiveWire, Buell) + `DS_OLDBOOK_2026` (1936–1999: Big Twin EL/FL→FLT, Softail, Dyna, FXR, FX, Sportster)
+- 47-entry EXPANSIONS map handles all slash patterns (FLHT/C/U/I, VRSCAW/DX, XL883 HUG → XLH883HUG, FXDS-CONV → FXDS, etc.)
+- Year expansion: discontinuous ranges (11-13,16-19), century logic (≤26 → 20xx, 27-99 → 19xx)
+- ON CONFLICT (model_year_id, source) DO NOTHING — idempotent
+- **Result: 1288 rows inserted, 0 errors**
+
+### harley_model_years gap-filling — 28 rows ✅
+Verified against H-D production history before inserting:
+- XL883L (24): 2005–2009 — existed from introduction; DB was missing these years
+- FXST (302): 2020 — Softail Standard reintroduced
+- FXLR (70): 1990–1993, 2021, 2024, 2025
+- FLTRXS (138): 2024, 2025 — Road Glide Special; DB ended at 2023
+- RA1250 (1): 2025 — Pan America; DB ended at 2024
+- VRSCB (383): 2006 — V-Rod Black existed 2004-2006
+- FLH (108): 1966–1971, 1973–1977 — continuous production gap
+
+### Model code corrections in script ✅
+- `XL1100`→`XLH1100`, `XL1200`→`XLH1200`, `XL883HUG`→`XLH883HUG`
+- `FLH/C`→`FLH` (old FLH Classic = FLH in DB; FLHC is modern Heritage Classic)
+- `FXDSCONV`→`FXDS`
+- `FXDB/I 91-92` split into `FXDB-S` (1991 Sturgis) + `FXDB-D` (1992 Daytona)
+
+### Permanent skips confirmed by research ✅
+- VRSCAW ended 2010 — "VRSCAW/DX 07-17" in FatBook means only VRSCDX for 2011-2017; VRSCDX rows match correctly
+- FLHXS 2024-2025 — Street Glide Special code retired in 2024 lineup redesign
+- XL1200XS — Forty-Eight Special only existed 2018-2020
+- FXLRS — Low Rider S introduced 2020; 2018-2019 unmatched is correct
+- FLTRX 2015-2016 — Road Glide Custom ended 2013
+
+## DB State After Session 61
+
+| Table | State |
+|---|---|
+| bike_specs | **1288 rows** (DS_FATBOOK_2026 + DS_OLDBOOK_2026) |
+| harley_model_years | **~2,090 rows** (+28 gap rows) |
+
+---
+
 # ——— FIFTY-EIGHTH PASS (June 25, 2026) ———
 
 ## WHERE WE ARE

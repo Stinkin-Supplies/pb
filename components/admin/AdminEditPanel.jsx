@@ -107,21 +107,50 @@ function FieldLabel({ children }) {
   );
 }
 
+function parseCsvList(value) {
+  return String(value ?? "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function getAdminToken(searchParams) {
+  const tokenFromQuery = searchParams.get("token") ?? "";
+  if (tokenFromQuery) return tokenFromQuery;
+  if (typeof window !== "undefined") {
+    return sessionStorage.getItem("stinkin_admin_token") ?? "";
+  }
+  return "";
+}
+
 // ── Main component ─────────────────────────────────────────────
 export default function AdminEditPanel({ product }) {
   const searchParams = useSearchParams();
   const isAdmin = searchParams.get("admin") === "1";
+  const adminToken = getAdminToken(searchParams);
+  const [adminTokenInput, setAdminTokenInput] = useState("");
+  const activeToken = adminToken || adminTokenInput.trim();
 
   const [open, setOpen]         = useState(false);
   const [saving, setSaving]     = useState(false);
   const [saveStatus, setSaveStatus] = useState(null); // 'ok' | 'err' | null
+  const [saveMessage, setSaveMessage] = useState("");
   const [flagMode, setFlagMode] = useState(false);
 
   // Editable fields
-  const [category,    setCategory]    = useState(product.displayCategory    ?? "");
-  const [subcategory, setSubcategory] = useState(product.displaySubcategory ?? "");
-  const [fitsAll,     setFitsAll]     = useState(product.fitsAllModels      ?? false);
-  const [packQty,     setPackQty]     = useState(String(product.packQty ?? 1));
+  const [category,    setCategory]    = useState(product.displayCategory    ?? product.display_category ?? "");
+  const [subcategory, setSubcategory] = useState(product.displaySubcategory ?? product.display_subcategory ?? "");
+  const [fitsAll,     setFitsAll]     = useState(Boolean(product.fitsAllModels ?? product.isUniversal ?? product.is_universal ?? false));
+  const [packQty,     setPackQty]     = useState(String(product.packQty ?? product.pack_qty ?? 1));
+  const [vendorSku,   setVendorSku]   = useState(product.vendorSku ?? product.vendor_sku ?? "");
+  const [brandPart,   setBrandPart]   = useState(product.brandPartNumber ?? product.brand_part_number ?? "");
+  const [oemNumbers,  setOemNumbers]  = useState(Array.isArray(product.oemNumbers ?? product.oem_numbers)
+    ? (product.oemNumbers ?? product.oem_numbers).join(", ")
+    : "");
+  const [canonicalId, setCanonicalId] = useState(String(product.canonicalProductId ?? product.canonical_product_id ?? ""));
+  const [canonicalQuery, setCanonicalQuery] = useState(product.canonicalSku ?? product.canonical_sku ?? "");
+  const [canonicalResults, setCanonicalResults] = useState([]);
+  const [canonicalLoading, setCanonicalLoading] = useState(false);
 
   // Flag fields
   const [flagType,  setFlagType]  = useState("wrong_category");
@@ -137,19 +166,62 @@ export default function AdminEditPanel({ product }) {
     return () => window.removeEventListener("keydown", handler);
   }, [open]);
 
-  // Don't render at all for non-admin
-  if (!isAdmin) return null;
-
   const hints = SUBCATEGORY_HINTS[category] ?? [];
   const dirty = category    !== (product.displayCategory    ?? "")
              || subcategory !== (product.displaySubcategory ?? "")
-             || fitsAll     !== (product.fitsAllModels      ?? false)
-             || packQty     !== String(product.packQty ?? 1);
+             || fitsAll     !== Boolean(product.fitsAllModels ?? product.isUniversal ?? product.is_universal ?? false)
+             || packQty     !== String(product.packQty ?? product.pack_qty ?? 1)
+             || vendorSku   !== (product.vendorSku ?? product.vendor_sku ?? "")
+             || brandPart   !== (product.brandPartNumber ?? product.brand_part_number ?? "")
+             || oemNumbers  !== (Array.isArray(product.oemNumbers ?? product.oem_numbers)
+               ? (product.oemNumbers ?? product.oem_numbers).join(", ")
+               : "")
+             || canonicalId !== String(product.canonicalProductId ?? product.canonical_product_id ?? "");
+
+  useEffect(() => {
+    if (!open || flagMode) return;
+    const query = canonicalQuery.trim();
+    if (query.length < 2 || !activeToken) return;
+
+    let active = true;
+    const timer = setTimeout(async () => {
+      setCanonicalLoading(true);
+      try {
+        const res = await fetch(
+          `/api/admin/canonical-matches/search-products?token=${encodeURIComponent(activeToken)}&q=${encodeURIComponent(query)}&limit=8`
+        );
+        const data = await res.json();
+        if (!active) return;
+        setCanonicalResults(Array.isArray(data.results) ? data.results : []);
+      } catch {
+        if (active) setCanonicalResults([]);
+      } finally {
+        if (active) setCanonicalLoading(false);
+      }
+    }, 250);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [open, flagMode, canonicalQuery, activeToken]);
+
+  const canSearchCanonical = open && !flagMode && canonicalQuery.trim().length >= 2 && Boolean(activeToken);
+
+  // Don't render at all for non-admin
+  if (!isAdmin) return null;
 
   async function handleSave() {
     setSaving(true);
     setSaveStatus(null);
+    setSaveMessage("");
     try {
+      if (!activeToken) {
+        setSaveStatus("err");
+        setSaveMessage("Admin token required");
+        return;
+      }
+
       const body = flagMode
         ? {
             action: "flag",
@@ -158,30 +230,36 @@ export default function AdminEditPanel({ product }) {
             flagNotes,
           }
         : {
-            action: "update",
-            productId: product.id,
             display_category:    category,
             display_subcategory: subcategory,
             fits_all_models:     fitsAll,
+            is_universal:        fitsAll,
             pack_qty:            parseInt(packQty, 10) || 1,
+            vendor_sku:          vendorSku.trim() || null,
+            brand_part_number:   brandPart.trim() || null,
+            oem_numbers:         parseCsvList(oemNumbers),
+            canonical_product_id: canonicalId.trim() ? parseInt(canonicalId, 10) || null : null,
           };
 
-          const token = new URLSearchParams(window.location.search).get("token")
-                         ?? sessionStorage.getItem("stinkin_admin_token")
-                         ?? "";
-          if (token) sessionStorage.setItem("stinkin_admin_token", token);
-          const res = await fetch(`/api/admin/products/${product.id}?token=${encodeURIComponent(token)}`, {
+          sessionStorage.setItem("stinkin_admin_token", activeToken);
+          const res = await fetch(`/api/admin/products/${product.id}?token=${encodeURIComponent(activeToken)}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body),
           });
 
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        const text = await res.text();
+        setSaveStatus("err");
+        setSaveMessage(res.status === 401 ? "Unauthorized — verify the admin token" : text || "Save failed");
+        return;
+      }
+
       setSaveStatus("ok");
       setTimeout(() => { setSaveStatus(null); if (!flagMode) setOpen(false); }, 1800);
-    } catch (err) {
-      console.error(err);
+    } catch {
       setSaveStatus("err");
+      setSaveMessage("Network error while saving");
     } finally {
       setSaving(false);
     }
@@ -278,6 +356,63 @@ export default function AdminEditPanel({ product }) {
         }}>
           {product.name}
         </div>
+
+        {!activeToken && (
+          <div style={{
+            padding: "12px 18px",
+            background: C.goldBg,
+            borderBottom: `1px solid ${C.borderLight}`,
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+          }}>
+            <FieldLabel>Admin Token</FieldLabel>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                value={adminTokenInput}
+                onChange={(e) => setAdminTokenInput(e.target.value)}
+                placeholder="Paste ADMIN_SECRET…"
+                style={{
+                  flex: 1,
+                  padding: "10px 12px",
+                  background: C.cream,
+                  border: `1px solid ${C.border}`,
+                  fontFamily: MONO,
+                  fontSize: 13,
+                  color: C.black,
+                  letterSpacing: "0.04em",
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (adminTokenInput.trim()) {
+                    sessionStorage.setItem("stinkin_admin_token", adminTokenInput.trim());
+                  }
+                }}
+                style={{
+                  padding: "10px 12px",
+                  border: `1px solid ${C.gold}`,
+                  background: C.gold,
+                  color: C.black,
+                  fontFamily: MONO,
+                  fontSize: 10,
+                  letterSpacing: "0.12em",
+                  textTransform: "uppercase",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Store
+              </button>
+            </div>
+            <div style={{ fontFamily: MONO, fontSize: 9, color: C.inkLight, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+              Needed to save category, OEM, and canonical edits.
+            </div>
+          </div>
+        )}
 
         {/* Mode toggle */}
         <div style={{
@@ -474,6 +609,149 @@ export default function AdminEditPanel({ product }) {
               </div>
             </div>
 
+            <div>
+              <FieldLabel>Vendor SKU</FieldLabel>
+              <input
+                value={vendorSku}
+                onChange={(e) => setVendorSku(e.target.value)}
+                placeholder="Vendor SKU…"
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  background: C.cream,
+                  border: `1px solid ${vendorSku !== (product.vendorSku ?? product.vendor_sku ?? "") ? C.gold : C.border}`,
+                  fontFamily: MONO,
+                  fontSize: 13,
+                  color: C.black,
+                  letterSpacing: "0.04em",
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <div>
+              <FieldLabel>Brand Part Number</FieldLabel>
+              <input
+                value={brandPart}
+                onChange={(e) => setBrandPart(e.target.value)}
+                placeholder="Brand part number…"
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  background: C.cream,
+                  border: `1px solid ${brandPart !== (product.brandPartNumber ?? product.brand_part_number ?? "") ? C.gold : C.border}`,
+                  fontFamily: MONO,
+                  fontSize: 13,
+                  color: C.black,
+                  letterSpacing: "0.04em",
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <div>
+              <FieldLabel>OEM Numbers</FieldLabel>
+              <textarea
+                value={oemNumbers}
+                onChange={(e) => setOemNumbers(e.target.value)}
+                placeholder="Comma-separated OEM numbers…"
+                style={{
+                  width: "100%",
+                  minHeight: 82,
+                  padding: "10px 12px",
+                  background: C.cream,
+                  border: `1px solid ${oemNumbers !== (Array.isArray(product.oemNumbers ?? product.oem_numbers) ? (product.oemNumbers ?? product.oem_numbers).join(", ") : "") ? C.gold : C.border}`,
+                  fontFamily: MONO,
+                  fontSize: 13,
+                  color: C.black,
+                  letterSpacing: "0.04em",
+                  outline: "none",
+                  boxSizing: "border-box",
+                  resize: "vertical",
+                }}
+              />
+              <div style={{ fontFamily: MONO, fontSize: 9, color: C.inkLight, letterSpacing: "0.1em", marginTop: 4, textTransform: "uppercase" }}>
+                Stored as an array in the catalog.
+              </div>
+            </div>
+
+            <div>
+              <FieldLabel>Canonical Product</FieldLabel>
+              <input
+                value={canonicalQuery}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setCanonicalQuery(next);
+                  if (/^\d+$/.test(next.trim())) setCanonicalId(next.trim());
+                }}
+                placeholder="Search canonical matches by name, SKU, or brand part…"
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  background: C.cream,
+                  border: `1px solid ${canonicalId !== String(product.canonicalProductId ?? product.canonical_product_id ?? "") ? C.gold : C.border}`,
+                  fontFamily: MONO,
+                  fontSize: 13,
+                  color: C.black,
+                  letterSpacing: "0.04em",
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+              <div style={{ fontFamily: MONO, fontSize: 9, color: C.inkLight, letterSpacing: "0.1em", marginTop: 4, textTransform: "uppercase" }}>
+                Current: {product.canonicalSku ?? product.canonical_sku ?? "—"}{canonicalId ? ` (#${canonicalId})` : ""}
+              </div>
+
+              {canSearchCanonical && canonicalLoading && (
+                <div style={{ fontFamily: MONO, fontSize: 9, color: C.inkLight, letterSpacing: "0.1em", marginTop: 8, textTransform: "uppercase" }}>
+                  Searching canonical matches…
+                </div>
+              )}
+
+              {canSearchCanonical && !canonicalLoading && canonicalResults.length > 0 && (
+                <div style={{
+                  marginTop: 8,
+                  border: `1px solid ${C.borderLight}`,
+                  background: C.cream,
+                  maxHeight: 180,
+                  overflowY: "auto",
+                }}>
+                  {canonicalResults.map((result) => {
+                    const resultId = result.canonical_product_id ? String(result.canonical_product_id) : "";
+                    return (
+                      <button
+                        key={result.id}
+                        type="button"
+                        onClick={() => {
+                          setCanonicalId(resultId);
+                          setCanonicalQuery(result.canonical_sku ?? result.name ?? "");
+                          setCanonicalResults([]);
+                        }}
+                        style={{
+                          width: "100%",
+                          textAlign: "left",
+                          padding: "10px 12px",
+                          border: "none",
+                          borderBottom: `1px solid ${C.borderLight}`,
+                          background: resultId && canonicalId === resultId ? C.goldBg : "transparent",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <div style={{ fontFamily: MONO, fontSize: 11, color: C.black, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                          {result.name}
+                        </div>
+                        <div style={{ fontFamily: MONO, fontSize: 9, color: C.inkLight, letterSpacing: "0.08em", marginTop: 2, textTransform: "uppercase" }}>
+                          {result.source_vendor ?? "—"} · {result.vendor_sku ?? "—"} · {result.display_category ?? "—"}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             {/* Current raw category (read-only reference) */}
             <div style={{
               padding: "10px 12px",
@@ -578,7 +856,7 @@ export default function AdminEditPanel({ product }) {
           )}
           {saveStatus === "err" && (
             <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: C.red, textAlign: "center" }}>
-              ✕ Save failed — check console
+              ✕ {saveMessage || "Save failed"}
             </div>
           )}
           <div style={{ display: "flex", gap: 8 }}>
@@ -601,22 +879,22 @@ export default function AdminEditPanel({ product }) {
             </button>
             <button
               onClick={handleSave}
-              disabled={saving || (!flagMode && !dirty)}
+              disabled={saving || (!flagMode && !dirty) || !activeToken}
               style={{
                 flex: 1,
                 height: 44,
-                background: saving ? C.creamMid : (!flagMode && !dirty) ? C.creamMid : C.gold,
+                background: saving || !activeToken ? C.creamMid : (!flagMode && !dirty) ? C.creamMid : C.gold,
                 border: "none",
                 fontFamily: DISPLAY,
                 fontSize: 18,
                 letterSpacing: "0.12em",
                 textTransform: "uppercase",
-                color: saving || (!flagMode && !dirty) ? C.inkLight : C.black,
-                cursor: saving || (!flagMode && !dirty) ? "not-allowed" : "pointer",
+                color: saving || !activeToken || (!flagMode && !dirty) ? C.inkLight : C.black,
+                cursor: saving || !activeToken || (!flagMode && !dirty) ? "not-allowed" : "pointer",
                 transition: "background 0.15s",
               }}
             >
-              {saving ? "Saving…" : flagMode ? "Submit Flag" : dirty ? "Save Changes" : "No Changes"}
+              {saving ? "Saving…" : !activeToken ? "Token Required" : flagMode ? "Submit Flag" : dirty ? "Save Changes" : "No Changes"}
             </button>
           </div>
           {!flagMode && dirty && (

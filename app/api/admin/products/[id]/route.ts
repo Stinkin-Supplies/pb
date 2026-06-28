@@ -207,6 +207,10 @@ const GENERIC_FIELD_MAP: Record<string, { column: string; cast?: (v: unknown) =>
   description:        { column: "description" },
   brand:              { column: "brand" },
   category:           { column: "category" },
+  display_category:   { column: "display_category", cast: v => (v === null || v === "" ? null : String(v)) },
+  display_subcategory:{ column: "display_subcategory", cast: v => (v === null || v === "" ? null : String(v)) },
+  vendor_sku:         { column: "vendor_sku", cast: v => (v === null || v === "" ? null : String(v)) },
+  brand_part_number:  { column: "brand_part_number", cast: v => (v === null || v === "" ? null : String(v)) },
   price:              { column: "computed_price", cast: v => (v === null || v === "" ? null : Number(v)) },
   msrp:               { column: "msrp",           cast: v => (v === null || v === "" ? null : Number(v)) },
   map_price:          { column: "map_price",      cast: v => (v === null || v === "" ? null : Number(v)) },
@@ -215,8 +219,25 @@ const GENERIC_FIELD_MAP: Record<string, { column: string; cast?: (v: unknown) =>
   is_discontinued:    { column: "is_discontinued" },
   is_harley_fitment:  { column: "is_harley_fitment" },
   is_universal:       { column: "is_universal" },
+  fits_all_models:    { column: "fits_all_models" },
   has_map_policy:     { column: "has_map_policy" },
   pack_qty:           { column: "pack_qty", cast: v => Math.max(1, Math.trunc(Number(v)) || 1) },
+  oem_numbers:        {
+    column: "oem_numbers",
+    cast: v => {
+      if (Array.isArray(v)) return v.map(item => String(item).trim()).filter(Boolean);
+      if (typeof v === "string") {
+        return v.split(",").map(item => item.trim()).filter(Boolean);
+      }
+      return [];
+    },
+  },
+  canonical_product_id:{ column: "canonical_product_id", cast: v => {
+      if (v === null || v === "") return null;
+      const n = Number(v);
+      return Number.isFinite(n) ? Math.trunc(n) : null;
+    },
+  },
   // Era flags — same key in body and column
   era_flathead:       { column: "era_flathead" },
   era_knucklehead:    { column: "era_knucklehead" },
@@ -280,7 +301,7 @@ async function handleGenericUpdate(db: ReturnType<typeof getCatalogDb>, productI
 }
 
 // ── GET — list unresolved flags (handy for admin dashboard) ────
-export async function GET(req: NextRequest, { params: _ }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest) {
   if (!isAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

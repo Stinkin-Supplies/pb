@@ -21,11 +21,11 @@ export async function POST(req: NextRequest) {
   }
 
   const { shared_oem_number, action } = body;
-  if (!shared_oem_number || !['confirm', 'reject'].includes(action)) {
-    return NextResponse.json({ error: 'shared_oem_number and action (confirm|reject) required' }, { status: 400 });
+  if (!shared_oem_number || !['confirm', 'reject', 'reopen'].includes(action)) {
+    return NextResponse.json({ error: 'shared_oem_number and action (confirm|reject|reopen) required' }, { status: 400 });
   }
 
-  const status = action === 'confirm' ? 'confirmed' : 'rejected';
+  const status = action === 'confirm' ? 'confirmed' : action === 'reopen' ? 'pending' : 'rejected';
 
   const client = await pool.connect();
   try {
@@ -33,7 +33,6 @@ export async function POST(req: NextRequest) {
       UPDATE canonical_match_proposals
       SET status = $1, reviewed_by = 'admin-bulk', reviewed_at = NOW()
       WHERE shared_oem_number = $2
-        AND status = 'pending'
       RETURNING id
     `, [status, shared_oem_number]);
 

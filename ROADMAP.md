@@ -1,5 +1,5 @@
 # STINKIN' SUPPLIES — PROJECT ROADMAP
-**Last Updated: June 26, 2026 (Sixtieth Pass)**
+**Last Updated: June 27, 2026 (Sixty-First Pass)**
 
 ---
 
@@ -11,7 +11,7 @@
 | Three vendor staging tables: pu_catalog, wps_catalog, vtwin_catalog | ✅ |
 | catalog_unified — single source of truth (**89,153 active rows**) | ✅ |
 | Internal SKU taxonomy (17 prefixes: ACC, BDY, BRK, DRV, ELC, ENG, EXH, etc.) | ✅ |
-| harley_families / harley_models / harley_model_years (**~365 models, ~2,062 year rows** — audited session 59 against 2026 H-D P&A catalog) | ✅ |
+| harley_families / harley_models / harley_model_years (**~365 models, ~2,090 year rows** — audited session 59; +28 gap rows session 61) | ✅ |
 | Typesense schema + index (**89,153 docs** — reindexed session 60) | ✅ |
 
 ---
@@ -75,6 +75,7 @@
 | **ebc_brake_fitment staging table — 528 rows** (14 H-D families, EBC 2026 catalog, session 60) | ✅ |
 | **hd_battery_fitment staging table — 22 rows** (7 H-D OEM battery SKUs × model/year fitment, session 60) | ✅ |
 | **hd_handlebar_specs staging table — 89 rows** (OEM handlebar dims per model/year 2002-2013, session 60) | ✅ |
+| **bike_specs table — 1,288 rows** (DS FatBook 2026 + OldBook 2026; battery/plugs/belt/chain/sprockets/tires/shock per model+year; UNIQUE(model_year_id, source); session 61 via import_bike_specs.mjs) | ✅ |
 
 ---
 
@@ -296,7 +297,7 @@
 | Typesense reindex automation | Auto-run as post-step in ingest scripts |
 | Unknown match pipeline | match_reason='upc'/'brand_part_number' — source never identified |
 | oem_fitment table | 379,899 rows — legacy, superseded by mv_oem_fitment_coverage |
-| Brake/battery/handlebar finder pages | ebc_brake_fitment + hd_battery_fitment + hd_handlebar_specs staging tables ready — frontend pages unbuilt |
+| Brake/battery/handlebar/spec finder pages | ebc_brake_fitment + hd_battery_fitment + hd_handlebar_specs + bike_specs staging tables ready — frontend pages unbuilt |
 | EBC catalog annual refresh | parse_ebc.py reusable; run against new Issue PDF each year |
 | scrape_vtwin_missing.mjs pg pool fix | Replace concurrent client queries with pool.query() |
 
@@ -319,4 +320,4 @@
 
 ---
 
-*Last updated June 26, 2026 · Session 60*
+*Last updated June 27, 2026 · Session 61*

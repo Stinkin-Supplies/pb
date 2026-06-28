@@ -21,11 +21,11 @@ export async function POST(req: NextRequest) {
   if (!Array.isArray(proposal_ids) || proposal_ids.length === 0) {
     return NextResponse.json({ error: 'proposal_ids array required' }, { status: 400 });
   }
-  if (!['confirm', 'reject'].includes(action)) {
-    return NextResponse.json({ error: 'action must be confirm or reject' }, { status: 400 });
+  if (!['confirm', 'reject', 'reopen'].includes(action)) {
+    return NextResponse.json({ error: 'action must be confirm, reject, or reopen' }, { status: 400 });
   }
 
-  const status = action === 'confirm' ? 'confirmed' : 'rejected';
+  const status = action === 'confirm' ? 'confirmed' : action === 'reopen' ? 'pending' : 'rejected';
 
   const client = await pool.connect();
   try {
@@ -33,7 +33,6 @@ export async function POST(req: NextRequest) {
       UPDATE canonical_match_proposals
       SET status = $1, reviewed_by = 'admin-select', reviewed_at = NOW()
       WHERE id = ANY($2::int[])
-        AND status = 'pending'
       RETURNING id
     `, [status, proposal_ids]);
 

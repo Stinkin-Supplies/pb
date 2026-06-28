@@ -61,6 +61,7 @@ export async function GET(req: NextRequest) {
         a.brand_part_number AS a_brand_part,
         a.oem_numbers   AS a_oem_numbers,
         a.is_kit        AS a_is_kit,
+        a.pack_qty      AS a_pack_qty,
         a.computed_price AS a_price,
         a.image_url     AS a_image,
         a.display_category AS a_category,
@@ -76,6 +77,7 @@ export async function GET(req: NextRequest) {
         b.brand_part_number AS b_brand_part,
         b.oem_numbers   AS b_oem_numbers,
         b.is_kit        AS b_is_kit,
+        b.pack_qty      AS b_pack_qty,
         b.computed_price AS b_price,
         b.image_url     AS b_image,
         b.display_category AS b_category,
@@ -91,6 +93,8 @@ export async function GET(req: NextRequest) {
       LEFT JOIN product_vendors pva ON pva.catalog_unified_id = a.id
       LEFT JOIN product_vendors pvb ON pvb.catalog_unified_id = b.id
       WHERE cmp.status = $1
+        AND a.is_active = true
+        AND b.is_active = true
       ORDER BY cmp.match_score DESC, cmp.id
       LIMIT $2 OFFSET $3
     `, [status, limit, offset]);

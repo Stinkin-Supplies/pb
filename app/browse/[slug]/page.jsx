@@ -6,6 +6,7 @@ import BrowseBackButton from '@/components/browse/BrowseBackButton';
 import ProductImage from '@/components/browse/ProductImage';
 import ProductImageGallery from '@/components/browse/ProductImageGallery';
 import PDPTabs from '@/components/browse/PDPTabs';
+import AdminEditPanel from '@/components/admin/AdminEditPanel';
 
 // Routes LeMans/PU images through local proxy
 function resolveImageSrc(url) {
@@ -31,8 +32,10 @@ async function getProduct(slug) {
       END AS image_urls,
       cu.vendor_sku, cu.source_vendor,
       cu.display_category, cu.display_subcategory, cu.category,
-      cu.is_universal, cu.is_kit, cu.pack_qty,
+      cu.is_universal, cu.fits_all_models, cu.is_kit, cu.pack_qty,
+      cu.canonical_product_id, cu.brand_part_number,
       cu.variant_group_id, cu.oem_numbers,
+      cp.canonical_sku,
       cu.product_details,
       COALESCE(vcnt.cnt, 0)::int AS variant_count
     FROM catalog_unified cu
@@ -49,6 +52,7 @@ async function getProduct(slug) {
         WHERE product_id = cu.id AND media_type = 'image'
       ) _cm
     ) cm ON true
+    LEFT JOIN canonical_products cp ON cp.id = cu.canonical_product_id
     WHERE cu.slug = $1
       AND cu.is_active = true
     LIMIT 1
@@ -154,7 +158,7 @@ async function getOemAlternatives(productId) {
   return rows;
 }
 
-async function getVariantMembers(variantGroupId, currentProductId) {
+async function getVariantMembers(variantGroupId) {
   if (!variantGroupId) return [];
   const db = getCatalogDb();
   const { rows } = await db.query(`
@@ -325,20 +329,16 @@ export default async function ProductDetailPage({ params }) {
                 background: '#fdf8f0',
               }}>
                 <div style={{
-                  width: 52, height: 52, flexShrink: 0,
+                  width: 52, height: 52, flexShrink: 0, position: 'relative',
                   borderRadius: 6, background: '#ffffff',
                   border: '1px solid #e6dcc0', overflow: 'hidden',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
-                  {productRow.image_url ? (
-                    <img
-                      src={resolveImageSrc(productRow.image_url)}
-                      alt={productRow.name}
-                      style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 4 }}
-                    />
-                  ) : (
-                    <div style={{ fontFamily: 'var(--font-stencil)', fontSize: 6, color: '#c9a84c' }}>NO IMG</div>
-                  )}
+                  <ProductImage
+                    src={productRow.image_url}
+                    alt={productRow.name}
+                    padding={4}
+                    placeholderFontSize={6}
+                  />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{
@@ -643,6 +643,26 @@ export default async function ProductDetailPage({ params }) {
           details={productRow.product_details}
         />
 
+        <AdminEditPanel
+          product={{
+            id: productRow.id,
+            sku: productRow.sku,
+            name: productRow.name,
+            sourceVendor: productRow.source_vendor,
+            displayCategory: productRow.display_category,
+            displaySubcategory: productRow.display_subcategory,
+            fitsAllModels: productRow.fits_all_models ?? productRow.is_universal ?? false,
+            packQty: productRow.pack_qty,
+            vendorSku: productRow.vendor_sku,
+            brandPartNumber: productRow.brand_part_number,
+            oemNumbers: productRow.oem_numbers ?? [],
+            canonicalProductId: productRow.canonical_product_id,
+            canonicalSku: productRow.canonical_sku,
+            category: productRow.category,
+            subcategory: productRow.display_subcategory,
+          }}
+        />
+
         {/* ── Chronological timeline ── */}
         {timeline.length > 0 && (
           <section style={{ margin: '40px 28px 0' }}>
@@ -707,25 +727,18 @@ function SidebarProductRow({ product, isLast }) {
         width: 52,
         height: 52,
         flexShrink: 0,
+        position: 'relative',
         borderRadius: 6,
         background: '#ffffff',
         border: '1px solid #e6dcc0',
         overflow: 'hidden',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
       }}>
-        {src ? (
-          <img
-            src={src}
-            alt={product.name}
-            style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 4 }}
-          />
-        ) : (
-          <div style={{ fontFamily: 'var(--font-stencil)', fontSize: 6, color: '#c9a84c', letterSpacing: '0.06em' }}>
-            NO IMG
-          </div>
-        )}
+        <ProductImage
+          src={src}
+          alt={product.name}
+          padding={4}
+          placeholderFontSize={6}
+        />
       </div>
 
       {/* Info */}

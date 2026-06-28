@@ -1,32 +1,52 @@
-// ============================================================
-// app/api/products/route.ts
-// ============================================================
-// Phase 10 — catalog_fitment retired. Fitment filtering uses
-// catalog_fitment_v2 only.
-// ============================================================
+/**
+ * app/api/products/route.ts
+ *
+ * Legacy products endpoint used by brand pages and older product grids.
+ * This now delegates to the canonical browse filter pipeline so the unified
+ * catalog behaves the same way everywhere.
+ */
 
-import { NextResponse } from "next/server";
-import getCatalogDb from "@/lib/db/catalog";
+import { NextRequest, NextResponse } from "next/server";
+import { browseProducts, type BrowseFilters, type CatalogProduct } from "@/lib/db/browse";
+import { proxyImageUrl, proxyImageUrls } from "@/lib/utils/image-proxy";
 
-const PAGE_SIZE_DEFAULT = 48;
-const PAGE_SIZE_MAX = 96;
+export const runtime = "nodejs";
 
-type FacetCounts = { name: string; count: number };
-type FacetResponse = {
-  categories: FacetCounts[];
-  brands: FacetCounts[];
-  priceRange: { min: number; max: number };
+type LegacyBrowseRow = CatalogProduct & {
+  image_urls?: string[] | null;
+  msrp?: number | null;
+  map_price?: number | null;
+  closeout?: boolean;
+  features?: string[];
+  description?: string | null;
+  is_harley_fitment?: boolean;
+  fitment_hd_families?: string[];
+  fitment_hd_codes?: string[];
+  fitment_year_start?: number | null;
+  fitment_year_end?: number | null;
+  drag_part?: boolean;
+  warehouse_wi?: number;
+  warehouse_ny?: number;
+  warehouse_tx?: number;
 };
 
-function proxyVTwinUrl(url: string | null | undefined): string | null {
-  if (!url) return null;
-  if (url.includes('vtwinmfg.com')) return `/api/image-proxy?url=${encodeURIComponent(url)}`;
-  return url;
+function normalizeNumber(value: string | null): number | undefined {
+  if (value == null || value === "") return undefined;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
 }
 
-function normalizeProductRow(row: any) {
-  const price = Number(row.price ?? row.msrp ?? row.cost ?? 0);
+function normalizeInt(value: string | null): number | undefined {
+  if (value == null || value === "") return undefined;
+  const n = parseInt(value, 10);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function mapLegacyProduct(row: LegacyBrowseRow) {
+  const price = Number(row.price ?? 0);
   const stockQty = Number(row.stock_quantity ?? 0);
+  const image = proxyImageUrl(row.image_url ?? null);
+  const images = proxyImageUrls(Array.isArray(row.image_urls) ? row.image_urls : []);
 
   return {
     id: row.id,
@@ -34,14 +54,18 @@ function normalizeProductRow(row: any) {
     slug: row.slug,
     name: row.name,
     brand: row.brand ?? "",
-    category: row.category ?? "",
+    category: row.category ?? row.display_category ?? "",
+    display_category: row.display_category ?? null,
+    display_subcategory: row.display_subcategory ?? null,
     price,
     was: row.msrp && Number(row.msrp) > price ? Number(row.msrp) : null,
     mapPrice: row.map_price ?? null,
     inStock: row.in_stock ?? stockQty > 0,
+    in_stock: row.in_stock ?? stockQty > 0,
     stockQty,
-    image: proxyVTwinUrl(row.image_url ?? row.image ?? null),
-    images: (row.image_urls ?? (row.image_url ? [row.image_url] : [])).map(proxyVTwinUrl),
+    stock_quantity: stockQty,
+    image,
+    images,
     badge: row.closeout ? "sale" : null,
     vendor: row.source_vendor ?? null,
     source_vendor: row.source_vendor ?? null,
@@ -57,253 +81,66 @@ function normalizeProductRow(row: any) {
     warehouseNy: row.warehouse_ny ?? 0,
     warehouseTx: row.warehouse_tx ?? 0,
     oemPartNumber: row.oem_numbers?.[0] ?? null,
+    oem_numbers: row.oem_numbers ?? [],
     priceMin: price,
     priceMax: price,
     brandCount: 1,
     availableBrands: [],
+    variant_count: row.variant_count ?? null,
+    oem_chain_match: row.oem_chain_match ?? false,
   };
 }
 
-export async function GET(req: Request) {
-  const url = new URL(req.url);
-  const category = url.searchParams.get("category") || undefined;
-  const brand = url.searchParams.get("brand") || undefined;
-  const minPrice = url.searchParams.get("minPrice")
-    ? Number(url.searchParams.get("minPrice"))
-    : undefined;
-  const maxPrice = url.searchParams.get("maxPrice")
-    ? Number(url.searchParams.get("maxPrice"))
-    : undefined;
-  const inStock = url.searchParams.get("inStock") === "true" ? true : undefined;
-  const search = url.searchParams.get("search")?.trim() || undefined;
-  const fitmentModel = url.searchParams.get("fitmentModel")?.trim() || undefined;
-  const fitmentYear = url.searchParams.get("fitmentYear")
-    ? parseInt(url.searchParams.get("fitmentYear")!, 10)
-    : undefined;
-  const sort = url.searchParams.get("sort") || "name_asc";
-  const page = Math.max(0, parseInt(url.searchParams.get("page") || "0", 10));
-  const pageSize = Math.min(
-    PAGE_SIZE_MAX,
-    parseInt(url.searchParams.get("pageSize") || String(PAGE_SIZE_DEFAULT), 10)
-  );
-
-  const from = page * pageSize;
-  const db = getCatalogDb();
-
-  const conditions: string[] = ["cu.is_active = true"];
-  const values: any[] = [];
-  let paramIdx = 1;
-
-  if (category) {
-    conditions.push(`cu.category = $${paramIdx++}`);
-    values.push(category);
-  }
-  if (brand) {
-    conditions.push(`cu.brand = $${paramIdx++}`);
-    values.push(brand);
-  }
-  if (minPrice != null && !Number.isNaN(minPrice)) {
-    conditions.push(`COALESCE(cu.computed_price, cu.msrp, cu.cost) >= $${paramIdx++}`);
-    values.push(minPrice);
-  }
-  if (maxPrice != null && !Number.isNaN(maxPrice)) {
-    conditions.push(`COALESCE(cu.computed_price, cu.msrp, cu.cost) <= $${paramIdx++}`);
-    values.push(maxPrice);
-  }
-  if (inStock) {
-    conditions.push(`EXISTS (
-      SELECT 1
-      FROM public.vendor_offers vo
-      WHERE vo.catalog_product_id = cu.id
-        AND vo.is_active = true
-    )`);
-  }
-  if (search) {
-    conditions.push(`(
-      cu.name ILIKE $${paramIdx}
-      OR cu.sku ILIKE $${paramIdx}
-      OR cu.brand ILIKE $${paramIdx}
-      OR cu.category ILIKE $${paramIdx}
-    )`);
-    values.push(`%${search}%`);
-    paramIdx++;
-  }
-
-  // Fitment filtering — catalog_fitment_v2 only
-  if (fitmentModel && fitmentYear) {
-    conditions.push(`
-      EXISTS (
-        SELECT 1 FROM catalog_fitment_v2 cfv
-        JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id
-        JOIN harley_models hm ON hm.id = hmy.model_id
-        WHERE cfv.product_id = cu.id
-          AND hm.model_code = $${paramIdx++}
-          AND hmy.year = $${paramIdx++}
-      )
-    `);
-    values.push(fitmentModel, fitmentYear);
-  } else if (fitmentModel) {
-    conditions.push(`
-      EXISTS (
-        SELECT 1 FROM catalog_fitment_v2 cfv
-        JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id
-        JOIN harley_models hm ON hm.id = hmy.model_id
-        WHERE cfv.product_id = cu.id
-          AND hm.model_code = $${paramIdx++}
-      )
-    `);
-    values.push(fitmentModel);
-  } else if (fitmentYear) {
-    conditions.push(`
-      EXISTS (
-        SELECT 1 FROM catalog_fitment_v2 cfv
-        JOIN harley_model_years hmy ON hmy.id = cfv.model_year_id
-        WHERE cfv.product_id = cu.id
-          AND hmy.year = $${paramIdx++}
-      )
-    `);
-    values.push(fitmentYear);
-  }
-
-  const where = conditions.join(" AND ");
-  const orderMap: Record<string, string> = {
-    newest: "cu.created_at DESC",
-    price_asc: "COALESCE(cu.computed_price, cu.msrp, cu.cost) ASC",
-    price_desc: "COALESCE(cu.computed_price, cu.msrp, cu.cost) DESC",
-    name_asc: "cu.name ASC",
-  };
-  const orderClause = orderMap[sort] ?? orderMap.newest;
+export async function GET(req: NextRequest) {
+  const p = req.nextUrl.searchParams;
 
   try {
-    const [{ rows }, countResult, categoriesResult, brandsResult, priceRangeResult] = await Promise.all([
-      db.query(
-        `SELECT
-            cu.id,
-            cu.sku,
-            cu.slug,
-            cu.name,
-            cu.brand,
-            cu.category,
-            COALESCE(cu.computed_price, cu.msrp, cu.cost, 0) AS price,
-            cu.msrp,
-            cu.map_price,
-            cu.weight,
-            cu.description,
-            cu.is_active,
-            cu.created_at,
-            COALESCE((
-              SELECT cm.url
-              FROM public.catalog_media cm
-              WHERE cm.product_id = cu.id
-              ORDER BY cm.priority ASC
-              LIMIT 1
-            ), cu.image_url) AS image_url,
-            COALESCE((
-              SELECT ARRAY_AGG(cm.url ORDER BY cm.priority ASC)
-              FROM public.catalog_media cm
-              WHERE cm.product_id = cu.id
-            ), cu.image_urls, '{}'::text[]) AS image_urls,
-            COALESCE((
-              SELECT SUM(vo.total_qty)
-              FROM public.vendor_offers vo
-              WHERE vo.catalog_product_id = cu.id
-                AND vo.is_active = true
-            ), cu.stock_quantity, 0) AS stock_quantity,
-            COALESCE((
-              SELECT BOOL_OR(vo.is_active)
-              FROM public.vendor_offers vo
-              WHERE vo.catalog_product_id = cu.id
-            ), cu.in_stock, false) AS in_stock,
-            cu.source_vendor,
-            cu.is_harley_fitment,
-            cu.fitment_hd_families,
-            cu.fitment_hd_codes,
-            cu.fitment_year_start,
-            cu.fitment_year_end,
-            cu.drag_part,
-            cu.features,
-            cu.warehouse_wi,
-            cu.warehouse_ny,
-            cu.warehouse_tx,
-         FROM public.catalog_unified cu
-         LEFT JOIN public.catalog_products cp ON cp.sku = cu.sku
-         WHERE ${where}
-         ORDER BY ${orderClause}
-         LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
-        [...values, pageSize, from]
-      ),
-      db.query(
-        `SELECT COUNT(*)::int AS count
-         FROM public.catalog_unified cu
-         WHERE ${where}`,
-        values
-      ),
-      db.query(
-        `SELECT cu.category AS name, COUNT(DISTINCT cu.id)::int AS count
-         FROM public.catalog_unified cu
-         WHERE ${where}
-         GROUP BY cu.category
-         ORDER BY count DESC
-         LIMIT 20`,
-        values
-      ),
-      db.query(
-        `SELECT cu.brand AS name, COUNT(DISTINCT cu.id)::int AS count
-         FROM public.catalog_unified cu
-         WHERE ${where}
-         GROUP BY cu.brand
-         ORDER BY count DESC
-         LIMIT 30`,
-        values
-      ),
-      db.query(
-        `SELECT
-           MIN(COALESCE(cu.computed_price, cu.msrp, cu.cost)) AS min,
-           MAX(COALESCE(cu.computed_price, cu.msrp, cu.cost)) AS max
-         FROM public.catalog_unified cu
-         WHERE ${where}`,
-        values
-      ),
-    ]);
+    const families = p.getAll("family");
+    const modelCodes = p.getAll("model_code");
+    const dbCategories = p.getAll("dbCategory");
 
-    const total = Number(countResult.rows[0]?.count ?? 0);
-    const products = rows.map(normalizeProductRow);
-    const facets = {
-      categories: categoriesResult.rows ?? [],
-      brands: brandsResult.rows ?? [],
-      priceRange: {
-        min: Number(priceRangeResult.rows[0]?.min ?? 0),
-        max: Number(priceRangeResult.rows[0]?.max ?? 0),
-      },
+    const filters: BrowseFilters = {
+      eraSlug:      p.get("era") || undefined,
+      families:     families.length ? families : undefined,
+      family:       families.length === 1 ? families[0] : undefined,
+      yearMin:      normalizeInt(p.get("year_min")) ?? normalizeInt(p.get("yearStart")),
+      yearMax:      normalizeInt(p.get("year_max")) ?? normalizeInt(p.get("yearEnd")),
+      year:         normalizeInt(p.get("year")) ?? normalizeInt(p.get("fitmentYear")),
+      universal:    p.get("universal") === "true",
+      modelCode:    p.get("model") || p.get("fitmentModel") || undefined,
+      modelCodes:   modelCodes.length ? modelCodes : undefined,
+      dbCategories: dbCategories.length ? dbCategories : undefined,
+      category:     dbCategories.length === 0 ? (p.get("display_category") || p.get("category") || undefined) : undefined,
+      subcategory:  p.get("subcategory") || p.get("display_subcategory") || undefined,
+      displayCategory:    p.get("display_category") || undefined,
+      displaySubcategory: p.get("display_subcategory") || undefined,
+      brand:        p.get("brand") || undefined,
+      inStock:      p.get("in_stock") === "true" || p.get("inStock") === "true",
+      search:       p.get("q")?.trim() || p.get("search")?.trim() || undefined,
+      minPrice:     normalizeNumber(p.get("min_price")) ?? normalizeNumber(p.get("minPrice")),
+      maxPrice:     normalizeNumber(p.get("max_price")) ?? normalizeNumber(p.get("maxPrice")),
+      page:         (normalizeInt(p.get("page")) ?? 0) + 1,
+      perPage:      normalizeInt(p.get("per_page")) ?? normalizeInt(p.get("pageSize")) ?? 48,
+      sort:         (p.get("sort") as BrowseFilters["sort"]) || (p.get("q") || p.get("search") ? "relevance" : "newest"),
     };
 
+    // Brand pages historically used zero-based pagination. Keep that working.
+    const result = await browseProducts(filters);
+
+    const products = result.products.map(mapLegacyProduct);
     return NextResponse.json({
       products,
-      total,
-      page,
-      pageSize,
-      total_pages: Math.max(1, Math.ceil(total / pageSize)),
+      total: result.total,
       facets: {
-        categories: facets.categories,
-        brands: facets.brands,
-        priceRange: facets.priceRange,
-        price_range: facets.priceRange,
+        categories: result.facets.categories,
+        brands: result.facets.brands,
+        priceRange: { min: 0, max: 0 },
+        price_range: { min: 0, max: 0 },
       },
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error("[api/products]", msg);
-    return NextResponse.json(
-      {
-        error: "Failed to load products",
-        message: msg,
-        products: [],
-        total: 0,
-        page,
-        pageSize,
-        facets: { categories: [], brands: [], priceRange: { min: 0, max: 0 } },
-      },
-      { status: 500 }
-    );
+    const message = err instanceof Error ? err.message : "Unknown products error";
+    console.error("[products] error:", message);
+    return NextResponse.json({ error: message, products: [], total: 0, facets: { categories: [], brands: [], priceRange: { min: 0, max: 0 } } }, { status: 500 });
   }
 }

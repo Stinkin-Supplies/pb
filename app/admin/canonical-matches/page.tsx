@@ -146,12 +146,13 @@ export default function CanonicalMatchesPage() {
   const [searching, setSearching] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [manualMatchMsg, setManualMatchMsg] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'pending' | 'applied' | 'rejected'>('pending');
 
   const load = useCallback(async () => {
     if (!token) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/canonical-matches?token=${encodeURIComponent(token)}&status=pending&limit=200`);
+      const res = await fetch(`/api/admin/canonical-matches?token=${encodeURIComponent(token)}&status=${statusFilter}&limit=200`);
       const data = await res.json();
       if (data.error) {
         setError(data.error);
@@ -166,7 +167,7 @@ export default function CanonicalMatchesPage() {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, statusFilter]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -271,7 +272,7 @@ export default function CanonicalMatchesPage() {
     }
   }
 
-  async function bulkAction(oem: string, action: 'confirm' | 'reject') {
+  async function bulkAction(oem: string, action: 'confirm' | 'reject' | 'reopen') {
     setBusyGroups(prev => new Set(prev).add(oem));
     try {
       await fetch('/api/admin/canonical-matches/bulk', {
@@ -286,6 +287,20 @@ export default function CanonicalMatchesPage() {
         next.delete(oem);
         return next;
       });
+    }
+  }
+
+  async function reopenGroup(oem: string, group: Proposal[]) {
+    setBusyGroups(prev => new Set(prev).add(oem));
+    try {
+      await fetch('/api/admin/canonical-matches/select', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, proposal_ids: group.map(p => p.id), action: 'reopen' }),
+      });
+      setProposals(prev => prev.filter(p => groupKeyOf(p) !== oem));
+    } finally {
+      setBusyGroups(prev => { const next = new Set(prev); next.delete(oem); return next; });
     }
   }
 
@@ -507,14 +522,33 @@ export default function CanonicalMatchesPage() {
           <div style={{ fontSize: 13, color: '#1E8A6B', marginBottom: 10, fontWeight: 600 }}>{appliedMsg}</div>
         )}
 
-        <p style={{ fontSize: 13, color: '#666', marginTop: 0, marginBottom: 24, textTransform: 'none' }}>
+        <p style={{ fontSize: 13, color: '#666', marginTop: 0, marginBottom: 16, textTransform: 'none' }}>
           Grouped by shared OEM number — <b>{groups.size}</b> groups, <b>{proposals.length}</b> pairs.
           Confirming a group queues the merge — click &quot;Apply confirmed merges&quot; to execute.
           <br />
           <b>Sync fitment</b> copies the combined year/model coverage to every vendor listing in the group, even if you reject the canonical merge.
         </p>
 
-        <div style={{ border: '1px solid #ddd8cc', borderRadius: 10, padding: 14, marginBottom: 24, background: '#fcfbf8' }}>
+        {/* ── Status tabs ── */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 24, borderBottom: '2px solid #e5e0d5', paddingBottom: 8 }}>
+          {(['pending', 'applied', 'rejected'] as const).map(s => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              style={{
+                padding: '6px 18px', fontSize: 13, fontWeight: 700, borderRadius: 6,
+                border: '1px solid #ccc', cursor: 'pointer', textTransform: 'uppercase',
+                background: statusFilter === s ? '#C9A84C' : '#fff',
+                color: statusFilter === s ? '#1a1208' : '#666',
+              }}
+            >
+              {s} ({counts[s] ?? 0})
+            </button>
+          ))}
+        </div>
+
+        {statusFilter === 'pending' && (
+          <div style={{ border: '1px solid #ddd8cc', borderRadius: 10, padding: 14, marginBottom: 24, background: '#fcfbf8' }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a', marginBottom: 8, textTransform: 'none' }}>
             Add a match the scan missed
           </div>
@@ -602,13 +636,14 @@ export default function CanonicalMatchesPage() {
             )}
           </div>
         </div>
+        )} {/* end pending-only manual match section */}
 
         {loading && <div style={{ color: '#666' }}>Loading...</div>}
         {error && <div style={{ color: '#c0392b', fontWeight: 600 }}>{error}</div>}
 
         {!loading && groups.size === 0 && (
           <div style={{ padding: 48, textAlign: 'center', color: '#999', border: '1px dashed #ccc', borderRadius: 10 }}>
-            No pending proposals. {counts.applied ? `${counts.applied} already applied.` : ''}
+            No {statusFilter} proposals.{statusFilter === 'pending' && counts.applied ? ` ${counts.applied} already applied.` : ''}
           </div>
         )}
 
@@ -726,6 +761,7 @@ export default function CanonicalMatchesPage() {
                       {syncMsg}
                     </span>
                   )}
+                  {statusFilter === 'pending' && (<>
                   <button
                     onClick={() => syncFitment(oem, productIds)}
                     style={{
@@ -770,22 +806,34 @@ export default function CanonicalMatchesPage() {
                     Reject all
                   </button>
                   {isPartialSelection ? (
-                    <button
-                      disabled={isBusy}
-                      onClick={() => selectiveAction(oem, group, sel, 'confirm')}
-                      style={{
-                        fontSize: 12, padding: '6px 12px', borderRadius: 5,
-                        border: '1px solid #3B6D11',
-                        background: selectedPairCount > 0 ? '#e6f4d9' : '#fff3e0',
-                        color: selectedPairCount > 0 ? '#3B6D11' : '#8a5a00',
-                        fontWeight: 700, cursor: isBusy ? 'default' : 'pointer',
-                        opacity: isBusy ? 0.5 : 1, textTransform: 'none',
-                      }}
-                    >
-                      {selectedPairCount > 0
-                        ? `Confirm ${selectedPairCount} pair${selectedPairCount !== 1 ? 's' : ''} · reject rest`
-                        : 'Reject deselected'}
-                    </button>
+                    <>
+                      {selectedPairCount > 0 && (
+                        <button
+                          disabled={isBusy}
+                          onClick={() => selectiveAction(oem, group, sel, 'confirm')}
+                          style={{
+                            fontSize: 12, padding: '6px 12px', borderRadius: 5,
+                            border: '1px solid #3B6D11', background: '#e6f4d9', color: '#3B6D11',
+                            fontWeight: 700, cursor: isBusy ? 'default' : 'pointer',
+                            opacity: isBusy ? 0.5 : 1, textTransform: 'none',
+                          }}
+                        >
+                          Confirm {selectedPairCount} pair{selectedPairCount !== 1 ? 's' : ''}
+                        </button>
+                      )}
+                      <button
+                        disabled={isBusy}
+                        onClick={() => selectiveAction(oem, group, sel, 'reject')}
+                        style={{
+                          fontSize: 12, padding: '6px 12px', borderRadius: 5,
+                          border: '1px solid #ddd', background: '#fff', color: '#993C1D',
+                          fontWeight: 700, cursor: isBusy ? 'default' : 'pointer',
+                          opacity: isBusy ? 0.5 : 1, textTransform: 'none',
+                        }}
+                      >
+                        Reject deselected
+                      </button>
+                    </>
                   ) : (
                     <button
                       disabled={isBusy}
@@ -799,6 +847,54 @@ export default function CanonicalMatchesPage() {
                       Confirm all ({group.length} pair{group.length !== 1 ? 's' : ''})
                     </button>
                   )}
+                  </>)} {/* end pending-only actions */}
+
+                  {statusFilter === 'rejected' && (<>
+                  <button
+                    disabled={isBusy}
+                    onClick={() => reopenGroup(oem, group)}
+                    style={{
+                      fontSize: 12, padding: '6px 12px', borderRadius: 5,
+                      border: '1px solid #888', background: '#f5f5f5', color: '#444',
+                      fontWeight: 600, cursor: isBusy ? 'default' : 'pointer', opacity: isBusy ? 0.5 : 1, textTransform: 'none',
+                    }}
+                  >
+                    Re-open to pending
+                  </button>
+                  <button
+                    disabled={isBusy}
+                    onClick={() => isRealOemGroup(oem) ? bulkAction(oem, 'confirm') : actOnGroupByIds(oem, group, 'confirm')}
+                    style={{
+                      fontSize: 12, padding: '6px 12px', borderRadius: 5,
+                      border: '1px solid #3B6D11', background: '#e6f4d9', color: '#3B6D11',
+                      fontWeight: 700, cursor: isBusy ? 'default' : 'pointer', opacity: isBusy ? 0.5 : 1, textTransform: 'none',
+                    }}
+                  >
+                    ✓ Confirm (was rejected)
+                  </button>
+                  {!oem.startsWith('MANUAL-') && (
+                    <button
+                      disabled={isBusy}
+                      onClick={() => flagAsVariant(
+                        oem, productIds,
+                        finishMismatch
+                          ? `different finishes (${[...distinctFinishes].join(' vs ')})`
+                          : packMismatch
+                          ? `different pack sizes (${packQtys.map(q => `${q}x`).join(' vs ')})`
+                          : priceMismatch
+                          ? `different sizes/lengths — price differs ${priceRatio.toFixed(1)}x ($${priceMin.toFixed(2)}–$${priceMax.toFixed(2)})`
+                          : 'flagged for variant review'
+                      )}
+                      style={{
+                        fontSize: 12, padding: '6px 12px', borderRadius: 5,
+                        border: '1px solid #534AB7', background: '#eeedfe', color: '#534AB7',
+                        fontWeight: 600, cursor: isBusy ? 'default' : 'pointer', opacity: isBusy ? 0.5 : 1, textTransform: 'none',
+                      }}
+                    >
+                      Flag as variant set
+                    </button>
+                  )}
+                  </>)} {/* end rejected actions */}
                 </div>
               </div>
 
@@ -807,16 +903,16 @@ export default function CanonicalMatchesPage() {
                   const ranges = fitment[p.id];
                   const isEditing = editingId === p.id;
                   const saveMsg = saveMsgs[p.id];
-                  const isSelected = sel.has(p.id);
+                  const isSelected = statusFilter === 'pending' && sel.has(p.id);
                   return (
                     <div key={p.id} style={{
                       display: 'flex', gap: 12, alignItems: 'flex-start',
-                      border: `1px solid ${isSelected ? '#cfe8bd' : '#f5c6c0'}`,
+                      border: '1px solid #ddd8cc',
                       borderRadius: 8, padding: 12,
                       flex: '1 1 320px', minWidth: 300,
-                      background: isSelected ? '#f9fdf6' : '#fdf6f5',
+                      background: '#faf8f3',
                     }}>
-                      <input
+                      {statusFilter === 'pending' && <input
                         type="checkbox"
                         checked={isSelected}
                         onChange={() => {
@@ -825,7 +921,7 @@ export default function CanonicalMatchesPage() {
                         }}
                         title={isSelected ? 'Uncheck to exclude from merge' : 'Check to include in merge'}
                         style={{ marginTop: 4, width: 16, height: 16, flexShrink: 0, cursor: 'pointer', accentColor: '#3B6D11' }}
-                      />
+                      />}
                       {p.image_url ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={p.image_url} alt="" style={{ width: 56, height: 56, objectFit: 'contain', borderRadius: 4, background: '#fff', border: '1px solid #eee', flexShrink: 0 }} />
