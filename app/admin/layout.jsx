@@ -202,6 +202,7 @@ export default async function AdminLayout({ children }) {
         { href: "/admin/products",     icon: "▤", label: "PRODUCTS"            },
         { href: "/admin/oem-crossref", icon: "⇄", label: "OEM CROSS-REF"       },
         { href: `/admin/canonical-matches?token=${process.env.ADMIN_SECRET}`, icon: "⇆", label: "CANONICAL MATCHES" },
+        { href: `/admin/parts-timeline?token=${process.env.ADMIN_SECRET}`, icon: "▬", label: "PARTS TIMELINE"     },
       ],
     },
     {

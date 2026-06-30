@@ -91,7 +91,13 @@ export async function GET(
           SELECT DISTINCT ON (cvg.id)
             cvg.id,
             cvg.display_name,
-            cu.slug AS representative_slug
+            cu.slug AS representative_slug,
+            COALESCE(
+              (SELECT cm.url FROM catalog_media cm
+               WHERE cm.product_id = cu.id
+               ORDER BY cm.priority ASC, cm.id ASC LIMIT 1),
+              cu.image_url
+            ) AS image_url
           FROM catalog_variant_groups cvg
           JOIN catalog_variant_members cvm ON cvm.group_id = cvg.id
           JOIN catalog_unified cu ON cu.id = cvm.product_id
@@ -103,15 +109,35 @@ export async function GET(
         `, [group_id, family_key])
       : { rows: [] };
 
+    // Also pull the current group's representative image (sort_order=0 member)
+    const currentGroupImageRow = await db.query(`
+      SELECT COALESCE(
+        (SELECT cm.url FROM catalog_media cm
+         WHERE cm.product_id = cu.id
+         ORDER BY cm.priority ASC, cm.id ASC LIMIT 1),
+        cu.image_url
+      ) AS image_url
+      FROM catalog_variant_members cvm
+      JOIN catalog_unified cu ON cu.id = cvm.product_id
+      WHERE cvm.group_id = $1
+      ORDER BY cvm.sort_order ASC NULLS LAST
+      LIMIT 1
+    `, [group_id]);
+
     const siblingGroups = siblingRows.rows.map(r => ({
       id: r.id,
       displayName: r.display_name,
       representativeSlug: r.representative_slug,
+      imageUrl: r.image_url ?? null,
     }));
 
     return NextResponse.json({
       hasVariants: true,
-      group: { id: group_id, displayName: display_name },
+      group: {
+        id: group_id,
+        displayName: display_name,
+        imageUrl: currentGroupImageRow.rows[0]?.image_url ?? null,
+      },
       currentProductId: id,
       variants: siblings.rows,
       siblingGroups: siblingGroups.length > 0 ? siblingGroups : undefined,

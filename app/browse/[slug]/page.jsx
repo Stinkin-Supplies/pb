@@ -660,6 +660,8 @@ export default async function ProductDetailPage({ params }) {
             canonicalSku: productRow.canonical_sku,
             category: productRow.category,
             subcategory: productRow.display_subcategory,
+            image_url: productRow.image_url,
+            image_urls: productRow.image_urls ?? [],
           }}
         />
 

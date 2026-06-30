@@ -102,8 +102,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Any 'confirmed' proposals where both sides already point to the same
-    // canonical (e.g. merged via a different pair already) — mark applied
+    // Confirmed proposals where both sides already point to the same canonical → mark applied
     await client.query(`
       UPDATE canonical_match_proposals cmp
       SET status = 'applied'
@@ -111,7 +110,22 @@ export async function POST(req: NextRequest) {
         AND EXISTS (
           SELECT 1 FROM catalog_unified a, catalog_unified b
           WHERE a.id = cmp.product_id_a AND b.id = cmp.product_id_b
+            AND a.canonical_product_id IS NOT NULL
             AND a.canonical_product_id = b.canonical_product_id
+        )
+    `);
+
+    // Confirmed proposals where a product has no canonical_product_id or is inactive
+    // — they can never be merged, reject them to clear the queue
+    await client.query(`
+      UPDATE canonical_match_proposals cmp
+      SET status = 'rejected', reviewed_by = 'auto-cleanup-no-canonical', reviewed_at = NOW()
+      FROM catalog_unified a, catalog_unified b
+      WHERE a.id = cmp.product_id_a AND b.id = cmp.product_id_b
+        AND cmp.status = 'confirmed'
+        AND (
+          a.canonical_product_id IS NULL OR b.canonical_product_id IS NULL
+          OR NOT a.is_active OR NOT b.is_active
         )
     `);
 

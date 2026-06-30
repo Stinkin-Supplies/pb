@@ -40,9 +40,13 @@ export async function GET(req: NextRequest) {
   const client = await pool.connect();
   try {
     const { rows: counts } = await client.query(`
-      SELECT status, COUNT(*) AS n
-      FROM canonical_match_proposals
-      GROUP BY status
+      SELECT cmp.status, COUNT(*) AS n
+      FROM canonical_match_proposals cmp
+      JOIN catalog_unified a ON a.id = cmp.product_id_a
+      JOIN catalog_unified b ON b.id = cmp.product_id_b
+      WHERE a.is_active = true AND b.is_active = true
+        AND cmp.reviewed_by IS DISTINCT FROM 'flagged-as-variant'
+      GROUP BY cmp.status
     `);
 
     const { rows } = await client.query(`
@@ -95,6 +99,7 @@ export async function GET(req: NextRequest) {
       WHERE cmp.status = $1
         AND a.is_active = true
         AND b.is_active = true
+        AND cmp.reviewed_by IS DISTINCT FROM 'flagged-as-variant'
       ORDER BY cmp.match_score DESC, cmp.id
       LIMIT $2 OFFSET $3
     `, [status, limit, offset]);

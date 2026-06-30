@@ -79,10 +79,9 @@ function hasFitmentData(variants) {
 /**
  * Determine render mode:
  *
- * MODE A — fitment+color (NEW):
+ * MODE A — fitment+color:
  *   Variants have BOTH option_1_value (color/finish) AND fitment_by_family.
  *   Group by fitment family first; within each group show color swatches.
- *   This fixes the "3x BLACK / 2x CHROME" duplicate problem.
  *
  * MODE B — fitment only:
  *   Variants have fitment but no option values.
@@ -91,13 +90,33 @@ function hasFitmentData(variants) {
  * MODE C — options only:
  *   Variants have option values but no meaningful fitment.
  *   Show flat VariantCard list (original behavior).
+ *
+ * MODE D — color+qty:
+ *   Two separate radio groups when variants differ by BOTH color and pack qty.
+ *
+ * MODE E — style+finish:
+ *   Sibling groups represent different visual styles (e.g. rotor designs).
+ *   Each sibling group has finish variants within it (Chrome/Polished/Stainless).
+ *   Show image-based style selector + finish pills. Triggered when:
+ *     - siblingGroups exist
+ *     - current group's variants have option_1_value (finish/color axis)
+ *     - variants do NOT have per-member fitment differences (all fit same bikes)
+ *     - group name doesn't look like a gauge group
  */
-function getRenderMode(variants) {
+function getRenderMode(variants, siblingGroups, groupDisplayName) {
   const hasOptions  = variants.some(v => v.option_1_value);
   const hasFitment  = hasFitmentData(variants);
+
+  // Mode E — style+finish (must check before gauge-tab path)
+  if (
+    siblingGroups?.length > 0 &&
+    hasOptions &&
+    !hasFitment &&
+    !/\d+\s*gauge/i.test(groupDisplayName ?? '')
+  ) return 'style+finish';
+
   if (hasOptions && hasFitment) return 'fitment+color';
   if (!hasOptions && hasFitment) return 'fitment';
-  // Mode D: two separate radio groups when variants differ by BOTH color and pack qty
   if (hasOptions) {
     const colors = new Set(variants.map(v => v.option_1_value).filter(Boolean));
     const qtys   = new Set(variants.map(v => v.pack_qty).filter(q => q && q > 1));
@@ -603,6 +622,185 @@ function ColorQtySelector({ variants, currentId, onSelect }) {
   );
 }
 
+// ── MODE E: Style image cards + Finish pills ──────────────────────────────────
+//
+// Renders two rows:
+//   Row 1 — Style: image thumbnail cards, one per sibling group + current group.
+//            Clicking navigates to that group's representative slug.
+//   Row 2 — Finish: text pills for each variant in the current group.
+//            Only shown when current group has >1 member.
+//            Clicking navigates to that product's slug.
+//
+// "Style" is determined by catalog_variant_groups.display_name.
+// "Finish" is determined by option_1_value within the current group.
+//
+function StyleFinishSelector({ currentGroup, siblingGroups, variants, currentId, onNavigate }) {
+  // Build the full ordered style list: current group first, then siblings
+  const allStyles = [
+    { ...currentGroup, isCurrent: true },
+    ...(siblingGroups ?? []).map(s => ({ ...s, isCurrent: false })),
+  ];
+
+  // Current finish = the variant matching currentId
+  const currentVariant = variants.find(v => v.id === currentId);
+
+  function resolveImg(url) {
+    if (!url) return null;
+    if (url.includes('asset.lemansnet.com') || url.includes('lemans')) {
+      return `/api/image-proxy?url=${encodeURIComponent(url)}`;
+    }
+    return url;
+  }
+
+  return (
+    <div style={{ padding: '14px 14px 16px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+
+      {/* ── Style row ── */}
+      <div>
+        <div style={{
+          fontFamily: "var(--font-stencil,'Barlow Condensed',monospace)",
+          fontSize: 9, letterSpacing: '0.14em', color: '#9a8870',
+          textTransform: 'uppercase', marginBottom: 10,
+        }}>
+          Style
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {allStyles.map(style => {
+            const img = resolveImg(style.imageUrl);
+            const isActive = style.isCurrent;
+            return (
+              <button
+                key={style.id}
+                onClick={() => !isActive && onNavigate(style.representativeSlug)}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '10px 10px 8px',
+                  background: isActive ? '#fffbf0' : 'white',
+                  border: `1.5px solid ${isActive ? GOLD : BORDER}`,
+                  borderRadius: 8,
+                  cursor: isActive ? 'default' : 'pointer',
+                  minWidth: 72,
+                  maxWidth: 100,
+                  boxShadow: isActive ? `0 0 0 2px ${GOLD}33` : 'none',
+                  transition: 'all 0.13s',
+                }}
+              >
+                {/* Thumbnail */}
+                <div style={{
+                  width: 52, height: 52, flexShrink: 0,
+                  borderRadius: 6, overflow: 'hidden',
+                  background: isActive ? '#f5ead8' : '#f5f0e8',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  position: 'relative',
+                }}>
+                  {img ? (
+                    <img
+                      src={img}
+                      alt={style.displayName}
+                      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                    />
+                  ) : (
+                    <span style={{ fontSize: 22, opacity: 0.25 }}>◉</span>
+                  )}
+                </div>
+                {/* Style label */}
+                <span style={{
+                  fontFamily: "var(--font-stencil,'Barlow Condensed',monospace)",
+                  fontSize: 9,
+                  color: isActive ? '#7a5810' : '#6b5c40',
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  textAlign: 'center',
+                  lineHeight: 1.25,
+                  maxWidth: 80,
+                }}>
+                  {style.displayName}
+                </span>
+                {isActive && (
+                  <span style={{ width: 4, height: 4, borderRadius: '50%', background: GOLD }} />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Finish row (only when current style has multiple finishes) ── */}
+      {variants.length > 1 && (
+        <div>
+          <div style={{
+            fontFamily: "var(--font-stencil,'Barlow Condensed',monospace)",
+            fontSize: 9, letterSpacing: '0.14em', color: '#9a8870',
+            textTransform: 'uppercase', marginBottom: 10,
+          }}>
+            Finish
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {variants.map(v => {
+              const isActive = v.id === currentId;
+              const inStock  = v.stock_qty > 0;
+              const price    = v.offer_price || v.msrp;
+              return (
+                <button
+                  key={v.id}
+                  onClick={() => !isActive && onNavigate(v.slug)}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    gap: 3,
+                    padding: '8px 14px',
+                    background: isActive ? '#fffbf0' : 'white',
+                    border: `1px solid ${isActive ? GOLD : BORDER}`,
+                    borderRadius: 6,
+                    cursor: isActive ? 'default' : 'pointer',
+                    opacity: inStock ? 1 : 0.5,
+                    boxShadow: isActive ? `0 0 0 2px ${GOLD}33` : 'none',
+                    transition: 'all 0.13s',
+                    minWidth: 72,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <ColorDot value={v.option_1_value} selected={isActive} />
+                    <span style={{
+                      fontFamily: "var(--font-stencil,'Barlow Condensed',monospace)",
+                      fontSize: 12, fontWeight: 600, letterSpacing: '0.06em',
+                      textTransform: 'uppercase',
+                      color: isActive ? '#7a5810' : DARK,
+                    }}>
+                      {v.option_1_value}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {price && (
+                      <span style={{
+                        fontFamily: "var(--font-stencil,'Barlow Condensed',monospace)",
+                        fontSize: 11, color: '#6b5c40',
+                      }}>
+                        ${parseFloat(price).toFixed(2)}
+                      </span>
+                    )}
+                    <span style={{
+                      fontFamily: "var(--font-stencil,'Barlow Condensed',monospace)",
+                      fontSize: 9, letterSpacing: '0.06em',
+                      color: inStock ? '#4a8c5c' : '#b05a40',
+                    }}>
+                      {inStock ? 'IN STOCK' : 'OUT OF STOCK'}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
 export default function VariantSelector({ productId }) {
   const router = useRouter();
@@ -623,8 +821,58 @@ export default function VariantSelector({ productId }) {
   const { variants, currentProductId, group, siblingGroups } = data;
   const currentId = currentProductId ?? productId;
 
+  const mode = getRenderMode(variants, siblingGroups, group?.displayName);
+
+  const handleSelect = (variant) => {
+    setSelected(variant.id);
+    if (variant.slug && variant.id !== productId) {
+      router.push(`/browse/${variant.slug}`);
+    }
+  };
+
+  const handleNavigate = (slug) => {
+    if (slug) router.push(`/browse/${slug}`);
+  };
+
+  // Style+finish mode — render before the card wrapper below
+  if (mode === 'style+finish') {
+    return (
+      <div style={{
+        margin: '16px 0',
+        border: `1px solid ${BORDER}`,
+        borderRadius: 8,
+        overflow: 'hidden',
+        background: CREAM,
+      }}>
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: '10px 14px', background: CREAM2, borderBottom: `1px solid ${BORDER}`,
+        }}>
+          <span style={{
+            fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
+            textTransform: 'uppercase', color: '#6b5c40',
+            fontFamily: "var(--font-stencil,'Barlow Condensed',monospace)",
+          }}>
+            Options
+          </span>
+          <span style={{ fontSize: 11, color: '#9a8870', background: '#ede8de', padding: '2px 8px', borderRadius: 10 }}>
+            {(siblingGroups?.length ?? 0) + 1} styles
+            {variants.length > 1 ? ` · ${variants.length} finishes` : ''}
+          </span>
+        </div>
+        <StyleFinishSelector
+          currentGroup={group}
+          siblingGroups={siblingGroups}
+          variants={variants}
+          currentId={currentId}
+          onNavigate={handleNavigate}
+        />
+      </div>
+    );
+  }
+
   // Gauge tabs
-  const hasTabs = siblingGroups?.length > 0;
+  const hasTabs = siblingGroups?.length > 0 && mode !== 'style+finish';
   const allGroups = hasTabs
     ? (() => {
         const all = [group, ...siblingGroups].sort((a, b) => {
@@ -642,19 +890,10 @@ export default function VariantSelector({ productId }) {
       })()
     : null;
 
-  const handleSelect = (variant) => {
-    setSelected(variant.id);
-    if (variant.slug && variant.id !== productId) {
-      router.push(`/browse/${variant.slug}`);
-    }
-  };
-
   const handleTabClick = (g) => {
     if (g.id === group?.id) return;
     if (g.representativeSlug) router.push(`/browse/${g.representativeSlug}`);
   };
-
-  const mode = getRenderMode(variants);
 
   return (
     <div style={{

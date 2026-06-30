@@ -1,8 +1,8 @@
 # Stinkin' Supplies — Master Reference
-**Last Updated:** June 27, 2026 (Sixty-First Pass)
-**Database:** Hetzner Postgres — stinkin_catalog @ 5.161.100.176:5432
+**Last Updated:** June 29, 2026 (Sixty-Fifth Pass)
+**Database:** Hetzner Postgres — stinkin_catalog @ 5.161.100.126:5432
 
-**Status:** Catalog rebuilt ✅ | Fitment rebuilt ✅ | Search indexed ✅ | Homepage rebuilt ✅ | Font system locked ✅ | ModelFinder built ✅ | FilterSidebar updated ✅ | VariantSelector fitment+color mode ✅ | Variant groups merged ✅ | browse.ts name-grouping ✅ | VTwin SKU dupes resolved ✅ | Filtering system audit complete ✅ | MODEL_ALIASES expanded ✅ | VTwin scraper round 2+3 complete ✅ | CategoryBentoGrid built ✅ | display_subcategory taxonomy COMPLETE ✅ | Canonical merges DRAINED ✅ | PU vendor_sku fully corrected ✅ | product_details JSONB live ✅ | Multi-image galleries live ✅ | OEM supersession table live ✅ | VTwin fitment 55.8% ✅ | HD model reference audited (2026 catalog) ✅ | OEM crossref expanded ✅ | VTwin attributes bug fixed ✅ | EBC brake fitment ingested ✅ | HD battery fitment ingested ✅ | bike_specs table populated ✅
+**Status:** Catalog rebuilt ✅ | Fitment rebuilt ✅ | Search indexed ✅ | Homepage rebuilt ✅ | Font system locked ✅ | ModelFinder built ✅ | FilterSidebar updated ✅ | VariantSelector fitment+color mode ✅ | Variant groups merged ✅ | browse.ts name-grouping ✅ | VTwin SKU dupes resolved ✅ | Filtering system audit complete ✅ | MODEL_ALIASES expanded ✅ | VTwin scraper round 2+3 complete ✅ | CategoryBentoGrid built ✅ | display_subcategory taxonomy COMPLETE ✅ | Canonical merges DRAINED ✅ | PU vendor_sku fully corrected ✅ | product_details JSONB live ✅ | Multi-image galleries live ✅ | OEM supersession table live ✅ | VTwin fitment 55.8% ✅ | HD model reference audited (2026 catalog) ✅ | OEM crossref expanded ✅ | VTwin attributes bug fixed ✅ | EBC brake fitment ingested ✅ | HD battery fitment ingested ✅ | bike_specs table populated ✅ | HD OEM catalog fitment rebuilt (all families, 121 catalogs) ✅ | OEM fitment consolidation pipeline live ✅ | OEM crossref admin page ✅ | Eastern Motorcycle Parts crossref imported (4,832 rows) ✅ | Path C oem_numbers[] bug fixed ✅ | **OEM fitment data quality fixed (session 65): noise rows eliminated, universal promotion family-scoped** ✅ | OEM fitment promoted → catalog_fitment_v2 (5,126,957 rows) ✅ | Parts timeline admin page live ✅ | Typesense reindexed 89,151 docs ✅
 
 ---
 
@@ -11,8 +11,10 @@
 | Metric | Value | Status |
 |--------|-------|--------|
 | catalog_unified (active) | **89,153** | ✅ PU 34,994 / VTwin 38,315 / WPS 15,844 |
-| catalog_fitment_v2 | ~3.9M+ rows | ✅ +86,833 VTwin (session 58) + 3,005 EBC (session 60) |
-| catalog_oem_crossref | **65,434 rows** | ✅ +5,511 vtwin_scrape + 63 HD_OEM battery (session 60) |
+| catalog_fitment_v2 | **5,126,957 rows** | ✅ Rebuilt session 65 — noise rows purged, universal promotion family-scoped |
+| oem_fitment | **315,427 rows** | ✅ All families — 121 catalogs, 37.9% matched. `catalog_family` column added. 130K noise rows eliminated. |
+| catalog_oem_crossref | **~70,329 rows** | ✅ +4,832 Eastern Motorcycle Parts 2022-2024 catalog (session 64) |
+| vtwin_oem_crossref | **12,278 rows** | ✅ 9,006 match catalog_unified via VT- prefix (discovered session 62) |
 | catalog_variant_groups | 7,556+ (+ 148 MULTI pack-size groups) | ✅ |
 | catalog_variant_members | ~29,031+ | ✅ |
 | catalog_media | ~35,990 rows | ✅ PU multi-image from 133 brand XML files |
@@ -20,14 +22,14 @@
 | canonical_products | 89,153 rows — all merges drained | ✅ 2,407 applied, 1,772 rejected |
 | catalog_variant_candidates | 62 pending human review | ⏳ |
 | oem_supersession | **485 pairs** (283 original inferred + 202 vtwin hardware) | ⏳ 283 original pairs confidence=1 pending review |
-| mv_oem_fitment_coverage | 683K rows | ✅ Refreshed session 59 |
+| mv_oem_fitment_coverage | — | ✅ Refreshed session 65 |
 | vtwin_scrape_data | ~31,000+ rows | ✅ +12,398 from scrape_vtwin_missing.mjs |
-| harley_model_years | **~2,090 rows** | ✅ +28 gap rows added session 61 (XL883L 2005-09, FXST 2020, FXLR gaps, FLTRXS 2024-25, RA1250 2025, VRSCB 2006, FLH 1966-71/73-77) |
+| harley_model_years | **~2,090 rows** | ✅ +28 gap rows added session 61 |
 | harley_models | **~365 rows** | ✅ 6 new 2026 codes added (FLHXL, FLHXLSE, FLHXSTSE, FLHLT, FLHLTSE, RA1250L); 1 orphan removed |
 | ebc_brake_fitment | **528 rows** | ✅ NEW session 60 — EBC 2026 catalog, 14 H-D families |
 | hd_battery_fitment | **22 rows** | ✅ NEW session 60 — 7 OEM battery SKUs, model/year fitment |
 | bike_specs | **1,288 rows** | ✅ NEW session 61 — DS FatBook 2026 + DS OldBook 2026; battery/plugs/belt/sprockets/tires/shock per model+year |
-| Typesense | **89,153 docs** | ✅ Reindexed session 60 |
+| Typesense | **89,151 docs** | ✅ Reindexed session 65 (0 errors) |
 
 ### Fitment Coverage (June 26, 2026 — Session 60)
 
@@ -61,7 +63,7 @@ Vercel env: CATALOG_DATABASE_URL
 ⚠️ getCatalogDb() returns a shared pool — never call .end() in API routes.
 ⚠️ Postgres word boundary: use `(\s|$)` not `\b` in regex patterns.
 ⚠️ catalog_fitment_v2 must NEVER be truncated — always use DELETE WHERE or ON CONFLICT.
-⚠️ catalog_fitment_v2 has NO confidence column — do not include in INSERT statements.
+⚠️ catalog_fitment_v2 `confidence_score` column EXISTS — safe to include in INSERTs. (Older rows have NULL.)
 
 ---
 
@@ -106,12 +108,14 @@ Single source of truth. 89,153 active rows.
 - `canonical_product_id` FK → canonical_products.id
 
 ### catalog_fitment_v2
-~3.9M+ rows. Never truncate.
+**5,126,957 rows** (as of session 65). Never truncate.
 - FK: `product_id → catalog_unified.id`, `model_year_id → harley_model_years.id`
-- Sources: JW Boon NOS, PU parsed, WPS API, VTwin scraper (rounds 1+2+3), EBC catalog
-- `fitment_source` values: 'jw_boon', 'pu_parsed', 'wps', 'vtwin_scrape', 'vtwin_fitment_raw', 'canonical_merge_sync', 'ebc_catalog', 'manual'
-- ⚠️ NO `confidence` column — do not include in INSERT statements
+- Sources (session 65): name_extraction (1,553K), jwboon (1,342K), wps (797K), copied_from_crossref (349K), vtwin_partial (210K), oem_catalog_hd_universal (166K), oem_catalog_hd (160K), oem_crossref_fatbook_universal (134K), oem_crossref_fatbook (110K), vtwin_fitment_raw (84K), oem_crossref_vtwin_universal (69K), oem_crossref_vtwin (68K), (none) (48K), canonical_merge_sync (35K), ebc_catalog (2.5K), pu_fitment_expanded (62), manual (43)
+- `fitment_source` values include: 'name_extraction', 'jwboon', 'wps', 'vtwin_partial', 'vtwin_fitment_raw', 'copied_from_crossref', 'canonical_merge_sync', 'ebc_catalog', 'manual', 'oem_catalog_hd', 'oem_catalog_hd_universal', 'oem_catalog', 'oem_crossref_vtwin', 'oem_crossref_vtwin_universal', 'oem_crossref_fatbook', 'oem_crossref_fatbook_universal', 'oem_crossref', 'pu_fitment_expanded'
+- `confidence_score` column EXISTS (some older rows have NULL) — safe to include in INSERTs
+- Priority: manual (1.0) > oem_catalog_hd (0.95) > oem_crossref_vtwin (0.90) > oem_crossref_fatbook (0.88) > oem_catalog_hd_universal (0.85) > oem_crossref_vtwin_universal (0.80) > oem_crossref_fatbook_universal (0.78) > others (no score)
 - Composite indexes: idx_cfv2_product_modelyear + idx_cfv2_modelyear_product
+- ⚠️ Universal oem_* sources are now family-scoped (session 65) — Softail catalog {ALL} only expands to Softail models, not cross-family
 
 ### catalog_oem_crossref
 **65,434 rows.** Canonical OEM ↔ product bridge.
@@ -206,6 +210,8 @@ Single source of truth. 89,153 active rows.
 | `scripts/ingest/import_hd_battery_fitment.mjs` | Creates hd_battery_fitment table and inserts 7 OEM battery SKUs × 22 fitment rows |
 | `scripts/ingest/import_battery_oem_crossref.mjs` | Bridges battery products to H-D OEM numbers via BCI group → catalog_oem_crossref |
 | `scripts/ingest/index_unified.js` | Typesense reindex — uses product_details as primary source |
+| `scripts/ingest/build_oem_fitment_all.mjs` | **PATCHED session 65** — Unified HD OEM PDF catalog extractor. 121 catalogs, all families. Fixes: (1) year-annotation noise filter (`description ~ '^\d{4}$'` rows skipped at parse time); (2) `catalog_family` column now populated from `cat.family` in bulkInsert. `catalog_family` values: sportster/dyna/softail/touring/all_model/fxr/fx/vintage/police. |
+| `scripts/ingest/promote_oem_fitment.mjs` | **PATCHED session 65** — PATH_A_UNIVERSAL, PATH_B_UNIVERSAL, PATH_C_UNIVERSAL now JOIN harley_families and constrain by `f.catalog_family`. A Softail catalog's {ALL} rows only expand to Softail model years. `all_model` family = unrestricted (1340cc era). ON CONFLICT keeps highest confidence. |
 
 ---
 
@@ -231,6 +237,7 @@ Section order (app/page.jsx):
 | Variant Candidates | /admin/variant-candidates?token=... | 62 groups pending variant_group_id building |
 | Database Snapshot | /admin/database | Stats |
 | Fitment & OEM | /admin/fitment | Fitment management |
+| OEM Crossref | /admin/oem-crossref | Inline edit crossref rows; click OEM # to manage fitment modal (2 tabs: Fitment + Products) |
 
 Auth: `?token=` URL param or `X-Admin-Token` header matching `ADMIN_SECRET` env var.
 ⚠️ ADMIN_SECRET not yet added to Vercel production — add with `npx vercel env add ADMIN_SECRET`.
@@ -261,4 +268,47 @@ Auth: `?token=` URL param or `X-Admin-Token` header matching `ADMIN_SECRET` env 
 
 ---
 
-*Master Reference — Last updated June 27, 2026 · Session 61*
+---
+
+## SESSION 63 HANDOFF — June 28, 2026
+
+### Work completed
+
+**OEM fitment promotion — APPLIED** (`scripts/ingest/promote_oem_fitment.mjs`)
+
+Two bugs fixed this session before running:
+- `updated_at` column doesn't exist on catalog_fitment_v2 — removed from UPSERT_SUFFIX
+- PATH_A_UNIVERSAL had FK violation (matched_product_id → deleted products) — added `JOIN catalog_unified cu ON cu.id = f.matched_product_id` to filter
+
+Promotion results (ran against 5,062,086 baseline):
+
+| Path | Variant | Rows Upserted |
+|------|---------|--------------|
+| A — direct match | model-specific (0.95) | 116,434 |
+| A — direct match | universal (0.85) | 454,872 |
+| B — VT- crossref | model-specific (0.90) | 103,005 |
+| B — VT- crossref | universal (0.80) | 356,066 |
+| C — fatbook crossref | model-specific (0.88) | 164,777 |
+| C — fatbook crossref | universal (0.78) | 696,286 |
+| **Total** | | **+737,995 net new** |
+
+**catalog_fitment_v2: 5,062,086 → 5,874,564 rows** (21 distinct sources)
+
+### Next session starting points
+1. Refresh materialized view: `REFRESH MATERIALIZED VIEW CONCURRENTLY mv_oem_fitment_coverage`
+2. Reindex Typesense: `node scripts/ingest/index_unified.js --recreate`
+3. OCR the 4 image-only PDF catalogs (FX 1971-80, FX 1971-84, Softail 2002, WLA 1942):
+   ```bash
+   brew install ocrmypdf
+   ocrmypdf "<path>" "<path>" --skip-text
+   # then: node scripts/ingest/build_oem_fitment_all.mjs --force
+   # then: node scripts/ingest/promote_oem_fitment.mjs
+   ```
+4. Acquire missing catalog years (Dyna 1993–97 gap is largest): microfiche.info, HD dealer portals, hdforums.com
+5. Review 62 variant candidates: `/admin/variant-candidates?token=...`
+6. Review 283 oem_supersession original inferred pairs: `SELECT * FROM oem_supersession_review LIMIT 30`
+7. Payment gateway decision — BLOCKING checkout
+
+---
+
+*Master Reference — Last updated June 29, 2026 · Session 65*

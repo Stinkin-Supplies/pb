@@ -232,6 +232,15 @@ const GENERIC_FIELD_MAP: Record<string, { column: string; cast?: (v: unknown) =>
       return [];
     },
   },
+  image_url:  { column: "image_url",  cast: v => (v === null || v === "" ? null : String(v)) },
+  image_urls: {
+    column: "image_urls",
+    cast: v => {
+      if (Array.isArray(v)) return v.map(u => String(u).trim()).filter(Boolean);
+      if (typeof v === "string") return v.split(",").map(u => u.trim()).filter(Boolean);
+      return [];
+    },
+  },
   canonical_product_id:{ column: "canonical_product_id", cast: v => {
       if (v === null || v === "") return null;
       const n = Number(v);

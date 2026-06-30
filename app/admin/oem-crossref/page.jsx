@@ -519,9 +519,11 @@ export default function OemCrossRefPage() {
   const [source,   setSource]   = useState("");
   const [sort,     setSort]     = useState("oem_number");
   const [dir,      setDir]      = useState("asc");
-  const [showAdd,  setShowAdd]  = useState(false);
-  const [toast,    setToast]    = useState(null);
-  const [deleting, setDeleting] = useState(null);
+  const [showAdd,    setShowAdd]    = useState(false);
+  const [editRow,    setEditRow]    = useState(null); // row object being edited
+  const [oemFitment, setOemFitment] = useState(null); // OEM # string for fitment panel
+  const [toast,      setToast]      = useState(null);
+  const [deleting,   setDeleting]   = useState(null);
 
   // ── Selection state ──
   // selectedIds: Set of row IDs selected on the current page via checkboxes
@@ -776,7 +778,7 @@ export default function OemCrossRefPage() {
       <div className="xref-header">
         <div>
           <div className="xref-title">OEM <span>CROSS-REFERENCE</span></div>
-          <div className="xref-subtitle">HARDDRIVE → WPS PART NUMBER LOOKUP TABLE</div>
+          <div className="xref-subtitle">OEM # ↔ VENDOR SKU LOOKUP · catalog_oem_crossref</div>
         </div>
         <div className="xref-header-right">
           <button className="btn btn-ghost" onClick={() => fetchData({ includeMeta: true })}>↺ REFRESH</button>
@@ -811,7 +813,7 @@ export default function OemCrossRefPage() {
         <input
           ref={searchRef}
           className="xref-input search"
-          placeholder="Search OEM#, WPS#, brand, part#…"
+          placeholder="Search OEM#, vendor SKU, brand, part#…"
           value={search}
           onChange={e => { setSearch(e.target.value); setPage(0); }}
         />
@@ -951,7 +953,7 @@ export default function OemCrossRefPage() {
                   OEM # {sortArrow("oem_number")}
                 </th>
                 <th onClick={() => handleSort("sku")} className={sort === "sku" ? "sorted" : ""}>
-                  WPS # {sortArrow("sku")}
+                  VENDOR SKU {sortArrow("sku")}
                 </th>
                 <th onClick={() => handleSort("oem_manufacturer")} className={sort === "oem_manufacturer" ? "sorted" : ""}>
                   BRAND {sortArrow("oem_manufacturer")}
@@ -962,7 +964,7 @@ export default function OemCrossRefPage() {
                 <th onClick={() => handleSort("source_file")} className={sort === "source_file" ? "sorted" : ""}>
                   SOURCE {sortArrow("source_file")}
                 </th>
-                <th className="no-sort" style={{ width: 48 }}></th>
+                <th className="no-sort" style={{ width: 80 }}></th>
               </tr>
             </thead>
             <tbody>
@@ -976,12 +978,29 @@ export default function OemCrossRefPage() {
                       onChange={() => toggleRow(row.id)}
                     />
                   </td>
-                  <td><span className="cell-oem">{row.oem_number}</span></td>
+                  <td>
+                    <span
+                      className="cell-oem"
+                      style={{ cursor: "pointer", textDecoration: "underline dotted", textUnderlineOffset: 3 }}
+                      title="Manage fitment for this OEM #"
+                      onClick={() => setOemFitment(row.oem_number)}
+                    >
+                      {row.oem_number}
+                    </span>
+                  </td>
                   <td><span className="cell-wps">{row.sku}</span></td>
                   <td><span className="cell-brand">{row.oem_manufacturer || "—"}</span></td>
                   <td><span className="cell-bpn">{row.page_reference || "—"}</span></td>
                   <td><span className="cell-src">{row.source_file || "—"}</span></td>
-                  <td>
+                  <td style={{ display: "flex", gap: 4 }}>
+                    <button
+                      className="delete-btn"
+                      title="Edit entry"
+                      onClick={() => setEditRow(row)}
+                      style={{ color: "#7a6a4f" }}
+                    >
+                      ✎
+                    </button>
                     <button
                       className="delete-btn"
                       title="Delete entry"
@@ -1028,6 +1047,24 @@ export default function OemCrossRefPage() {
         <AddModal
           onClose={() => setShowAdd(false)}
           onSuccess={() => { setShowAdd(false); fetchData({ includeMeta: true }); showToast("Entry added"); }}
+        />
+      )}
+
+      {/* EDIT MODAL */}
+      {editRow && (
+        <EditModal
+          row={editRow}
+          onClose={() => setEditRow(null)}
+          onSuccess={() => { setEditRow(null); fetchData({ includeMeta: true }); showToast("Entry updated"); }}
+        />
+      )}
+
+      {/* OEM FITMENT PANEL */}
+      {oemFitment && (
+        <OemFitmentModal
+          oemNumber={oemFitment}
+          onClose={() => setOemFitment(null)}
+          showToast={showToast}
         />
       )}
 
@@ -1092,7 +1129,7 @@ function AddModal({ onClose, onSuccess }) {
   async function submit(e) {
     e.preventDefault();
     if (!form.oem_number.trim() || !form.sku.trim() || !form.oem_manufacturer.trim()) {
-      setError("OEM #, WPS #, and Brand are required.");
+      setError("OEM #, Vendor SKU, and Brand are required.");
       return;
     }
     setSaving(true);
@@ -1125,8 +1162,8 @@ function AddModal({ onClose, onSuccess }) {
               onChange={e => set("oem_number", e.target.value)} autoFocus />
           </div>
           <div className="modal-field">
-            <label className="modal-label">WPS # <span className="req">*</span></label>
-            <input style={fieldStyle} placeholder="e.g. 681-4810" value={form.sku}
+            <label className="modal-label">VENDOR SKU <span className="req">*</span></label>
+            <input style={fieldStyle} placeholder="e.g. 681-4810 or VT-23-0362" value={form.sku}
               onChange={e => set("sku", e.target.value)} />
           </div>
           <div className="modal-field">
@@ -1229,6 +1266,88 @@ function BulkBrandModal({ count, allMatching, working, brands, onClose, onConfir
   );
 }
 
+// ── Edit Row Modal ────────────────────────────────────────────────────────────
+function EditModal({ row, onClose, onSuccess }) {
+  const [form, setForm] = useState({
+    oem_number:       row.oem_number       ?? "",
+    sku:              row.sku              ?? "",
+    oem_manufacturer: row.oem_manufacturer ?? "",
+    page_reference:   row.page_reference   ?? "",
+    source_file:      row.source_file      ?? "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error,  setError]  = useState("");
+
+  function set(k, v) { setForm(f => ({ ...f, [k]: v })); }
+
+  async function submit(e) {
+    e.preventDefault();
+    if (!form.oem_number.trim() || !form.sku.trim() || !form.oem_manufacturer.trim()) {
+      setError("OEM #, Vendor SKU, and Brand are required.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/oem-crossref/${row.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Save failed");
+      onSuccess();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        <div className="modal-title">EDIT <span>ENTRY</span></div>
+        <div className="modal-subtitle">ID <strong>{row.id}</strong></div>
+        {error && <div className="modal-error">{error}</div>}
+        <form onSubmit={submit}>
+          <div className="modal-field">
+            <label className="modal-label">OEM # <span className="req">*</span></label>
+            <input style={fieldStyle} value={form.oem_number} autoFocus
+              onChange={e => set("oem_number", e.target.value)} />
+          </div>
+          <div className="modal-field">
+            <label className="modal-label">VENDOR SKU <span className="req">*</span></label>
+            <input style={fieldStyle} value={form.sku}
+              onChange={e => set("sku", e.target.value)} />
+          </div>
+          <div className="modal-field">
+            <label className="modal-label">BRAND (OEM_MANUFACTURER) <span className="req">*</span></label>
+            <input style={fieldStyle} value={form.oem_manufacturer}
+              onChange={e => set("oem_manufacturer", e.target.value)} />
+          </div>
+          <div className="modal-field">
+            <label className="modal-label">BRAND PART #</label>
+            <input style={fieldStyle} value={form.page_reference}
+              onChange={e => set("page_reference", e.target.value)} />
+          </div>
+          <div className="modal-field">
+            <label className="modal-label">SOURCE FILE</label>
+            <input style={fieldStyle} value={form.source_file}
+              onChange={e => set("source_file", e.target.value)} />
+          </div>
+          <div className="modal-actions">
+            <button type="button" className="btn btn-ghost" onClick={onClose} disabled={saving}>CANCEL</button>
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              {saving ? "SAVING…" : "SAVE CHANGES"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ── Bulk Add OEM # Modal ──────────────────────────────────────────────────────
 function BulkAddOemModal({ count, allMatching, working, onClose, onConfirm }) {
   const [oemNumber,       setOemNumber]       = useState("");
@@ -1282,6 +1401,308 @@ function BulkAddOemModal({ count, allMatching, working, onClose, onConfirm }) {
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+// ── OEM Fitment Panel ─────────────────────────────────────────────────────────
+const CURRENT_YEAR = new Date().getFullYear();
+
+function OemFitmentModal({ oemNumber, onClose, showToast }) {
+  const [data,      setData]      = useState(null);   // { products, fitment, families }
+  const [loading,   setLoading]   = useState(true);
+  const [tab,       setTab]       = useState("fitment"); // "fitment" | "products"
+  const [adding,    setAdding]    = useState(false);
+  const [removing,  setRemoving]  = useState(null);  // "family|model_code|from|to"
+  const [addErr,    setAddErr]    = useState("");
+
+  // Add form state
+  const [addFamily,  setAddFamily]  = useState("");
+  const [addModel,   setAddModel]   = useState("");   // optional model_code filter
+  const [addFrom,    setAddFrom]    = useState("");
+  const [addTo,      setAddTo]      = useState("");
+
+  useEffect(() => { load(); }, [oemNumber]);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const res  = await fetch(`/api/admin/oem-crossref/oem-fitment?oem_number=${encodeURIComponent(oemNumber)}`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Load failed");
+      setData(json);
+      if (json.families?.length && !addFamily) setAddFamily(json.families[0]);
+    } catch (err) {
+      showToast(err.message, "error");
+      onClose();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleAdd(e) {
+    e.preventDefault();
+    setAddErr("");
+    const from = parseInt(addFrom, 10);
+    const to   = parseInt(addTo,   10);
+    if (!addFamily) { setAddErr("Select a family."); return; }
+    if (!addFrom || isNaN(from)) { setAddErr("Enter a start year."); return; }
+    if (!addTo   || isNaN(to))   { setAddErr("Enter an end year."); return; }
+    if (from > to)               { setAddErr("Start year must be ≤ end year."); return; }
+    setAdding(true);
+    try {
+      const res  = await fetch("/api/admin/oem-crossref/oem-fitment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          oem_number:  oemNumber,
+          family_name: addFamily,
+          year_from:   from,
+          year_to:     to,
+          ...(addModel.trim() ? { model_code: addModel.trim() } : {}),
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Add failed");
+      showToast(`Added ${json.inserted} fitment row${json.inserted !== 1 ? "s" : ""} across ${json.products_affected} product${json.products_affected !== 1 ? "s" : ""}`);
+      load();
+    } catch (err) {
+      setAddErr(err.message);
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  async function handleRemove(row) {
+    const key = `${row.family_name}|${row.model_code}|${row.year_from}|${row.year_to}`;
+    if (!confirm(`Remove ${row.family_name} ${row.model_name} ${row.year_from}–${row.year_to} from all linked products?`)) return;
+    setRemoving(key);
+    try {
+      const res  = await fetch("/api/admin/oem-crossref/oem-fitment", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          oem_number:  oemNumber,
+          family_name: row.family_name,
+          model_code:  row.model_code,
+          year_from:   row.year_from,
+          year_to:     row.year_to,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Remove failed");
+      showToast(`Removed ${json.deleted} fitment row${json.deleted !== 1 ? "s" : ""}`);
+      load();
+    } catch (err) {
+      showToast(err.message, "error");
+    } finally {
+      setRemoving(null);
+    }
+  }
+
+  const iStyle = { ...fieldStyle, width: "100%" };
+  const selStyle = { ...iStyle, cursor: "pointer" };
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}
+      style={{ alignItems: "flex-start", paddingTop: 32 }}>
+      <div className="modal" style={{
+        maxWidth: 680, width: "100%",
+        maxHeight: "calc(100vh - 64px)",
+        display: "flex", flexDirection: "column",
+        overflow: "hidden",
+      }}>
+
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 4 }}>
+          <div>
+            <div className="modal-title">OEM <span>{oemNumber}</span></div>
+            <div className="modal-subtitle">
+              FITMENT MANAGER · applies to all linked products
+            </div>
+          </div>
+          <button onClick={onClose} style={{
+            background: "none", border: "none", color: "var(--chrome)",
+            fontSize: 20, cursor: "pointer", lineHeight: 1, padding: "0 4px"
+          }}>✕</button>
+        </div>
+
+        <div style={{ overflowY: "auto", flex: 1, minHeight: 0 }}>
+        {loading ? (
+          <div className="xref-loading" style={{ padding: "40px 0" }}>
+            <div className="spinner" /> LOADING…
+          </div>
+        ) : (
+          <>
+            {/* Tab bar */}
+            <div style={{ display: "flex", gap: 0, borderBottom: "1px solid var(--steel)", marginBottom: 20 }}>
+              {["fitment", "products"].map(t => (
+                <button key={t} onClick={() => setTab(t)} style={{
+                  background: "none", border: "none", borderBottom: tab === t ? "2px solid var(--orange)" : "2px solid transparent",
+                  color: tab === t ? "var(--orange)" : "var(--chrome)",
+                  fontFamily: "var(--font-stencil), monospace", fontSize: 9, letterSpacing: "0.16em",
+                  padding: "8px 16px", cursor: "pointer", textTransform: "uppercase",
+                  marginBottom: -1,
+                }}>
+                  {t === "fitment"
+                    ? `FITMENT (${data.fitment.length})`
+                    : `PRODUCTS (${data.products.length})`}
+                </button>
+              ))}
+            </div>
+
+            {/* ── FITMENT TAB ── */}
+            {tab === "fitment" && (
+              <>
+                {/* Current fitment table */}
+                {data.fitment.length === 0 ? (
+                  <div style={{ fontSize: 10, color: "var(--chrome)", letterSpacing: "0.1em", marginBottom: 20, padding: "12px 0" }}>
+                    NO FITMENT SET — use the form below to add coverage.
+                  </div>
+                ) : (
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, marginBottom: 20 }}>
+                    <thead>
+                      <tr>
+                        {["FAMILY", "MODEL", "YEARS", ""].map(h => (
+                          <th key={h} style={{
+                            textAlign: "left", padding: "6px 10px", fontSize: 8,
+                            color: "var(--chrome)", letterSpacing: "0.16em",
+                            borderBottom: "1px solid var(--steel)", fontWeight: "normal"
+                          }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.fitment.map(row => {
+                        const key = `${row.family_name}|${row.model_code}|${row.year_from}|${row.year_to}`;
+                        return (
+                          <tr key={key} style={{ borderBottom: "1px solid rgba(26,18,8,0.05)" }}>
+                            <td style={{ padding: "8px 10px", color: "var(--orange)", fontFamily: "var(--font-caesar), monospace", fontSize: 13 }}>
+                              {row.family_name}
+                            </td>
+                            <td style={{ padding: "8px 10px", color: "var(--cream)", fontSize: 11 }}>
+                              {row.model_name}
+                              <div style={{ fontSize: 9, color: "var(--chrome)", letterSpacing: "0.08em" }}>{row.model_code}</div>
+                            </td>
+                            <td style={{ padding: "8px 10px", fontFamily: "monospace", fontSize: 12, letterSpacing: "0.04em", color: "var(--cream)" }}>
+                              {row.year_from === row.year_to ? row.year_from : `${row.year_from}–${row.year_to}`}
+                              <span style={{ marginLeft: 6, fontSize: 9, color: "var(--chrome)" }}>({row.year_count}yr)</span>
+                            </td>
+                            <td style={{ padding: "8px 4px", textAlign: "right" }}>
+                              <button
+                                className="delete-btn"
+                                title="Remove from all linked products"
+                                disabled={removing === key}
+                                onClick={() => handleRemove(row)}
+                              >
+                                {removing === key ? "…" : "✕"}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+
+                {/* Add fitment form */}
+                <div style={{
+                  background: "var(--iron)", border: "1px solid var(--steel)",
+                  borderRadius: 3, padding: 16,
+                }}>
+                  <div style={{ fontSize: 8, color: "var(--chrome)", letterSpacing: "0.18em", marginBottom: 12 }}>
+                    ADD FITMENT TO ALL {data.products.length} LINKED PRODUCT{data.products.length !== 1 ? "S" : ""}
+                  </div>
+                  {addErr && <div className="modal-error" style={{ marginBottom: 10 }}>{addErr}</div>}
+                  <form onSubmit={handleAdd}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+                      <div>
+                        <label className="modal-label">FAMILY <span className="req">*</span></label>
+                        <select style={selStyle} value={addFamily} onChange={e => setAddFamily(e.target.value)}>
+                          <option value="">— select —</option>
+                          {(data.families ?? []).map(f => <option key={f} value={f}>{f}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="modal-label">MODEL CODE (optional filter)</label>
+                        <input style={iStyle} placeholder="e.g. xl1200c" value={addModel}
+                          onChange={e => setAddModel(e.target.value)} />
+                      </div>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+                      <div>
+                        <label className="modal-label">YEAR FROM <span className="req">*</span></label>
+                        <input style={iStyle} type="number" min="1903" max={CURRENT_YEAR}
+                          placeholder="e.g. 1986" value={addFrom}
+                          onChange={e => setAddFrom(e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="modal-label">YEAR TO <span className="req">*</span></label>
+                        <input style={iStyle} type="number" min="1903" max={CURRENT_YEAR}
+                          placeholder="e.g. 2003" value={addTo}
+                          onChange={e => setAddTo(e.target.value)} />
+                      </div>
+                    </div>
+                    <button type="submit" className="btn btn-primary" disabled={adding} style={{ width: "100%" }}>
+                      {adding ? "ADDING…" : `ADD FITMENT COVERAGE`}
+                    </button>
+                  </form>
+                </div>
+              </>
+            )}
+
+            {/* ── PRODUCTS TAB ── */}
+            {tab === "products" && (
+              <>
+                {data.products.length === 0 ? (
+                  <div style={{ fontSize: 10, color: "var(--chrome)", letterSpacing: "0.1em", padding: "12px 0" }}>
+                    NO PRODUCTS FOUND WITH THIS OEM # IN oem_numbers[]
+                  </div>
+                ) : (
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                    <thead>
+                      <tr>
+                        {["BRAND", "NAME / SKU", "VENDOR", "FITMENT ROWS"].map(h => (
+                          <th key={h} style={{
+                            textAlign: "left", padding: "6px 10px", fontSize: 8,
+                            color: "var(--chrome)", letterSpacing: "0.16em",
+                            borderBottom: "1px solid var(--steel)", fontWeight: "normal"
+                          }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.products.map(p => (
+                        <tr key={p.id} style={{ borderBottom: "1px solid rgba(26,18,8,0.05)" }}>
+                          <td style={{ padding: "8px 10px", color: "var(--orange)", fontFamily: "var(--font-caesar), monospace", fontSize: 13 }}>
+                            {p.brand}
+                          </td>
+                          <td style={{ padding: "8px 10px" }}>
+                            <div style={{ color: "var(--cream)", fontSize: 11 }}>{p.name}</div>
+                            <div style={{ color: "var(--chrome)", fontSize: 9, letterSpacing: "0.08em", fontFamily: "monospace" }}>{p.sku}</div>
+                          </td>
+                          <td style={{ padding: "8px 10px", color: "var(--chrome)", fontSize: 9, letterSpacing: "0.08em" }}>
+                            {p.source_vendor || "—"}
+                          </td>
+                          <td style={{ padding: "8px 10px" }}>
+                            <span style={{
+                              fontFamily: "var(--font-caesar), monospace", fontSize: 15,
+                              color: p.fitment_count > 0 ? "var(--green)" : "var(--chrome)"
+                            }}>
+                              {p.fitment_count}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </>
+            )}
+          </>
+        )}
+        </div>
       </div>
     </div>
   );

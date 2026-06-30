@@ -1,5 +1,5 @@
 # Stinkin' Supplies — Filtering System Roadmap
-**Created:** June 5, 2026 · **Last Updated:** June 26, 2026 (Session 60)
+**Created:** June 5, 2026 · **Last Updated:** June 29, 2026 (Session 65)
 **Scope:** browse.ts · FilterSidebar · Fitment data · Typesense facets · display_subcategory taxonomy
 
 ---
@@ -80,7 +80,7 @@ All 20 categories mapped. Subcategory facets live in Typesense.
 
 ## OEM Pipeline ✅ COMPLETE
 catalog_oem_crossref is single source of truth. product_id FK added. Unique index on (sku, oem_number).
-OEM supersession chain: oem_supersession table (**485 pairs** — 283 original inferred + 202 vtwin hardware added session 59) + mv_oem_fitment_coverage (683K rows, refreshed session 59). Recursive forward+backward chain traversal. browse.ts pre-fetches chain IDs when year+model set.
+OEM supersession chain: oem_supersession table (**485 pairs** — 283 original inferred + 202 vtwin hardware added session 59) + mv_oem_fitment_coverage (683K rows, refreshed session 65). Recursive forward+backward chain traversal. browse.ts pre-fetches chain IDs when year+model set.
 
 ⚠️ oem_supersession schema note: `from_oem_norm`/`to_oem_norm` are **GENERATED columns** — do not include in INSERT statements.
 
@@ -88,6 +88,17 @@ OEM supersession chain: oem_supersession table (**485 pairs** — 283 original i
 - vtwin_scrape: +5,511 rows (import_vtwin_oem_crossref.mjs)
 - HD_OEM battery: +63 rows (import_battery_oem_crossref.mjs)
 - Total: **65,434 rows**
+
+**Session 65 — OEM fitment data quality fix:**
+Two systemic bugs in the OEM fitment pipeline discovered and fixed:
+
+1. **Noise rows eliminated** — `build_oem_fitment_all.mjs` Python extractor now skips rows where `description ~ '^\d{4}$'` (year annotations grabbed as part descriptions). 130,621 rows removed; oem_fitment: 441,416 → 315,427 rows.
+
+2. **Universal promotion family-scoped** — `promote_oem_fitment.mjs` PATH_A/B/C_UNIVERSAL now JOIN `harley_families` and filter by `oem_fitment.catalog_family`. A Softail catalog's `{ALL}` rows now expand to Softail models only, not V-Rods/Shovelheads/Trikes. `catalog_family` column added to `oem_fitment` table.
+
+Universal row reduction: `oem_catalog_hd_universal` −75% | `oem_crossref_vtwin_universal` −69% | `oem_crossref_fatbook_universal` −70%.
+
+catalog_fitment_v2: 6,369,578 → **5,126,957 rows** (1.24M rows removed were wrong).
 
 ---
 
@@ -100,7 +111,7 @@ OEM supersession chain: oem_supersession table (**485 pairs** — 283 original i
 | Model codes | FLHRX + FLI missing | ✅ Both added session 47 |
 | Model codes | 6 new 2026 codes added (session 59) | ✅ FLHXL, FLHXLSE, FLHXSTSE, FLHLT, FLHLTSE, RA1250L |
 | Typesense | No reindex automation | 🔵 Future |
-| Typesense | Reindex after session 58 VTwin fitment additions | ✅ Done session 60 |
+| Typesense | Reindexed session 65 | ✅ 89,151 docs, 0 errors |
 | display_subcategory | Accessories & Misc 94% NULL | Accepted — catch-all by design |
 | Browse ?category= param | Sticky URL bug | ✅ Fixed session 57 |
 | OEM number search | Not searching OEM arrays | ✅ Fixed session 57 (unnest ILIKE) |
@@ -108,7 +119,9 @@ OEM supersession chain: oem_supersession table (**485 pairs** — 283 original i
 | VTwin fitment | Additional ~4,035 on-site products with no fitment | 🔵 Low priority — marginal improvement |
 | VTwin attributes | Stringified JSON in product_details | ✅ Fixed session 60 at source; PDPTabs workaround removed |
 | VTwin OEM crossref | ~12,265 scraped OEM numbers not in crossref | ✅ Fixed session 60 — 5,511 rows imported |
+| OEM fitment noise rows | 130,621 year-annotation rows in oem_fitment | ✅ Fixed session 65 — filter added to build_oem_fitment_all.mjs |
+| OEM fitment universal bleed | {ALL} rows crossing family boundaries | ✅ Fixed session 65 — promote_oem_fitment.mjs universal paths family-scoped |
 
 ---
 
-*Filter Roadmap — Last updated June 26, 2026 · Session 60 (no changes session 61)*
+*Filter Roadmap — Last updated June 29, 2026 · Session 65*

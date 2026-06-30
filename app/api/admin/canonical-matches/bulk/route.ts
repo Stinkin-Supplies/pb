@@ -29,14 +29,21 @@ export async function POST(req: NextRequest) {
 
   const client = await pool.connect();
   try {
+    const allowed = status === 'confirmed' ? ['pending', 'rejected']
+                  : status === 'rejected'  ? ['pending', 'confirmed']
+                  : ['pending', 'confirmed', 'rejected'];
+
     const { rows } = await client.query(`
       UPDATE canonical_match_proposals
       SET status = $1, reviewed_by = 'admin-bulk', reviewed_at = NOW()
       WHERE shared_oem_number = $2
+        AND status = ANY($3::text[])
       RETURNING id
-    `, [status, shared_oem_number]);
+    `, [status, shared_oem_number, allowed]);
 
     return NextResponse.json({ success: true, updated: rows.length });
+  } catch (err) {
+    return NextResponse.json({ error: String(err) }, { status: 500 });
   } finally {
     client.release();
   }

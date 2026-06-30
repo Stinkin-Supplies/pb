@@ -114,22 +114,23 @@ function parseCsvList(value) {
     .filter(Boolean);
 }
 
-function getAdminToken(searchParams) {
-  const tokenFromQuery = searchParams.get("token") ?? "";
-  if (tokenFromQuery) return tokenFromQuery;
-  if (typeof window !== "undefined") {
-    return sessionStorage.getItem("stinkin_admin_token") ?? "";
-  }
-  return "";
-}
-
 // ── Main component ─────────────────────────────────────────────
 export default function AdminEditPanel({ product }) {
   const searchParams = useSearchParams();
   const isAdmin = searchParams.get("admin") === "1";
-  const adminToken = getAdminToken(searchParams);
+
+  // Read only the URL param during render (server-safe).
+  // sessionStorage is read after mount to avoid hydration mismatch.
+  const tokenFromQuery = searchParams.get("token") ?? "";
+  const [storedToken, setStoredToken] = useState("");
   const [adminTokenInput, setAdminTokenInput] = useState("");
-  const activeToken = adminToken || adminTokenInput.trim();
+
+  useEffect(() => {
+    const saved = sessionStorage.getItem("stinkin_admin_token") ?? "";
+    setStoredToken(saved);
+  }, []);
+
+  const activeToken = tokenFromQuery || storedToken || adminTokenInput.trim();
 
   const [open, setOpen]         = useState(false);
   const [saving, setSaving]     = useState(false);
@@ -148,6 +149,13 @@ export default function AdminEditPanel({ product }) {
     ? (product.oemNumbers ?? product.oem_numbers).join(", ")
     : "");
   const [canonicalId, setCanonicalId] = useState(String(product.canonicalProductId ?? product.canonical_product_id ?? ""));
+
+  // Image management
+  const initialImages = Array.isArray(product.imageUrls ?? product.image_urls)
+    ? (product.imageUrls ?? product.image_urls).filter(Boolean)
+    : (product.imageUrl ?? product.image_url) ? [(product.imageUrl ?? product.image_url)] : [];
+  const [images, setImages] = useState(initialImages);
+  const [newImageUrl, setNewImageUrl] = useState("");
   const [canonicalQuery, setCanonicalQuery] = useState(product.canonicalSku ?? product.canonical_sku ?? "");
   const [canonicalResults, setCanonicalResults] = useState([]);
   const [canonicalLoading, setCanonicalLoading] = useState(false);
@@ -176,7 +184,8 @@ export default function AdminEditPanel({ product }) {
              || oemNumbers  !== (Array.isArray(product.oemNumbers ?? product.oem_numbers)
                ? (product.oemNumbers ?? product.oem_numbers).join(", ")
                : "")
-             || canonicalId !== String(product.canonicalProductId ?? product.canonical_product_id ?? "");
+             || canonicalId !== String(product.canonicalProductId ?? product.canonical_product_id ?? "")
+             || JSON.stringify(images) !== JSON.stringify(initialImages);
 
   useEffect(() => {
     if (!open || flagMode) return;
@@ -239,6 +248,8 @@ export default function AdminEditPanel({ product }) {
             brand_part_number:   brandPart.trim() || null,
             oem_numbers:         parseCsvList(oemNumbers),
             canonical_product_id: canonicalId.trim() ? parseInt(canonicalId, 10) || null : null,
+            image_url:   images[0] ?? null,
+            image_urls:  images,
           };
 
           sessionStorage.setItem("stinkin_admin_token", activeToken);
@@ -674,6 +685,107 @@ export default function AdminEditPanel({ product }) {
               />
               <div style={{ fontFamily: MONO, fontSize: 9, color: C.inkLight, letterSpacing: "0.1em", marginTop: 4, textTransform: "uppercase" }}>
                 Stored as an array in the catalog.
+              </div>
+            </div>
+
+            {/* ── Image manager ── */}
+            <div>
+              <FieldLabel>Images</FieldLabel>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {images.length === 0 && (
+                  <div style={{ fontFamily: MONO, fontSize: 10, color: C.inkLight, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                    No images
+                  </div>
+                )}
+                {images.map((url, i) => {
+                  const src = url.includes("asset.lemansnet.com") || url.includes("lemans")
+                    ? `/api/image-proxy?url=${encodeURIComponent(url)}`
+                    : url;
+                  return (
+                    <div key={i} style={{
+                      display: "flex", gap: 8, alignItems: "center",
+                      padding: 8, background: C.cream, border: `1px solid ${C.borderLight}`,
+                    }}>
+                      <img
+                        src={src}
+                        alt=""
+                        style={{ width: 52, height: 52, objectFit: "contain", background: "#fff", border: `1px solid ${C.borderLight}`, flexShrink: 0 }}
+                        onError={e => { e.target.style.opacity = 0.2; }}
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        {i === 0 && (
+                          <div style={{ fontFamily: MONO, fontSize: 8, color: C.gold, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 2 }}>
+                            Primary
+                          </div>
+                        )}
+                        <div style={{
+                          fontFamily: MONO, fontSize: 9, color: C.inkLight,
+                          wordBreak: "break-all", lineHeight: 1.4,
+                        }}>
+                          {url.length > 60 ? url.slice(0, 57) + "…" : url}
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4, flexShrink: 0 }}>
+                        {i > 0 && (
+                          <button
+                            type="button"
+                            title="Move to primary"
+                            onClick={() => setImages(prev => {
+                              const next = [...prev];
+                              next.splice(i, 1);
+                              next.unshift(url);
+                              return next;
+                            })}
+                            style={{ background: "none", border: `1px solid ${C.border}`, color: C.inkLight, cursor: "pointer", fontSize: 10, padding: "2px 5px" }}
+                          >
+                            ↑
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          title="Remove image"
+                          onClick={() => setImages(prev => prev.filter((_, j) => j !== i))}
+                          style={{ background: "none", border: `1px solid ${C.red}`, color: C.red, cursor: "pointer", fontSize: 11, padding: "2px 6px", fontWeight: 700 }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Add new image URL */}
+                <div style={{ display: "flex", gap: 6 }}>
+                  <input
+                    value={newImageUrl}
+                    onChange={e => setNewImageUrl(e.target.value)}
+                    placeholder="Paste image URL to add…"
+                    style={{
+                      flex: 1, padding: "8px 10px", background: C.cream,
+                      border: `1px solid ${C.border}`, fontFamily: MONO,
+                      fontSize: 11, color: C.black, outline: "none", boxSizing: "border-box",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const u = newImageUrl.trim();
+                      if (u && !images.includes(u)) setImages(prev => [...prev, u]);
+                      setNewImageUrl("");
+                    }}
+                    style={{
+                      padding: "8px 12px", background: C.creamMid,
+                      border: `1px solid ${C.border}`, fontFamily: MONO,
+                      fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase",
+                      color: C.ink, cursor: "pointer",
+                    }}
+                  >
+                    Add
+                  </button>
+                </div>
+                <div style={{ fontFamily: MONO, fontSize: 9, color: C.inkLight, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                  First image is primary. ✕ removes from gallery. ↑ promotes to primary.
+                </div>
               </div>
             </div>
 

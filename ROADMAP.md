@@ -1,5 +1,5 @@
 # STINKIN' SUPPLIES — PROJECT ROADMAP
-**Last Updated: June 27, 2026 (Sixty-First Pass)**
+**Last Updated: June 29, 2026 (Sixty-Fourth Pass)**
 
 ---
 
@@ -28,7 +28,7 @@
 | **EBC brake fitment — 3,005 net-new rows** (source='ebc_catalog', session 60 via import_ebc_fitment.mjs) | ✅ |
 | Era boolean columns on catalog_unified (era_flathead → era_milwaukee8) | ✅ |
 | catalog_fitment_v2 composite indexes (product_id+model_year_id, reverse) | ✅ |
-| **⚠️ NO `confidence` column on catalog_fitment_v2** — do not include in INSERT statements | ✅ |
+| `confidence_score` column EXISTS on catalog_fitment_v2 — safe to include in INSERTs (older rows NULL) | ✅ |
 | **VTwin fitment coverage: 55.8%** (21,390 products) — up from 41.1% (15,741) | ✅ |
 | PU fitment coverage: ~49% — ceiling reached, no new feed available | ✅ |
 | WPS fitment: 41% — correct as-is (non-HD/universal products confirmed) | ✅ |
@@ -55,7 +55,9 @@
 | **VTwin scrape OEM import — 5,511 rows** (source='vtwin_scrape', session 60 via import_vtwin_oem_crossref.mjs) | ✅ |
 | **HD_OEM battery crossref — 63 rows** (7 H-D OEM battery SKUs → 64 BCI-matched catalog products, session 60) | ✅ |
 | **HD_OEM handlebar crossref — 2 rows** (56569-86 + 56082-83 already in crossref from OldBook; 3 stock-only OEMs not in catalog) | ✅ |
-| **Total catalog_oem_crossref: 65,434 rows** | ✅ |
+| **Total catalog_oem_crossref: 65,434 rows** (pre-session 64) | ✅ |
+| **Eastern Motorcycle Parts crossref — 4,832 rows** (oem_manufacturer='EASTERN'; 4,364 unique HD OEM#s; 1911–present coverage; session 64 via import_eastern_crossref.mjs) | ✅ |
+| **Total catalog_oem_crossref: ~70,329 rows** | ✅ |
 | OEM badge on PDP sourced only from catalog_oem_crossref (catalog numbers excluded) | ✅ |
 | **WPS/HardDrive 2026 OEM crossref** — 826 product→OEM pairs imported from pp.1091–1104; 272 WPS# missing from wps_catalog (Kibble White, Diamond Chain, Carlisle, Alto specialty lines) | ✅ |
 | **VTwin 2026 hardware supersession** — 202 old→new H-D OEM pairs in oem_supersession (source='vtwin'); vintage hardware format (nuts, bolts, washers, cotter pins, lock washers) | ✅ |
@@ -162,8 +164,9 @@
 | admin/products/[id]/route.ts — update + flag + generic flat-body (GENERIC_FIELD_MAP) + pack_qty | ✅ |
 | ProductManager.jsx — bulk grid, inline edit, pack_qty column, EditModal | ✅ |
 | /admin/canonical-matches — full workbench (confirm/reject/flag/edit/manual-match/variant-flag/mismatch badges) | ✅ |
-| /admin/variant-candidates — variant candidate tracking + resolution | ✅ |
+| /admin/variant-candidates — variant candidate tracking + resolution (images fixed via COALESCE across 3 sources) | ✅ |
 | admin/products list route — search by name/sku/internal_sku/brand_part_number | ✅ |
+| **/admin/parts-timeline** — OEM# span visualization per model code; category/subcat filters; colored bars with tooltip (session 64) | ✅ |
 | /admin/orders — list, filter, order detail | ⏳ |
 | /admin/fulfillment/vtwin — manual PO queue | ⏳ |
 | /admin/inventory — per-vendor stock levels | ⏳ |
@@ -296,7 +299,9 @@
 | Harden admin auth | ?token= → session cookie |
 | Typesense reindex automation | Auto-run as post-step in ingest scripts |
 | Unknown match pipeline | match_reason='upc'/'brand_part_number' — source never identified |
-| oem_fitment table | 379,899 rows — legacy, superseded by mv_oem_fitment_coverage |
+| oem_fitment table | **315,427 rows** (session 65) — 121 catalogs. `catalog_family` column added. 130K year-annotation noise rows eliminated. Universal promotion now family-scoped. Re-run `--force` after adding catalogs. |
+| OCR 4 image-only PDFs | FX 1971-80, FX 1971-84, Softail 2002, WLA 1942 — need `brew install ocrmypdf` |
+| Missing catalogs | 2024 Touring, Softail 2016, Sportster 1979-1985 — user still sourcing |
 | Brake/battery/handlebar/spec finder pages | ebc_brake_fitment + hd_battery_fitment + hd_handlebar_specs + bike_specs staging tables ready — frontend pages unbuilt |
 | EBC catalog annual refresh | parse_ebc.py reusable; run against new Issue PDF each year |
 | scrape_vtwin_missing.mjs pg pool fix | Replace concurrent client queries with pool.query() |
@@ -320,4 +325,4 @@
 
 ---
 
-*Last updated June 27, 2026 · Session 61*
+*Last updated June 29, 2026 · Session 65*

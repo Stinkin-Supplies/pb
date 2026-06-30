@@ -29,14 +29,19 @@ export async function POST(req: NextRequest) {
 
   const client = await pool.connect();
   try {
+    console.log(`[select] action=${action} status=${status} ids=${JSON.stringify(proposal_ids)}`);
     const { rows } = await client.query(`
       UPDATE canonical_match_proposals
       SET status = $1, reviewed_by = 'admin-select', reviewed_at = NOW()
       WHERE id = ANY($2::int[])
-      RETURNING id
+      RETURNING id, status
     `, [status, proposal_ids]);
 
+    console.log(`[select] updated ${rows.length} rows:`, rows);
     return NextResponse.json({ success: true, updated: rows.length });
+  } catch (err) {
+    console.error('[select] DB error:', err);
+    return NextResponse.json({ error: String(err) }, { status: 500 });
   } finally {
     client.release();
   }

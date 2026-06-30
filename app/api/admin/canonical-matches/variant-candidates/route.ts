@@ -41,7 +41,12 @@ export async function GET(req: NextRequest) {
           SELECT json_agg(json_build_object(
             'id', cu.id, 'name', cu.name, 'source_vendor', cu.source_vendor,
             'vendor_sku', cu.vendor_sku, 'computed_price', cu.computed_price,
-            'image_url', cu.image_url, 'display_category', cu.display_category,
+            'image_url', COALESCE(
+              cu.image_url,
+              (SELECT cm.url FROM catalog_media cm WHERE cm.product_id = cu.id ORDER BY cm.priority ASC LIMIT 1),
+              cu.image_urls[1]
+            ),
+            'display_category', cu.display_category,
             'display_subcategory', cu.display_subcategory
           ) ORDER BY cu.source_vendor, cu.name)
           FROM catalog_unified cu
@@ -83,13 +88,25 @@ export async function POST(req: NextRequest) {
       RETURNING *
     `, [group_key, product_ids, reason ?? null, notes ?? null]);
 
-    // Reject any pending proposals for this group — they're variants,
-    // not canonical duplicates
-    const { rowCount: rejected } = await client.query(`
+    // Reject all non-applied proposals for this group — they're variants,
+    // not canonical duplicates. This handles both pending AND already-rejected
+    // proposals so flagging from the rejected tab also works.
+    const { rowCount: rejectedByOem } = await client.query(`
       UPDATE canonical_match_proposals
       SET status = 'rejected', reviewed_by = 'flagged-as-variant', reviewed_at = NOW()
-      WHERE shared_oem_number = $1 AND status = 'pending'
+      WHERE shared_oem_number = $1 AND status != 'applied'
     `, [group_key]);
+
+    // For __pair_* groups (no shared OEM number), match by product IDs instead
+    const { rowCount: rejectedByProduct } = await client.query(`
+      UPDATE canonical_match_proposals
+      SET status = 'rejected', reviewed_by = 'flagged-as-variant', reviewed_at = NOW()
+      WHERE shared_oem_number IS NULL
+        AND status != 'applied'
+        AND (product_id_a = ANY($1::int[]) OR product_id_b = ANY($1::int[]))
+    `, [product_ids]);
+
+    const rejected = (rejectedByOem ?? 0) + (rejectedByProduct ?? 0);
 
     await client.query('COMMIT');
 

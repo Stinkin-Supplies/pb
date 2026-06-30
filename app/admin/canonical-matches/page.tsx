@@ -146,7 +146,8 @@ export default function CanonicalMatchesPage() {
   const [searching, setSearching] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [manualMatchMsg, setManualMatchMsg] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<'pending' | 'applied' | 'rejected'>('pending');
+  const [statusFilter, setStatusFilter] = useState<'pending' | 'confirmed' | 'applied' | 'rejected'>('pending');
+  const [groupErrors, setGroupErrors] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -219,35 +220,44 @@ export default function CanonicalMatchesPage() {
 
   async function selectiveAction(oem: string, group: Proposal[], selectedIds: Set<number>, action: 'confirm' | 'reject') {
     setBusyGroups(prev => new Set(prev).add(oem));
+    setGroupErrors(prev => { const next = { ...prev }; delete next[oem]; return next; });
     try {
-      // Find proposal IDs where both products are in the selected set
       const proposalIds = group
         .filter(p => selectedIds.has(p.a_id) && selectedIds.has(p.b_id))
         .map(p => p.id);
 
-      // Find proposal IDs where at least one product is NOT selected
       const rejectIds = group
         .filter(p => !selectedIds.has(p.a_id) || !selectedIds.has(p.b_id))
         .map(p => p.id);
 
       if (action === 'confirm' && proposalIds.length > 0) {
-        await fetch('/api/admin/canonical-matches/select', {
+        const res = await fetch('/api/admin/canonical-matches/select', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token, proposal_ids: proposalIds, action: 'confirm' }),
         });
+        const data = await res.json();
+        if (!res.ok || data.error) {
+          setGroupErrors(prev => ({ ...prev, [oem]: `Confirm failed (${res.status}): ${data.error ?? JSON.stringify(data)}` }));
+          return;
+        }
       }
-      // Always reject the non-selected pairs
-      if (rejectIds.length > 0) {
-        await fetch('/api/admin/canonical-matches/select', {
+      if (action === 'reject' && rejectIds.length > 0) {
+        const res = await fetch('/api/admin/canonical-matches/select', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token, proposal_ids: rejectIds, action: 'reject' }),
         });
+        const data = await res.json();
+        if (!res.ok || data.error) {
+          setGroupErrors(prev => ({ ...prev, [oem]: `Reject failed (${res.status}): ${data.error ?? JSON.stringify(data)}` }));
+          return;
+        }
       }
 
       setProposals(prev => prev.filter(p => groupKeyOf(p) !== oem));
       setGroupSelections(prev => { const next = { ...prev }; delete next[oem]; return next; });
+      load();
     } finally {
       setBusyGroups(prev => { const next = new Set(prev); next.delete(oem); return next; });
     }
@@ -257,16 +267,28 @@ export default function CanonicalMatchesPage() {
   // server-side bulk route matches on shared_oem_number, which is null for
   // these. Route them through the same proposal-ID-based endpoint
   // selectiveAction already uses instead.
-  async function actOnGroupByIds(oem: string, group: Proposal[], action: 'confirm' | 'reject') {
+  async function actOnGroupByIds(oem: string, group: Proposal[], action: 'confirm' | 'reject' | 'reopen') {
     setBusyGroups(prev => new Set(prev).add(oem));
+    setGroupErrors(prev => { const next = { ...prev }; delete next[oem]; return next; });
     try {
-      await fetch('/api/admin/canonical-matches/select', {
+      const res = await fetch('/api/admin/canonical-matches/select', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, proposal_ids: group.map(p => p.id), action }),
       });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setGroupErrors(prev => ({ ...prev, [oem]: `Action failed (${res.status}): ${data.error ?? JSON.stringify(data)}` }));
+        return;
+      }
+      if (data.updated === 0) {
+        setGroupErrors(prev => ({ ...prev, [oem]: `Warning: 0 proposals updated — IDs may not match any DB rows` }));
+        load();
+        return;
+      }
       setProposals(prev => prev.filter(p => groupKeyOf(p) !== oem));
       setGroupSelections(prev => { const next = { ...prev }; delete next[oem]; return next; });
+      load();
     } finally {
       setBusyGroups(prev => { const next = new Set(prev); next.delete(oem); return next; });
     }
@@ -274,13 +296,25 @@ export default function CanonicalMatchesPage() {
 
   async function bulkAction(oem: string, action: 'confirm' | 'reject' | 'reopen') {
     setBusyGroups(prev => new Set(prev).add(oem));
+    setGroupErrors(prev => { const next = { ...prev }; delete next[oem]; return next; });
     try {
-      await fetch('/api/admin/canonical-matches/bulk', {
+      const res = await fetch('/api/admin/canonical-matches/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, shared_oem_number: oem, action }),
       });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setGroupErrors(prev => ({ ...prev, [oem]: `Bulk action failed (${res.status}): ${data.error ?? JSON.stringify(data)}` }));
+        return;
+      }
+      if (data.updated === 0) {
+        setGroupErrors(prev => ({ ...prev, [oem]: `Warning: 0 proposals updated — shared_oem_number may not match any DB rows` }));
+        load();
+        return;
+      }
       setProposals(prev => prev.filter(p => groupKeyOf(p) !== oem));
+      load();
     } finally {
       setBusyGroups(prev => {
         const next = new Set(prev);
@@ -299,6 +333,7 @@ export default function CanonicalMatchesPage() {
         body: JSON.stringify({ token, proposal_ids: group.map(p => p.id), action: 'reopen' }),
       });
       setProposals(prev => prev.filter(p => groupKeyOf(p) !== oem));
+      load();
     } finally {
       setBusyGroups(prev => { const next = new Set(prev); next.delete(oem); return next; });
     }
@@ -306,13 +341,20 @@ export default function CanonicalMatchesPage() {
 
   async function flagAsVariant(oem: string, productIds: number[], reason: string) {
     setBusyGroups(prev => new Set(prev).add(oem));
+    setGroupErrors(prev => { const next = { ...prev }; delete next[oem]; return next; });
     try {
-      await fetch('/api/admin/canonical-matches/variant-candidates', {
+      const res = await fetch('/api/admin/canonical-matches/variant-candidates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, group_key: oem, product_ids: productIds, reason }),
       });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setGroupErrors(prev => ({ ...prev, [oem]: `Flag failed (${res.status}): ${data.error ?? JSON.stringify(data)}` }));
+        return;
+      }
       setProposals(prev => prev.filter(p => groupKeyOf(p) !== oem));
+      load();
     } finally {
       setBusyGroups(prev => {
         const next = new Set(prev);
@@ -531,15 +573,16 @@ export default function CanonicalMatchesPage() {
 
         {/* ── Status tabs ── */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 24, borderBottom: '2px solid #e5e0d5', paddingBottom: 8 }}>
-          {(['pending', 'applied', 'rejected'] as const).map(s => (
+          {(['pending', 'confirmed', 'applied', 'rejected'] as const).map(s => (
             <button
               key={s}
               onClick={() => setStatusFilter(s)}
               style={{
                 padding: '6px 18px', fontSize: 13, fontWeight: 700, borderRadius: 6,
-                border: '1px solid #ccc', cursor: 'pointer', textTransform: 'uppercase',
-                background: statusFilter === s ? '#C9A84C' : '#fff',
-                color: statusFilter === s ? '#1a1208' : '#666',
+                border: s === 'confirmed' ? '1px solid #3B6D11' : '1px solid #ccc',
+                cursor: 'pointer', textTransform: 'uppercase',
+                background: statusFilter === s ? (s === 'confirmed' ? '#3B6D11' : '#C9A84C') : (s === 'confirmed' && (counts[s] ?? 0) > 0 ? '#eef7e6' : '#fff'),
+                color: statusFilter === s ? (s === 'confirmed' ? '#fff' : '#1a1208') : (s === 'confirmed' && (counts[s] ?? 0) > 0 ? '#3B6D11' : '#666'),
               }}
             >
               {s} ({counts[s] ?? 0})
@@ -669,6 +712,7 @@ export default function CanonicalMatchesPage() {
           const productIds = products.map(p => p.id);
           const isBusy = busyGroups.has(oem);
           const syncMsg = syncMsgs[oem];
+          const groupError = groupErrors[oem];
 
           // Per-product selection within this group
           const sel = groupSelections[oem] ?? new Set(productIds);
@@ -756,6 +800,11 @@ export default function CanonicalMatchesPage() {
                   )}
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  {groupError && (
+                    <span style={{ fontSize: 12, color: '#c0392b', fontWeight: 600, background: '#fdecea', border: '1px solid #f5c6cb', borderRadius: 5, padding: '3px 8px', maxWidth: 480, wordBreak: 'break-all' }}>
+                      {groupError}
+                    </span>
+                  )}
                   {syncMsg && (
                     <span style={{ fontSize: 12, color: syncMsg.startsWith('Error') ? '#c0392b' : '#1E8A6B', fontWeight: 600 }}>
                       {syncMsg}
@@ -807,7 +856,7 @@ export default function CanonicalMatchesPage() {
                   </button>
                   {isPartialSelection ? (
                     <>
-                      {selectedPairCount > 0 && (
+                      {selectedPairCount > 0 ? (
                         <button
                           disabled={isBusy}
                           onClick={() => selectiveAction(oem, group, sel, 'confirm')}
@@ -820,7 +869,46 @@ export default function CanonicalMatchesPage() {
                         >
                           Confirm {selectedPairCount} pair{selectedPairCount !== 1 ? 's' : ''}
                         </button>
-                      )}
+                      ) : sel.size >= 2 ? (
+                        <button
+                          disabled={isBusy}
+                          onClick={async () => {
+                            setBusyGroups(prev => new Set(prev).add(oem));
+                            try {
+                              // Create the missing proposal between the selected products
+                              const res = await fetch('/api/admin/canonical-matches/manual-match', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ token, product_ids: [...sel] }),
+                              });
+                              const data = await res.json();
+                              if (data.error) { alert(`Error: ${data.error}`); return; }
+                              // Immediately confirm the new proposals via their group_key
+                              if (data.group_key) {
+                                await fetch('/api/admin/canonical-matches/bulk', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ token, shared_oem_number: data.group_key, action: 'confirm' }),
+                                });
+                              }
+                              // Deselected pairs are left as pending — do NOT auto-reject them.
+                              // The user can explicitly reject remaining pairs after reviewing.
+                              setProposals(prev => prev.filter(p => groupKeyOf(p) !== oem));
+                              setGroupSelections(prev => { const next = { ...prev }; delete next[oem]; return next; });
+                            } finally {
+                              setBusyGroups(prev => { const next = new Set(prev); next.delete(oem); return next; });
+                            }
+                          }}
+                          style={{
+                            fontSize: 12, padding: '6px 12px', borderRadius: 5,
+                            border: '1px solid #3B6D11', background: '#e6f4d9', color: '#3B6D11',
+                            fontWeight: 700, cursor: isBusy ? 'default' : 'pointer',
+                            opacity: isBusy ? 0.5 : 1, textTransform: 'none',
+                          }}
+                        >
+                          Create & confirm {sel.size} selected
+                        </button>
+                      ) : null}
                       <button
                         disabled={isBusy}
                         onClick={() => selectiveAction(oem, group, sel, 'reject')}
@@ -848,6 +936,21 @@ export default function CanonicalMatchesPage() {
                     </button>
                   )}
                   </>)} {/* end pending-only actions */}
+
+                  {statusFilter === 'confirmed' && (<>
+                  <span style={{ fontSize: 12, color: '#3B6D11', fontWeight: 600 }}>Queued for apply →</span>
+                  <button
+                    disabled={isBusy}
+                    onClick={() => isRealOemGroup(oem) ? bulkAction(oem, 'reopen') : actOnGroupByIds(oem, group, 'reopen')}
+                    style={{
+                      fontSize: 12, padding: '6px 12px', borderRadius: 5,
+                      border: '1px solid #888', background: '#f5f5f5', color: '#444',
+                      fontWeight: 600, cursor: isBusy ? 'default' : 'pointer', opacity: isBusy ? 0.5 : 1, textTransform: 'none',
+                    }}
+                  >
+                    Un-confirm → pending
+                  </button>
+                  </>)} {/* end confirmed actions */}
 
                   {statusFilter === 'rejected' && (<>
                   <button
