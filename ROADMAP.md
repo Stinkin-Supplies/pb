@@ -1,5 +1,5 @@
 # STINKIN' SUPPLIES — PROJECT ROADMAP
-**Last Updated: June 29, 2026 (Sixty-Fourth Pass)**
+**Last Updated: June 30, 2026 (Sixty-Seventh Pass)**
 
 ---
 
@@ -104,7 +104,8 @@
 | browse.ts — OEM number search via `unnest(cu.oem_numbers) ILIKE` | ✅ |
 | browse.ts — catalog_media image fallback | ✅ |
 | browse.ts — OEM chain pre-fetch (1.3ms warm) when year+model set | ✅ |
-| **`?category=` URL param stuck bug fixed** — old links fold into display_category; category never persists invisibly | ✅ |
+| **browse.ts — ILIKE 2-word threshold for 3+ word queries (session 67)** — "brake rotor street glide" no longer returns 0 | ✅ |
+| `?category=` URL param stuck bug fixed — old links fold into display_category; category never persists invisibly | ✅ |
 | ProductCard.jsx / ProductImage.jsx — cream theme, broken-image fallback | ✅ |
 | ProductCard.jsx — selected/onSelect props; OEM chain badge | ✅ |
 | ProductImageGallery.jsx — multi-image thumbnail strip on PDP | ✅ |
@@ -113,12 +114,14 @@
 | Browse inline panel — InlinePanel.jsx + panel API route | ✅ |
 | Era pages — era_* boolean lookups | ✅ |
 | PDP (/browse/[slug]) — LeMans image proxy, fitment tab, OEM tab | ✅ |
-| **PDP window function crash fixed** — catalog_media lateral replaced MIN OVER with array_agg nested subquery | ✅ |
+| PDP window function crash fixed — catalog_media lateral replaced MIN OVER with array_agg nested subquery | ✅ |
 | PDP — ProductDetailsSection above fitment/OEM tabs | ✅ |
-| PDP — OemAlternativesPanel removed (session 57) | ✅ |
 | PDP — breadcrumb link fixed (?category= → ?display_category=) | ✅ |
-| PDP — getProduct() SQL: catalog_media all_urls lateral; image_urls VTwin/PU fallback | ✅ |
-| **PDP — VTwin attributes fixed at source** (session 60) — JSON.parse workaround removed from PDPTabs.jsx | ✅ |
+| PDP — VTwin attributes fixed at source (session 60) — JSON.parse workaround removed from PDPTabs.jsx | ✅ |
+| **PDP — OemPartTimeline component (session 67)** — two-panel: left=options for OEM#, right=year carousel. Modal with image/brand/packQty/price. No vendor data shown. | ✅ |
+| **`lib/getOemPartTimeline.ts` (session 67)** — server function; older/same_year/newer/current buckets; returns null when no family | ✅ |
+| **Typesense search properly wired (session 67)** — `route.ts` now calls Typesense server-side when `?q=` present; was indexed but never called before this session | ✅ |
+| **`fitment_text` Typesense field (session 67)** — combined family+model+code+year string per product; "Street Glide" in search now matches via fitment data | ✅ |
 | index_unified.js — product_details as primary source; WPS HTML stripped from Typesense | ✅ |
 | QuickView modal — removed; cards navigate directly to PDP | ✅ |
 | getChronologicalNeighbors — tightened to display_subcategory | ✅ |
@@ -292,8 +295,10 @@
 | Hard Drive book crossref | Import when file available |
 | WPS API enrichment | Features+blocks hit rate testing |
 | WPS OEM crossref — 662 unmatched rows | Revisit after next WPS ingest |
-| oem_supersession review | 283 original inferred pairs pending — `SELECT * FROM oem_supersession_review LIMIT 30`; 202 vtwin hardware pairs are solid (source catalog) |
+| oem_supersession review | 283 original inferred pairs pending — `SELECT * FROM oem_supersession_review LIMIT 30`; 202 vtwin hardware pairs are solid (source catalog); **delete 2 wrong cable-type pairs flagged session 67** |
 | oem_supersession PDP timeline | Show chain on OEM tab: "replaced X in [year]" |
+| OemPartTimeline modal animation | Removed framer-motion (transform conflict). Re-add with ReactDOM.createPortal approach to avoid centering issue |
+| OemPartTimeline — same-year siblings display | When many products share an OEM#, left panel can get long. Consider max-height scroll or "show all" toggle |
 | TC/M8 platform dedup in variant groups | Platform-aware split in build_variant_groups.cjs |
 | Browse/Brand tabs | Data ready, UI unbuilt |
 | Harden admin auth | ?token= → session cookie |
@@ -320,9 +325,10 @@
 | scrape_vtwin_missing.mjs | pg deprecation warning (concurrent queries on single client) — not failing | ⏳ Low urgency |
 | catalog_oem_crossref | 826 WPS 2026 catalog entries have NULL source — no source column value specified on INSERT | ⏳ Low priority |
 | FLHXU 2025 | Street Glide Ultra (2025-only model, predecessor to FLHXL) has 0 WPS fitment rows | 🔵 Monitor after next WPS feed |
-| oem_supersession | 283 original inferred pairs confidence=1 still pending review | ⏳ |
+| oem_supersession | 283 original inferred pairs confidence=1 still pending review. **2 flagged wrong session 67:** `56308-88→56309-96` (Throttle→Idle cable mismatch) and `56324-81A→56356-92` (wrong cable length) | ⏳ |
 | catalog_variant_candidates | 62 groups pending human review | ⏳ |
+| OemPartTimeline | framer-motion removed from modal — no enter/exit animation. Can re-add with portal approach when desired. | 🔵 Future |
 
 ---
 
-*Last updated June 30, 2026 · Session 66*
+*Last updated June 30, 2026 · Session 67*

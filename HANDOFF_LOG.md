@@ -5,7 +5,156 @@
 
 ---
 
-# ——— SIXTY-SIXTH PASS (June 30, 2026) ———
+# ——— SIXTY-SEVENTH PASS (June 30, 2026) ———
+
+## WHERE WE ARE
+
+OEM part timeline feature built and live on PDP. Typesense search wired in for the first time (was fully indexed but never actually called — every search was ILIKE-only). Browse ILIKE fallback upgraded so multi-word queries including model names never return 0 results. `fitment_text` Typesense field added so "street glide brake rotor" finds brake rotors that fit Street Glide via fitment data. Reindexed: 89,151 docs, 0 errors.
+
+⚠️ Payment gateway still undecided — BLOCKING checkout.
+⚠️ 62 variant candidates still pending manual review at /admin/variant-candidates.
+⚠️ 283 OEM supersession pairs still pending review. **2 flagged this session as likely wrong:** `56308-88 → 56309-96` (Throttle Cable → Idle Cable — different cable entirely) and `56324-81A → 56356-92` (different throttle cable length). Remaining 281 majority are safe year-suffix pairs.
+⚠️ Missing 2024 Touring, Softail 2016, Sportster 1979–1985 catalogs.
+⚠️ OCR 4 image-only PDFs: FX 1971-80, FX 1971-84, Softail 2002, WLA 1942.
+
+## What Was Done
+
+### OEM fitment/supersession audit — read-only investigation ✅
+
+Sampled 20 supersession pairs and validated the underlying data model:
+- 75% (15/20) are same-base-number year-suffix pairs — e.g. `43063-83A → 43063-83B`. These are mechanical (suffix = first year part shipped), can't be wrong, and are the "free" timeline.
+- 25% (5/20) are genuinely inferred different-base-number pairs: 3 look correct (identical descriptions), 2 look wrong (cable type/length mismatch).
+- Key insight confirmed: letter suffixes (A/B/C at same year) are parallel product options, not timeline steps.
+- Century rule validated: 3–4 digit base numbers always 19XX; 5+ digit base numbers use 00–26=20XX, 27–99=19XX.
+- Full-table scan: 8,227 part families; 71% (5,871) have only one number ever; 27% have 2–5 revisions; 5 families have 17+ numbers.
+
+### oem_part_timeline table — NEW ✅
+
+New table to hold computed OEM part timelines for customer-facing display.
+
+```sql
+CREATE TABLE oem_part_timeline (
+  id SERIAL PRIMARY KEY,
+  base_number TEXT NOT NULL,
+  oem_number TEXT NOT NULL,
+  letter_suffix TEXT,
+  computed_year INTEGER NOT NULL,
+  confidence_tier TEXT NOT NULL CHECK (confidence_tier IN ('confirmed', 'likely')),
+  source TEXT,
+  product_id INTEGER REFERENCES catalog_unified(id),
+  created_at TIMESTAMP DEFAULT now(),
+  CONSTRAINT oem_part_timeline_number_product_uniq UNIQUE (oem_number, product_id)
+);
+CREATE INDEX idx_oem_part_timeline_base_year ON oem_part_timeline(base_number, computed_year);
+CREATE INDEX idx_oem_part_timeline_product ON oem_part_timeline(product_id);
+
+CREATE VIEW oem_part_timeline_sellable AS
+SELECT * FROM oem_part_timeline WHERE product_id IS NOT NULL;
+```
+
+**Population script:** `scripts/ingest/build_oem_part_timeline.mjs` — dry-run default, `--apply` flag, progress bar, `ON CONFLICT (oem_number, product_id) DO NOTHING`. Filters to `oem_format = 'hd_oem'` only. Century-aware year logic.
+
+**Final counts after `--apply`:**
+
+| Metric | Value |
+|--------|-------|
+| oem_part_timeline rows | 32,570 |
+| oem_part_timeline_sellable rows | 19,824 |
+| Distinct base families | 7,981 |
+| confirmed-tier (from HD catalogs) | 4,842 |
+| likely-tier (third-party sources) | 27,728 |
+| No linked product (kept for ref, hidden from customers) | 12,746 |
+
+### OEM Part Timeline PDP feature ✅
+
+**`lib/getOemPartTimeline.ts`** — server function.
+- Returns `OemPartTimeline | null` (null = product has no family, component silently skipped).
+- Returns buckets: `older` / `same_year` / `newer` / `current`.
+- Each entry includes: oemNumber, computedYear, slug, name, brand, packQty, msrp, imageUrl.
+- catalog_media join: `LEFT JOIN LATERAL (SELECT url FROM catalog_media WHERE ... ORDER BY priority ASC LIMIT 1) cm ON true` — no `is_primary` column; uses `priority`.
+
+**`components/pdp/OemPartTimeline.jsx`** — client component, no framer-motion.
+- Left panel: all products sharing current OEM number (current + same_year siblings), deduplicated by product_id. Clicking any row opens a quick-view modal.
+- Right panel: horizontal year carousel — older year cards left, current highlighted/non-clickable, newer cards right. Clicking non-current card opens that product's page in a new tab (first product in that OEM group).
+- Modal: product image, name, OEM number, brand, pack qty, price + "View Product Page" → new tab. No vendor data, no confidence scores exposed to customers.
+
+**`app/browse/[slug]/page.jsx`** — wired in:
+- `getOemPartTimeline` added to `Promise.all` as `oemTimeline`.
+- Component rendered between `PDPTabs` and `AdminEditPanel`: `{oemTimeline && <OemPartTimeline timeline={oemTimeline} currentProductId={unifiedId} />}`
+
+**Bugs found and fixed during integration:**
+1. `catalog_media` has no `is_primary` column (uses `priority`) — SQL rewritten to match rest of codebase.
+2. framer-motion `transform: translate(-50%, -50%)` conflicts with its own animation transforms — modal rewritten as plain CSS `position: fixed`, no framer-motion.
+3. Products with 2 OEM numbers appeared twice in left panel — fixed with `dedupeByProductId()`.
+
+### Typesense search — wired for the first time ✅
+
+**Previous state:** Typesense was indexed (89,151 docs) but `app/api/browse/products/route.ts` never called it. All text searches went through Postgres ILIKE.
+
+**`app/api/browse/products/route.ts` rewritten:**
+- Now calls Typesense server-side when `?q=` is present (3-second timeout, AbortSignal).
+- Query fields + weights: `name(10), oem_numbers(9), fitment_text(8), fitment_hd_models(7), fitment_hd_families(7), fitment_hd_codes(7), brand(5), description(3)`.
+- `drop_tokens_threshold: 5`, `num_typos: 1`, `typo_tokens_threshold: 1`.
+- Typesense IDs → `tsIds` → Postgres filters within those IDs; if Typesense returns 0 or fails → `search` → ILIKE fallback.
+- Env vars: `TYPESENSE_SEARCH_KEY` (read-only) || `TYPESENSE_API_KEY`, `TYPESENSE_COLLECTION`.
+
+### fitment_text — new Typesense field ✅
+
+**`scripts/ingest/index_unified.js` updated:**
+- New schema field: `{ name: 'fitment_text', type: 'string', optional: true }`.
+- Populated in transform: joins `fitment_hd_families + fitment_hd_models + fitment_hd_codes + year_range` into single deduplicated string. e.g. `"Touring Street Glide Road King FLHX FLHR 2006-2023"`.
+- Makes "street glide brake rotor" find brake rotors that fit Street Glide bikes via Typesense.
+- Schema change required `--recreate`: **89,151 docs, 0 errors**.
+
+### browse.ts ILIKE threshold fix ✅
+
+For 3+ word queries: each word scored 0 or 1, threshold = 2 words must match.
+"brake rotor street glide" → brake(1) + rotor(1) + street(0) + glide(0) = 2 ≥ 2 → returns results.
+1–2 word queries: unchanged (AND all words for precision).
+Prevents zero-results when model names appear in a search but not in product fields.
+
+## Files Changed This Session
+
+| File | Change |
+|------|--------|
+| `lib/getOemPartTimeline.ts` | NEW — server function, OEM part timeline buckets |
+| `components/pdp/OemPartTimeline.jsx` | NEW — two-panel PDP component (carousel + modal, no framer-motion) |
+| `app/browse/[slug]/page.jsx` | Added oemTimeline to Promise.all + OemPartTimeline in JSX |
+| `app/api/browse/products/route.ts` | Wired Typesense search server-side for the first time |
+| `scripts/ingest/index_unified.js` | Added fitment_text field to schema + transform; --recreate required |
+| `lib/db/browse.ts` | ILIKE fallback: 2-word threshold for 3+ word queries |
+| `scripts/ingest/build_oem_part_timeline.mjs` | NEW — populates oem_part_timeline from catalog_oem_crossref |
+| `06_create_oem_part_timeline_table.sql` | NEW migration — creates table, view, indexes |
+
+## DB Objects Added This Session
+
+| Object | Type | Rows |
+|--------|------|------|
+| `oem_part_timeline` | table | 32,570 |
+| `oem_part_timeline_sellable` | view | 19,824 (product_id IS NOT NULL) |
+
+## Next Session Starting Points
+
+```bash
+# Reindex after any catalog/fitment changes:
+node scripts/ingest/index_unified.js --recreate
+
+# Rebuild oem_part_timeline after crossref updates:
+node scripts/ingest/build_oem_part_timeline.mjs --apply
+
+# Review queues:
+# - /admin/variant-candidates (62 pending)
+# - oem_supersession (283 pairs): SELECT * FROM oem_supersession_review LIMIT 30
+#   NOTE: Delete or correct these two pairs flagged this session:
+#     56308-88 → 56309-96  (Throttle Cable → Idle Cable — different part)
+#     56324-81A → 56356-92 (Throttle cable, wrong length)
+
+# Payment gateway decision — still BLOCKING checkout
+```
+
+---
+
+
 
 ## WHERE WE ARE
 

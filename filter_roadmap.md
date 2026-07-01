@@ -110,18 +110,20 @@ catalog_fitment_v2: 6,369,578 → **5,126,957 rows** (1.24M rows removed were wr
 | Framer Motion | Transparent animation errors | ⏳ FRAMER_TRANSPARENT_FIX.md ready, not applied |
 | Model codes | FLHRX + FLI missing | ✅ Both added session 47 |
 | Model codes | 6 new 2026 codes added (session 59) | ✅ FLHXL, FLHXLSE, FLHXSTSE, FLHLT, FLHLTSE, RA1250L |
+| Typesense | **Search now properly wired (session 67)** | ✅ route.ts calls Typesense server-side; fitment_text field added; --recreate reindex 89,151 docs 0 errors |
 | Typesense | No reindex automation | 🔵 Future |
-| Typesense | Reindexed session 65 | ✅ 89,151 docs, 0 errors |
 | display_subcategory | Accessories & Misc 94% NULL | Accepted — catch-all by design |
 | Browse ?category= param | Sticky URL bug | ✅ Fixed session 57 |
 | OEM number search | Not searching OEM arrays | ✅ Fixed session 57 (unnest ILIKE) |
+| browse.ts ILIKE | Zero results for multi-word model-name queries ("brake rotor street glide") | ✅ Fixed session 67 — 2-word threshold for 3+ word queries |
 | Softail + Suspension + Triple Trees filter | Untested since session 51 | ⏳ Retest |
 | VTwin fitment | Additional ~4,035 on-site products with no fitment | 🔵 Low priority — marginal improvement |
 | VTwin attributes | Stringified JSON in product_details | ✅ Fixed session 60 at source; PDPTabs workaround removed |
 | VTwin OEM crossref | ~12,265 scraped OEM numbers not in crossref | ✅ Fixed session 60 — 5,511 rows imported |
 | OEM fitment noise rows | 130,621 year-annotation rows in oem_fitment | ✅ Fixed session 65 — filter added to build_oem_fitment_all.mjs |
 | OEM fitment universal bleed | {ALL} rows crossing family boundaries | ✅ Fixed session 65 — promote_oem_fitment.mjs universal paths family-scoped |
+| OEM part timeline | Feature unbuilt | ✅ Built session 67 — oem_part_timeline table (32,570 rows), OemPartTimeline.jsx PDP component |
 
 ---
 
-*Filter Roadmap — Last updated June 29, 2026 · Session 65*
+*Filter Roadmap — Last updated June 30, 2026 · Session 67*

@@ -104,6 +104,10 @@ const SCHEMA = {
     { name: 'fitment_hd_models',   type: 'string[]', optional: true, facet: true },
     { name: 'fitment_hd_codes',    type: 'string[]', optional: true, facet: true },
     { name: 'fitment_other_makes', type: 'string[]', optional: true, facet: true },
+    // Combined human-readable fitment string for full-text search.
+    // e.g. "Touring Street Glide Road King FLHX FLHR 2006-2023"
+    // Makes "street glide brake rotor" find the right products.
+    { name: 'fitment_text',        type: 'string',   optional: true },
     { name: 'is_harley_fitment',   type: 'bool',     facet: true },
     { name: 'is_universal',        type: 'bool',     facet: true },
 
@@ -216,6 +220,18 @@ function transform(row) {
     fitment_hd_models:   row.fitment_hd_models?.length   ? row.fitment_hd_models   : undefined,
     fitment_hd_codes:    row.fitment_hd_codes?.length    ? row.fitment_hd_codes    : undefined,
     fitment_other_makes: row.fitment_other_makes?.length ? row.fitment_other_makes : undefined,
+    // Combined human-readable fitment string for full-text search.
+    // Joins families + models + year range into one searchable field.
+    fitment_text: (() => {
+      const parts = [];
+      if (row.fitment_hd_families?.length) parts.push(...row.fitment_hd_families);
+      if (row.fitment_hd_models?.length)   parts.push(...row.fitment_hd_models);
+      if (row.fitment_hd_codes?.length)    parts.push(...row.fitment_hd_codes);
+      if (row.fitment_year_start && row.fitment_year_end) {
+        parts.push(`${row.fitment_year_start}-${row.fitment_year_end}`);
+      }
+      return parts.length ? [...new Set(parts)].join(' ') : undefined;
+    })(),
     is_harley_fitment:   row.is_harley_fitment || false,
     is_universal:        row.is_universal || false,
 

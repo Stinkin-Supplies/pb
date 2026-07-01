@@ -148,6 +148,23 @@ function extractAttribute(name) {
   return null;
 }
 
+/**
+ * Find a second, distinct attribute type in the same name — e.g. a rotor
+ * named "10 Inch Drilled Stainless" carries both a Style-ish word and a
+ * Finish word. Skips whichever rule matched as the primary axis so the two
+ * never collide. Returns null if nothing else matches.
+ */
+function extractSecondAttribute(name, primaryAxisName) {
+  if (!name) return null;
+  for (const rule of ATTRIBUTE_RULES) {
+    const normalized = normalizeAxisName(rule.name);
+    if (normalized === primaryAxisName) continue;
+    const m = name.match(rule.pattern);
+    if (m) return { name: normalized, value: rule.extract(m) };
+  }
+  return null;
+}
+
 // Finish and Color describe the same physical dimension
 function normalizeAxisName(name) {
   return name === 'Finish' ? 'Color' : name;
@@ -220,7 +237,19 @@ function classifyGroup(candidates) {
     // meaningfully variants of each other if nothing tells them apart).
     const distinctValues = new Set(attrs.filter(Boolean).map(a => a.value));
     if (distinctValues.size >= 2) {
-      return { axis: normalizeAxisName(axis), members, memberAttrs: attrs };
+      const normalizedAxis = normalizeAxisName(axis);
+
+      // Secondary axis (optional): look for a second, different attribute type
+      // in each member's name (e.g. a rotor group axis'd on Style might also
+      // carry a Finish word — "10 Inch Drilled Stainless"). Only attach it if
+      // it actually distinguishes members from each other, same rule as the
+      // primary axis — otherwise every member would show the identical
+      // secondary label, which isn't a real choice for the customer.
+      const attrs2 = members.map(m => extractSecondAttribute(m.name, normalizedAxis));
+      const distinctValues2 = new Set(attrs2.filter(Boolean).map(a => a.value));
+      const memberAttrs2 = distinctValues2.size >= 2 ? attrs2 : members.map(() => null);
+
+      return { axis: normalizedAxis, members, memberAttrs: attrs, memberAttrs2 };
     }
     if (DRY) {
       console.log(`  [non_distinguishing_axis] "${axis}"="${[...distinctValues][0]}" shared by all ${members.length} members — dissolving, trying Pack Size fallback`);
@@ -246,7 +275,7 @@ function classifyGroup(candidates) {
     qty != null ? { name: 'Pack Size', value: qty === 1 ? '1 Piece' : `${qty}-Pack` } : null
   );
 
-  return { axis: 'Pack Size', members, memberAttrs: packAttrs };
+  return { axis: 'Pack Size', members, memberAttrs: packAttrs, memberAttrs2: members.map(() => null) };
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -397,18 +426,23 @@ async function main() {
     wpsGroups_created++;
 
     for (let i = 0; i < result.members.length; i++) {
-      const m    = result.members[i];
-      const attr = result.memberAttrs[i];
+      const m     = result.members[i];
+      const attr  = result.memberAttrs[i];
+      const attr2 = result.memberAttrs2?.[i];
       await q(`
         INSERT INTO catalog_variant_members
-          (group_id, product_id, option_1_name, option_1_value, sort_order)
-        VALUES ($1, $2, $3, $4, $5)
+          (group_id, product_id, option_1_name, option_1_value, option_2_name, option_2_value, sort_order)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         ON CONFLICT (group_id, product_id) DO UPDATE
           SET option_1_name  = EXCLUDED.option_1_name,
-              option_1_value = EXCLUDED.option_1_value
+              option_1_value = EXCLUDED.option_1_value,
+              option_2_name  = EXCLUDED.option_2_name,
+              option_2_value = EXCLUDED.option_2_value
       `, [grp.id, m.id,
           attr ? normalizeAxisName(attr.name) : null,
           attr?.value ?? null,
+          attr2 ? normalizeAxisName(attr2.name) : null,
+          attr2?.value ?? null,
           i]);
       wpsMembers_created++;
     }
@@ -529,6 +563,13 @@ async function main() {
     const unique   = result.members.filter(m => { if (seenIds.has(m.id)) return false; seenIds.add(m.id); return true; });
     if (unique.length < 2) continue;
 
+    // Build id-keyed attribute lookups BEFORE dedup filtering — `unique`'s
+    // indices no longer line up with `result.memberAttrs`/`memberAttrs2`
+    // once any duplicate is removed, so index into these maps by product id
+    // instead of positionally.
+    const attrById  = new Map(result.members.map((m, i) => [m.id, result.memberAttrs[i]]));
+    const attr2ById = new Map(result.members.map((m, i) => [m.id, result.memberAttrs2?.[i]]));
+
     const [grp] = await q(`
       INSERT INTO catalog_variant_groups (wps_product_id, display_name, source_vendor)
       VALUES (NULL, $1, $2)
@@ -537,12 +578,13 @@ async function main() {
     puGroupsCreated++;
 
     for (let i = 0; i < unique.length; i++) {
-      const m    = unique[i];
-      const attr = result.memberAttrs[i];
+      const m     = unique[i];
+      const attr  = attrById.get(m.id);
+      const attr2 = attr2ById.get(m.id);
       await q(`
         INSERT INTO catalog_variant_members
-          (group_id, product_id, option_1_name, option_1_value, sort_order)
-        SELECT $1, $2, $3, $4, $5
+          (group_id, product_id, option_1_name, option_1_value, option_2_name, option_2_value, sort_order)
+        SELECT $1, $2, $3, $4, $5, $6, $7
         WHERE EXISTS (
           SELECT 1 FROM catalog_unified cu2
           JOIN catalog_variant_groups cvg ON cvg.id = $1
@@ -552,6 +594,8 @@ async function main() {
       `, [grp.id, m.id,
           attr ? normalizeAxisName(attr.name) : null,
           attr?.value ?? null,
+          attr2 ? normalizeAxisName(attr2.name) : null,
+          attr2?.value ?? null,
           i]);
       puMembersCreated++;
     }

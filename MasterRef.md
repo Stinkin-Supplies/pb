@@ -1,8 +1,8 @@
 # Stinkin' Supplies — Master Reference
-**Last Updated:** June 30, 2026 (Sixty-Sixth Pass)
+**Last Updated:** June 30, 2026 (Sixty-Seventh Pass)
 **Database:** Hetzner Postgres — stinkin_catalog @ 5.161.100.126:5432
 
-**Status:** Catalog rebuilt ✅ | Fitment rebuilt ✅ | Search indexed ✅ | Homepage rebuilt ✅ | Font system locked ✅ | ModelFinder built ✅ | FilterSidebar updated ✅ | VariantSelector fitment+color mode ✅ | Variant groups merged ✅ | browse.ts name-grouping ✅ | VTwin SKU dupes resolved ✅ | Filtering system audit complete ✅ | MODEL_ALIASES expanded ✅ | VTwin scraper round 2+3 complete ✅ | CategoryBentoGrid built ✅ | display_subcategory taxonomy COMPLETE ✅ | Canonical merges DRAINED ✅ | PU vendor_sku fully corrected ✅ | product_details JSONB live ✅ | Multi-image galleries live ✅ | OEM supersession table live ✅ | VTwin fitment 55.8% ✅ | HD model reference audited (2026 catalog) ✅ | OEM crossref expanded ✅ | VTwin attributes bug fixed ✅ | EBC brake fitment ingested ✅ | HD battery fitment ingested ✅ | bike_specs table populated ✅ | HD OEM catalog fitment rebuilt (all families, 121 catalogs) ✅ | OEM fitment consolidation pipeline live ✅ | OEM crossref admin page ✅ | Eastern Motorcycle Parts crossref imported (4,832 rows) ✅ | Path C oem_numbers[] bug fixed ✅ | **OEM fitment data quality fixed (session 65): noise rows eliminated, universal promotion family-scoped** ✅ | OEM fitment promoted → catalog_fitment_v2 (5,126,957 rows) ✅ | Parts timeline admin page live ✅ | Typesense reindexed 89,151 docs ✅ | **Canonical match queue re-drained (session 66): 2,807 applied / 1,375 rejected** ✅
+**Status:** Catalog rebuilt ✅ | Fitment rebuilt ✅ | Search indexed ✅ | Homepage rebuilt ✅ | Font system locked ✅ | ModelFinder built ✅ | FilterSidebar updated ✅ | VariantSelector fitment+color mode ✅ | Variant groups merged ✅ | browse.ts name-grouping ✅ | VTwin SKU dupes resolved ✅ | Filtering system audit complete ✅ | MODEL_ALIASES expanded ✅ | VTwin scraper round 2+3 complete ✅ | CategoryBentoGrid built ✅ | display_subcategory taxonomy COMPLETE ✅ | Canonical merges DRAINED ✅ | PU vendor_sku fully corrected ✅ | product_details JSONB live ✅ | Multi-image galleries live ✅ | OEM supersession table live ✅ | VTwin fitment 55.8% ✅ | HD model reference audited (2026 catalog) ✅ | OEM crossref expanded ✅ | VTwin attributes bug fixed ✅ | EBC brake fitment ingested ✅ | HD battery fitment ingested ✅ | bike_specs table populated ✅ | HD OEM catalog fitment rebuilt (all families, 121 catalogs) ✅ | OEM fitment consolidation pipeline live ✅ | OEM crossref admin page ✅ | Eastern Motorcycle Parts crossref imported (4,832 rows) ✅ | Path C oem_numbers[] bug fixed ✅ | **OEM fitment data quality fixed (session 65): noise rows eliminated, universal promotion family-scoped** ✅ | OEM fitment promoted → catalog_fitment_v2 (5,126,957 rows) ✅ | Parts timeline admin page live ✅ | Typesense reindexed 89,151 docs ✅ | **Canonical match queue re-drained (session 66): 2,807 applied / 1,375 rejected** ✅ | **OEM part timeline table + PDP feature live (session 67)** ✅ | **Typesense search properly wired for first time (session 67)** ✅ | **fitment_text field added to Typesense (session 67); reindexed 89,151 docs** ✅
 
 ---
 
@@ -15,13 +15,15 @@
 | oem_fitment | **315,427 rows** | ✅ All families — 121 catalogs, 37.9% matched. `catalog_family` column added. 130K noise rows eliminated. |
 | catalog_oem_crossref | **~70,329 rows** | ✅ +4,832 Eastern Motorcycle Parts 2022-2024 catalog (session 64) |
 | vtwin_oem_crossref | **12,278 rows** | ✅ 9,006 match catalog_unified via VT- prefix (discovered session 62) |
+| **oem_part_timeline** | **32,570 rows** | ✅ NEW session 67 — 7,981 base families; UNIQUE(oem_number, product_id) |
+| **oem_part_timeline_sellable** | **19,824 rows** | ✅ NEW session 67 — view: WHERE product_id IS NOT NULL |
 | catalog_variant_groups | 7,556+ (+ 148 MULTI pack-size groups) | ✅ |
 | catalog_variant_members | ~29,031+ | ✅ |
 | catalog_media | ~35,990 rows | ✅ PU multi-image from 133 brand XML files |
 | product_details | ~59,253 rows (~66.5% coverage) | ✅ VTwin attributes fixed session 60 |
 | canonical_products | 89,153 rows — all merges drained | ✅ 2,807 applied, 1,375 rejected (session 66) |
 | catalog_variant_candidates | 62 pending human review | ⏳ |
-| oem_supersession | **485 pairs** (283 original inferred + 202 vtwin hardware) | ⏳ 283 original pairs confidence=1 pending review |
+| oem_supersession | **485 pairs** (283 original inferred + 202 vtwin hardware) | ⏳ 283 original pairs confidence=1 pending review; 2 flagged wrong (session 67) |
 | mv_oem_fitment_coverage | — | ✅ Refreshed session 65 |
 | vtwin_scrape_data | ~31,000+ rows | ✅ +12,398 from scrape_vtwin_missing.mjs |
 | harley_model_years | **~2,090 rows** | ✅ +28 gap rows added session 61 |
@@ -29,7 +31,7 @@
 | ebc_brake_fitment | **528 rows** | ✅ NEW session 60 — EBC 2026 catalog, 14 H-D families |
 | hd_battery_fitment | **22 rows** | ✅ NEW session 60 — 7 OEM battery SKUs, model/year fitment |
 | bike_specs | **1,288 rows** | ✅ NEW session 61 — DS FatBook 2026 + DS OldBook 2026; battery/plugs/belt/sprockets/tires/shock per model+year |
-| Typesense | **89,151 docs** | ✅ Reindexed session 65 (0 errors) |
+| Typesense | **89,151 docs** | ✅ Reindexed session 67 (--recreate; fitment_text field added; 0 errors) |
 
 ### Fitment Coverage (June 26, 2026 — Session 60)
 
@@ -209,7 +211,8 @@ Single source of truth. 89,153 active rows.
 | `scripts/ingest/import_bike_specs.mjs` | DS FatBook 2026 + OldBook 2026 → bike_specs. 296 raw rows, 47-entry expansion map, century-aware year logic, --dry-run flag. 1288 rows inserted. |
 | `scripts/ingest/import_hd_battery_fitment.mjs` | Creates hd_battery_fitment table and inserts 7 OEM battery SKUs × 22 fitment rows |
 | `scripts/ingest/import_battery_oem_crossref.mjs` | Bridges battery products to H-D OEM numbers via BCI group → catalog_oem_crossref |
-| `scripts/ingest/index_unified.js` | Typesense reindex — uses product_details as primary source |
+| `scripts/ingest/index_unified.js` | Typesense reindex — uses product_details as primary source. **Session 67:** added `fitment_text` field (combined family+model+code+year string for search); schema change requires `--recreate`. |
+| `scripts/ingest/build_oem_part_timeline.mjs` | **NEW session 67** — populates `oem_part_timeline` from `catalog_oem_crossref`. Century-aware year logic. Dry-run default, `--apply` flag. ON CONFLICT (oem_number, product_id) DO NOTHING. |
 | `scripts/confirm-and-apply-pending.mjs` | Confirms ALL pending proposals then immediately applies them. Use after UI rejection pass. --dry-run flag. |
 | `scripts/apply-confirmed-merges.mjs` | Applies all 'confirmed' proposals (use if already confirmed via UI). --dry-run flag. |
 | `scripts/ingest/build_oem_fitment_all.mjs` | **PATCHED session 65** — Unified HD OEM PDF catalog extractor. 121 catalogs, all families. Fixes: (1) year-annotation noise filter (`description ~ '^\d{4}$'` rows skipped at parse time); (2) `catalog_family` column now populated from `cat.family` in bulkInsert. `catalog_family` values: sportster/dyna/softail/touring/all_model/fxr/fx/vintage/police. |
@@ -253,9 +256,11 @@ Auth: `?token=` URL param or `X-Admin-Token` header matching `ADMIN_SECRET` env 
 - Image resolution: `CASE WHEN array_length(cu.image_urls,1) > 0 THEN cu.image_urls ELSE cm.all_urls END` — VTwin reads image_urls column; PU reads catalog_media
 - Image proxy: `app/api/image-proxy/route.ts` — fflate-based, Referer-spoofing for LeMans zips, 1-year edge cache
 - `ProductImageGallery.jsx` — client component, thumbnail strip for multi-image products
-- Layout: ProductDetailsSection → DataTabs (Fitment + OEM)
-- OemAlternativesPanel: removed session 57
+- Layout: ProductDetailsSection → PDPTabs (Fitment + OEM) → **OemPartTimeline** → AdminEditPanel
 - `PDPTabs.jsx` — DetailsContent reads `product_details.attributes` directly as object (JSON.parse workaround removed session 60)
+- **`OemPartTimeline.jsx`** — client component (session 67). Two panels: left = all products sharing current OEM number (clickable → modal); right = year carousel (older/current/newer). Modal: image, name, OEM#, brand, pack qty, price, new-tab link. No vendor names or confidence scores shown. Rendered only when `getOemPartTimeline()` returns non-null.
+- **`lib/getOemPartTimeline.ts`** — server function (session 67). Queries `oem_part_timeline_sellable`. Returns OemPartTimeline with older/same_year/newer/current buckets, or null if product has no family.
+- catalog_media join pattern throughout PDP: `LEFT JOIN LATERAL (SELECT url FROM catalog_media WHERE product_id=... AND media_type='image' ORDER BY priority ASC LIMIT 1) cm ON true` — no `is_primary` column; always use `priority`.
 
 ---
 
@@ -264,7 +269,9 @@ Auth: `?token=` URL param or `X-Admin-Token` header matching `ADMIN_SECRET` env 
 | Bug | Workaround | Real fix |
 |-----|------------|---------|
 | scrape_vtwin_missing.mjs pg deprecation warning | Not failing — concurrent queries on single client instead of pool | Use `pool.query()` in worker |
-| oem_supersession 283 original confidence=1 rows | Not yet promoted or rejected | Manual review via `SELECT * FROM oem_supersession_review LIMIT 30` |
+| oem_supersession 283 original confidence=1 rows | Not yet reviewed or corrected | Manual review via `SELECT * FROM oem_supersession_review LIMIT 30`; delete `56308-88→56309-96` and `56324-81A→56356-92` (flagged session 67 as wrong cable-type matches) |
+
+**Search architecture (session 67):** `app/api/browse/products/route.ts` now calls Typesense server-side when `?q=` present. Fallback to ILIKE in browse.ts if Typesense returns 0 or times out (3s). ILIKE fallback uses 2-word threshold for 3+ word queries — no more zero results for model-name searches like "brake rotor street glide".
 
 *Note: VTwin extra_attributes stringified JSON bug (was #22 on chase list) — FIXED session 60 at source in build_product_details.mjs. Workaround in PDPTabs.jsx also removed.*
 

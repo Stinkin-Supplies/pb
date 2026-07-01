@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
         (
           SELECT json_agg(json_build_object(
             'id', cu.id, 'name', cu.name, 'source_vendor', cu.source_vendor,
-            'vendor_sku', cu.vendor_sku, 'computed_price', cu.computed_price,
+            'vendor_sku', cu.vendor_sku, 'brand', cu.brand, 'computed_price', cu.computed_price,
             'image_url', COALESCE(
               cu.image_url,
               (SELECT cm.url FROM catalog_media cm WHERE cm.product_id = cu.id ORDER BY cm.priority ASC LIMIT 1),

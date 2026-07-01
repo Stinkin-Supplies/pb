@@ -17,6 +17,11 @@
  *     product_id:      number
  *     option_1_name:   string          — axis label, e.g. "Color", "Size", "Finish"
  *     option_1_value:  string          — axis value, e.g. "Chrome", "XL", "+0.020"
+ *     option_2_name?:  string          — second axis label (optional), e.g. "Size"
+ *                                        when a group varies along two independent
+ *                                        dimensions at once (e.g. Style groups whose
+ *                                        members also differ by Size)
+ *     option_2_value?: string          — second axis value (optional), e.g. "10 Inch"
  *     sort_order?:     number          — display order within the group (default 0)
  *   }>
  */
@@ -47,6 +52,17 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    // option_2_name and option_2_value must travel together — a name with no
+    // value (or vice versa) means the admin UI's secondary-axis field was left
+    // half-filled, which would silently produce a blank label in the PDP selector.
+    const has2Name  = !!m.option_2_name?.trim();
+    const has2Value = !!m.option_2_value?.trim();
+    if (has2Name !== has2Value) {
+      return NextResponse.json(
+        { error: `Member ${m.product_id}: option_2_name and option_2_value must both be set or both be empty (got name="${m.option_2_name ?? ''}" value="${m.option_2_value ?? ''}")` },
+        { status: 400 }
+      );
+    }
   }
 
   const client = await pool.connect();
@@ -66,13 +82,19 @@ export async function POST(req: NextRequest) {
     for (const m of members) {
       await client.query(`
         INSERT INTO catalog_variant_members
-          (group_id, product_id, option_1_name, option_1_value, sort_order)
-        VALUES ($1, $2, $3, $4, $5)
+          (group_id, product_id, option_1_name, option_1_value, option_2_name, option_2_value, sort_order)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         ON CONFLICT (group_id, product_id) DO UPDATE
           SET option_1_name  = EXCLUDED.option_1_name,
               option_1_value = EXCLUDED.option_1_value,
+              option_2_name  = EXCLUDED.option_2_name,
+              option_2_value = EXCLUDED.option_2_value,
               sort_order     = EXCLUDED.sort_order
-      `, [groupId, m.product_id, m.option_1_name.trim(), m.option_1_value.trim(), m.sort_order ?? 0]);
+      `, [
+        groupId, m.product_id, m.option_1_name.trim(), m.option_1_value.trim(),
+        m.option_2_name?.trim() || null, m.option_2_value?.trim() || null,
+        m.sort_order ?? 0,
+      ]);
     }
 
     // 3. Backfill variant_group_id on catalog_unified

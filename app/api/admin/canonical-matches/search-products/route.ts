@@ -4,7 +4,8 @@
  * GET /api/admin/canonical-matches/search-products?token=...&q=...&limit=20
  *
  * Free-text search across name, vendor SKU, brand part number, and internal SKU.
- * Used by the manual-match tool to find products the OEM-based scan missed.
+ * Used by the manual-match tool to find products the OEM-based scan missed,
+ * and by the variant-candidates "attach product" tool.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -29,7 +30,7 @@ export async function GET(req: NextRequest) {
   try {
     const { rows } = await client.query(`
       SELECT
-        cu.id, cu.name, cu.source_vendor, cu.internal_sku,
+        cu.id, cu.name, cu.source_vendor, cu.internal_sku, cu.brand,
         cu.brand_part_number, cu.computed_price, cu.image_url,
         cu.display_category, cu.display_subcategory, cu.is_kit,
         cu.oem_numbers, cu.canonical_product_id,

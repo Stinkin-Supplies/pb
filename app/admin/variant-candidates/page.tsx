@@ -68,6 +68,19 @@ function extractAttribute(name: string): { name: string; value: string } | null 
   return null;
 }
 
+// Find a second, distinct attribute type in the same name (e.g. a rotor named
+// "10 Inch Drilled Stainless" has both a Style-ish word and a Finish word).
+// Skips whichever rule matched as the primary axis so the two never collide.
+function extractSecondAttribute(name: string, primaryAxisName: string | null): { name: string; value: string } | null {
+  for (const rule of ATTRIBUTE_RULES) {
+    const normalized = rule.name === 'Finish' ? 'Color' : rule.name;
+    if (normalized === primaryAxisName) continue;
+    const m = name.match(rule.pattern);
+    if (m) return { name: normalized, value: rule.extract(m) };
+  }
+  return null;
+}
+
 // Guess a clean group display name: strip the detected attribute value from
 // the shortest product name, then trim punctuation/dashes from the edges.
 function guessGroupName(products: CandidateProduct[]): string {
@@ -88,10 +101,41 @@ interface CandidateProduct {
   name: string;
   source_vendor: string;
   vendor_sku: string | null;
+  brand: string | null;
   computed_price: number;
   image_url: string | null;
   display_category: string;
   display_subcategory: string | null;
+}
+
+// Shape returned by /api/admin/canonical-matches/search-products — used for
+// the "attach product" tool. Mapped down to CandidateProduct for display.
+interface SearchResultProduct {
+  id: number;
+  name: string;
+  source_vendor: string;
+  vendor_sku: string | null;
+  brand: string | null;
+  brand_part_number: string | null;
+  computed_price: number;
+  image_url: string | null;
+  display_category: string;
+  display_subcategory: string | null;
+  is_kit: boolean;
+}
+
+function toCandidateProduct(p: SearchResultProduct): CandidateProduct {
+  return {
+    id: p.id,
+    name: p.name,
+    source_vendor: p.source_vendor,
+    vendor_sku: p.vendor_sku,
+    brand: p.brand,
+    computed_price: p.computed_price,
+    image_url: p.image_url,
+    display_category: p.display_category,
+    display_subcategory: p.display_subcategory,
+  };
 }
 
 interface Candidate {
@@ -109,6 +153,8 @@ interface MemberDraft {
   product_id: number;
   option_1_name: string;
   option_1_value: string;
+  option_2_name: string;
+  option_2_value: string;
   sort_order: number;
 }
 
@@ -129,6 +175,20 @@ export default function VariantCandidatesPage() {
   const [familyKeys, setFamilyKeys] = useState<Record<number, string>>({});
   const [memberDrafts, setMemberDrafts] = useState<Record<number, MemberDraft[]>>({});
   const [buildMsgs, setBuildMsgs] = useState<Record<number, { text: string; ok: boolean }>>({});
+
+  // Freeform editing: products added beyond the auto-flagged candidate, and
+  // originally-flagged products the person chose to drop from the group.
+  const [extraProducts, setExtraProducts] = useState<Record<number, CandidateProduct[]>>({});
+  const [removedProductIds, setRemovedProductIds] = useState<Record<number, Set<number>>>({});
+
+  // "Attach product" search tool (per candidate)
+  const [attachQuery, setAttachQuery] = useState<Record<number, string>>({});
+  const [attachResults, setAttachResults] = useState<Record<number, CandidateProduct[]>>({});
+  const [attachLoading, setAttachLoading] = useState<Record<number, boolean>>({});
+
+  // Custom (freeform) axis name, used when the preset AXIS_OPTIONS don't fit
+  const [customAxisInput, setCustomAxisInput] = useState<Record<number, string>>({});
+  const [customAxis2Input, setCustomAxis2Input] = useState<Record<number, string>>({});
 
   async function load() {
     setLoading(true);
@@ -160,9 +220,19 @@ export default function VariantCandidatesPage() {
     }
   }
 
+  // Merge the originally-flagged candidate products with anything manually
+  // attached, minus anything manually removed. This is the single source of
+  // truth for "what's in this group" everywhere in the UI.
+  function getGroupProducts(c: Candidate): CandidateProduct[] {
+    const removed = removedProductIds[c.id];
+    const original = (c.products ?? []).filter(p => !removed?.has(p.id));
+    const extra = extraProducts[c.id] ?? [];
+    return [...original, ...extra];
+  }
+
   // Open the build form for a candidate, seeding labels from auto-detection
   function openBuild(c: Candidate) {
-    const products = c.products ?? [];
+    const products = getGroupProducts(c);
     setBuildOpen(prev => new Set(prev).add(c.id));
 
     if (!displayNames[c.id]) {
@@ -172,10 +242,14 @@ export default function VariantCandidatesPage() {
     if (!memberDrafts[c.id]) {
       const drafts: MemberDraft[] = products.map((p, i) => {
         const attr = extractAttribute(p.name);
+        const axis1 = attr?.name ?? 'Color';
+        const attr2 = extractSecondAttribute(p.name, axis1);
         return {
           product_id: p.id,
-          option_1_name: attr?.name ?? 'Color',
+          option_1_name: axis1,
           option_1_value: attr?.value ?? '',
+          option_2_name: attr2?.name ?? '',
+          option_2_value: attr2?.value ?? '',
           sort_order: i,
         };
       });
@@ -202,6 +276,109 @@ export default function VariantCandidatesPage() {
       ...prev,
       [candidateId]: (prev[candidateId] ?? []).map(m => ({ ...m, option_1_name: axisName })),
     }));
+  }
+
+  // Sync the option_2_name across all members. Passing '' clears the second
+  // axis entirely (also blanks every option_2_value so a stale label can't
+  // linger after the axis is removed).
+  function syncAxis2Name(candidateId: number, axisName: string) {
+    setMemberDrafts(prev => ({
+      ...prev,
+      [candidateId]: (prev[candidateId] ?? []).map(m => ({
+        ...m,
+        option_2_name: axisName,
+        option_2_value: axisName ? m.option_2_value : '',
+      })),
+    }));
+  }
+
+  // ── Attach product search ──────────────────────────────────────────────
+  async function searchAttach(candidateId: number) {
+    const q = (attachQuery[candidateId] ?? '').trim();
+    if (q.length < 2) return;
+    setAttachLoading(prev => ({ ...prev, [candidateId]: true }));
+    try {
+      const res = await fetch(
+        `/api/admin/canonical-matches/search-products?token=${encodeURIComponent(token)}&q=${encodeURIComponent(q)}&limit=15`,
+        { cache: 'no-store' }
+      );
+      const data = await res.json();
+      const results: SearchResultProduct[] = data.results ?? [];
+      setAttachResults(prev => ({ ...prev, [candidateId]: results.map(toCandidateProduct) }));
+    } finally {
+      setAttachLoading(prev => ({ ...prev, [candidateId]: false }));
+    }
+  }
+
+  // Add a product (from search) into the group — updates the product list,
+  // seeds a member draft for it if the build form is open, and un-marks it
+  // as removed if it was previously dropped from this same candidate.
+  function addProduct(c: Candidate, product: CandidateProduct) {
+    const alreadyIn = getGroupProducts(c).some(p => p.id === product.id);
+    if (alreadyIn) return;
+
+    setRemovedProductIds(prev => {
+      const n = new Set(prev[c.id] ?? []);
+      n.delete(product.id);
+      return { ...prev, [c.id]: n };
+    });
+    setExtraProducts(prev => ({
+      ...prev,
+      [c.id]: [...(prev[c.id] ?? []), product],
+    }));
+
+    if (memberDrafts[c.id]) {
+      const currentAxis = memberDrafts[c.id][0]?.option_1_name ?? 'Color';
+      const currentAxis2 = memberDrafts[c.id][0]?.option_2_name ?? '';
+      const attr = extractAttribute(product.name);
+      const attr2 = currentAxis2 ? extractSecondAttribute(product.name, currentAxis) : null;
+      setMemberDrafts(prev => ({
+        ...prev,
+        [c.id]: [...(prev[c.id] ?? []), {
+          product_id: product.id,
+          option_1_name: currentAxis,
+          option_1_value: attr?.value ?? '',
+          option_2_name: currentAxis2,
+          option_2_value: attr2?.value ?? '',
+          sort_order: (prev[c.id] ?? []).length,
+        }],
+      }));
+    }
+
+    // clear the search UI for this candidate
+    setAttachQuery(prev => ({ ...prev, [c.id]: '' }));
+    setAttachResults(prev => ({ ...prev, [c.id]: [] }));
+  }
+
+  // Drop a product from the group — works whether it came from the original
+  // flag or was manually attached.
+  function removeProduct(candidateId: number, productId: number) {
+    setExtraProducts(prev => ({
+      ...prev,
+      [candidateId]: (prev[candidateId] ?? []).filter(p => p.id !== productId),
+    }));
+    setRemovedProductIds(prev => {
+      const n = new Set(prev[candidateId] ?? []);
+      n.add(productId);
+      return { ...prev, [candidateId]: n };
+    });
+    setMemberDrafts(prev => ({
+      ...prev,
+      [candidateId]: (prev[candidateId] ?? []).filter(m => m.product_id !== productId),
+    }));
+  }
+
+  // Apply a freeform axis name (typed, not from the AXIS_OPTIONS presets)
+  function applyCustomAxis(candidateId: number) {
+    const name = (customAxisInput[candidateId] ?? '').trim();
+    if (!name) return;
+    syncAxisName(candidateId, name);
+  }
+
+  function applyCustomAxis2(candidateId: number) {
+    const name = (customAxis2Input[candidateId] ?? '').trim();
+    if (!name) return;
+    syncAxis2Name(candidateId, name);
   }
 
   async function buildGroup(c: Candidate) {
@@ -244,6 +421,10 @@ export default function VariantCandidatesPage() {
       }));
       // Remove from list (it's now resolved)
       setTimeout(() => setCandidates(prev => prev.filter(x => x.id !== c.id)), 1200);
+      setExtraProducts(prev => { const n = { ...prev }; delete n[c.id]; return n; });
+      setRemovedProductIds(prev => { const n = { ...prev }; delete n[c.id]; return n; });
+      setAttachQuery(prev => { const n = { ...prev }; delete n[c.id]; return n; });
+      setAttachResults(prev => { const n = { ...prev }; delete n[c.id]; return n; });
     } finally {
       setBusyIds(prev => { const n = new Set(prev); n.delete(c.id); return n; });
     }
@@ -274,8 +455,9 @@ export default function VariantCandidatesPage() {
           <a href={`/admin/canonical-matches?token=${encodeURIComponent(token)}`} style={{ color: '#1d4f87' }}>
             Canonical Match Review
           </a>{' '}
-          as finish/size/color variants of the same part. Click <strong>Build group</strong> to assign labels and
-          create the variant group directly in the database.
+          as finish/size/color variants of the same part. Click <strong>Build group</strong> to assign labels,
+          attach or remove products, set a custom axis if none of the presets fit, and create the variant group
+          directly in the database.
         </p>
 
         {loading && <div style={{ color: '#666' }}>Loading...</div>}
@@ -290,7 +472,7 @@ export default function VariantCandidatesPage() {
           const isOpen = buildOpen.has(c.id);
           const drafts = memberDrafts[c.id] ?? [];
           const buildMsg = buildMsgs[c.id];
-          const products = c.products ?? [];
+          const products = getGroupProducts(c);
 
           return (
             <div key={c.id} style={{
@@ -384,6 +566,9 @@ export default function VariantCandidatesPage() {
                       <div style={{ fontSize: 13, lineHeight: 1.35, color: '#1a1a1a', marginBottom: 4, textTransform: 'none' }}>
                         {p.name}
                       </div>
+                      {p.brand && (
+                        <div style={{ fontSize: 11, fontWeight: 600, color: '#7c5fd6', textTransform: 'none' }}>{p.brand}</div>
+                      )}
                       {p.vendor_sku && (
                         <div style={{ fontSize: 11, fontFamily: 'monospace', color: '#aaa' }}>{p.vendor_sku}</div>
                       )}
@@ -439,7 +624,7 @@ export default function VariantCandidatesPage() {
                   {/* Axis name selector (shared across all members) */}
                   <div style={{ marginBottom: 12 }}>
                     <span style={{ fontSize: 11, color: '#666' }}>Variant axis (applies to all):</span>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6, alignItems: 'center' }}>
                       {AXIS_OPTIONS.map(axis => {
                         const currentAxis = drafts[0]?.option_1_name ?? 'Color';
                         return (
@@ -458,15 +643,173 @@ export default function VariantCandidatesPage() {
                           </button>
                         );
                       })}
+                      <span style={{ fontSize: 11, color: '#ccc', margin: '0 2px' }}>|</span>
+                      <input
+                        value={customAxisInput[c.id] ?? ''}
+                        onChange={e => setCustomAxisInput(prev => ({ ...prev, [c.id]: e.target.value }))}
+                        onKeyDown={e => { if (e.key === 'Enter') applyCustomAxis(c.id); }}
+                        placeholder="Custom axis..."
+                        style={{
+                          fontSize: 11, padding: '4px 10px', borderRadius: 12, width: 120,
+                          border: `1px solid ${!AXIS_OPTIONS.includes(drafts[0]?.option_1_name ?? 'Color') && drafts.length ? '#534AB7' : '#ccc'}`,
+                          background: '#fff', color: '#555',
+                        }}
+                      />
+                      <button
+                        onClick={() => applyCustomAxis(c.id)}
+                        style={{
+                          fontSize: 11, padding: '4px 10px', borderRadius: 12,
+                          border: '1px solid #ccc', background: '#fff', color: '#555', cursor: 'pointer',
+                        }}
+                      >
+                        Apply
+                      </button>
                     </div>
+                  </div>
+
+                  {/* Secondary axis selector (optional) — for products that vary along
+                      two independent dimensions at once, e.g. Style groups where members
+                      also differ by Size (10" vs 11.5" rotor within the same Drilled style). */}
+                  <div style={{ marginBottom: 16 }}>
+                    <span style={{ fontSize: 11, color: '#666' }}>
+                      Secondary axis <span style={{ color: '#aaa' }}>(optional — e.g. Size within a Style group)</span>:
+                    </span>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6, alignItems: 'center' }}>
+                      {(() => {
+                        const currentAxis2 = drafts[0]?.option_2_name ?? '';
+                        return (
+                          <button
+                            onClick={() => syncAxis2Name(c.id, '')}
+                            style={{
+                              fontSize: 11, padding: '4px 10px', borderRadius: 12,
+                              border: `1px solid ${!currentAxis2 ? '#534AB7' : '#ccc'}`,
+                              background: !currentAxis2 ? '#534AB7' : '#fff',
+                              color: !currentAxis2 ? '#fff' : '#555',
+                              cursor: 'pointer', fontWeight: !currentAxis2 ? 700 : 400,
+                            }}
+                          >
+                            None
+                          </button>
+                        );
+                      })()}
+                      {AXIS_OPTIONS.filter(a => a !== (drafts[0]?.option_1_name ?? 'Color')).map(axis => {
+                        const currentAxis2 = drafts[0]?.option_2_name ?? '';
+                        return (
+                          <button
+                            key={axis}
+                            onClick={() => syncAxis2Name(c.id, axis)}
+                            style={{
+                              fontSize: 11, padding: '4px 10px', borderRadius: 12,
+                              border: `1px solid ${currentAxis2 === axis ? '#534AB7' : '#ccc'}`,
+                              background: currentAxis2 === axis ? '#534AB7' : '#fff',
+                              color: currentAxis2 === axis ? '#fff' : '#555',
+                              cursor: 'pointer', fontWeight: currentAxis2 === axis ? 700 : 400,
+                            }}
+                          >
+                            {axis}
+                          </button>
+                        );
+                      })}
+                      <span style={{ fontSize: 11, color: '#ccc', margin: '0 2px' }}>|</span>
+                      <input
+                        value={customAxis2Input[c.id] ?? ''}
+                        onChange={e => setCustomAxis2Input(prev => ({ ...prev, [c.id]: e.target.value }))}
+                        onKeyDown={e => { if (e.key === 'Enter') applyCustomAxis2(c.id); }}
+                        placeholder="Custom axis..."
+                        style={{
+                          fontSize: 11, padding: '4px 10px', borderRadius: 12, width: 120,
+                          border: '1px solid #ccc', background: '#fff', color: '#555',
+                        }}
+                      />
+                      <button
+                        onClick={() => applyCustomAxis2(c.id)}
+                        style={{
+                          fontSize: 11, padding: '4px 10px', borderRadius: 12,
+                          border: '1px solid #ccc', background: '#fff', color: '#555', cursor: 'pointer',
+                        }}
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Attach product — search and add anything into this group */}
+                  <div style={{ marginBottom: 16, padding: 10, border: '1px dashed #c8bff5', borderRadius: 8, background: '#fff' }}>
+                    <span style={{ fontSize: 11, color: '#666' }}>Attach product to this group:</span>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                      <input
+                        value={attachQuery[c.id] ?? ''}
+                        onChange={e => setAttachQuery(prev => ({ ...prev, [c.id]: e.target.value }))}
+                        onKeyDown={e => { if (e.key === 'Enter') searchAttach(c.id); }}
+                        placeholder="Search name, SKU, brand part #..."
+                        style={{
+                          flex: 1, fontSize: 13, padding: '6px 10px',
+                          border: '1px solid #c8bff5', borderRadius: 6, background: '#fff',
+                        }}
+                      />
+                      <button
+                        onClick={() => searchAttach(c.id)}
+                        disabled={attachLoading[c.id]}
+                        style={{
+                          fontSize: 12, padding: '6px 14px', borderRadius: 6,
+                          border: '1px solid #534AB7', background: '#eeedfe', color: '#534AB7',
+                          fontWeight: 700, cursor: 'pointer',
+                        }}
+                      >
+                        {attachLoading[c.id] ? 'Searching...' : 'Search'}
+                      </button>
+                    </div>
+                    {(attachResults[c.id] ?? []).length > 0 && (
+                      <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 220, overflowY: 'auto' }}>
+                        {(attachResults[c.id] ?? []).map(r => {
+                          const alreadyIn = products.some(p => p.id === r.id);
+                          return (
+                            <div key={r.id} style={{
+                              display: 'flex', gap: 8, alignItems: 'center', padding: '6px 8px',
+                              border: '1px solid #eee', borderRadius: 6, background: alreadyIn ? '#f5f5f5' : '#fcfbf8',
+                            }}>
+                              <span style={{
+                                fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 8,
+                                color: '#fff', background: VENDOR_COLORS[r.source_vendor] ?? '#888',
+                                textTransform: 'uppercase', flexShrink: 0,
+                              }}>
+                                {r.source_vendor}
+                              </span>
+                              <span style={{ flex: 1, fontSize: 12, color: '#1a1a1a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {r.name}{r.brand ? ` — ${r.brand}` : ''}
+                              </span>
+                              <span style={{ fontSize: 11, color: '#999', flexShrink: 0 }}>${Number(r.computed_price).toFixed(2)}</span>
+                              <button
+                                onClick={() => addProduct(c, r)}
+                                disabled={alreadyIn}
+                                style={{
+                                  fontSize: 11, padding: '3px 10px', borderRadius: 5, flexShrink: 0,
+                                  border: '1px solid #3B6D11', background: alreadyIn ? '#eee' : '#e6f4d9',
+                                  color: alreadyIn ? '#999' : '#3B6D11', fontWeight: 700,
+                                  cursor: alreadyIn ? 'default' : 'pointer',
+                                }}
+                              >
+                                {alreadyIn ? 'Added' : '+ Add'}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
 
                   {/* Per-product label rows */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px 56px', gap: 8, fontSize: 10, color: '#aaa', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', paddingLeft: 60 }}>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: drafts[0]?.option_2_name ? '1fr 140px 140px 56px 26px' : '1fr 140px 56px 26px',
+                      gap: 8, fontSize: 10, color: '#aaa', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', paddingLeft: 60,
+                    }}>
                       <span>Product</span>
-                      <span>Label value</span>
+                      <span>{drafts[0]?.option_1_name || 'Label value'}</span>
+                      {drafts[0]?.option_2_name && <span>{drafts[0].option_2_name}</span>}
                       <span>Order</span>
+                      <span></span>
                     </div>
                     {drafts.map(d => {
                       const p = products.find(x => x.id === d.product_id);
@@ -494,9 +837,14 @@ export default function VariantCandidatesPage() {
                                 {p.name}
                               </span>
                             </div>
-                            {p.vendor_sku && (
-                              <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#bbb', marginTop: 1 }}>{p.vendor_sku}</div>
-                            )}
+                            <div style={{ display: 'flex', gap: 8, marginTop: 1 }}>
+                              {p.brand && (
+                                <span style={{ fontSize: 10, fontWeight: 600, color: '#7c5fd6' }}>{p.brand}</span>
+                              )}
+                              {p.vendor_sku && (
+                                <span style={{ fontSize: 10, fontFamily: 'monospace', color: '#bbb' }}>{p.vendor_sku}</span>
+                              )}
+                            </div>
                           </div>
                           {/* Label value input */}
                           <input
@@ -510,7 +858,20 @@ export default function VariantCandidatesPage() {
                               borderRadius: 6, background: '#fff', fontWeight: 600,
                             }}
                           />
-                          {/* Sort order */}
+                          {/* Secondary label value input — only rendered when a second axis is set */}
+                          {drafts[0]?.option_2_name && (
+                            <input
+                              value={d.option_2_value}
+                              onChange={e => updateMember(c.id, d.product_id, 'option_2_value', e.target.value)}
+                              placeholder={`e.g. ${drafts[0].option_2_name}`}
+                              style={{
+                                width: 140, flexShrink: 0,
+                                fontSize: 13, padding: '6px 8px',
+                                border: '1px solid #c8bff5',
+                                borderRadius: 6, background: '#fff', fontWeight: 600,
+                              }}
+                            />
+                          )}
                           <input
                             type="number"
                             value={d.sort_order}
@@ -522,21 +883,38 @@ export default function VariantCandidatesPage() {
                               border: '1px solid #ddd', borderRadius: 6, background: '#fff',
                             }}
                           />
+                          {/* Remove from group */}
+                          <button
+                            onClick={() => removeProduct(c.id, d.product_id)}
+                            title="Remove from group"
+                            style={{
+                              width: 26, height: 26, flexShrink: 0, borderRadius: 6,
+                              border: '1px solid #e0b0b0', background: '#fdf2f2', color: '#c0392b',
+                              fontWeight: 700, cursor: 'pointer', fontSize: 13, lineHeight: 1,
+                            }}
+                          >
+                            ×
+                          </button>
                         </div>
                       );
                     })}
+                    {drafts.length < 2 && (
+                      <div style={{ fontSize: 11, color: '#c0392b', fontWeight: 600 }}>
+                        Need at least 2 products in the group — attach one above before creating.
+                      </div>
+                    )}
                   </div>
 
                   {/* Submit */}
                   <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                     <button
-                      disabled={isBusy}
+                      disabled={isBusy || drafts.length < 2}
                       onClick={() => buildGroup(c)}
                       style={{
                         fontSize: 13, padding: '8px 20px', borderRadius: 6,
                         border: '1px solid #3B6D11', background: '#e6f4d9', color: '#3B6D11',
-                        fontWeight: 700, cursor: isBusy ? 'default' : 'pointer',
-                        opacity: isBusy ? 0.5 : 1, textTransform: 'none',
+                        fontWeight: 700, cursor: (isBusy || drafts.length < 2) ? 'default' : 'pointer',
+                        opacity: (isBusy || drafts.length < 2) ? 0.5 : 1, textTransform: 'none',
                       }}
                     >
                       {isBusy ? 'Creating...' : `Create group (${drafts.length} members)`}

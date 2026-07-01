@@ -43,6 +43,22 @@ async function run() {
     }
     console.log(`  ${myRows.length} model-year rows loaded.`);
 
+    // ── 1b. Load model_alias_map for WPS-style naming (e.g. "Pan America 1250"
+    // → RA1250, "Sportster S" → RH1250S, "Nightster" → RH975) ──────────────────
+    console.log('Loading model_alias_map...');
+    const { rows: aliasRows } = await client.query(`
+      SELECT lower(alias_text) AS alias_lower, model_code, priority
+      FROM model_alias_map
+      WHERE is_active = true AND model_code IS NOT NULL
+      ORDER BY priority ASC
+    `);
+    // "pan america" → "RA1250" (first/highest-priority wins on dedup)
+    const aliasMap = new Map();
+    for (const r of aliasRows) {
+      if (!aliasMap.has(r.alias_lower)) aliasMap.set(r.alias_lower, r.model_code);
+    }
+    console.log(`  ${aliasMap.size} active aliases loaded.`);
+
     // ── 2. Load WPS items that have Harley fitment, joined to catalog_unified ──
     console.log('Loading WPS items with Harley fitment...');
     const { rows: wpsItems } = await client.query(`
@@ -88,6 +104,25 @@ async function run() {
       const firstWord = needle.split(' ')[0].toUpperCase();
       for (const c of candidates) {
         if (c.model_code === firstWord) return c.model_year_id;
+      }
+
+      // 5. model_alias_map fallback — handles WPS-style naming that doesn't
+      // match harley_models.name or model_code at all, e.g. "Pan America 1250"
+      // → RA1250, "Sportster S" → RH1250S, "Nightster" → RH975.
+      // Try longest-alias-first substring match so "pan america 1250 special"
+      // doesn't get stuck matching only the shorter "pan america" alias when a
+      // more specific one might exist.
+      const sortedAliases = [...aliasMap.keys()].sort((a, b) => b.length - a.length);
+      for (const aliasKey of sortedAliases) {
+        if (needle.includes(aliasKey) || withoutCode.includes(aliasKey)) {
+          const aliasCode = aliasMap.get(aliasKey);
+          for (const c of candidates) {
+            if (c.model_code === aliasCode) return c.model_year_id;
+          }
+          // Alias resolved to a model_code, but no row for this specific year —
+          // stop here rather than falling through to a wrong candidate.
+          break;
+        }
       }
 
       return null;

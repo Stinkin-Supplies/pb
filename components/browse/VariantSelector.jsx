@@ -736,7 +736,7 @@ function StyleFinishSelector({ currentGroup, siblingGroups, variants, currentId,
             fontSize: 9, letterSpacing: '0.14em', color: '#9a8870',
             textTransform: 'uppercase', marginBottom: 10,
           }}>
-            Finish
+            {variants.find(v => v.option_1_name)?.option_1_name ?? 'Finish'}
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {variants.map(v => {
@@ -791,6 +791,59 @@ function StyleFinishSelector({ currentGroup, siblingGroups, variants, currentId,
                       {inStock ? 'IN STOCK' : 'OUT OF STOCK'}
                     </span>
                   </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Second option row (e.g. Size) — only when this Style group's members
+           vary along a second axis in addition to Finish/Color. Each pill still
+           navigates directly to that exact variant's slug (same one-click-jump
+           pattern as the Finish row above), so no combinatorial matrix logic is
+           needed — every SKU already carries both option_1_value and
+           option_2_value baked in. ── */}
+      {variants.some(v => v.option_2_value) && (
+        <div>
+          <div style={{
+            fontFamily: "var(--font-stencil,'Barlow Condensed',monospace)",
+            fontSize: 9, letterSpacing: '0.14em', color: '#9a8870',
+            textTransform: 'uppercase', marginBottom: 10,
+          }}>
+            {variants.find(v => v.option_2_name)?.option_2_name ?? 'Size'}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {variants.map(v => {
+              const isActive = v.id === currentId;
+              const inStock  = v.stock_qty > 0;
+              if (!v.option_2_value) return null;
+              return (
+                <button
+                  key={v.id}
+                  onClick={() => !isActive && onNavigate(v.slug)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '8px 14px',
+                    background: isActive ? '#fffbf0' : 'white',
+                    border: `1px solid ${isActive ? GOLD : BORDER}`,
+                    borderRadius: 6,
+                    cursor: isActive ? 'default' : 'pointer',
+                    opacity: inStock ? 1 : 0.5,
+                    boxShadow: isActive ? `0 0 0 2px ${GOLD}33` : 'none',
+                    transition: 'all 0.13s',
+                    minWidth: 60,
+                  }}
+                >
+                  <span style={{
+                    fontFamily: "var(--font-stencil,'Barlow Condensed',monospace)",
+                    fontSize: 12, fontWeight: 600, letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                    color: isActive ? '#7a5810' : DARK,
+                  }}>
+                    {v.option_2_value}
+                  </span>
                 </button>
               );
             })}
