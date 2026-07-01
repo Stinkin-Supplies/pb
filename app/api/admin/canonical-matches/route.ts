@@ -100,7 +100,7 @@ export async function GET(req: NextRequest) {
         AND a.is_active = true
         AND b.is_active = true
         AND cmp.reviewed_by IS DISTINCT FROM 'flagged-as-variant'
-      ORDER BY cmp.match_score DESC, cmp.id
+      ORDER BY cmp.match_score DESC, cmp.match_reason = 'manual' DESC, cmp.id
       LIMIT $2 OFFSET $3
     `, [status, limit, offset]);
 

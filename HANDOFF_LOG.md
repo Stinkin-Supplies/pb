@@ -5,6 +5,87 @@
 
 ---
 
+# ——— SIXTY-SIXTH PASS (June 30, 2026) ———
+
+## WHERE WE ARE
+
+Canonical match proposal queue re-drained. UI confirm button debugging revealed the root issue was unresolvable without browser devtools access; replaced the workflow with two CLI scripts. Queue is fully cleared.
+
+⚠️ Payment gateway still undecided — BLOCKING checkout.
+⚠️ 62 variant candidates still pending manual review at /admin/variant-candidates.
+⚠️ 283 OEM supersession pairs still pending review.
+⚠️ Missing 2024 Touring, Softail 2016, Sportster 1979–1985 catalogs.
+⚠️ OCR 4 image-only PDFs: FX 1971-80, FX 1971-84, Softail 2002, WLA 1942.
+
+## What Was Done
+
+### Canonical match queue re-drained ✅
+
+After re-opening rejected proposals, the UI confirm button stopped working (confirmed action never reached server — `[select] received POST` never appeared in terminal logs). Reject and reopen worked fine; only confirm was broken.
+
+**Debugging added** to all API routes: top-level logging in `/select`, `/bulk`, `/manual-match`. Confirmed confirm action was not making network requests from the browser.
+
+**Fix approach:** bypassed the broken UI confirm entirely with two new terminal scripts.
+
+**New scripts:**
+
+| Script | Use |
+|--------|-----|
+| `scripts/confirm-and-apply-pending.mjs` | Confirms ALL pending proposals then immediately applies them. Designed for post-rejection-pass cleanup. `--dry-run` flag for preview. |
+| `scripts/apply-confirmed-merges.mjs` | Applies only 'confirmed' proposals — use when proposals were already confirmed via UI. |
+
+**Workflow going forward:**
+1. In the admin UI, reject any groups you don't want merged (reject still works)
+2. Run `node scripts/confirm-and-apply-pending.mjs` to confirm + apply everything remaining
+
+**Run results (session 66):**
+
+| Metric | Count |
+|--------|-------|
+| Pending at run time | 40 |
+| Confirmed by script | 40 |
+| Merged (canonicals differ) | 0 |
+| Already same canonical | 9 (marked applied) |
+| Auto-rejected (null canonical) | 31 |
+
+The 1,344 other proposals that disappeared between dry-run and live run were handled by the user through the UI (537 bulk-rejected, 256 select-rejected, 551 flagged-as-variant).
+
+**Final proposal counts:**
+
+| Status | Count |
+|--------|-------|
+| applied | 2,807 |
+| rejected | 1,375 |
+| pending | 0 |
+| confirmed | 0 |
+
+### Also added (UI debugging artifacts left in place — harmless):
+- `[select] received POST` logging at top of `/api/admin/canonical-matches/select/route.ts`
+- `[bulk]` and `[manual-match]` logging in their respective routes
+- `groupErrors` state + red error banners per group in page.tsx
+- `actOnGroupByIds` now accepts `'confirm' | 'reject' | 'reopen'` (was `'confirm' | 'reject'`)
+
+## Next Session Starting Points
+
+```bash
+# No immediate pipeline work needed.
+
+# If new catalog PDFs uploaded:
+node scripts/ingest/build_oem_fitment_all.mjs --force
+node scripts/ingest/promote_oem_fitment.mjs
+node scripts/ingest/index_unified.js
+
+# Review queues:
+# - /admin/variant-candidates (62 pending)
+# - oem_supersession (283 pairs): SELECT * FROM oem_supersession_review LIMIT 30
+
+# If new canonical proposals are generated and need applying:
+node scripts/confirm-and-apply-pending.mjs --dry-run
+node scripts/confirm-and-apply-pending.mjs
+```
+
+---
+
 # ——— SIXTY-FIFTH PASS (June 29, 2026) ———
 
 ## WHERE WE ARE

@@ -874,27 +874,36 @@ export default function CanonicalMatchesPage() {
                           disabled={isBusy}
                           onClick={async () => {
                             setBusyGroups(prev => new Set(prev).add(oem));
+                            setGroupErrors(prev => { const next = { ...prev }; delete next[oem]; return next; });
                             try {
-                              // Create the missing proposal between the selected products
-                              const res = await fetch('/api/admin/canonical-matches/manual-match', {
+                              const mmRes = await fetch('/api/admin/canonical-matches/manual-match', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ token, product_ids: [...sel] }),
                               });
-                              const data = await res.json();
-                              if (data.error) { alert(`Error: ${data.error}`); return; }
-                              // Immediately confirm the new proposals via their group_key
-                              if (data.group_key) {
-                                await fetch('/api/admin/canonical-matches/bulk', {
+                              const mmData = await mmRes.json();
+                              if (!mmRes.ok || mmData.error) {
+                                setGroupErrors(prev => ({ ...prev, [oem]: `Create failed (${mmRes.status}): ${mmData.error ?? JSON.stringify(mmData)}` }));
+                                return;
+                              }
+                              // Confirm by proposal IDs (works even when ON CONFLICT DO NOTHING
+                              // fired and the pair already existed under a different OEM key).
+                              const idsToConfirm: number[] = mmData.proposal_ids ?? [];
+                              if (idsToConfirm.length > 0) {
+                                const selRes = await fetch('/api/admin/canonical-matches/select', {
                                   method: 'POST',
                                   headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ token, shared_oem_number: data.group_key, action: 'confirm' }),
+                                  body: JSON.stringify({ token, proposal_ids: idsToConfirm, action: 'confirm' }),
                                 });
+                                const selData = await selRes.json();
+                                if (!selRes.ok || selData.error) {
+                                  setGroupErrors(prev => ({ ...prev, [oem]: `Confirm failed (${selRes.status}): ${selData.error ?? JSON.stringify(selData)}` }));
+                                  return;
+                                }
                               }
-                              // Deselected pairs are left as pending — do NOT auto-reject them.
-                              // The user can explicitly reject remaining pairs after reviewing.
                               setProposals(prev => prev.filter(p => groupKeyOf(p) !== oem));
                               setGroupSelections(prev => { const next = { ...prev }; delete next[oem]; return next; });
+                              load();
                             } finally {
                               setBusyGroups(prev => { const next = new Set(prev); next.delete(oem); return next; });
                             }
@@ -925,7 +934,7 @@ export default function CanonicalMatchesPage() {
                   ) : (
                     <button
                       disabled={isBusy}
-                      onClick={() => isRealOemGroup(oem) ? bulkAction(oem, 'confirm') : actOnGroupByIds(oem, group, 'confirm')}
+                      onClick={() => actOnGroupByIds(oem, group, 'confirm')}
                       style={{
                         fontSize: 12, padding: '6px 12px', borderRadius: 5,
                         border: '1px solid #3B6D11', background: '#e6f4d9', color: '#3B6D11',
@@ -938,17 +947,19 @@ export default function CanonicalMatchesPage() {
                   </>)} {/* end pending-only actions */}
 
                   {statusFilter === 'confirmed' && (<>
-                  <span style={{ fontSize: 12, color: '#3B6D11', fontWeight: 600 }}>Queued for apply →</span>
+                  <span style={{ fontSize: 12, color: '#3B6D11', fontWeight: 700, background: '#eef7e6', border: '1px solid #cfe8bd', borderRadius: 5, padding: '4px 10px' }}>
+                    ✓ Queued — click "Apply confirmed merges" above to execute
+                  </span>
                   <button
                     disabled={isBusy}
                     onClick={() => isRealOemGroup(oem) ? bulkAction(oem, 'reopen') : actOnGroupByIds(oem, group, 'reopen')}
                     style={{
-                      fontSize: 12, padding: '6px 12px', borderRadius: 5,
-                      border: '1px solid #888', background: '#f5f5f5', color: '#444',
-                      fontWeight: 600, cursor: isBusy ? 'default' : 'pointer', opacity: isBusy ? 0.5 : 1, textTransform: 'none',
+                      fontSize: 11, padding: '4px 8px', borderRadius: 5,
+                      border: '1px solid #ccc', background: '#fafafa', color: '#999',
+                      fontWeight: 400, cursor: isBusy ? 'default' : 'pointer', opacity: isBusy ? 0.5 : 1, textTransform: 'none',
                     }}
                   >
-                    Un-confirm → pending
+                    undo (move back to pending)
                   </button>
                   </>)} {/* end confirmed actions */}
 

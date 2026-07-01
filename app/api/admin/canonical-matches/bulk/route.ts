@@ -33,14 +33,16 @@ export async function POST(req: NextRequest) {
                   : status === 'rejected'  ? ['pending', 'confirmed']
                   : ['pending', 'confirmed', 'rejected'];
 
+    console.log(`[bulk] action=${action} status=${status} oem=${shared_oem_number} allowed=${JSON.stringify(allowed)}`);
     const { rows } = await client.query(`
       UPDATE canonical_match_proposals
       SET status = $1, reviewed_by = 'admin-bulk', reviewed_at = NOW()
       WHERE shared_oem_number = $2
         AND status = ANY($3::text[])
-      RETURNING id
+      RETURNING id, status
     `, [status, shared_oem_number, allowed]);
 
+    console.log(`[bulk] updated ${rows.length} rows:`, rows);
     return NextResponse.json({ success: true, updated: rows.length });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });

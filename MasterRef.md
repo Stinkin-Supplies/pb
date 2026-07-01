@@ -1,8 +1,8 @@
 # Stinkin' Supplies — Master Reference
-**Last Updated:** June 29, 2026 (Sixty-Fifth Pass)
+**Last Updated:** June 30, 2026 (Sixty-Sixth Pass)
 **Database:** Hetzner Postgres — stinkin_catalog @ 5.161.100.126:5432
 
-**Status:** Catalog rebuilt ✅ | Fitment rebuilt ✅ | Search indexed ✅ | Homepage rebuilt ✅ | Font system locked ✅ | ModelFinder built ✅ | FilterSidebar updated ✅ | VariantSelector fitment+color mode ✅ | Variant groups merged ✅ | browse.ts name-grouping ✅ | VTwin SKU dupes resolved ✅ | Filtering system audit complete ✅ | MODEL_ALIASES expanded ✅ | VTwin scraper round 2+3 complete ✅ | CategoryBentoGrid built ✅ | display_subcategory taxonomy COMPLETE ✅ | Canonical merges DRAINED ✅ | PU vendor_sku fully corrected ✅ | product_details JSONB live ✅ | Multi-image galleries live ✅ | OEM supersession table live ✅ | VTwin fitment 55.8% ✅ | HD model reference audited (2026 catalog) ✅ | OEM crossref expanded ✅ | VTwin attributes bug fixed ✅ | EBC brake fitment ingested ✅ | HD battery fitment ingested ✅ | bike_specs table populated ✅ | HD OEM catalog fitment rebuilt (all families, 121 catalogs) ✅ | OEM fitment consolidation pipeline live ✅ | OEM crossref admin page ✅ | Eastern Motorcycle Parts crossref imported (4,832 rows) ✅ | Path C oem_numbers[] bug fixed ✅ | **OEM fitment data quality fixed (session 65): noise rows eliminated, universal promotion family-scoped** ✅ | OEM fitment promoted → catalog_fitment_v2 (5,126,957 rows) ✅ | Parts timeline admin page live ✅ | Typesense reindexed 89,151 docs ✅
+**Status:** Catalog rebuilt ✅ | Fitment rebuilt ✅ | Search indexed ✅ | Homepage rebuilt ✅ | Font system locked ✅ | ModelFinder built ✅ | FilterSidebar updated ✅ | VariantSelector fitment+color mode ✅ | Variant groups merged ✅ | browse.ts name-grouping ✅ | VTwin SKU dupes resolved ✅ | Filtering system audit complete ✅ | MODEL_ALIASES expanded ✅ | VTwin scraper round 2+3 complete ✅ | CategoryBentoGrid built ✅ | display_subcategory taxonomy COMPLETE ✅ | Canonical merges DRAINED ✅ | PU vendor_sku fully corrected ✅ | product_details JSONB live ✅ | Multi-image galleries live ✅ | OEM supersession table live ✅ | VTwin fitment 55.8% ✅ | HD model reference audited (2026 catalog) ✅ | OEM crossref expanded ✅ | VTwin attributes bug fixed ✅ | EBC brake fitment ingested ✅ | HD battery fitment ingested ✅ | bike_specs table populated ✅ | HD OEM catalog fitment rebuilt (all families, 121 catalogs) ✅ | OEM fitment consolidation pipeline live ✅ | OEM crossref admin page ✅ | Eastern Motorcycle Parts crossref imported (4,832 rows) ✅ | Path C oem_numbers[] bug fixed ✅ | **OEM fitment data quality fixed (session 65): noise rows eliminated, universal promotion family-scoped** ✅ | OEM fitment promoted → catalog_fitment_v2 (5,126,957 rows) ✅ | Parts timeline admin page live ✅ | Typesense reindexed 89,151 docs ✅ | **Canonical match queue re-drained (session 66): 2,807 applied / 1,375 rejected** ✅
 
 ---
 
@@ -19,7 +19,7 @@
 | catalog_variant_members | ~29,031+ | ✅ |
 | catalog_media | ~35,990 rows | ✅ PU multi-image from 133 brand XML files |
 | product_details | ~59,253 rows (~66.5% coverage) | ✅ VTwin attributes fixed session 60 |
-| canonical_products | 89,153 rows — all merges drained | ✅ 2,407 applied, 1,772 rejected |
+| canonical_products | 89,153 rows — all merges drained | ✅ 2,807 applied, 1,375 rejected (session 66) |
 | catalog_variant_candidates | 62 pending human review | ⏳ |
 | oem_supersession | **485 pairs** (283 original inferred + 202 vtwin hardware) | ⏳ 283 original pairs confidence=1 pending review |
 | mv_oem_fitment_coverage | — | ✅ Refreshed session 65 |
@@ -210,6 +210,8 @@ Single source of truth. 89,153 active rows.
 | `scripts/ingest/import_hd_battery_fitment.mjs` | Creates hd_battery_fitment table and inserts 7 OEM battery SKUs × 22 fitment rows |
 | `scripts/ingest/import_battery_oem_crossref.mjs` | Bridges battery products to H-D OEM numbers via BCI group → catalog_oem_crossref |
 | `scripts/ingest/index_unified.js` | Typesense reindex — uses product_details as primary source |
+| `scripts/confirm-and-apply-pending.mjs` | Confirms ALL pending proposals then immediately applies them. Use after UI rejection pass. --dry-run flag. |
+| `scripts/apply-confirmed-merges.mjs` | Applies all 'confirmed' proposals (use if already confirmed via UI). --dry-run flag. |
 | `scripts/ingest/build_oem_fitment_all.mjs` | **PATCHED session 65** — Unified HD OEM PDF catalog extractor. 121 catalogs, all families. Fixes: (1) year-annotation noise filter (`description ~ '^\d{4}$'` rows skipped at parse time); (2) `catalog_family` column now populated from `cat.family` in bulkInsert. `catalog_family` values: sportster/dyna/softail/touring/all_model/fxr/fx/vintage/police. |
 | `scripts/ingest/promote_oem_fitment.mjs` | **PATCHED session 65** — PATH_A_UNIVERSAL, PATH_B_UNIVERSAL, PATH_C_UNIVERSAL now JOIN harley_families and constrain by `f.catalog_family`. A Softail catalog's {ALL} rows only expand to Softail model years. `all_model` family = unrestricted (1340cc era). ON CONFLICT keeps highest confidence. |
 
@@ -311,4 +313,4 @@ Promotion results (ran against 5,062,086 baseline):
 
 ---
 
-*Master Reference — Last updated June 29, 2026 · Session 65*
+*Master Reference — Last updated June 30, 2026 · Session 66*

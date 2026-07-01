@@ -210,8 +210,11 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
   }
 
   // Full-text fallback (ILIKE) when no tsIds but search string present.
-  // Split into individual words and AND them — each word must appear
-  // somewhere in name/brand/sku, in any order.
+  // For 1-2 word queries: require ALL words to match (precise).
+  // For 3+ word queries: require at least 2 words to match — prevents
+  // model names like "street glide" from killing results when they don't
+  // appear in product names. "brake rotor street glide" → "brake" + "rotor"
+  // both match → results surface correctly.
   if (filters.search && !filters.tsIds?.length) {
     const words = filters.search.trim().split(/\s+/).filter(Boolean).slice(0, 6);
     if (words.length) {
@@ -222,7 +225,14 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
         groups.push('(cu.name ILIKE ?? OR cu.brand ILIKE ?? OR cu.vendor_sku ILIKE ?? OR cu.internal_sku ILIKE ?? OR EXISTS (SELECT 1 FROM unnest(cu.oem_numbers) AS oem WHERE oem ILIKE ??))');
         values.push(pat, pat, pat, pat, pat);
       }
-      conds.push({ tag: 'other', sql: `(${groups.join(' AND ')})`, values });
+      if (words.length <= 2) {
+        // Short queries: AND all words — stay precise
+        conds.push({ tag: 'other', sql: `(${groups.join(' AND ')})`, values });
+      } else {
+        // Longer queries: score each word 0/1, require at least 2 to match
+        const cases = groups.map(g => `(CASE WHEN ${g} THEN 1 ELSE 0 END)`);
+        conds.push({ tag: 'other', sql: `(${cases.join(' + ')}) >= 2`, values });
+      }
     }
   }
 

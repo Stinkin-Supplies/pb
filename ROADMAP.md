@@ -193,7 +193,7 @@
 |------|--------|
 | canonical_products table + product_vendors table | ✅ |
 | build_canonical_products.mjs Phase A + Phase B | ✅ |
-| **All 2,407 confirmed merges applied and drained** — 0 pending / 1,772 rejected | ✅ |
+| **All merges drained** — 0 pending / 2,807 applied / 1,375 rejected (session 66) | ✅ |
 | **62 variant candidates** — /admin/variant-candidates; finish/size/length groups | ⏳ |
 | Backfill vendor_offers from product_vendors (PU/VTwin) | ⏳ |
 | Unknown match pipeline (match_reason='upc'/'brand_part_number', null shared_oem_number) | ⏳ Identify source script |
@@ -325,4 +325,4 @@
 
 ---
 
-*Last updated June 29, 2026 · Session 65*
+*Last updated June 30, 2026 · Session 66*

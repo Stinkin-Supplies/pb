@@ -7,6 +7,8 @@ import ProductImage from '@/components/browse/ProductImage';
 import ProductImageGallery from '@/components/browse/ProductImageGallery';
 import PDPTabs from '@/components/browse/PDPTabs';
 import AdminEditPanel from '@/components/admin/AdminEditPanel';
+import { getOemPartTimeline } from '@/lib/getOemPartTimeline';
+import OemPartTimeline from '@/components/pdp/OemPartTimeline';
 
 // Routes LeMans/PU images through local proxy
 function resolveImageSrc(url) {
@@ -217,7 +219,7 @@ export default async function ProductDetailPage({ params }) {
   const unifiedId = productRow.id;
 
   // Parallel fetches
-  const [fitment, oemRows, variants, related, timeline, oemAlternatives] = await Promise.all([
+  const [fitment, oemRows, variants, related, timeline, oemAlternatives, oemTimeline] = await Promise.all([
     getFitmentRows(unifiedId),
     getOemRows(unifiedId),
     getVariantMembers(productRow.variant_group_id, unifiedId),
@@ -232,6 +234,7 @@ export default async function ProductDetailPage({ params }) {
       productRow.display_subcategory ?? null,
     ),
     getOemAlternatives(unifiedId),
+    getOemPartTimeline(unifiedId),
   ]);
 
   const hasSidebar = oemAlternatives.length > 0;
@@ -642,6 +645,10 @@ export default async function ProductDetailPage({ params }) {
           oemRows={oemRows}
           details={productRow.product_details}
         />
+
+        {oemTimeline && (
+          <OemPartTimeline timeline={oemTimeline} currentProductId={unifiedId} />
+        )}
 
         <AdminEditPanel
           product={{

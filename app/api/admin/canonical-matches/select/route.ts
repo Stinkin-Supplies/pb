@@ -12,7 +12,9 @@ import { Pool } from 'pg';
 const pool = new Pool({ connectionString: process.env.CATALOG_DATABASE_URL });
 
 export async function POST(req: NextRequest) {
+  console.log('[select] received POST');
   const body = await req.json();
+  console.log('[select] body keys:', Object.keys(body), 'action:', body.action, 'ids:', body.proposal_ids);
   if (body.token !== process.env.ADMIN_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
