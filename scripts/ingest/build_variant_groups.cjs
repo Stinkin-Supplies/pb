@@ -36,6 +36,27 @@ const pool = new Pool({
 });
 const q = async (sql, p = []) => { const { rows } = await pool.query(sql, p); return rows; };
 
+/**
+ * Upsert every axis for one variant member into catalog_variant_member_options.
+ * `axes` is the array shape produced by classifyGroup's memberAxes:
+ *   [{ name, value, order }, ...]
+ * Source of truth for axis count/labels going forward — the option_1 and
+ * option_2 columns on catalog_variant_members are written alongside this
+ * purely as a legacy mirror for anything not yet migrated to read the
+ * junction table.
+ */
+async function upsertMemberOptions(memberId, axes) {
+  for (const a of axes ?? []) {
+    if (!a?.name || !a?.value) continue;
+    await q(`
+      INSERT INTO catalog_variant_member_options (member_id, axis_name, axis_value, axis_order)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (member_id, axis_name) DO UPDATE
+        SET axis_value = EXCLUDED.axis_value, axis_order = EXCLUDED.axis_order
+    `, [memberId, a.name, a.value, a.order ?? 0]);
+  }
+}
+
 // ── String helpers ────────────────────────────────────────────────────────────
 
 function toTitleCase(s) {
@@ -139,6 +160,62 @@ const ATTRIBUTE_RULES = [
     extract: m => m[1].toUpperCase() === 'SS' ? 'Stainless' : toTitleCase(m[1]) },
 ];
 
+/**
+ * Find EVERY distinct attribute type present in a name — not just the first
+ * or second match. A rotor named "10 Inch Drilled Stainless" can carry a
+ * Size word, a Style-ish word, AND a Finish word simultaneously; this is the
+ * source-of-truth extractor for the catalog_variant_member_options junction
+ * table, which has no ceiling on axis count.
+ *
+ * Each rule contributes at most one axis (first match per rule pattern).
+ * Finish and Color collapse to the same axis name (normalizeAxisName), so a
+ * name can't accidentally produce both.
+ */
+function extractAllAttributes(name) {
+  if (!name) return [];
+  const found = [];
+  const seenAxisNames = new Set();
+  for (const rule of ATTRIBUTE_RULES) {
+    const m = name.match(rule.pattern);
+    if (!m) continue;
+    const axisName = normalizeAxisName(rule.name);
+    if (seenAxisNames.has(axisName)) continue;
+    seenAxisNames.add(axisName);
+    found.push({ name: axisName, value: rule.extract(m) });
+  }
+  return found;
+}
+
+/**
+ * Given per-member attribute lists (from extractAllAttributes), keep only
+ * the axes that actually distinguish members from each other — same guard
+ * as the primary-axis check in classifyGroup. An axis where every member
+ * shows the identical value isn't a real choice for the customer.
+ * Returns axes in the order they should display (primaryAxisName first, if
+ * present, then everything else in first-seen order).
+ */
+function filterDistinguishingAxes(memberAttrLists, primaryAxisName) {
+  const byAxis = new Map(); // axisName -> Set of values seen
+  for (const attrs of memberAttrLists) {
+    for (const a of attrs) {
+      if (!byAxis.has(a.name)) byAxis.set(a.name, new Set());
+      byAxis.get(a.name).add(a.value);
+    }
+  }
+  const keptAxisNames = [...byAxis.entries()]
+    .filter(([, values]) => values.size >= 2)
+    .map(([name]) => name);
+
+  // Order: primary axis first (if it made the cut), then first-seen order
+  // for everything else.
+  const ordered = [];
+  if (primaryAxisName && keptAxisNames.includes(primaryAxisName)) ordered.push(primaryAxisName);
+  for (const name of keptAxisNames) {
+    if (name !== primaryAxisName) ordered.push(name);
+  }
+  return ordered;
+}
+
 function extractAttribute(name) {
   if (!name) return null;
   for (const rule of ATTRIBUTE_RULES) {
@@ -149,10 +226,10 @@ function extractAttribute(name) {
 }
 
 /**
- * Find a second, distinct attribute type in the same name — e.g. a rotor
- * named "10 Inch Drilled Stainless" carries both a Style-ish word and a
- * Finish word. Skips whichever rule matched as the primary axis so the two
- * never collide. Returns null if nothing else matches.
+ * Find a second, distinct attribute type in the same name — retained for
+ * mirroring option_1/option_2 legacy columns only. The junction table
+ * (extractAllAttributes + filterDistinguishingAxes) is the source of truth
+ * for axis count going forward.
  */
 function extractSecondAttribute(name, primaryAxisName) {
   if (!name) return null;
@@ -239,17 +316,23 @@ function classifyGroup(candidates) {
     if (distinctValues.size >= 2) {
       const normalizedAxis = normalizeAxisName(axis);
 
-      // Secondary axis (optional): look for a second, different attribute type
-      // in each member's name (e.g. a rotor group axis'd on Style might also
-      // carry a Finish word — "10 Inch Drilled Stainless"). Only attach it if
-      // it actually distinguishes members from each other, same rule as the
-      // primary axis — otherwise every member would show the identical
-      // secondary label, which isn't a real choice for the customer.
+      // Legacy mirror: option_2 (retained for catalog_variant_members columns).
       const attrs2 = members.map(m => extractSecondAttribute(m.name, normalizedAxis));
       const distinctValues2 = new Set(attrs2.filter(Boolean).map(a => a.value));
       const memberAttrs2 = distinctValues2.size >= 2 ? attrs2 : members.map(() => null);
 
-      return { axis: normalizedAxis, members, memberAttrs: attrs, memberAttrs2 };
+      // Source of truth: every axis this member's name carries, filtered to
+      // only the ones that actually distinguish members from each other.
+      const allAttrsPerMember = members.map(m => extractAllAttributes(m.name));
+      const keptAxisNames = filterDistinguishingAxes(allAttrsPerMember, normalizedAxis);
+      const memberAxes = allAttrsPerMember.map(attrList => {
+        const byName = new Map(attrList.map(a => [a.name, a.value]));
+        return keptAxisNames
+          .filter(axisName => byName.has(axisName))
+          .map((axisName, i) => ({ name: axisName, value: byName.get(axisName), order: i }));
+      });
+
+      return { axis: normalizedAxis, members, memberAttrs: attrs, memberAttrs2, memberAxes };
     }
     if (DRY) {
       console.log(`  [non_distinguishing_axis] "${axis}"="${[...distinctValues][0]}" shared by all ${members.length} members — dissolving, trying Pack Size fallback`);
@@ -275,7 +358,10 @@ function classifyGroup(candidates) {
     qty != null ? { name: 'Pack Size', value: qty === 1 ? '1 Piece' : `${qty}-Pack` } : null
   );
 
-  return { axis: 'Pack Size', members, memberAttrs: packAttrs, memberAttrs2: members.map(() => null) };
+  return {
+    axis: 'Pack Size', members, memberAttrs: packAttrs, memberAttrs2: members.map(() => null),
+    memberAxes: packAttrs.map(a => a ? [{ name: 'Pack Size', value: a.value, order: 0 }] : []),
+  };
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -310,6 +396,18 @@ async function main() {
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_variant_members_product ON catalog_variant_members(product_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_variant_members_group   ON catalog_variant_members(group_id)`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS catalog_variant_member_options (
+      id          SERIAL PRIMARY KEY,
+      member_id   INTEGER NOT NULL REFERENCES catalog_variant_members(id) ON DELETE CASCADE,
+      axis_name   TEXT NOT NULL,
+      axis_value  TEXT NOT NULL,
+      axis_order  INTEGER NOT NULL DEFAULT 0,
+      UNIQUE (member_id, axis_name)
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_variant_member_options_member ON catalog_variant_member_options(member_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_variant_member_options_axis   ON catalog_variant_member_options(axis_name)`);
   await pool.query(`ALTER TABLE catalog_unified ADD COLUMN IF NOT EXISTS variant_group_id INTEGER REFERENCES catalog_variant_groups(id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_cu_variant_group ON catalog_unified(variant_group_id) WHERE variant_group_id IS NOT NULL`);
   await pool.query(`ALTER TABLE catalog_variant_groups ADD COLUMN IF NOT EXISTS family_key TEXT`);
@@ -429,7 +527,7 @@ async function main() {
       const m     = result.members[i];
       const attr  = result.memberAttrs[i];
       const attr2 = result.memberAttrs2?.[i];
-      await q(`
+      const [memberRow] = await q(`
         INSERT INTO catalog_variant_members
           (group_id, product_id, option_1_name, option_1_value, option_2_name, option_2_value, sort_order)
         VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -438,12 +536,14 @@ async function main() {
               option_1_value = EXCLUDED.option_1_value,
               option_2_name  = EXCLUDED.option_2_name,
               option_2_value = EXCLUDED.option_2_value
+        RETURNING id
       `, [grp.id, m.id,
           attr ? normalizeAxisName(attr.name) : null,
           attr?.value ?? null,
           attr2 ? normalizeAxisName(attr2.name) : null,
           attr2?.value ?? null,
           i]);
+      if (memberRow) await upsertMemberOptions(memberRow.id, result.memberAxes?.[i]);
       wpsMembers_created++;
     }
 
@@ -569,6 +669,7 @@ async function main() {
     // instead of positionally.
     const attrById  = new Map(result.members.map((m, i) => [m.id, result.memberAttrs[i]]));
     const attr2ById = new Map(result.members.map((m, i) => [m.id, result.memberAttrs2?.[i]]));
+    const axesById  = new Map(result.members.map((m, i) => [m.id, result.memberAxes?.[i]]));
 
     const [grp] = await q(`
       INSERT INTO catalog_variant_groups (wps_product_id, display_name, source_vendor)
@@ -597,6 +698,17 @@ async function main() {
           attr2 ? normalizeAxisName(attr2.name) : null,
           attr2?.value ?? null,
           i]);
+      // The INSERT above is conditional (WHERE EXISTS) + ON CONFLICT DO NOTHING,
+      // so it never reliably RETURNING's an id. Look the member row up instead —
+      // if it's missing, either the vendor-mismatch guard rejected it (correct:
+      // don't write axes for a member that was never actually linked) or nothing
+      // changed on conflict but the row already existed from a prior run (fine:
+      // fetch its id and upsert axes normally).
+      const [memberRow] = await q(
+        `SELECT id FROM catalog_variant_members WHERE group_id = $1 AND product_id = $2`,
+        [grp.id, m.id]
+      );
+      if (memberRow) await upsertMemberOptions(memberRow.id, axesById.get(m.id));
       puMembersCreated++;
     }
 

@@ -68,17 +68,24 @@ function extractAttribute(name: string): { name: string; value: string } | null 
   return null;
 }
 
-// Find a second, distinct attribute type in the same name (e.g. a rotor named
-// "10 Inch Drilled Stainless" has both a Style-ish word and a Finish word).
-// Skips whichever rule matched as the primary axis so the two never collide.
-function extractSecondAttribute(name: string, primaryAxisName: string | null): { name: string; value: string } | null {
+// Find EVERY distinct attribute type present in a name — not just the first
+// match. A rotor named "10 Inch Drilled Stainless" can carry a Size word, a
+// Style-ish word, AND a Finish word simultaneously. Each rule contributes at
+// most one axis; Finish and Color collapse to the same axis name so a name
+// can't accidentally produce both. This is what makes auto-seeding an
+// unlimited number of axes possible instead of capping at two.
+function extractAllAttributes(name: string): Array<{ name: string; value: string }> {
+  const found: Array<{ name: string; value: string }> = [];
+  const seen = new Set<string>();
   for (const rule of ATTRIBUTE_RULES) {
-    const normalized = rule.name === 'Finish' ? 'Color' : rule.name;
-    if (normalized === primaryAxisName) continue;
     const m = name.match(rule.pattern);
-    if (m) return { name: normalized, value: rule.extract(m) };
+    if (!m) continue;
+    const axisName = rule.name === 'Finish' ? 'Color' : rule.name;
+    if (seen.has(axisName)) continue;
+    seen.add(axisName);
+    found.push({ name: axisName, value: rule.extract(m) });
   }
-  return null;
+  return found;
 }
 
 // Guess a clean group display name: strip the detected attribute value from
@@ -149,12 +156,14 @@ interface Candidate {
   products: CandidateProduct[] | null;
 }
 
+interface AxisValue {
+  name: string;
+  value: string;
+}
+
 interface MemberDraft {
   product_id: number;
-  option_1_name: string;
-  option_1_value: string;
-  option_2_name: string;
-  option_2_value: string;
+  options: AxisValue[]; // one entry per active axis, same names/order across every member in the group
   sort_order: number;
 }
 
@@ -187,8 +196,12 @@ export default function VariantCandidatesPage() {
   const [attachLoading, setAttachLoading] = useState<Record<number, boolean>>({});
 
   // Custom (freeform) axis name, used when the preset AXIS_OPTIONS don't fit
-  const [customAxisInput, setCustomAxisInput] = useState<Record<number, string>>({});
-  const [customAxis2Input, setCustomAxis2Input] = useState<Record<number, string>>({});
+  const [newAxisInput, setNewAxisInput] = useState<Record<number, string>>({});
+
+  // Shared, ordered list of variant axes active for a candidate's build form
+  // (e.g. ['Style', 'Size', 'Finish']) — no ceiling on length. Every member
+  // draft's `options` array stays in lockstep with this list.
+  const [axisNames, setAxisNames] = useState<Record<number, string[]>>({});
 
   async function load() {
     setLoading(true);
@@ -240,19 +253,25 @@ export default function VariantCandidatesPage() {
     }
 
     if (!memberDrafts[c.id]) {
+      // Union of every axis detected across all products, in first-seen order.
+      // Falls back to a single 'Color' axis if nothing was detected, so the
+      // form always has at least one axis to fill in by hand.
+      const perProductAttrs = products.map(p => extractAllAttributes(p.name));
+      const detectedOrder: string[] = [];
+      perProductAttrs.forEach(attrs => attrs.forEach(a => {
+        if (!detectedOrder.includes(a.name)) detectedOrder.push(a.name);
+      }));
+      const initialAxes = detectedOrder.length > 0 ? detectedOrder : ['Color'];
+
       const drafts: MemberDraft[] = products.map((p, i) => {
-        const attr = extractAttribute(p.name);
-        const axis1 = attr?.name ?? 'Color';
-        const attr2 = extractSecondAttribute(p.name, axis1);
+        const byName = new Map(perProductAttrs[i].map(a => [a.name, a.value]));
         return {
           product_id: p.id,
-          option_1_name: axis1,
-          option_1_value: attr?.value ?? '',
-          option_2_name: attr2?.name ?? '',
-          option_2_value: attr2?.value ?? '',
+          options: initialAxes.map(axisName => ({ name: axisName, value: byName.get(axisName) ?? '' })),
           sort_order: i,
         };
       });
+      setAxisNames(prev => ({ ...prev, [c.id]: initialAxes }));
       setMemberDrafts(prev => ({ ...prev, [c.id]: drafts }));
     }
   }
@@ -261,33 +280,56 @@ export default function VariantCandidatesPage() {
     setBuildOpen(prev => { const n = new Set(prev); n.delete(id); return n; });
   }
 
-  function updateMember(candidateId: number, productId: number, field: keyof MemberDraft, value: string | number) {
+  function updateMemberOption(candidateId: number, productId: number, axisName: string, value: string) {
     setMemberDrafts(prev => ({
       ...prev,
       [candidateId]: (prev[candidateId] ?? []).map(m =>
-        m.product_id === productId ? { ...m, [field]: value } : m
+        m.product_id === productId
+          ? { ...m, options: m.options.map(o => o.name === axisName ? { ...o, value } : o) }
+          : m
       ),
     }));
   }
 
-  // Sync the option_1_name across all members when one changes (they share an axis)
-  function syncAxisName(candidateId: number, axisName: string) {
+  function updateMemberSortOrder(candidateId: number, productId: number, sortOrder: number) {
     setMemberDrafts(prev => ({
       ...prev,
-      [candidateId]: (prev[candidateId] ?? []).map(m => ({ ...m, option_1_name: axisName })),
+      [candidateId]: (prev[candidateId] ?? []).map(m =>
+        m.product_id === productId ? { ...m, sort_order: sortOrder } : m
+      ),
     }));
   }
 
-  // Sync the option_2_name across all members. Passing '' clears the second
-  // axis entirely (also blanks every option_2_value so a stale label can't
-  // linger after the axis is removed).
-  function syncAxis2Name(candidateId: number, axisName: string) {
+  // Add a new axis to the group (no ceiling on how many). Appends it to the
+  // shared axisNames list and, for every existing member, appends a value —
+  // auto-detected from that product's name if possible, blank otherwise.
+  function addAxis(c: Candidate, axisName: string) {
+    const name = axisName.trim();
+    if (!name) return;
+    if ((axisNames[c.id] ?? []).includes(name)) return; // already active
+
+    const products = getGroupProducts(c);
+    setAxisNames(prev => ({ ...prev, [c.id]: [...(prev[c.id] ?? []), name] }));
+    setMemberDrafts(prev => ({
+      ...prev,
+      [c.id]: (prev[c.id] ?? []).map(m => {
+        if (m.options.some(o => o.name === name)) return m;
+        const product = products.find(p => p.id === m.product_id);
+        const detected = product ? extractAllAttributes(product.name).find(a => a.name === name) : undefined;
+        return { ...m, options: [...m.options, { name, value: detected?.value ?? '' }] };
+      }),
+    }));
+  }
+
+  // Remove an axis from the group entirely — drops it from the shared list
+  // and strips it out of every member's options array.
+  function removeAxis(candidateId: number, axisName: string) {
+    setAxisNames(prev => ({ ...prev, [candidateId]: (prev[candidateId] ?? []).filter(a => a !== axisName) }));
     setMemberDrafts(prev => ({
       ...prev,
       [candidateId]: (prev[candidateId] ?? []).map(m => ({
         ...m,
-        option_2_name: axisName,
-        option_2_value: axisName ? m.option_2_value : '',
+        options: m.options.filter(o => o.name !== axisName),
       })),
     }));
   }
@@ -328,18 +370,14 @@ export default function VariantCandidatesPage() {
     }));
 
     if (memberDrafts[c.id]) {
-      const currentAxis = memberDrafts[c.id][0]?.option_1_name ?? 'Color';
-      const currentAxis2 = memberDrafts[c.id][0]?.option_2_name ?? '';
-      const attr = extractAttribute(product.name);
-      const attr2 = currentAxis2 ? extractSecondAttribute(product.name, currentAxis) : null;
+      const currentAxes = axisNames[c.id] ?? [];
+      const detected = extractAllAttributes(product.name);
+      const byName = new Map(detected.map(a => [a.name, a.value]));
       setMemberDrafts(prev => ({
         ...prev,
         [c.id]: [...(prev[c.id] ?? []), {
           product_id: product.id,
-          option_1_name: currentAxis,
-          option_1_value: attr?.value ?? '',
-          option_2_name: currentAxis2,
-          option_2_value: attr2?.value ?? '',
+          options: currentAxes.map(axisName => ({ name: axisName, value: byName.get(axisName) ?? '' })),
           sort_order: (prev[c.id] ?? []).length,
         }],
       }));
@@ -369,28 +407,29 @@ export default function VariantCandidatesPage() {
   }
 
   // Apply a freeform axis name (typed, not from the AXIS_OPTIONS presets)
-  function applyCustomAxis(candidateId: number) {
-    const name = (customAxisInput[candidateId] ?? '').trim();
+  function applyNewAxis(c: Candidate) {
+    const name = (newAxisInput[c.id] ?? '').trim();
     if (!name) return;
-    syncAxisName(candidateId, name);
-  }
-
-  function applyCustomAxis2(candidateId: number) {
-    const name = (customAxis2Input[candidateId] ?? '').trim();
-    if (!name) return;
-    syncAxis2Name(candidateId, name);
+    addAxis(c, name);
+    setNewAxisInput(prev => ({ ...prev, [c.id]: '' }));
   }
 
   async function buildGroup(c: Candidate) {
     const drafts = memberDrafts[c.id] ?? [];
+    const axes = axisNames[c.id] ?? [];
     const name = displayNames[c.id]?.trim();
     if (!name) {
       setBuildMsgs(prev => ({ ...prev, [c.id]: { text: 'Group name is required', ok: false } }));
       return;
     }
+    if (axes.length === 0) {
+      setBuildMsgs(prev => ({ ...prev, [c.id]: { text: 'At least one variant axis is required', ok: false } }));
+      return;
+    }
     for (const d of drafts) {
-      if (!d.option_1_value.trim()) {
-        setBuildMsgs(prev => ({ ...prev, [c.id]: { text: `Label value missing for product ${d.product_id}`, ok: false } }));
+      const missing = d.options.find(o => !o.value.trim());
+      if (missing) {
+        setBuildMsgs(prev => ({ ...prev, [c.id]: { text: `${missing.name} value missing for product ${d.product_id}`, ok: false } }));
         return;
       }
     }
@@ -407,7 +446,11 @@ export default function VariantCandidatesPage() {
           display_name: name,
           family_key: familyKeys[c.id]?.trim() || null,
           candidate_id: c.id,
-          members: drafts,
+          members: drafts.map(d => ({
+            product_id: d.product_id,
+            sort_order: d.sort_order,
+            options: d.options.map(o => ({ name: o.name, value: o.value.trim() })),
+          })),
         }),
       });
       const data = await res.json();
@@ -425,6 +468,8 @@ export default function VariantCandidatesPage() {
       setRemovedProductIds(prev => { const n = { ...prev }; delete n[c.id]; return n; });
       setAttachQuery(prev => { const n = { ...prev }; delete n[c.id]; return n; });
       setAttachResults(prev => { const n = { ...prev }; delete n[c.id]; return n; });
+      setAxisNames(prev => { const n = { ...prev }; delete n[c.id]; return n; });
+      setNewAxisInput(prev => { const n = { ...prev }; delete n[c.id]; return n; });
     } finally {
       setBusyIds(prev => { const n = new Set(prev); n.delete(c.id); return n; });
     }
@@ -621,100 +666,63 @@ export default function VariantCandidatesPage() {
                     </label>
                   </div>
 
-                  {/* Axis name selector (shared across all members) */}
-                  <div style={{ marginBottom: 12 }}>
-                    <span style={{ fontSize: 11, color: '#666' }}>Variant axis (applies to all):</span>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6, alignItems: 'center' }}>
-                      {AXIS_OPTIONS.map(axis => {
-                        const currentAxis = drafts[0]?.option_1_name ?? 'Color';
-                        return (
-                          <button
-                            key={axis}
-                            onClick={() => syncAxisName(c.id, axis)}
-                            style={{
-                              fontSize: 11, padding: '4px 10px', borderRadius: 12,
-                              border: `1px solid ${currentAxis === axis ? '#534AB7' : '#ccc'}`,
-                              background: currentAxis === axis ? '#534AB7' : '#fff',
-                              color: currentAxis === axis ? '#fff' : '#555',
-                              cursor: 'pointer', fontWeight: currentAxis === axis ? 700 : 400,
-                            }}
-                          >
-                            {axis}
-                          </button>
-                        );
-                      })}
-                      <span style={{ fontSize: 11, color: '#ccc', margin: '0 2px' }}>|</span>
-                      <input
-                        value={customAxisInput[c.id] ?? ''}
-                        onChange={e => setCustomAxisInput(prev => ({ ...prev, [c.id]: e.target.value }))}
-                        onKeyDown={e => { if (e.key === 'Enter') applyCustomAxis(c.id); }}
-                        placeholder="Custom axis..."
-                        style={{
-                          fontSize: 11, padding: '4px 10px', borderRadius: 12, width: 120,
-                          border: `1px solid ${!AXIS_OPTIONS.includes(drafts[0]?.option_1_name ?? 'Color') && drafts.length ? '#534AB7' : '#ccc'}`,
-                          background: '#fff', color: '#555',
-                        }}
-                      />
-                      <button
-                        onClick={() => applyCustomAxis(c.id)}
-                        style={{
-                          fontSize: 11, padding: '4px 10px', borderRadius: 12,
-                          border: '1px solid #ccc', background: '#fff', color: '#555', cursor: 'pointer',
-                        }}
-                      >
-                        Apply
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Secondary axis selector (optional) — for products that vary along
-                      two independent dimensions at once, e.g. Style groups where members
-                      also differ by Size (10" vs 11.5" rotor within the same Drilled style). */}
+                  {/* Axes (shared across all members) — add as many as this
+                      product line actually needs. No ceiling: a rotor family
+                      might need Style + Size + Finish, a bolt kit might need
+                      just Color. Each chip is removable; new axes get
+                      auto-detected values where possible, blank otherwise. */}
                   <div style={{ marginBottom: 16 }}>
                     <span style={{ fontSize: 11, color: '#666' }}>
-                      Secondary axis <span style={{ color: '#aaa' }}>(optional — e.g. Size within a Style group)</span>:
+                      Variant axes <span style={{ color: '#aaa' }}>(applies to all members):</span>
                     </span>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6, alignItems: 'center' }}>
-                      {(() => {
-                        const currentAxis2 = drafts[0]?.option_2_name ?? '';
-                        return (
+                      {(axisNames[c.id] ?? []).length === 0 && (
+                        <span style={{ fontSize: 11, color: '#c0392b', fontWeight: 600 }}>
+                          No axes yet — add at least one below.
+                        </span>
+                      )}
+                      {(axisNames[c.id] ?? []).map(axis => (
+                        <span
+                          key={axis}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 6,
+                            fontSize: 11, padding: '4px 6px 4px 10px', borderRadius: 12,
+                            border: '1px solid #534AB7', background: '#534AB7', color: '#fff', fontWeight: 700,
+                          }}
+                        >
+                          {axis}
                           <button
-                            onClick={() => syncAxis2Name(c.id, '')}
+                            onClick={() => removeAxis(c.id, axis)}
+                            title={`Remove ${axis} axis`}
                             style={{
-                              fontSize: 11, padding: '4px 10px', borderRadius: 12,
-                              border: `1px solid ${!currentAxis2 ? '#534AB7' : '#ccc'}`,
-                              background: !currentAxis2 ? '#534AB7' : '#fff',
-                              color: !currentAxis2 ? '#fff' : '#555',
-                              cursor: 'pointer', fontWeight: !currentAxis2 ? 700 : 400,
+                              width: 16, height: 16, borderRadius: '50%', border: 'none',
+                              background: 'rgba(255,255,255,0.28)', color: '#fff', fontSize: 10, lineHeight: 1,
+                              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
                             }}
                           >
-                            None
+                            ×
                           </button>
-                        );
-                      })()}
-                      {AXIS_OPTIONS.filter(a => a !== (drafts[0]?.option_1_name ?? 'Color')).map(axis => {
-                        const currentAxis2 = drafts[0]?.option_2_name ?? '';
-                        return (
-                          <button
-                            key={axis}
-                            onClick={() => syncAxis2Name(c.id, axis)}
-                            style={{
-                              fontSize: 11, padding: '4px 10px', borderRadius: 12,
-                              border: `1px solid ${currentAxis2 === axis ? '#534AB7' : '#ccc'}`,
-                              background: currentAxis2 === axis ? '#534AB7' : '#fff',
-                              color: currentAxis2 === axis ? '#fff' : '#555',
-                              cursor: 'pointer', fontWeight: currentAxis2 === axis ? 700 : 400,
-                            }}
-                          >
-                            {axis}
-                          </button>
-                        );
-                      })}
+                        </span>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8, alignItems: 'center' }}>
+                      {AXIS_OPTIONS.filter(a => !(axisNames[c.id] ?? []).includes(a)).map(axis => (
+                        <button
+                          key={axis}
+                          onClick={() => addAxis(c, axis)}
+                          style={{
+                            fontSize: 11, padding: '4px 10px', borderRadius: 12,
+                            border: '1px solid #ccc', background: '#fff', color: '#555', cursor: 'pointer',
+                          }}
+                        >
+                          + {axis}
+                        </button>
+                      ))}
                       <span style={{ fontSize: 11, color: '#ccc', margin: '0 2px' }}>|</span>
                       <input
-                        value={customAxis2Input[c.id] ?? ''}
-                        onChange={e => setCustomAxis2Input(prev => ({ ...prev, [c.id]: e.target.value }))}
-                        onKeyDown={e => { if (e.key === 'Enter') applyCustomAxis2(c.id); }}
+                        value={newAxisInput[c.id] ?? ''}
+                        onChange={e => setNewAxisInput(prev => ({ ...prev, [c.id]: e.target.value }))}
+                        onKeyDown={e => { if (e.key === 'Enter') applyNewAxis(c); }}
                         placeholder="Custom axis..."
                         style={{
                           fontSize: 11, padding: '4px 10px', borderRadius: 12, width: 120,
@@ -722,13 +730,13 @@ export default function VariantCandidatesPage() {
                         }}
                       />
                       <button
-                        onClick={() => applyCustomAxis2(c.id)}
+                        onClick={() => applyNewAxis(c)}
                         style={{
                           fontSize: 11, padding: '4px 10px', borderRadius: 12,
-                          border: '1px solid #ccc', background: '#fff', color: '#555', cursor: 'pointer',
+                          border: '1px solid #3B6D11', background: '#e6f4d9', color: '#3B6D11', fontWeight: 700, cursor: 'pointer',
                         }}
                       >
-                        Apply
+                        + Add axis
                       </button>
                     </div>
                   </div>
@@ -802,12 +810,11 @@ export default function VariantCandidatesPage() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
                     <div style={{
                       display: 'grid',
-                      gridTemplateColumns: drafts[0]?.option_2_name ? '1fr 140px 140px 56px 26px' : '1fr 140px 56px 26px',
+                      gridTemplateColumns: `1fr ${(axisNames[c.id] ?? []).map(() => '140px').join(' ')} 56px 26px`,
                       gap: 8, fontSize: 10, color: '#aaa', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', paddingLeft: 60,
                     }}>
                       <span>Product</span>
-                      <span>{drafts[0]?.option_1_name || 'Label value'}</span>
-                      {drafts[0]?.option_2_name && <span>{drafts[0].option_2_name}</span>}
+                      {(axisNames[c.id] ?? []).map(axis => <span key={axis}>{axis}</span>)}
                       <span>Order</span>
                       <span></span>
                     </div>
@@ -846,37 +853,30 @@ export default function VariantCandidatesPage() {
                               )}
                             </div>
                           </div>
-                          {/* Label value input */}
-                          <input
-                            value={d.option_1_value}
-                            onChange={e => updateMember(c.id, d.product_id, 'option_1_value', e.target.value)}
-                            placeholder="e.g. Chrome"
-                            style={{
-                              width: 140, flexShrink: 0,
-                              fontSize: 13, padding: '6px 8px',
-                              border: `1px solid ${d.option_1_value.trim() ? '#c8bff5' : '#f5a623'}`,
-                              borderRadius: 6, background: '#fff', fontWeight: 600,
-                            }}
-                          />
-                          {/* Secondary label value input — only rendered when a second axis is set */}
-                          {drafts[0]?.option_2_name && (
-                            <input
-                              value={d.option_2_value}
-                              onChange={e => updateMember(c.id, d.product_id, 'option_2_value', e.target.value)}
-                              placeholder={`e.g. ${drafts[0].option_2_name}`}
-                              style={{
-                                width: 140, flexShrink: 0,
-                                fontSize: 13, padding: '6px 8px',
-                                border: '1px solid #c8bff5',
-                                borderRadius: 6, background: '#fff', fontWeight: 600,
-                              }}
-                            />
-                          )}
+                          {/* One label-value input per active axis */}
+                          {(axisNames[c.id] ?? []).map(axis => {
+                            const opt = d.options.find(o => o.name === axis);
+                            return (
+                              <input
+                                key={axis}
+                                value={opt?.value ?? ''}
+                                onChange={e => updateMemberOption(c.id, d.product_id, axis, e.target.value)}
+                                placeholder={`e.g. ${axis}`}
+                                style={{
+                                  width: 140, flexShrink: 0,
+                                  fontSize: 13, padding: '6px 8px',
+                                  border: `1px solid ${opt?.value.trim() ? '#c8bff5' : '#f5a623'}`,
+                                  borderRadius: 6, background: '#fff', fontWeight: 600,
+                                }}
+                              />
+                            );
+                          })}
+                          {/* Sort order */}
                           <input
                             type="number"
                             value={d.sort_order}
                             min={0}
-                            onChange={e => updateMember(c.id, d.product_id, 'sort_order', parseInt(e.target.value) || 0)}
+                            onChange={e => updateMemberSortOrder(c.id, d.product_id, parseInt(e.target.value) || 0)}
                             style={{
                               width: 56, flexShrink: 0,
                               fontSize: 12, padding: '6px 8px', textAlign: 'center',

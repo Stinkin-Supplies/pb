@@ -12,11 +12,17 @@ export async function GET(
   const db = getCatalogDb();
 
   try {
+    // ORDER BY + LIMIT 1 guards against a product ever being a member of more
+    // than one group (shouldn't happen by design, but a bad admin edit or a
+    // stray script run could do it — without this the row picked was
+    // nondeterministic across requests).
     const groupRow = await db.query(`
       SELECT cvg.id as group_id, cvg.display_name, cvg.source_vendor, cvg.family_key
       FROM catalog_variant_groups cvg
       JOIN catalog_variant_members cvm ON cvm.group_id = cvg.id
       WHERE cvm.product_id = $1
+      ORDER BY cvg.id ASC
+      LIMIT 1
     `, [id]);
 
     if (groupRow.rows.length === 0) {
@@ -29,6 +35,12 @@ export async function GET(
     // The previous DISTINCT ON (option_1_value) was silently collapsing all members that
     // share the same option value (e.g. 33 "Chrome" bolts → 1 row), hiding the panel entirely.
     // Image falls back to cu.image_url (LeMans CDN) when catalog_media has no entry.
+    //
+    // `options` is the full N-axis set for this member, pulled from
+    // catalog_variant_member_options and ordered by axis_order — the source of
+    // truth going forward. option_1_value/option_2_value are still returned
+    // alongside it (mirrored from the legacy columns) for any caller not yet
+    // migrated to read `options`.
     const siblings = await db.query(`
       SELECT
         cu.id,
@@ -43,6 +55,15 @@ export async function GET(
         cvm.option_2_name,
         cvm.option_2_value,
         cvm.sort_order,
+        COALESCE(
+          (SELECT json_agg(
+             json_build_object('name', cvmo.axis_name, 'value', cvmo.axis_value)
+             ORDER BY cvmo.axis_order ASC
+           )
+           FROM catalog_variant_member_options cvmo
+           WHERE cvmo.member_id = cvm.id),
+          '[]'::json
+        ) AS options,
         COALESCE(vo.total_qty, 0) AS stock_qty,
         COALESCE(vo.msrp, cu.msrp) AS offer_price,
         COALESCE(
