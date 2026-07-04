@@ -4,11 +4,18 @@
  * Creates a variant group from admin-reviewed member data.
  * Handles the full transaction:
  *   1. Insert catalog_variant_groups row
- *   2. Insert catalog_variant_members rows (one per product)
- *   3. Insert catalog_variant_member_options rows (one per axis per product —
- *      unlimited axis count, source of truth going forward)
- *   4. Backfill catalog_unified.variant_group_id for each member
- *   5. Optionally mark a catalog_variant_candidates row as resolved
+ *   2. Insert catalog_variant_members rows (one per product) + full axis set
+ *      into catalog_variant_member_options (unlimited axes, junction table)
+ *   3. Backfill catalog_unified.variant_group_id for each member
+ *   4. Optionally mark a catalog_variant_candidates row as resolved
+ *
+ * Session 71 fix: this file had been accidentally overwritten with the
+ * content of [id]/route.ts in commit c9d2f2a ("refactor: enhance variant
+ * candidate management and update axis handling") — real create logic was
+ * lost from disk (recovered from HEAD~1) and combined here with the
+ * options[]/junction-table axis pattern that same commit introduced into
+ * [id]/route.ts's PATCH handler, since the HEAD~1 version predates that
+ * migration and only supported two fixed axes (option_1/option_2 columns).
  *
  * Body:
  *   token          string
@@ -18,18 +25,9 @@
  *   members        Array<{
  *     product_id:  number
  *     sort_order?: number              — display order within the group (default 0)
- *     options:     Array<{ name: string, value: string }>
- *                  — one entry per variant axis, in display order (Style, Size,
- *                    Finish, ...). At least one required. No ceiling on length —
- *                    this is what makes N-axis groups possible without a schema
- *                    change every time a new dimension shows up.
+ *     options:     Array<{ name: string, value: string }>  — unlimited axes,
+ *                  e.g. [{name:"Style",value:"Chrome"},{name:"Size",value:"11.5in"}]
  *   }>
- *
- * Legacy compatibility: a member may instead (or additionally) send
- * option_1_name/option_1_value/option_2_name/option_2_value — these get folded
- * into the same `options` array internally. New callers should send `options`
- * directly; this exists only so anything not yet updated to the new shape
- * doesn't break.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -42,31 +40,15 @@ interface IncomingMember {
   product_id: number;
   sort_order?: number;
   options?: AxisOption[];
-  option_1_name?: string;
-  option_1_value?: string;
-  option_2_name?: string;
-  option_2_value?: string;
 }
 
-// Normalize any member shape (new `options` array or legacy option_1/option_2
-// fields) down to a single trimmed, deduplicated options array.
 function normalizeOptions(m: IncomingMember): AxisOption[] {
   const raw: AxisOption[] = [];
   if (Array.isArray(m.options)) {
     for (const o of m.options) {
       if (o?.name?.trim() && o?.value?.trim()) raw.push({ name: o.name.trim(), value: o.value.trim() });
     }
-  } else {
-    if (m.option_1_name?.trim() && m.option_1_value?.trim()) {
-      raw.push({ name: m.option_1_name.trim(), value: m.option_1_value.trim() });
-    }
-    if (m.option_2_name?.trim() && m.option_2_value?.trim()) {
-      raw.push({ name: m.option_2_name.trim(), value: m.option_2_value.trim() });
-    }
   }
-  // De-dupe by axis name, keeping first occurrence (a member shouldn't carry
-  // "Size" twice — that's a client bug, but silently keeping the first entry
-  // is safer than a 500 mid-transaction).
   const seen = new Set<string>();
   return raw.filter(o => {
     if (seen.has(o.name)) return false;
@@ -118,9 +100,8 @@ export async function POST(req: NextRequest) {
 
     const groupId: number = group.id;
 
-    // 2. Insert members — option_1_name/option_1_value/option_2_name/option_2_value
-    //    are still written here as a legacy mirror of the first two axes, for
-    //    any read path not yet migrated to the junction table.
+    // 2. Insert members + full axis set (legacy option_1/2 columns kept in
+    //    sync for backward compat, same pattern as [id]/route.ts PATCH)
     for (const m of normalizedMembers) {
       const [axis0, axis1] = m.options;
       const { rows: [memberRow] } = await client.query(`
@@ -141,10 +122,6 @@ export async function POST(req: NextRequest) {
         m.sort_order,
       ]);
 
-      // 3. Insert every axis into the junction table — the source of truth,
-      //    unlimited length. Replaces the full axis set for this member each
-      //    time (delete-then-insert) so removing an axis in the admin UI
-      //    actually removes it here too, rather than leaving a stale row.
       await client.query(`DELETE FROM catalog_variant_member_options WHERE member_id = $1`, [memberRow.id]);
       for (let i = 0; i < m.options.length; i++) {
         const opt = m.options[i];
@@ -157,7 +134,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 4. Backfill variant_group_id on catalog_unified
+    // 3. Backfill variant_group_id on catalog_unified
     const productIds = normalizedMembers.map(m => m.product_id);
     await client.query(`
       UPDATE catalog_unified
@@ -165,7 +142,7 @@ export async function POST(req: NextRequest) {
       WHERE id = ANY($2::int[])
     `, [groupId, productIds]);
 
-    // 5. Optionally resolve the candidate
+    // 4. Optionally resolve the candidate
     if (candidate_id) {
       await client.query(`
         UPDATE catalog_variant_candidates
