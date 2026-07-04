@@ -4,6 +4,11 @@
  * Legacy products endpoint used by brand pages and older product grids.
  * This now delegates to the canonical browse filter pipeline so the unified
  * catalog behaves the same way everywhere.
+ *
+ * Session 71: added canonicalSku to the mapped response — this route never
+ * threaded canonical_sku through at all (same gap /api/search had until
+ * session 69, fixed there via Typesense; this route reads Postgres directly
+ * via lib/db/browse.ts, which now also joins canonical_products).
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -82,6 +87,7 @@ function mapLegacyProduct(row: LegacyBrowseRow) {
     warehouseTx: row.warehouse_tx ?? 0,
     oemPartNumber: row.oem_numbers?.[0] ?? null,
     oem_numbers: row.oem_numbers ?? [],
+    canonicalSku: row.canonical_sku ?? null,
     priceMin: price,
     priceMax: price,
     brandCount: 1,

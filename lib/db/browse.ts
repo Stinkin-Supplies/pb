@@ -8,6 +8,13 @@
  *   - CatalogProduct: oem_chain_match?: boolean
  *   - browseProducts: chain IDs ORed into fitment condition; oem_chain_match computed column
  *   - getChronologicalNeighbors: displaySubcategory third param ($3); productId→$4; yearWindow→$5
+ *
+ * Session 71 changes:
+ *   - CatalogProduct: canonical_sku: string | null (was missing entirely — same gap /api/search had
+ *     until session 69; this route/lib never joined canonical_products at all)
+ *   - browseProducts: LEFT JOIN canonical_products cp ON cp.id = cu.canonical_product_id;
+ *     cp.canonical_sku added to productSql SELECT. NOT added to countSql/facet queries (not needed there).
+ *   - getProductBySlug: NOT yet checked for the same gap — separate query, used by PDP not brand-page grids.
  */
 
 import { getCatalogDb } from './catalog';
@@ -36,6 +43,9 @@ export interface CatalogProduct {
   oem_numbers: string[];
   stock_quantity: number;
   in_stock: boolean;
+  /** canonical_products.canonical_sku, joined via cu.canonical_product_id.
+   *  Null when the product has no canonical match yet (~2.3% of active catalog). */
+  canonical_sku: string | null;
   /** True when surfaced via OEM supersession chain (not a direct fitment row).
    *  Only populated when year + model are active in the request. */
   oem_chain_match?: boolean;
@@ -454,6 +464,7 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
         cu.pack_qty,
         cu.variant_group_id,
         cu.oem_numbers,
+        cp.canonical_sku                           AS canonical_sku,
         COALESCE((
           SELECT SUM(vo.total_qty)
           FROM public.vendor_offers vo
@@ -469,6 +480,7 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
         (cu.id = ANY(${chainLiteral}))            AS oem_chain_match,
         (fv.product_id IS NOT NULL)               AS has_fitment
       FROM catalog_unified cu
+      LEFT JOIN canonical_products cp ON cp.id = cu.canonical_product_id
       ${fitmentJoin}
       LEFT JOIN LATERAL (
         SELECT COUNT(*)::int AS cnt
