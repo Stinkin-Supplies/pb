@@ -14,7 +14,7 @@
  *     until session 69; this route/lib never joined canonical_products at all)
  *   - browseProducts: LEFT JOIN canonical_products cp ON cp.id = cu.canonical_product_id;
  *     cp.canonical_sku added to productSql SELECT. NOT added to countSql/facet queries (not needed there).
- *   - getProductBySlug: NOT yet checked for the same gap — separate query, used by PDP not brand-page grids.
+ *   - getProductBySlug: removed (confirmed zero callers — PDP uses its own inline query, not this function).
  */
 
 import { getCatalogDb } from './catalog';
@@ -626,38 +626,6 @@ export async function getChronologicalNeighbors(
   `, [productId, category, displaySubcategory ?? null, productId, yearWindow]);
 
   return rows;
-}
-
-// ── Single product by slug ────────────────────────────────────────────────────
-
-export async function getProductBySlug(slug: string): Promise<CatalogProduct | null> {
-  const db = getCatalogDb();
-  const { rows } = await db.query<CatalogProduct>(`
-    SELECT
-      cu.id, cu.sku, cu.slug, cu.name, cu.brand,
-      cu.computed_price AS price,
-      COALESCE(cu.image_url, cm.url) AS image_url,
-      cu.vendor_sku, cu.source_vendor,
-      cu.display_category, cu.display_subcategory, cu.category,
-      cu.is_universal, cu.is_active, cu.is_kit, cu.pack_qty,
-      cu.variant_group_id, cu.oem_numbers,
-      COALESCE(vcnt.cnt, 0)::int AS variant_count
-    FROM catalog_unified cu
-    LEFT JOIN LATERAL (
-      SELECT COUNT(*)::int AS cnt
-      FROM catalog_variant_members
-      WHERE group_id = cu.variant_group_id
-    ) vcnt ON true
-    LEFT JOIN LATERAL (
-      SELECT url FROM catalog_media
-      WHERE product_id = cu.id AND media_type = 'image'
-      ORDER BY priority ASC
-      LIMIT 1
-    ) cm ON cu.image_url IS NULL OR cu.image_url = ''
-    WHERE cu.slug = $1 AND cu.is_active = true
-    LIMIT 1
-  `, [slug]);
-  return rows[0] ?? null;
 }
 
 // ── Fitment helpers (used by app/api/browse/fitment/route.ts) ─────────────────
