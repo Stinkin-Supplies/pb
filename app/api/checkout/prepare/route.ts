@@ -10,13 +10,18 @@
  * — those are internal to the optimizer's RoutedGroup/RoutedItem and have no business
  * being visible in a browser network tab.
  *
- * All lookups (canonical_products, product_vendors) are now confirmed against real
- * schema — nothing left to guess here.
+ * POINTS: accepts optional userId + pointsToRedeem. This is a QUOTE only — the
+ * authoritative balance check + debit happens in orders/create inside a locked
+ * transaction. Here we just read the balance (no lock needed for a read-only
+ * preview) and compute what discount *would* apply, so the UI can show an
+ * accurate total before the customer commits to paying.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getCatalogDb } from '@/lib/db/catalog'; // CONFIRM this import path
 import { resolveFulfillment, type OrderItemInput } from '@/lib/fulfillment/optimizer';
+
+const POINTS_REDEEM_RATE = 0.01; // $ value per point
 
 type PrepareRequestItem = {
   canonicalSku: string;
@@ -33,6 +38,8 @@ type CanonicalLookupRow = {
 export async function POST(request: NextRequest) {
   const body = await request.json();
   const requestedItems: PrepareRequestItem[] = body.items ?? [];
+  const userId: string | null = body.userId ?? null;
+  const pointsToRedeem: number = Number(body.pointsToRedeem ?? 0) || 0;
 
   if (requestedItems.length === 0) {
     return NextResponse.json({ error: 'No items in cart' }, { status: 400 });
@@ -90,6 +97,26 @@ export async function POST(request: NextRequest) {
   // Both placeholders per CHASE_LIST item 17 — wire real calculation when that's built.
   const shippingTotal = 0;
   const taxTotal = 0;
+  const preDiscountTotal = subtotal + shippingTotal + taxTotal;
+
+  let pointsAvailable = 0;
+  let pointsApplied = 0;
+  let discountTotal = 0;
+
+  if (userId) {
+    const { rows } = await db.query(
+      `SELECT points_balance FROM customer_points WHERE user_id = $1`,
+      [userId]
+    );
+    pointsAvailable = rows[0]?.points_balance ?? 0;
+
+    const requested = Math.max(0, Math.min(pointsToRedeem, pointsAvailable));
+    const rawValue = requested * POINTS_REDEEM_RATE;
+    discountTotal = Math.min(rawValue, preDiscountTotal);
+    // If capped by the order total, don't quote more points as "applied" than
+    // the discount actually consumed.
+    pointsApplied = Math.round(discountTotal / POINTS_REDEEM_RATE);
+  }
 
   return NextResponse.json({
     lineItems,
@@ -97,7 +124,10 @@ export async function POST(request: NextRequest) {
     subtotal,
     shippingTotal,
     taxTotal,
-    total: subtotal + shippingTotal + taxTotal,
+    pointsAvailable,
+    pointsApplied,
+    discountTotal,
+    total: Math.max(preDiscountTotal - discountTotal, 0),
   });
 }
 

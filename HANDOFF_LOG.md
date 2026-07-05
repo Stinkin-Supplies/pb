@@ -5,6 +5,244 @@
 
 ---
 
+# ——— SEVENTIETH PASS (July 4, 2026) ———
+
+## WHERE WE ARE
+
+User asked to confirm canonical_products matches were actually correct — worried about two failure modes: wrong products sharing one canonical card (customers can't find/buy the right variant) and missed merges (customers see 3 duplicate cards for one item). Built a read-only audit (`audit_canonical_matches.mjs`) checking canonical groupings against `catalog_unified.brand_part_number`, normalized (uppercase, strip dashes/spaces, leading zeros preserved).
+
+**Root cause found:** the canonical matching pipeline (`build_canonical_products.mjs` Phase B) only ever proposes matches on OEM number — it never checks `brand_part_number` at all. Confirmed via a targeted proposal-coverage check: of 3,898 missed-merge part numbers, **3,470 (89%) had ZERO `canonical_match_proposals` row of any status** — never even considered as candidates. This resolves the long-standing "Unknown match pipeline (match_reason='upc'/'brand_part_number', null shared_oem_number) — Identify source script" open item from ROADMAP.md Phase 10: `match_reason='brand_part_number'` already existed as a legitimate value used by the admin match-review UI's manual "admin-select" path (1,440 pre-existing applied rows from earlier in June) — it just had no automated generator feeding it until tonight.
+
+**Fixed tonight:**
+- Missed-merges (duplicate cards): **3,898 → 74** part-number groups
+- False-merges (wrong products sharing a card): **38 → 22** canonical groups (16 confirmed real errors split correctly)
+
+⚠️ **74 missed-merge groups remain** — mix of the pre-existing 428 pending/rejected proposals (never re-investigated tonight) and edge cases.
+⚠️ **22 false-merge groups remain** — 15 are genuinely ambiguous (could be legit cross-vendor part-number reuse or real errors) and need Laken's domain review; the other ~7 weren't reached tonight.
+⚠️ **61 proposals auto-rejected** by `apply/route.ts`'s cleanup query during tonight's batch (one side had null/inactive `canonical_product_id` by the time it processed) — not manually verified as *correctly* rejected.
+⚠️ Checkout rebuild (`app/checkout/page.jsx`) and `migrate_add_points.sql` — still untouched from session 69, unrelated to tonight's work.
+
+## What Was Done
+
+### `audit_canonical_matches.mjs` — read-only diagnostic ✅
+Checks both failure directions against `catalog_unified.brand_part_number`: false merges (same `canonical_product_id`, disagreeing normalized part number) and missed merges (same normalized part number, different/null `canonical_product_id`). No writes. Lives in `scripts/ingest/`.
+
+### `check_proposal_coverage.mjs` — confirmed root cause ✅
+For each missed-merge part-number group, checked whether `canonical_match_proposals` had ANY row at all (regardless of status) connecting those `catalog_unified` ids. 3,470/3,898 (89%) had none — proved the matcher gap rather than a stuck-review-queue problem.
+
+### `generate_brand_part_number_proposals.mjs` — new proposal generator ✅
+Groups active `catalog_unified` rows by normalized `brand_part_number`, finds pairs with different/null `canonical_product_id` that don't already have a proposal of any status, inserts new `canonical_match_proposals` rows with `status='pending'`, `match_reason='brand_part_number'` — routed into the same admin review queue as OEM-sourced proposals, not auto-confirmed. Dry-run by default. **Inserted 4,759 proposals.**
+
+### `bulk_confirm_brand_part_number_proposals.mjs` — scoped bulk-confirm ✅
+Flipped the 4,759 pending proposals to `confirmed`, scoped tightly by `match_reason` + exact `created_at` window (belt-and-suspenders against ever touching unrelated proposals). `reviewed_by='bulk-confirm-brand-part-number'` tag makes them independently traceable/reversible from every other proposal source.
+
+### `apply/route.ts` run against the batch ✅
+2,471 direct merges + 2,227 resolved transitively (repointed onto an already-merged canonical id earlier in the same batch) + 61 auto-rejected (stale null/inactive side) = all 4,759 accounted for, zero unexplained. Confirmed the existing route logic itself was correct all along — the bug was entirely upstream (nothing generating proposals), not in the merge/apply code.
+
+### `split_false_merge_groups.mjs` — fixed 16 confirmed false-merge groups ✅
+Of the original 38 false-merge groups, hand-classified into: 7 false alarms (branding-prefix differences like `A-24002-70` vs `24002-70` — same part, not a bug), 16 confirmed real errors (different thicknesses/materials/pack sizes/vehicle applications merged together), 15 genuinely ambiguous (need Laken's parts knowledge, deferred). Script splits each confirmed group by exact normalized `brand_part_number`, keeping the lowest-`catalog_unified_id` cluster on the existing `canonical_products` row and creating new canonical entries for each other cluster.
+
+One member (`VT-14-0501`, id 84575) had no `brand_part_number` at all and would have split off alone incorrectly — caught by checking its OEM No. (11101) against vtwinmfg.com, which matched `JGI-11101` exactly. Hardcoded override folds it into the correct cluster instead. **General lesson: a `brand_part_number`-only audit is blind to members with a null value — cross-check OEM number when one turns up.**
+
+Hit two schema surprises building this (both fixed): `canonical_products.canonical_sku` and `display_name` are both `NOT NULL` with no default — had to reserve the new id via `pg_get_serial_sequence('canonical_products','id')` + `nextval()` *before* inserting (rather than insert-then-update) so both columns could be supplied in one INSERT. `display_name` sourced from the lowest-id member's product name.
+
+**Result:** 22 new canonical_products rows created, 22 catalog_unified rows repointed, 0 failures.
+
+### `fix_product_vendors_drift.mjs` — reconciliation follow-up ✅
+Discovered `product_vendors.catalog_unified_id` has a UNIQUE constraint (one row per actual item, not one row per canonical+vendor as assumed earlier) — meaning the split script's `catalog_unified` repoint left `product_vendors.canonical_id` drifted for every split-off item with vendor data. General reconciliation script (not tied to tonight's specific 16 groups) finds any `catalog_unified_id` where `product_vendors.canonical_id != catalog_unified.canonical_product_id` and fixes it. Found and fixed 8 drifted rows (fewer than 22 because `product_vendors` coverage is still partial for PU).
+
+## Next Session Starting Points
+
+1. Review the 15 ambiguous false-merge groups by hand: `92224, 92235, 93581, 93626, 93849, 93879, 94223, 94330, 98114, 101658, 103490, 103813, 103838, 122311, 123546`
+2. Investigate the 61 auto-rejected proposals from tonight's batch — confirm they were correctly rejected, not just stale timing
+3. Investigate the remaining 74 missed-merge groups and the 428 pre-existing pending/rejected proposals from before tonight
+4. `cat app/api/products/route.ts` — check for the same `canonical_sku` gap as search (carried over from session 69, still unconfirmed)
+5. Run `migrate_add_points.sql` against the live DB
+6. Rebuild `app/checkout/page.jsx` — Stripe Elements, points redemption, same chain as before
+7. Consider extending `build_canonical_products.mjs` Phase B itself to check `brand_part_number` going forward, not just re-running the standalone generator script periodically — otherwise this gap reopens for every new product ingested
+
+---
+
+# ——— SIXTY-NINTH PASS (July 3, 2026) ———
+
+## WHERE WE ARE
+
+Started this session picking up the variant junction table migration from last time — turned out to already be fully applied and backfilled (8,405 rows, clean), so the real work was the `[id]/route.ts` edit route (had never actually made it onto disk — only `create/route.ts` existed). Rebuilt it against the confirmed schema. From there the session pivoted hard into checkout: **decided to proceed with Stripe as an interim gateway** while Braintree/merchant-account stays pending, which surfaced a much bigger discovery — the live `checkout/page.jsx` runs entirely on an abandoned Supabase architecture (own routing engine, own Stripe Checkout Sessions flow, own orders/order_items schema) that shares nothing with the Postgres/`canonical_products`/optimizer system the rest of the project is built on. **Decision made: Postgres is canonical going forward; the Supabase checkout path is being retired**, keeping Supabase for auth only.
+
+Also decided tonight: rebuilding the points/loyalty system from scratch (fresh demo build, no legacy data to preserve) — 1 pt/$1 subtotal, 500-pt first-order bonus, $0.01/pt redemption, tracked in a new Postgres `customer_points` table rather than the old Supabase `user_profiles.points_balance`.
+
+Biggest technical finding: **cart items never carried `canonical_sku`** — `CartContext.addItem()` only ever stored `catalog_unified.id`, a different keyspace from what checkout actually needs. Traced and fixed through the whole chain: `catalog_unified.canonical_product_id → canonical_products.canonical_sku` join added to `index_unified.js`, `canonical_sku` added to the Typesense schema, threaded through `/api/search`'s `normalizeDoc()`, and `CartContext` updated to store it on every cart item. **Verified live** — reindexed 90,629 docs (0 errors), confirmed `canonicalSku` populated on a real search hit.
+
+⚠️ Payment gateway: Stripe wired as interim (PaymentIntent-based), Braintree/merchant-account decision still pending for the long term.
+⚠️ **`checkout/page.jsx` itself is NOT yet rebuilt** — still running the old Supabase/`create-session` flow. All backend routes (prepare, create-intent, orders/create) are ready; the actual page + Stripe Elements UI is the next session's first job.
+⚠️ `migrate_add_points.sql` written, **not yet run** against the live DB.
+⚠️ `app/api/products/route.ts` — a third product-fetching path (used by `app/brands/[slug]/page.jsx`), discovered late in the session, **not yet inspected for the same `canonical_sku` gap**. Unknown if it has its own normalizer or queries Postgres directly.
+⚠️ `userId` is trusted directly from the request body in the new points-aware checkout routes (`prepare`, `create-intent`, `orders/create`, `account/points`) — no server-side Supabase session verification yet. Fine for demo stage, not fine once real money/points are on the line.
+⚠️ 62 variant candidates still pending manual review at /admin/variant-candidates.
+⚠️ 283 OEM supersession pairs still pending review.
+
+## What Was Done
+
+### Variant junction table — `[id]/route.ts` rebuilt ✅
+
+`catalog_variant_member_options` was already fully migrated/backfilled (confirmed: 8,405 rows = 8,398 option_1 + 7 option_2, matches `catalog_variant_members` exactly). The actual blocker was `app/api/admin/variant-groups/[id]/route.ts` never having been saved to disk from a prior session — only `create/route.ts` existed (`find` confirmed). Rebuilt GET/PATCH/DELETE against the real schema pulled from `create/route.ts` (confirmed via cascade check: `catalog_variant_members → catalog_variant_groups` is `ON DELETE CASCADE`, so DELETE is safe as written). Not yet tested live against the running dev server — session moved on to checkout before that verification loop closed.
+
+### Checkout architecture decision — Postgres wins, Supabase checkout retired ✅
+
+Discovered `app/checkout/page.jsx`, `app/api/checkout/create-session/route.ts`, `app/api/checkout/create-order/route.ts`, and `app/api/webhooks/stripe/route.ts` are a complete second checkout architecture — Supabase auth/addresses/orders, a different vendor-routing engine (`lib/routing/scoreOffers`, `wpsAdapter`/`puAdapter`), Stripe **Checkout Sessions** (hosted redirect), all disconnected from `canonical_products`, the fulfillment optimizer, and the Postgres `orders` table everything else expects. Decision: Postgres/`canonical_products` is the path forward; this old stack gets replaced, not merged. Auth stays on Supabase (unrelated concern, already working, no reason to move).
+
+### Stripe wired into the Postgres checkout path ✅
+
+- `app/api/stripe/create-intent/route.ts` — rewritten from scratch (old version used dead `lib/map/engine` pricing, no relation to current schema). Runs the same `lookupCanonicalProducts` + `resolveFulfillment` pricing path as `prepare`, creates a PaymentIntent for the resulting total.
+- `app/api/orders/create/route.ts` — `chargeGateway()` stub replaced with real Stripe: retrieves the PaymentIntent by id (passed as `paymentToken`), verifies `status === 'succeeded'` and that the charged amount matches what this route independently recomputes — so a customer who already paid through Elements can never be double-charged, and a tampered/stale PaymentIntent id gets rejected rather than silently trusted.
+- Both routes now handle a $0-after-points-discount order by skipping the PaymentIntent/charge entirely (Stripe doesn't support $0 charges) — flagged explicitly in code rather than left to surface as a confusing Stripe API error later.
+
+### Points/loyalty system — built fresh, not yet run ✅ (migration pending)
+
+New `customer_points` table (Postgres) + `orders.user_id`/`points_earned`/`points_redeemed`/`points_redeemed_value` columns — `migrate_add_points.sql` written, **not yet executed**. Rules: 1 pt/$1 of subtotal, +500 bonus on first `payment_status='paid'` order, redeem at $0.01/pt. `prepare` and `create-intent` do read-only balance previews; `orders/create` does the actual locked debit/credit (`SELECT ... FOR UPDATE` on the balance row) inside the same transaction as the order write, so concurrent checkouts for one user can't double-spend points. New `GET /api/account/points?userId=` route for the checkout UI to display a balance. `CartContext.jsx` updated to fetch balance from this route instead of the old Supabase `user_profiles.points_balance`; the dead Supabase `carts`/`cart_items` sync (write-only, nothing ever read it back) was removed from `CartContext` in the same pass.
+
+### `canonical_sku` cart gap — traced and fixed end-to-end ✅
+
+Root cause: `CartContext.addItem()` stored `product.id` (== `catalog_unified.id` wherever it's called from — `brands/[slug]/page.jsx`, `SearchClient.jsx`, `WishlistClient.jsx`), but every checkout route keys off `canonical_products.canonical_sku` — a different id space, joined via `catalog_unified.canonical_product_id → canonical_products.id` (confirmed via `\d`). 88,585 of 90,629 active products (97.7%) have this match; 2,044 don't and simply can't checkout until matched — accepted as a data-quality gap, not something routed around in code.
+
+Fix chain: `scripts/ingest/index_unified.js` query now `LEFT JOIN`s `canonical_products`, new `canonical_sku` field added to the Typesense schema, `app/api/search/route.ts`'s `normalizeDoc()` returns `canonicalSku`, `CartContext.addItem()` stores it on every cart item. **Full reindex run and verified**: 90,629 docs, 0 errors, confirmed `canonicalSku: "CP-134723"` on a real live search hit.
+
+Note: Typesense does NOT retroactively add a new field to an existing collection's schema without `--recreate` — this is now called out directly in the script's comments so it isn't rediscovered the hard way next time a field gets added.
+
+**Not yet checked**: `app/api/brands/[slug]/route.ts` turned out to be brand-metadata-only (name/logo), not a product list — the brand page's actual product fetch goes through a third, previously unknown route, `app/api/products/route.ts`. Whether it has the same `canonical_sku` gap is unconfirmed — next session's first data-integrity check.
+
+## Next Session Starting Points
+
+1. `cat app/api/products/route.ts` — check for the same `canonical_sku` gap as search; fix if present
+2. Run `migrate_add_points.sql` against the live DB
+3. Rebuild `app/checkout/page.jsx` for real — Stripe Elements (`PaymentElement`), points redemption input wired to `/api/account/points`, same visual design, calling `prepare` → `create-intent` → confirm → `orders/create`
+4. Verify `[id]/route.ts` live (curl a real multi-axis group id) — was rebuilt but never tested against the running dev server this session
+5. Close the `userId` client-trust gap in `prepare`/`create-intent`/`orders/create`/`account/points` — derive from a verified Supabase session token server-side instead of trusting the request body, before this is real money
+6. Delete (or explicitly archive) the retired Supabase checkout stack: `checkout/create-session`, `checkout/create-order`, `webhooks/stripe`, and the Supabase-facing parts of `checkout/page.jsx` once the rebuild lands
+7. Review 62 variant candidates: `/admin/variant-candidates?token=...`
+8. Payment gateway long-term decision — Braintree merchant-account meeting still pending; Stripe is explicitly interim
+
+---
+
+# ——— SIXTY-EIGHTH PASS (July 2, 2026) ———
+
+## WHERE WE ARE
+
+Biggest single finding this session: `catalog_unified`'s flat fitment columns (`is_harley_fitment`, `fitment_year_start/end`, `fitment_hd_families`, `fitment_hd_models`, `fitment_hd_codes`, `fitment_year_ranges`) were **0% populated across the entire catalog** — every ingest script for years had written real fitment into `catalog_fitment_v2` only, and nothing ever synced it back to the columns the main product API and Typesense actually read. Fixed catalog-wide (45,659 products synced), plus three new brand-source fitment backfills and an `harley_models` data-quality cleanup. Full Typesense reindex: **90,629 docs, 0 errors**.
+
+⚠️ Payment gateway still undecided — BLOCKING checkout.
+⚠️ 62 variant candidates still pending manual review at /admin/variant-candidates.
+⚠️ 283 OEM supersession pairs still pending review (2 flagged wrong in session 67).
+⚠️ Missing 2024 Touring, Softail 2016, Sportster 1979–1985 catalogs.
+⚠️ OCR 4 image-only PDFs: FX 1971-80, FX 1971-84, Softail 2002, WLA 1942.
+⚠️ **Colony brand fitment data the user believed was already loaded was never found in the DB** — only Eastern's crossref had actually landed. Colony was instead sourced fresh this session from Colony's own 2026 catalog PDF (see below). If a *different* Colony dataset shows up later, check for duplicate/conflicting `colony_2026_catalog` fitment rows before re-running.
+
+## What Was Done
+
+### Fitment/OEM gap audit — PU/WPS/VTwin ✅
+
+Built the gap definition used throughout this session: a product has **no fitment** if `is_harley_fitment=false AND is_universal=false AND fits_all_models=false AND fitment_hd_models/families empty AND fitment_year_start IS NULL AND no catalog_fitment_v2 rows`; **no OEM** if `oem_numbers[] empty AND oem_part_number IS NULL AND no catalog_oem_crossref rows`. Helmets/apparel/tools/chemicals categories excluded (not real fitment gaps by nature).
+
+Initial counts (no fitment AND no OEM, active, excl. apparel/tools/chemicals): PU 5,988 · VTWIN 12,016 · WPS 5,764. Exported to `no_fitment_no_oem_2026-07-01.csv` (23,768 rows) and later `vtwin_no_fitment_2026-07-02.csv` (15,511 rows, fitment-only criterion) for external scraper use.
+
+### Magnum Shielding + GMA Engineering — manual brand review ✅
+
+User pointed at two PU brand-file XMLs (`MAGNUM-SHIELDING-Brand_Catalog_Content_Export 2.xml`, and a GMA Engineering export from Downloads). Both files' `partDescription`/`productName` fields carry per-SKU model+year text (e.g. `"Sterling Chromite II Designer Handlebar Installation Kit - '18-'24 FX"`) but bullets are mostly generic install-instruction boilerplate — unreliable, excluded from parsing.
+
+- Magnum Shielding: brand confirmed 100% Harley-exclusive (848 "Harley" mentions, 0 other-manufacturer mentions) — not itself applied broadly, left for the general PU-XML backfill below to pick up per-SKU matches.
+- GMA Engineering by BDL: 3 forward-control SKUs (`16220285`, `16220286`, `16220360`) got real fitment — `FL/FX '70-'99` mapped to Touring/Softail/Dyna/FXR/Shovelhead/Panhead/Knucklehead/Evolution/Twin Cam (Softail excluded — different floorboard mount), 1970–1999. 27 other SKUs (rebuild kits, brake pads, handlebar-diameter-universal M/C assemblies) correctly flagged `is_universal = true` instead of guessing a bike-specific fitment that doesn't exist. `fitment_source = 'gma_pu_brand_export_manual'`, 1,206 rows / 3 products.
+
+### `harley_models` catalog data-quality cleanup ✅
+
+Found while building fitment queries. Three fixes, all applied via one-off transactions (no persisted script — one-time cleanup):
+
+1. **True duplicate Dyna rows merged**: `FXDX` (ids 56/263), `FXDFSE` (48/267), `FXDSE` (52/265) each existed twice under identical/near-identical year ranges (two ingestion batches, different naming case). Kept the id with existing `bike_specs` data where applicable, migrated/repointed `harley_model_years` + `catalog_fitment_v2`, deleted the duplicate `harley_models` row. Zero fitment data lost (360 links recovered that only existed under the duplicate).
+2. **5 redundant generic "era-bucket" model rows removed**: `shovelhead`, `panhead`, `knucklehead`, `twin_cam`, `evolution_bigtwin` were placeholder rows inside their own family duplicating the purpose of the `era_*` boolean columns already on `catalog_unified`. Backfilled `era_shovelhead`/`era_panhead`/`era_knucklehead`/`era_twin_cam`/`era_evolution` for 3,510 products first, then deleted the 5 rows (cascaded their redundant `catalog_fitment_v2` rows).
+3. **`is_vrod` column added** (plain boolean, NOT part of the `era_*` set per user direction — V-Rod is a distinct engine platform, not a chronological "era"). Backfilled `true` for the 33 products that were only tagged via the redundant `revolution` generic bucket row (V-Rod family), then removed that row too.
+
+`harley_models`: 356 → **347** rows. `FL`/`FLH`/`FLF`/`FLHF` duplicate-code pairs (Touring-generic vs. Panhead-engine-specific) and the CVO code-reissue duplicates (`FLHTCVO`, `FLHTKCVO`, etc.) were left alone — those are legitimate HD code reuse across eras/platforms, not data errors.
+
+### New fitment source: PU brand-file XML corpus ✅
+
+**`scripts/ingest/backfill_pu_brand_xml_fitment.mjs`** — scans all 133 unique brand XML files in `scripts/data/pu_pricefile/` (root + `brand_files/`, deduped by filename — the two dirs are mirror copies). Extracts model+year signal from `partDescription`/`productName` (PIES format: `Description[DescriptionCode=TLE]`) only — bullets excluded as unreliable. Uses `model_alias_map`, grouping by `alias_text` so one phrase (e.g. "fat boy") can carry multiple model codes across HD generations — the per-model year-range clipping then naturally picks the generation(s) that overlap.
+
+Result: **42 products, 1,148 rows** (`fitment_source='pu_brand_xml_backfill'`). Low yield is expected — most of the 133 brand files (tires, helmets, hardware, generic accessories) simply have no bike-specific fitment text in their titles.
+
+⚠️ **Process incident**: a debug command (`node -e "import(...)"` without `--dry-run`) accidentally executed a live, pre-fix version of this script against production, writing 56,913 low-quality rows (a bug where duplicate `model_alias_map` rows for one phrase like "flh" — one with a code, one without — caused over-broad family-wide fallback matches instead of the specific code). Caught immediately, deleted (`DELETE FROM catalog_fitment_v2 WHERE fitment_source='pu_brand_xml_backfill'`), and re-verified clean before the real run. **Lesson: never invoke ingest scripts via `node -e "import(...)"` — always through the file path with an explicit `--dry-run` first.**
+
+### New fitment source: Colony 2026 catalog ✅
+
+User linked `https://www.colonymachine.com/wp-content/uploads/2026/03/2026-Catalog-Web.pdf` (214 pages; downloaded to `scripts/data/colony/Colony_2026_Catalog.pdf` + `.txt` via `pdftotext -layout`). Its "Screw and Nut Kit Application Index" sections list `<stock#> <description with model+year> <stock#>` lines.
+
+**`scripts/ingest/backfill_colony_catalog_fitment.mjs`** — parses that tabular pattern, matches Colony's own stock-number tokens (`vendor_sku`, format `NNNN-N`) against currently-gap Colony products, extracts year+model same as the PU script. Includes a same-token conflict guard: stock number `8606-6` was reused across an unrelated Big Twin kit *and* a Sportster kit within Colony's own catalog (real vendor data inconsistency, not a parsing bug) — detected and skipped rather than guessed.
+
+Result: **84 products, 7,887 rows** (`fitment_source='colony_2026_catalog'`).
+
+### Eastern Motorcycle Parts crossref — finally linked + fitment extracted ✅
+
+The 4,832-row `eastern_2022_catalog` crossref (imported session 64) had **0 rows linked to any product** the whole time. Root cause: Eastern's own catalog SKU (`A-46-WRTT`) uses a different numbering scheme than `catalog_unified.vendor_sku` — but the crossref's `oem_number` field (the real HD OEM part number, e.g. `46-WRTT`) matches products' existing `oem_numbers[]` directly. **3,103 crossref rows now linked** via `catalog_oem_crossref.oem_number = ANY(cu.oem_numbers)`.
+
+**`scripts/ingest/backfill_eastern_crossref_fitment.mjs`** — first pass ignored the trailing `[FL]/[XL]/[WL]/[XR]` bracket in `page_reference` (looked inconsistent on a small sample — e.g. `[XL]` covering both genuine Sportster parts and unrelated 1930s flathead twins). **User corrected this**: it's reproduction hardware that genuinely interchanges across a whole platform *lineage*, not a strict modern model code — `FL`=full Big Twin lineage, `XL`=Sportster + its 45" flathead ancestor, `WL`=45"/Servi-Car flathead lineage, `XR`=XR-750 racing (no `harley_models` coverage, effectively skipped). Rewrote to use the bracket as the primary family signal, with free-text used only to narrow further (e.g. explicit "SPORTSTER" mention → drop the Flathead half of the XL lineage) — and added a conflict guard: if the free text explicitly names a platform genuinely **outside** the bracket's lineage (e.g. bracket `[XL]` but text says "BIG TWIN"), the row is skipped rather than forced.
+
+Result after redo: **606 products, 99,545 rows** (`fitment_source='eastern_2022_catalog'`) — down from an initial free-text-only pass of 725/146,900 rows, but now trustworthy.
+
+### Flat fitment column sync — catalog-wide, first time ever ✅
+
+While closing the loop on "show this in the unified catalog," discovered `catalog_unified.is_harley_fitment` and every flat fitment column were **0% populated across all 97,277 rows in the table** — `catalog_fitment_v2` has been the real data store the whole time, but only `/era/[slug]` and the by-model browse API (`/api/harley/[family]/[model]/products`) ever queried it directly. The main product API (`app/api/products/route.ts`) and the Typesense index both read only the flat columns, and have shown **zero fitment info catalog-wide** until now.
+
+**New script — `scripts/ingest/sync_fitment_flat_columns.mjs`**: aggregates `catalog_fitment_v2` (joined through `harley_model_years` → `harley_models` → `harley_families`) into `is_harley_fitment`, `fitment_year_start/end`, `fitment_hd_families`, `fitment_hd_models`, `fitment_hd_codes`, `fitment_year_ranges` per product. Idempotent — safe to re-run after any script that writes to `catalog_fitment_v2`.
+
+Ran catalog-wide (user's call — not just this session's new sources): **45,659 products synced**, spanning every existing `fitment_source` (`jwboon` 13,632 · `vtwin_partial` 6,978 · `copied_from_crossref` 6,012 · `wps` 5,946 · `vtwin_fitment_raw` 5,621 · `name_extraction` 4,809 · `oem_catalog_hd` 3,271 · plus this session's `eastern_2022_catalog` 606 · `colony_2026_catalog` 84 · `pu_brand_xml_backfill` 42 · `gma_pu_brand_export_manual` 3, etc.).
+
+### Typesense reindex ✅
+
+`node scripts/ingest/index_unified.js` (upsert mode) — **90,629 documents indexed, 0 errors**, matching Typesense's total exactly.
+
+## Files Changed This Session
+
+| File | Change |
+|------|--------|
+| `scripts/ingest/backfill_pu_brand_xml_fitment.mjs` | NEW — mines model+year fitment from all 133 PU brand XML files |
+| `scripts/ingest/backfill_colony_catalog_fitment.mjs` | NEW — parses Colony's 2026 catalog PDF text for kit application index fitment |
+| `scripts/ingest/backfill_eastern_crossref_fitment.mjs` | NEW — links eastern_2022_catalog crossref via oem_numbers[], extracts fitment via bracket-lineage + free-text narrowing |
+| `scripts/ingest/sync_fitment_flat_columns.mjs` | NEW — syncs catalog_fitment_v2 → catalog_unified flat fitment columns (idempotent, re-run after any fitment ingest) |
+| `scripts/data/colony/Colony_2026_Catalog.pdf` + `.txt` | NEW — source data for Colony backfill |
+| `no_fitment_no_oem_2026-07-01.csv` | NEW — PU/VTWIN/WPS gap export (23,768 rows) |
+| `vtwin_no_fitment_2026-07-02.csv` | NEW — VTWIN fitment-only gap export for external scraper (15,511 rows) |
+
+## DB Objects Added/Changed This Session
+
+| Object | Change |
+|--------|--------|
+| `catalog_unified.is_vrod` | NEW column (boolean, indexed) — 33 rows true |
+| `harley_models` | 356 → 347 rows (3 true dupes merged, 6 redundant generic-bucket rows removed) |
+| `catalog_fitment_v2` | +108,786 net new rows (eastern/colony/pu-xml/gma sources); 45,659 products' flat columns synced back to catalog_unified |
+| `catalog_oem_crossref` | 3,103 `eastern_2022_catalog` rows linked to product_id (was 0) |
+
+## Next Session Starting Points
+
+```bash
+# Re-run after any new fitment source is added:
+node scripts/ingest/sync_fitment_flat_columns.mjs
+node scripts/ingest/index_unified.js --recreate
+
+# If a genuine Colony brand-data table shows up (user believed one was already
+# loaded this session but it was never found — only Eastern had landed):
+# check for conflicts against colony_2026_catalog fitment rows before merging.
+
+# Review queues (unchanged):
+# - /admin/variant-candidates (62 pending)
+# - oem_supersession (283 pairs): SELECT * FROM oem_supersession_review LIMIT 30
+
+# Remaining PU/VTWIN/WPS gap products (post this session, no-fitment-no-OEM,
+# excl. apparel/tools/chemicals) — no further brand-XML signal to mine without
+# new vendor feeds; VTWIN list already exported for external scraper use.
+
+# Payment gateway decision — still BLOCKING checkout
+```
+
+---
+
 # ——— SIXTY-SEVENTH PASS (June 30, 2026) ———
 
 ## WHERE WE ARE

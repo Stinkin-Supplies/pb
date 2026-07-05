@@ -2,6 +2,7 @@
  * app/api/search/route.ts
  * Unified search — Typesense → normalized response
  * Schema-corrected May 3 2026 (products collection, no computed_price/fitment_make/fitment_model)
+ * canonical_sku added (checkout dependency — see components/CartContext.jsx)
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -53,6 +54,10 @@ function normalizeDoc(doc: any) {
   return {
     id:           String(doc.id),
     sku:          doc.sku          ?? "",
+    // canonical_products.canonical_sku — null for the ~2.3% of products not
+    // yet canonical-matched. This is what checkout actually keys off of;
+    // `sku` above is catalog_unified's own sku, a different keyspace.
+    canonicalSku: doc.canonical_sku ?? null,
     slug:         doc.slug         ?? "",
     name:         doc.name         ?? "",
     brand:        doc.brand        ?? "",

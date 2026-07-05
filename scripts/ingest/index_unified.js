@@ -5,6 +5,15 @@
  * Indexes catalog_unified into Typesense with full schema:
  * fitment, features, vendor flags, inventory, images, categories
  *
+ * UPDATED: joins canonical_products to add canonical_sku to the index. This
+ * is the field checkout actually needs — catalog_unified.id/sku are a
+ * different keyspace from canonical_products.canonical_sku, which is what
+ * checkout/prepare, stripe/create-intent, and orders/create all key off of.
+ * ~2,044 of 90,629 active products (2.3%) have no canonical match yet and
+ * will index with canonical_sku = null — those can't go through checkout
+ * until they're matched; that's a data gap to close separately, not
+ * something to work around here.
+ *
  * Run: node scripts/ingest/index_unified.js
  * Run (recreate): node scripts/ingest/index_unified.js --recreate
  */
@@ -45,6 +54,7 @@ const SCHEMA = {
   fields: [
     // Identity
     { name: 'sku',               type: 'string' },
+    { name: 'canonical_sku',     type: 'string',   optional: true },
     { name: 'vendor_sku',        type: 'string',   optional: true },
     { name: 'source_vendor',     type: 'string',   facet: true },
     { name: 'product_code',      type: 'string',   facet: true, optional: true },
@@ -167,6 +177,10 @@ function transform(row) {
   return {
     id:               row.id.toString(),
     sku:              row.sku,
+    // From the canonical_products join below — null for the ~2.3% of active
+    // products not yet matched to a canonical row. Checkout keys off this,
+    // not `sku`.
+    canonical_sku:    row.canonical_sku || undefined,
     vendor_sku:       row.vendor_sku || undefined,
     source_vendor:    row.source_vendor || '',
     product_code:     row.product_code || undefined,
@@ -274,7 +288,12 @@ async function setupCollection() {
     await client.collections().create(SCHEMA);
     console.log('   ✓ Collection created\n');
   } else {
-    // Try to update schema or create if missing
+    // Try to update schema or create if missing.
+    // NOTE: adding a new optional field (canonical_sku) to an EXISTING
+    // collection without --recreate will NOT retroactively add it to the
+    // schema — Typesense only applies SCHEMA on creation. Run with
+    // --recreate at least once after this change, then plain upserts are
+    // fine going forward.
     try {
       await client.collections(COLLECTION).retrieve();
       console.log(`   ✓ Collection exists — upserting documents\n`);
@@ -309,8 +328,16 @@ async function main() {
   let offset    = 0;
 
   while (offset < total) {
+    // LEFT JOIN — unmatched products (canonical_product_id IS NULL) still
+    // index, just with canonical_sku = null. They're just not sellable via
+    // checkout until they're matched; that's a separate data-quality task.
     const { rows } = await pool.query(
-      `SELECT * FROM catalog_unified WHERE is_active = true ORDER BY id LIMIT $1 OFFSET $2`,
+      `SELECT cu.*, cp.canonical_sku
+       FROM catalog_unified cu
+       LEFT JOIN canonical_products cp ON cp.id = cu.canonical_product_id
+       WHERE cu.is_active = true
+       ORDER BY cu.id
+       LIMIT $1 OFFSET $2`,
       [BATCH_SIZE, offset]
     );
 

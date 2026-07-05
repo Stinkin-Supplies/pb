@@ -2,23 +2,21 @@
  * app/api/stripe/create-intent/route.ts
  *
  * Creates a Stripe PaymentIntent for the current cart, using the exact same
- * pricing + points-discount path as /api/checkout/prepare so the amount
- * charged can never drift from what the customer was quoted.
+ * pricing path as /api/checkout/prepare (lookupCanonicalProducts + resolveFulfillment)
+ * so the amount charged can never drift from what the customer was quoted.
  *
- * POINTS: same read-only quote pattern as prepare/route.ts — the balance is
- * read here (no lock) to size the PaymentIntent correctly, but the actual
- * debit only happens in orders/create's locked transaction. If a customer
- * opens two checkout tabs and races this, orders/create's re-validation is
- * the backstop that prevents a double-spend of points, not this route.
+ * REPLACES the previous version of this route, which was built against a dead
+ * architecture (applyMapPricing / lib/map/engine, no canonical_products, no
+ * fulfillment optimizer) — that predates the checkout/prepare + orders/create
+ * rebuild and shares no dependencies with it, so it couldn't be patched forward.
  *
  * Flow:
- *   1. POST here with { items, userId?, pointsToRedeem? } → get back clientSecret
+ *   1. POST here with { items: [{canonicalSku, qty}] } → get back clientSecret
  *   2. Client confirms payment via Stripe Elements (PaymentElement) using that
  *      clientSecret
- *   3. Client calls /api/orders/create with the same userId/pointsToRedeem plus
- *      paymentToken = the resulting PaymentIntent id — chargeGateway() there
- *      re-fetches the PaymentIntent from Stripe and verifies status + amount
- *      rather than charging again.
+ *   3. Client calls /api/orders/create with paymentToken = the resulting
+ *      PaymentIntent id — chargeGateway() there re-fetches the PaymentIntent
+ *      from Stripe and verifies status + amount rather than charging again.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -32,8 +30,6 @@ if (!stripeKey) {
 }
 const stripe = new Stripe(stripeKey, { apiVersion: '2026-03-25.dahlia' });
 
-const POINTS_REDEEM_RATE = 0.01;
-
 type PrepareRequestItem = { canonicalSku: string; qty: number };
 type CanonicalLookupRow = {
   canonicalId: number;
@@ -45,8 +41,6 @@ type CanonicalLookupRow = {
 export async function POST(request: NextRequest) {
   const body = await request.json();
   const requestedItems: PrepareRequestItem[] = body.items ?? [];
-  const userId: string | null = body.userId ?? null;
-  const pointsToRedeem: number = Number(body.pointsToRedeem ?? 0) || 0;
 
   if (requestedItems.length === 0) {
     return NextResponse.json({ error: 'No items in cart' }, { status: 400 });
@@ -91,33 +85,14 @@ export async function POST(request: NextRequest) {
     (sum, g) => sum + g.items.reduce((s, i) => s + i.unitPrice * i.qty, 0),
     0
   );
-  const shippingTotal = 0; // CHASE_LIST item 17 — placeholder
-  const taxTotal = 0; // CHASE_LIST item 17 — placeholder
-  const preDiscountTotal = subtotal + shippingTotal + taxTotal;
+  // Same placeholders as prepare/route.ts and orders/create/route.ts — CHASE_LIST item 17
+  const shippingTotal = 0;
+  const taxTotal = 0;
+  const total = subtotal + shippingTotal + taxTotal;
 
-  let discountTotal = 0;
-  if (userId && pointsToRedeem > 0) {
-    const { rows } = await db.query(
-      `SELECT points_balance FROM customer_points WHERE user_id = $1`,
-      [userId]
-    );
-    const pointsAvailable = rows[0]?.points_balance ?? 0;
-    const requested = Math.max(0, Math.min(pointsToRedeem, pointsAvailable));
-    discountTotal = Math.min(requested * POINTS_REDEEM_RATE, preDiscountTotal);
-  }
-
-  const total = Math.max(preDiscountTotal - discountTotal, 0);
   const amount = Math.round(total * 100);
-
-  // A fully-covered order (0 remaining after points) has no card to charge —
-  // Stripe requires amount > 0, so this needs a separate free-order path in
-  // orders/create rather than a PaymentIntent. Surfacing it here rather than
-  // letting Stripe's API reject it with a less obvious error.
-  if (amount <= 0) {
-    return NextResponse.json(
-      { error: 'Order fully covered by points — no payment intent needed', total: 0 },
-      { status: 200 }
-    );
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return NextResponse.json({ error: 'Invalid amount' }, { status: 400 });
   }
 
   const paymentIntent = await stripe.paymentIntents.create({
@@ -125,9 +100,10 @@ export async function POST(request: NextRequest) {
     currency: 'usd',
     automatic_payment_methods: { enabled: true },
     metadata: {
+      // Fine for typical cart sizes under Stripe's 500-char metadata value limit.
+      // If that ever becomes a real constraint, switch to a cart hash + server-side
+      // lookup instead of embedding the full item list.
       items: JSON.stringify(requestedItems),
-      userId: userId ?? '',
-      pointsToRedeem: String(pointsToRedeem),
     },
   });
 
@@ -138,6 +114,10 @@ export async function POST(request: NextRequest) {
   });
 }
 
+/**
+ * Identical to prepare/route.ts and orders/create/route.ts — same confirmed
+ * schema (canonical_products.id, canonical_sku, display_name, our_price, is_active).
+ */
 async function lookupCanonicalProducts(
   db: ReturnType<typeof getCatalogDb>,
   skus: string[]

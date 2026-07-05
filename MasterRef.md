@@ -1,8 +1,8 @@
 # Stinkin' Supplies — Master Reference
-**Last Updated:** June 30, 2026 (Sixty-Seventh Pass)
+**Last Updated:** July 2, 2026 (Sixty-Eighth Pass)
 **Database:** Hetzner Postgres — stinkin_catalog @ 5.161.100.126:5432
 
-**Status:** Catalog rebuilt ✅ | Fitment rebuilt ✅ | Search indexed ✅ | Homepage rebuilt ✅ | Font system locked ✅ | ModelFinder built ✅ | FilterSidebar updated ✅ | VariantSelector fitment+color mode ✅ | Variant groups merged ✅ | browse.ts name-grouping ✅ | VTwin SKU dupes resolved ✅ | Filtering system audit complete ✅ | MODEL_ALIASES expanded ✅ | VTwin scraper round 2+3 complete ✅ | CategoryBentoGrid built ✅ | display_subcategory taxonomy COMPLETE ✅ | Canonical merges DRAINED ✅ | PU vendor_sku fully corrected ✅ | product_details JSONB live ✅ | Multi-image galleries live ✅ | OEM supersession table live ✅ | VTwin fitment 55.8% ✅ | HD model reference audited (2026 catalog) ✅ | OEM crossref expanded ✅ | VTwin attributes bug fixed ✅ | EBC brake fitment ingested ✅ | HD battery fitment ingested ✅ | bike_specs table populated ✅ | HD OEM catalog fitment rebuilt (all families, 121 catalogs) ✅ | OEM fitment consolidation pipeline live ✅ | OEM crossref admin page ✅ | Eastern Motorcycle Parts crossref imported (4,832 rows) ✅ | Path C oem_numbers[] bug fixed ✅ | **OEM fitment data quality fixed (session 65): noise rows eliminated, universal promotion family-scoped** ✅ | OEM fitment promoted → catalog_fitment_v2 (5,126,957 rows) ✅ | Parts timeline admin page live ✅ | Typesense reindexed 89,151 docs ✅ | **Canonical match queue re-drained (session 66): 2,807 applied / 1,375 rejected** ✅ | **OEM part timeline table + PDP feature live (session 67)** ✅ | **Typesense search properly wired for first time (session 67)** ✅ | **fitment_text field added to Typesense (session 67); reindexed 89,151 docs** ✅
+**Status:** Catalog rebuilt ✅ | Fitment rebuilt ✅ | Search indexed ✅ | Homepage rebuilt ✅ | Font system locked ✅ | ModelFinder built ✅ | FilterSidebar updated ✅ | VariantSelector fitment+color mode ✅ | Variant groups merged ✅ | browse.ts name-grouping ✅ | VTwin SKU dupes resolved ✅ | Filtering system audit complete ✅ | MODEL_ALIASES expanded ✅ | VTwin scraper round 2+3 complete ✅ | CategoryBentoGrid built ✅ | display_subcategory taxonomy COMPLETE ✅ | Canonical merges DRAINED ✅ | PU vendor_sku fully corrected ✅ | product_details JSONB live ✅ | Multi-image galleries live ✅ | OEM supersession table live ✅ | VTwin fitment 55.8% ✅ | HD model reference audited (2026 catalog) ✅ | OEM crossref expanded ✅ | VTwin attributes bug fixed ✅ | EBC brake fitment ingested ✅ | HD battery fitment ingested ✅ | bike_specs table populated ✅ | HD OEM catalog fitment rebuilt (all families, 121 catalogs) ✅ | OEM fitment consolidation pipeline live ✅ | OEM crossref admin page ✅ | Eastern Motorcycle Parts crossref imported (4,832 rows) ✅ | Path C oem_numbers[] bug fixed ✅ | **OEM fitment data quality fixed (session 65): noise rows eliminated, universal promotion family-scoped** ✅ | OEM fitment promoted → catalog_fitment_v2 (5,126,957 rows) ✅ | Parts timeline admin page live ✅ | Typesense reindexed 89,151 docs ✅ | **Canonical match queue re-drained (session 66): 2,807 applied / 1,375 rejected** ✅ | **OEM part timeline table + PDP feature live (session 67)** ✅ | **Typesense search properly wired for first time (session 67)** ✅ | **fitment_text field added to Typesense (session 67); reindexed 89,151 docs** ✅ | **harley_models dupes merged + era-bucket cleanup, is_vrod column added (session 68)** ✅ | **Eastern crossref finally linked to products (3,103 rows) + Colony/PU-XML brand-file fitment backfills (session 68)** ✅ | **catalog_unified flat fitment columns synced catalog-wide for the first time ever — 45,659 products (session 68)** ✅ | **Typesense reindexed 90,629 docs, 0 errors (session 68)** ✅
 
 ---
 
@@ -10,28 +10,30 @@
 
 | Metric | Value | Status |
 |--------|-------|--------|
-| catalog_unified (active) | **89,153** | ✅ PU 34,994 / VTwin 38,315 / WPS 15,844 |
-| catalog_fitment_v2 | **5,126,957 rows** | ✅ Rebuilt session 65 — noise rows purged, universal promotion family-scoped |
+| catalog_unified (active) | **90,629** | ✅ Reindexed to Typesense 1:1 session 68 |
+| catalog_fitment_v2 | **5,257,539 rows** | ✅ +108,786 net new session 68 (eastern/colony/pu-xml/gma sources) |
+| **catalog_unified flat fitment columns** | **45,659 products synced** | ✅ NEW session 68 — was 0% populated catalog-wide (0/97,277) until `sync_fitment_flat_columns.mjs`; now `is_harley_fitment`/`fitment_year_start`/`fitment_hd_families`/etc. actually reflect catalog_fitment_v2 |
 | oem_fitment | **315,427 rows** | ✅ All families — 121 catalogs, 37.9% matched. `catalog_family` column added. 130K noise rows eliminated. |
-| catalog_oem_crossref | **~70,329 rows** | ✅ +4,832 Eastern Motorcycle Parts 2022-2024 catalog (session 64) |
+| catalog_oem_crossref | **70,329 rows** | ✅ Eastern (4,832 rows, session 64) finally **linked to product_id — 3,103 rows** (session 68; was 0 linked since import) |
 | vtwin_oem_crossref | **12,278 rows** | ✅ 9,006 match catalog_unified via VT- prefix (discovered session 62) |
-| **oem_part_timeline** | **32,570 rows** | ✅ NEW session 67 — 7,981 base families; UNIQUE(oem_number, product_id) |
-| **oem_part_timeline_sellable** | **19,824 rows** | ✅ NEW session 67 — view: WHERE product_id IS NOT NULL |
+| **oem_part_timeline** | **32,570 rows** | ✅ session 67 — 7,981 base families; UNIQUE(oem_number, product_id) |
+| **oem_part_timeline_sellable** | **19,824 rows** | ✅ session 67 — view: WHERE product_id IS NOT NULL |
 | catalog_variant_groups | 7,556+ (+ 148 MULTI pack-size groups) | ✅ |
 | catalog_variant_members | ~29,031+ | ✅ |
 | catalog_media | ~35,990 rows | ✅ PU multi-image from 133 brand XML files |
 | product_details | ~59,253 rows (~66.5% coverage) | ✅ VTwin attributes fixed session 60 |
-| canonical_products | 89,153 rows — all merges drained | ✅ 2,807 applied, 1,375 rejected (session 66) |
+| canonical_products | 90,629 rows — all merges drained | ✅ 2,807 applied, 1,375 rejected (session 66) |
 | catalog_variant_candidates | 62 pending human review | ⏳ |
 | oem_supersession | **485 pairs** (283 original inferred + 202 vtwin hardware) | ⏳ 283 original pairs confidence=1 pending review; 2 flagged wrong (session 67) |
 | mv_oem_fitment_coverage | — | ✅ Refreshed session 65 |
 | vtwin_scrape_data | ~31,000+ rows | ✅ +12,398 from scrape_vtwin_missing.mjs |
-| harley_model_years | **~2,090 rows** | ✅ +28 gap rows added session 61 |
-| harley_models | **~365 rows** | ✅ 6 new 2026 codes added (FLHXL, FLHXLSE, FLHXSTSE, FLHLT, FLHLTSE, RA1250L); 1 orphan removed |
+| harley_model_years | **3,290 rows** | ✅ 3 true-duplicate Dyna models merged + 6 redundant generic era-bucket rows removed session 68 |
+| harley_models | **347 rows** | ✅ Down from 356 session 68 — 3 duplicate Dyna rows (FXDX/FXDFSE/FXDSE) merged, 5 redundant era-bucket rows removed (era_* backfilled first), 1 redundant V-Rod bucket removed (is_vrod column backfilled first) |
+| **catalog_unified.is_vrod** | **33 rows true** | ✅ NEW session 68 — plain boolean (not an era_* column); replaces the deleted generic `revolution` harley_models bucket |
 | ebc_brake_fitment | **528 rows** | ✅ NEW session 60 — EBC 2026 catalog, 14 H-D families |
 | hd_battery_fitment | **22 rows** | ✅ NEW session 60 — 7 OEM battery SKUs, model/year fitment |
 | bike_specs | **1,288 rows** | ✅ NEW session 61 — DS FatBook 2026 + DS OldBook 2026; battery/plugs/belt/sprockets/tires/shock per model+year |
-| Typesense | **89,151 docs** | ✅ Reindexed session 67 (--recreate; fitment_text field added; 0 errors) |
+| Typesense | **90,629 docs** | ✅ Reindexed session 68 (upsert mode; 0 errors) |
 
 ### Fitment Coverage (June 26, 2026 — Session 60)
 
@@ -110,19 +112,21 @@ Single source of truth. 89,153 active rows.
 - `canonical_product_id` FK → canonical_products.id
 
 ### catalog_fitment_v2
-**5,126,957 rows** (as of session 65). Never truncate.
+**5,257,539 rows** (as of session 68). Never truncate.
 - FK: `product_id → catalog_unified.id`, `model_year_id → harley_model_years.id`
-- Sources (session 65): name_extraction (1,553K), jwboon (1,342K), wps (797K), copied_from_crossref (349K), vtwin_partial (210K), oem_catalog_hd_universal (166K), oem_catalog_hd (160K), oem_crossref_fatbook_universal (134K), oem_crossref_fatbook (110K), vtwin_fitment_raw (84K), oem_crossref_vtwin_universal (69K), oem_crossref_vtwin (68K), (none) (48K), canonical_merge_sync (35K), ebc_catalog (2.5K), pu_fitment_expanded (62), manual (43)
-- `fitment_source` values include: 'name_extraction', 'jwboon', 'wps', 'vtwin_partial', 'vtwin_fitment_raw', 'copied_from_crossref', 'canonical_merge_sync', 'ebc_catalog', 'manual', 'oem_catalog_hd', 'oem_catalog_hd_universal', 'oem_catalog', 'oem_crossref_vtwin', 'oem_crossref_vtwin_universal', 'oem_crossref_fatbook', 'oem_crossref_fatbook_universal', 'oem_crossref', 'pu_fitment_expanded'
+- Sources (session 65 baseline): name_extraction (1,553K), jwboon (1,342K), wps (797K), copied_from_crossref (349K), vtwin_partial (210K), oem_catalog_hd_universal (166K), oem_catalog_hd (160K), oem_crossref_fatbook_universal (134K), oem_crossref_fatbook (110K), vtwin_fitment_raw (84K), oem_crossref_vtwin_universal (69K), oem_crossref_vtwin (68K), (none) (48K), canonical_merge_sync (35K), ebc_catalog (2.5K), pu_fitment_expanded (62), manual (43)
+- **Session 68 additions:** `eastern_2022_catalog` (99,545 rows / 606 products), `colony_2026_catalog` (7,887 rows / 84 products), `pu_brand_xml_backfill` (1,148 rows / 42 products), `gma_pu_brand_export_manual` (1,206 rows / 3 products)
+- `fitment_source` values include: 'name_extraction', 'jwboon', 'wps', 'vtwin_partial', 'vtwin_fitment_raw', 'copied_from_crossref', 'canonical_merge_sync', 'ebc_catalog', 'manual', 'oem_catalog_hd', 'oem_catalog_hd_universal', 'oem_catalog', 'oem_crossref_vtwin', 'oem_crossref_vtwin_universal', 'oem_crossref_fatbook', 'oem_crossref_fatbook_universal', 'oem_crossref', 'pu_fitment_expanded', 'eastern_2022_catalog', 'colony_2026_catalog', 'pu_brand_xml_backfill', 'gma_pu_brand_export_manual'
 - `confidence_score` column EXISTS (some older rows have NULL) — safe to include in INSERTs
 - Priority: manual (1.0) > oem_catalog_hd (0.95) > oem_crossref_vtwin (0.90) > oem_crossref_fatbook (0.88) > oem_catalog_hd_universal (0.85) > oem_crossref_vtwin_universal (0.80) > oem_crossref_fatbook_universal (0.78) > others (no score)
 - Composite indexes: idx_cfv2_product_modelyear + idx_cfv2_modelyear_product
 - ⚠️ Universal oem_* sources are now family-scoped (session 65) — Softail catalog {ALL} only expands to Softail models, not cross-family
+- ⚠️ **This table is the source of truth, NOT `catalog_unified`'s flat fitment columns.** After any INSERT here, run `node scripts/ingest/sync_fitment_flat_columns.mjs` then reindex Typesense — those flat columns were 0% populated catalog-wide until session 68 and will silently drift out of sync again if this step is skipped.
 
 ### catalog_oem_crossref
-**65,434 rows.** Canonical OEM ↔ product bridge.
-- Join on `sku` column (matches catalog_unified.sku)
-- Sources: oldbook_crossref, fatbook_crossref, VTWIN_SCRAPE, PU_PIES, vtwin_scrape_r2, wps, vtwin_scrape (session 60), HD_OEM (session 60 — battery OEM numbers)
+**70,329 rows.** Canonical OEM ↔ product bridge.
+- Join on `sku` column (matches catalog_unified.sku) — **except** `eastern_2022_catalog` rows, which join via `oem_number = ANY(catalog_unified.oem_numbers)` instead (Eastern's own catalog SKU scheme doesn't match `vendor_sku`)
+- Sources: oldbook_crossref, fatbook_crossref, VTWIN_SCRAPE, PU_PIES, vtwin_scrape_r2, wps, vtwin_scrape (session 60), HD_OEM (session 60 — battery OEM numbers), eastern_2022_catalog (4,832 rows, session 64 — **finally linked to product_id session 68, 3,103 rows**)
 - `expanded_from` BOOL — denormalized variants (filter: expanded_from=FALSE for canonical)
 - `oem_format` generated column — valid filter: `oem_format IN ('hd_oem','hd_oem_nodash')`
 
@@ -161,10 +165,25 @@ Single source of truth. 89,153 active rows.
 - Script: `scripts/ingest/import_bike_specs.mjs`
 
 ### canonical_products / product_vendors
-- canonical_products: 89,153 rows, one per active catalog_unified product
-- product_vendors: 89,153 rows — `vendor_sku` = correct ordering number for all vendors
-- All 2,407 confirmed merges applied and drained
-- `match_confidence`: 'single' (1:1 unmerged) or 'oem_match' (confirmed merge)
+- canonical_products: 89,153 base rows (Phase A/B) + 22 new rows created session 70 (manual false-merge splits) = 89,175
+- product_vendors: 89,153 rows — `vendor_sku` = correct ordering number for all vendors. **Schema confirmed session 70**: `catalog_unified_id` has a UNIQUE constraint (one row per actual item, NOT one row per canonical+vendor pair as previously assumed) — `(canonical_id, source_vendor)` also UNIQUE. FK `canonical_id → canonical_products.id` is `ON DELETE CASCADE`.
+- `match_confidence`: 'single' (1:1 unmerged), 'oem' (confirmed OEM-based merge via apply/route.ts), or 'manual-split' (session 70 — canonical entries created by splitting a false-merge group)
+- `match_reason` on `canonical_match_proposals`: 'oem' (Phase B automated) or 'brand_part_number' (admin manual-select historically; automated generator added session 70 — see HANDOFF_LOG "SEVENTIETH PASS")
+- Join to catalog_unified: `catalog_unified.canonical_product_id → canonical_products.id` (direct FK, confirmed session 69). 88,585 of 90,629 active products (97.7%) have a match; 2,044 don't and can't go through checkout until matched.
+- `canonical_products.canonical_sku` is what checkout (`prepare`/`create-intent`/`orders/create`) keys off of — NOT `catalog_unified.id` or `catalog_unified.sku`. Cart items didn't carry this until session 69's fix (see Known Bugs).
+- ⚠️ **`canonical_products.canonical_sku` and `.display_name` are BOTH `NOT NULL` with no default** (confirmed via `\d canonical_products`, session 70). When inserting a new canonical row manually/programmatically: reserve the id first via `pg_get_serial_sequence('canonical_products','id')` + `nextval()` so `canonical_sku` can be computed and supplied in the same INSERT — insert-then-update fails on the NOT NULL constraint. Observed sku convention across all existing rows: `canonical_sku = 'CP-' + zero-padded(id+1, 6)` — inferred from data, not from a trigger definition, but held for every row checked.
+- ⚠️ **`product_vendors.canonical_id` does not auto-follow `catalog_unified.canonical_product_id`** — they're two separate columns with no trigger/constraint keeping them in sync. Any script that repoints `catalog_unified.canonical_product_id` (e.g. a manual canonical split) must also update `product_vendors.canonical_id` for the same `catalog_unified_id`, or vendor/pricing lookups will resolve to the wrong canonical entry. `scripts/ingest/fix_product_vendors_drift.mjs` (session 70) is a general reconciliation — safe to re-run any time as a consistency check.
+
+### canonical_match_proposals
+- Columns include: `id`, `product_id_a`/`product_id_b` (FK → catalog_unified.id), `status` ('pending'/'confirmed'/'applied'/'rejected'), `match_reason`, `reviewed_by`, `reviewed_at`, `created_at`
+- `apply/route.ts` (`app/api/admin/canonical-matches/apply/route.ts`) only acts on `status='confirmed'` rows — picks `min(canonical_product_id)` as keeper, moves/dedupes `product_vendors`, repoints `catalog_unified`, deactivates the loser, marks proposal `applied`. Also auto-marks proposals `applied` if both sides already share a canonical id, and auto-rejects proposals where either side has a null/inactive `canonical_product_id`. Confirmed safe to re-run repeatedly (session 70 — ran clean against a 4,759-row batch, 0 errors).
+
+### customer_points ← NEW session 69
+- `user_id TEXT PRIMARY KEY` (Supabase auth uuid, no cross-DB FK — just a stored reference), `points_balance INTEGER`, `updated_at`
+- Rules: 1 pt/$1 order subtotal, +500 bonus on first `orders.payment_status='paid'` row, redeem at $0.01/pt
+- `orders` gained `user_id`, `points_earned`, `points_redeemed`, `points_redeemed_value` columns same session
+- Migration written (`migrate_add_points.sql`) — **not yet run** as of session 69
+- Replaces the old Supabase `user_profiles.points_balance` column, which is now stale/unused
 
 ### catalog_variant_groups / catalog_variant_members
 - 7,556+ regular groups + 148 MULTI pack-size cross-vendor groups
@@ -217,6 +236,10 @@ Single source of truth. 89,153 active rows.
 | `scripts/apply-confirmed-merges.mjs` | Applies all 'confirmed' proposals (use if already confirmed via UI). --dry-run flag. |
 | `scripts/ingest/build_oem_fitment_all.mjs` | **PATCHED session 65** — Unified HD OEM PDF catalog extractor. 121 catalogs, all families. Fixes: (1) year-annotation noise filter (`description ~ '^\d{4}$'` rows skipped at parse time); (2) `catalog_family` column now populated from `cat.family` in bulkInsert. `catalog_family` values: sportster/dyna/softail/touring/all_model/fxr/fx/vintage/police. |
 | `scripts/ingest/promote_oem_fitment.mjs` | **PATCHED session 65** — PATH_A_UNIVERSAL, PATH_B_UNIVERSAL, PATH_C_UNIVERSAL now JOIN harley_families and constrain by `f.catalog_family`. A Softail catalog's {ALL} rows only expand to Softail model years. `all_model` family = unrestricted (1340cc era). ON CONFLICT keeps highest confidence. |
+| `scripts/ingest/backfill_pu_brand_xml_fitment.mjs` | **NEW session 68** — mines model+year fitment from all 133 PU brand XML files (root + brand_files/, deduped). Only partDescription/productName used (bullets excluded as unreliable). Groups model_alias_map by alias_text so multi-generation phrases (e.g. "fat boy") try all candidate codes. `--dry-run` flag. |
+| `scripts/ingest/backfill_colony_catalog_fitment.mjs` | **NEW session 68** — parses Colony's 2026 catalog (`scripts/data/colony/Colony_2026_Catalog.txt`, pdftotext -layout output) "Kit Application Index" tables for stock-number + model+year lines. Same-token conflict guard (skips stock numbers reused across genuinely different platforms in Colony's own catalog). `--dry-run` flag. |
+| `scripts/ingest/backfill_eastern_crossref_fitment.mjs` | **NEW session 68** — links `catalog_oem_crossref` (source_file='eastern_2022_catalog') to products via `oem_number = ANY(oem_numbers[])`, then extracts fitment using the trailing `[FL]/[XL]/[WL]/[XR]` bracket as platform-lineage family signal (not a strict model code), narrowed/conflict-checked against free text. `--dry-run` flag. |
+| `scripts/ingest/sync_fitment_flat_columns.mjs` | **NEW session 68** — aggregates catalog_fitment_v2 → catalog_unified's flat fitment columns (is_harley_fitment, fitment_year_start/end, fitment_hd_families/models/codes, fitment_year_ranges). Idempotent. Run after any script that writes to catalog_fitment_v2, before every Typesense reindex. |
 
 ---
 
@@ -270,6 +293,11 @@ Auth: `?token=` URL param or `X-Admin-Token` header matching `ADMIN_SECRET` env 
 |-----|------------|---------|
 | scrape_vtwin_missing.mjs pg deprecation warning | Not failing — concurrent queries on single client instead of pool | Use `pool.query()` in worker |
 | oem_supersession 283 original confidence=1 rows | Not yet reviewed or corrected | Manual review via `SELECT * FROM oem_supersession_review LIMIT 30`; delete `56308-88→56309-96` and `56324-81A→56356-92` (flagged session 67 as wrong cable-type matches) |
+| catalog_unified flat fitment columns drift silently | Fixed catalog-wide session 68 via sync_fitment_flat_columns.mjs | Must re-run `sync_fitment_flat_columns.mjs` after every script that writes to catalog_fitment_v2 — nothing does this automatically yet |
+| ⚠️ Never run ingest scripts via `node -e "import(...)"` | N/A — process discipline only | Always invoke by file path with an explicit `--dry-run` first; an accidental unflagged `node -e` run wrote 56,913 bad rows in session 68 before being caught and deleted |
+| Cart items never carried `canonical_sku` — `CartContext.addItem()` only stored `catalog_unified.id` | Fixed session 69 — join added in `index_unified.js`, field added to Typesense schema + `/api/search` normalizer + `CartContext` | Still need to check `app/api/products/route.ts` (used by brands page) for the same gap — unconfirmed as of session 69 |
+| Typesense won't retroactively add a new schema field to an existing collection without `--recreate` | Documented in `index_unified.js` comments as of session 69 | Always run `--recreate` (not plain upsert) the first time after adding any new field |
+| `userId` client-trusted (not session-verified) in `prepare`/`create-intent`/`orders/create`/`account/points` | None yet — fine for demo/no real customers | Verify Supabase JWT server-side before this handles real money/points |
 
 **Search architecture (session 67):** `app/api/browse/products/route.ts` now calls Typesense server-side when `?q=` present. Fallback to ILIKE in browse.ts if Typesense returns 0 or times out (3s). ILIKE fallback uses 2-word threshold for 3+ word queries — no more zero results for model-name searches like "brake rotor street glide".
 
@@ -320,4 +348,4 @@ Promotion results (ran against 5,062,086 baseline):
 
 ---
 
-*Master Reference — Last updated June 30, 2026 · Session 66*
+*Master Reference — Last updated July 3, 2026 · Session 69 (see HANDOFF_LOG.md "SIXTY-NINTH PASS" for full session detail)*

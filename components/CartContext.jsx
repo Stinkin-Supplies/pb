@@ -5,12 +5,20 @@
 // Global cart state shared across all pages.
 // Wraps the app in app/layout.jsx.
 //
-// Persists to localStorage so cart survives page navigation.
-// Syncs to Supabase cart_items table on every change.
+// Persists to localStorage — this is the actual source of truth (loaded on
+// mount, read by everything downstream). The old Supabase carts/cart_items
+// sync was write-only (nothing ever read it back) and has been removed.
 //
-// Auth state (userId) is tracked here once and exposed via
-// context so consumers like NavBar don't need their own
-// Supabase subscriptions.
+// Auth state (userId) is still tracked here via Supabase — auth stays on
+// Supabase per the architecture decision made when rebuilding checkout;
+// it's only order/points data that moved to Postgres. userId is exposed via
+// context for consumers like NavBar, and passed to checkout API calls
+// (prepare/create-intent/orders-create) so points can be looked up/redeemed.
+//
+// Points balance now comes from Postgres (customer_points table) via
+// /api/account/points, not the old Supabase user_profiles.points_balance
+// column — that column is stale/unused now that orders/create is the only
+// thing that actually earns or spends points.
 // ============================================================
 
 import {
@@ -18,7 +26,6 @@ import {
   useCallback, useRef,
 } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
-import { getGuestCart, clearGuestCart } from "@/lib/guestCart";
 
 const CartContext = createContext(null);
 
@@ -28,12 +35,7 @@ export function CartProvider({ children }) {
   const [userId,        setUserId]        = useState(null);
   const [pointsBalance, setPointsBalance] = useState(0);
 
-  const cartIdRef        = useRef(null);
-  const prevItemsRef     = useRef([]);
-  const syncingRef       = useRef(false);
-  const mergedForUserRef = useRef(null);
-
-  // ── Single Supabase client for this provider lifetime ────
+  // ── Single Supabase client for this provider lifetime — auth only ───────
   const supabaseRef = useRef(null);
   if (!supabaseRef.current) {
     supabaseRef.current = createBrowserSupabaseClient();
@@ -78,46 +80,17 @@ export function CartProvider({ children }) {
     };
   }, []);
 
-  // ── Fetch points balance when user logs in ──────────────
+  // ── Fetch points balance (Postgres, via /api/account/points) whenever
+  // the user changes ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!userId) { setPointsBalance(0); return; }
-    const supabase = supabaseRef.current;
-    supabase
-      .from("user_profiles")
-      .select("points_balance")
-      .eq("id", userId)
-      .maybeSingle()
-      .then(({ data }) => {
-        setPointsBalance(data?.points_balance ?? 0);
-      })
-      .catch(() => setPointsBalance(0));
+    let cancelled = false;
+    fetch(`/api/account/points?userId=${encodeURIComponent(userId)}`)
+      .then((res) => res.ok ? res.json() : { pointsBalance: 0 })
+      .then((data) => { if (!cancelled) setPointsBalance(data.pointsBalance ?? 0); })
+      .catch(() => { if (!cancelled) setPointsBalance(0); });
+    return () => { cancelled = true; };
   }, [userId]);
-
-  // ── Merge guest cart when user signs in ──────────────────
-  const mergeGuestCartOnLogin = useCallback(async (id) => {
-    if (!id || mergedForUserRef.current === id) return;
-    const guest = getGuestCart();
-    if (!guest.length) {
-      mergedForUserRef.current = id;
-      return;
-    }
-    const res = await fetch("/api/cart/merge", {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ items: guest }),
-    });
-    if (!res.ok) {
-      console.error("Cart merge failed:", await res.text());
-      return;
-    }
-    clearGuestCart();
-    mergedForUserRef.current = id;
-  }, []);
-
-  useEffect(() => {
-    if (!userId) return;
-    mergeGuestCartOnLogin(userId);
-  }, [mergeGuestCartOnLogin, userId]);
 
   // ── Persist to localStorage on every change ───────────────
   useEffect(() => {
@@ -125,96 +98,6 @@ export function CartProvider({ children }) {
       localStorage.setItem("ss_cart", JSON.stringify(cartItems));
     } catch (_) {}
   }, [cartItems]);
-
-  // ── Ensure Supabase cart row exists ───────────────────────
-  const ensureCartId = useCallback(async () => {
-    if (!userId) return null;
-    if (cartIdRef.current) return cartIdRef.current;
-
-    const supabase = supabaseRef.current;
-
-    const { data: existing, error: fetchErr } = await supabase
-      .from("carts")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("status", "active")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single();
-
-    if (!fetchErr && existing?.id) {
-      cartIdRef.current = existing.id;
-      return existing.id;
-    }
-
-    const { data: created, error: createErr } = await supabase
-      .from("carts")
-      .insert({ user_id: userId, status: "active" })
-      .select("id")
-      .single();
-
-    if (createErr) {
-      console.warn("CartContext: unable to create cart", createErr);
-      return null;
-    }
-
-    cartIdRef.current = created.id;
-    return created.id;
-  }, [userId]);
-
-  // ── Sync cart to Supabase on every change ────────────────
-  useEffect(() => {
-    if (!userId) return;
-    if (syncingRef.current) return;
-
-    const sync = async () => {
-      syncingRef.current = true;
-      try {
-        const supabase = supabaseRef.current;
-        const cartId   = await ensureCartId();
-        if (!cartId) return;
-
-        // Delete removed items
-        const prevIds    = new Set(prevItemsRef.current.map(i => i.id));
-        const nextIds    = new Set(cartItems.map(i => i.id));
-        const removedIds = [...prevIds].filter(id => !nextIds.has(id));
-
-        if (removedIds.length) {
-          await supabase
-            .from("cart_items")
-            .delete()
-            .eq("cart_id", cartId)
-            .in("product_id", removedIds);
-        }
-
-        if (cartItems.length === 0) {
-          prevItemsRef.current = cartItems;
-          return;
-        }
-
-        const rows = cartItems.map(i => ({
-          cart_id:    cartId,
-          product_id: i.id,
-          quantity:   i.qty,
-          unit_price: i.price,
-        }));
-
-        const { error: upsertErr } = await supabase
-          .from("cart_items")
-          .upsert(rows, { onConflict: "cart_id,product_id" });
-
-        if (upsertErr) {
-          console.warn("CartContext: unable to sync cart_items", upsertErr);
-        }
-
-        prevItemsRef.current = cartItems;
-      } finally {
-        syncingRef.current = false;
-      }
-    };
-
-    sync();
-  }, [cartItems, ensureCartId, userId]);
 
   // ── Actions ───────────────────────────────────────────────
   const addItem = useCallback((product, qty = 1) => {
@@ -227,6 +110,14 @@ export function CartProvider({ children }) {
       }
       return [...prev, {
         id:       product.id,
+        // The field checkout actually keys off of — canonical_products
+        // .canonical_sku, not catalog_unified.id/sku. Null for the ~2.3% of
+        // products not yet canonical-matched; checkout/prepare will reject
+        // those with a clear "no longer exists" error rather than silently
+        // mis-charging, so surface that at the add-to-cart button instead
+        // (disable/hide "add to cart" when canonicalSku is null) rather than
+        // letting it reach checkout.
+        canonicalSku: product.canonical_sku ?? product.canonicalSku ?? null,
         slug:     product.slug,
         name:     product.name,
         brand:    product.brand ?? product.brand_name ?? "",

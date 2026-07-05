@@ -1,5 +1,5 @@
 # STINKIN' SUPPLIES — PROJECT ROADMAP
-**Last Updated: June 30, 2026 (Sixty-Seventh Pass)**
+**Last Updated: July 2, 2026 (Sixty-Eighth Pass)**
 
 ---
 
@@ -9,10 +9,10 @@
 |------|--------|
 | Stack: Next.js 15 / Postgres (Hetzner 5.161.100.126) / Typesense / Vercel | ✅ |
 | Three vendor staging tables: pu_catalog, wps_catalog, vtwin_catalog | ✅ |
-| catalog_unified — single source of truth (**89,153 active rows**) | ✅ |
+| catalog_unified — single source of truth (**90,629 active rows**) | ✅ |
 | Internal SKU taxonomy (17 prefixes: ACC, BDY, BRK, DRV, ELC, ENG, EXH, etc.) | ✅ |
-| harley_families / harley_models / harley_model_years (**~365 models, ~2,090 year rows** — audited session 59; +28 gap rows session 61) | ✅ |
-| Typesense schema + index (**89,153 docs** — reindexed session 60) | ✅ |
+| harley_families / harley_models / harley_model_years (**347 models, 3,290 year rows** — audited session 59; +28 gap rows session 61; 3 duplicate Dyna models merged + 6 redundant generic-bucket rows removed session 68) | ✅ |
+| Typesense schema + index (**90,629 docs, 0 errors** — reindexed session 68) | ✅ |
 
 ---
 
@@ -38,6 +38,11 @@
 | FXBFS typo corrected to FXFBS in vtwin_scrape_data | ✅ |
 | **`parse_vtwin_fitment_raw.mjs`** — re-parses fitment_raw from vtwin_scrape_data; ~86,833 rows inserted | ✅ |
 | **`scrape_vtwin_missing.mjs`** — GraphQL url_key discovery + HTML FITS scrape for 12,398 never-scraped VTwin SKUs; 99% hit rate; upserts vtwin_scrape_data | ✅ |
+| **Eastern Motorcycle Parts crossref (4,832 rows) linked to products for the first time** — 0 → 3,103 linked via oem_number = ANY(oem_numbers[]); 606 products gained fitment (session 68) | ✅ |
+| **PU brand-file XML corpus mined for fitment** — all 133 brand XMLs; 42 products / 1,148 rows (session 68) | ✅ |
+| **Colony Machine 2026 catalog mined for fitment** — Kit Application Index tables; 84 products / 7,887 rows (session 68) | ✅ |
+| **GMA Engineering (PU brand) — 3 forward-control SKUs fitted, 27 correctly flagged is_universal instead of guessed** (session 68) | ✅ |
+| **catalog_unified flat fitment columns synced catalog-wide for the first time** — was 0% populated (0/97,277); now 45,659 products synced via new `sync_fitment_flat_columns.mjs` (session 68) | ✅ |
 
 ---
 
@@ -57,7 +62,8 @@
 | **HD_OEM handlebar crossref — 2 rows** (56569-86 + 56082-83 already in crossref from OldBook; 3 stock-only OEMs not in catalog) | ✅ |
 | **Total catalog_oem_crossref: 65,434 rows** (pre-session 64) | ✅ |
 | **Eastern Motorcycle Parts crossref — 4,832 rows** (oem_manufacturer='EASTERN'; 4,364 unique HD OEM#s; 1911–present coverage; session 64 via import_eastern_crossref.mjs) | ✅ |
-| **Total catalog_oem_crossref: ~70,329 rows** | ✅ |
+| **Total catalog_oem_crossref: 70,329 rows** | ✅ |
+| **Eastern crossref linked to product_id for the first time** — 0 → 3,103 rows, via oem_number = ANY(cu.oem_numbers[]) instead of sku (Eastern's own catalog numbering doesn't match vendor_sku); session 68 via backfill_eastern_crossref_fitment.mjs | ✅ |
 | OEM badge on PDP sourced only from catalog_oem_crossref (catalog numbers excluded) | ✅ |
 | **WPS/HardDrive 2026 OEM crossref** — 826 product→OEM pairs imported from pp.1091–1104; 272 WPS# missing from wps_catalog (Kibble White, Diamond Chain, Carlisle, Alto specialty lines) | ✅ |
 | **VTwin 2026 hardware supersession** — 202 old→new H-D OEM pairs in oem_supersession (source='vtwin'); vintage hardware format (nuts, bolts, washers, cotter pins, lock washers) | ✅ |
@@ -190,35 +196,45 @@
 
 ---
 
-## ✅ PHASE 10 — CANONICAL PRODUCTS (Complete — 62 candidates remain)
+## ✅ PHASE 10 — CANONICAL PRODUCTS (Complete — 15 ambiguous groups + 74 missed-merges remain)
 
 | Item | Status |
 |------|--------|
 | canonical_products table + product_vendors table | ✅ |
 | build_canonical_products.mjs Phase A + Phase B | ✅ |
-| **All merges drained** — 0 pending / 2,807 applied / 1,375 rejected (session 66) | ✅ |
+| **All OEM-based merges drained** — 0 pending / 2,807 applied / 1,375 rejected (session 66) | ✅ |
 | **62 variant candidates** — /admin/variant-candidates; finish/size/length groups | ⏳ |
 | Backfill vendor_offers from product_vendors (PU/VTwin) | ⏳ |
-| Unknown match pipeline (match_reason='upc'/'brand_part_number', null shared_oem_number) | ⏳ Identify source script |
+| Unknown match pipeline (match_reason='upc'/'brand_part_number', null shared_oem_number) | ✅ Resolved session 70 — `match_reason='brand_part_number'` was a legitimate value already used by the admin "admin-select" manual-match path (1,440 pre-existing rows); it just had no automated generator until session 70. Root cause: Phase B only ever proposed on OEM number, never checked brand_part_number at all — 89% of duplicate-part-number pairs had literally zero proposal of any kind. |
+| **Canonical match audit (session 70)** — read-only audit found 3,898 missed-merge groups (duplicate cards) + 38 false-merge groups (wrong products sharing a card) | ✅ Missed-merges → 74, false-merges → 22 after fix. See HANDOFF_LOG "SEVENTIETH PASS" for full detail. |
+| 15 ambiguous false-merge groups needing Laken's parts-domain review | ⏳ Session 70 — see HANDOFF_LOG for the id list |
+| 74 remaining missed-merge groups + 61 auto-rejected proposals from session 70's batch | ⏳ Unverified as of session 70 |
+| Extend build_canonical_products.mjs Phase B to check brand_part_number going forward | 🔵 Future — otherwise the gap reopens for every newly ingested product |
 
 ---
 
-## ⚠️ PHASE 11 — CHECKOUT + PAYMENT (Backend Ready — GATEWAY BLOCKING)
+## ⚠️ PHASE 11 — CHECKOUT + PAYMENT (Stripe Wired Interim — Page Rebuild Pending)
+
+**Session 69 architecture decision:** the live `checkout/page.jsx` was discovered to be running on an entirely separate, abandoned Supabase architecture (own routing engine, own Stripe Checkout Sessions flow, own orders schema) with no connection to `canonical_products`/the fulfillment optimizer. Decided: Postgres is canonical going forward, old Supabase checkout stack (`checkout/create-session`, `checkout/create-order`, `webhooks/stripe`) is being retired. Auth only stays on Supabase.
 
 | Item | Status |
 |------|--------|
 | orders / order_items / vendor_orders schema + triggers | ✅ |
 | Auto order numbers SS-YYYYMMDD-NNNN | ✅ |
-| CartContext (localStorage, canonical_sku-based) | ✅ |
+| CartContext (localStorage, canonical_sku-based) | ✅ Fixed session 69 — was never actually populated; see filter_roadmap session 69 note |
 | CartProvider wired into root layout | ✅ |
-| Checkout page skeleton — address form + MAP pricing | ✅ |
-| app/api/checkout/prepare/route.ts — validates cart, runs optimizer | ✅ |
-| app/api/orders/create/route.ts — gateway stub, atomic order write, fulfillment dispatch | ✅ |
-| **Payment gateway decision** ⚠️ BLOCKING — Braintree recommended | ⚠️ PENDING MERCHANT MEETING |
-| Order confirmation page (/checkout/success) | ⏳ |
+| Checkout page skeleton — address form + MAP pricing | ⚠️ Old version still live, on retired Supabase architecture — full rebuild is next session's first job |
+| app/api/checkout/prepare/route.ts — validates cart, runs optimizer, points preview | ✅ Updated session 69 with points discount calc |
+| app/api/stripe/create-intent/route.ts — Stripe PaymentIntent, points-aware | ✅ Session 69 (rewritten — old version used dead pricing engine) |
+| app/api/orders/create/route.ts — Stripe charge verification, atomic order write, points debit/credit, fulfillment dispatch | ✅ Session 69 |
+| app/api/account/points/route.ts — balance lookup | ✅ Session 69 |
+| customer_points table + orders points columns | ⏳ Migration written (`migrate_add_points.sql`), **not yet run** |
+| **Payment gateway decision** — Stripe wired as interim; Braintree still the long-term recommendation | ⚠️ PENDING MERCHANT MEETING |
+| Order confirmation page (/checkout/success) | ⏳ Exists on old architecture, needs rebuild alongside checkout page |
 | Tax calculation (TaxJar or flat rate) | ⏳ |
 | Shipping estimate (UPS/FedEx API or zone table) | ⏳ |
 | PU + WPS API credentials for order submission | ⏳ |
+| `userId` server-side verification (currently client-trusted in points-aware routes) | ⏳ Flagged session 69 — fine for demo, not for real money |
 
 ---
 
@@ -328,7 +344,10 @@
 | oem_supersession | 283 original inferred pairs confidence=1 still pending review. **2 flagged wrong session 67:** `56308-88→56309-96` (Throttle→Idle cable mismatch) and `56324-81A→56356-92` (wrong cable length) | ⏳ |
 | catalog_variant_candidates | 62 groups pending human review | ⏳ |
 | OemPartTimeline | framer-motion removed from modal — no enter/exit animation. Can re-add with portal approach when desired. | 🔵 Future |
+| **catalog_unified flat fitment columns** | Must re-run `node scripts/ingest/sync_fitment_flat_columns.mjs` after any script writes to catalog_fitment_v2, before every Typesense reindex — nothing does this automatically yet. Was 0% populated catalog-wide until session 68. | ⏳ Needs automation |
+| **Colony brand fitment data** | User believed a Colony dataset was already loaded into the DB this session — never found (searched every table). Colony fitment was instead sourced fresh from Colony's own 2026 catalog PDF. If the originally-intended dataset turns up later, check for conflicts against `colony_2026_catalog` fitment rows before merging. | ⏳ Awaiting user |
+| **PU/VTWIN/WPS remaining no-fitment/no-OEM gap** | Post session 68: PU brand-XML corpus and Colony/Eastern catalogs both exhausted of easily-parseable signal (42/84/606 products recovered respectively — most of the 133 PU brand files and Colony's/Eastern's catalogs simply don't name a bike-specific model+year for the remaining SKUs). VTWIN gap list exported (`vtwin_no_fitment_2026-07-02.csv`, 15,511 rows) for external scraper. | 🔵 No further script-mineable signal without new vendor feeds |
 
 ---
 
-*Last updated June 30, 2026 · Session 67*
+*Last updated July 3, 2026 · Session 69 (see HANDOFF_LOG.md "SIXTY-NINTH PASS" for full session detail)*

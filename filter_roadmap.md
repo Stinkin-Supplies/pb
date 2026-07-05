@@ -1,5 +1,5 @@
 # Stinkin' Supplies — Filtering System Roadmap
-**Created:** June 5, 2026 · **Last Updated:** June 29, 2026 (Session 65)
+**Created:** June 5, 2026 · **Last Updated:** July 3, 2026 (Session 69)
 **Scope:** browse.ts · FilterSidebar · Fitment data · Typesense facets · display_subcategory taxonomy
 
 ---
@@ -24,8 +24,15 @@ FilterSidebar improvements shipped (sessions 42–43). `?category=` URL param st
 | WPS | ~41% | Session 47 | Correct as-is — gap confirmed to be non-HD/universal products |
 | VTwin | **55.8%** | **Session 58** | Up from 41.1% (15,741) → 21,390 products. Two new scripts: parse_vtwin_fitment_raw.mjs + scrape_vtwin_missing.mjs |
 | EBC (via PU/WPS/VTwin) | **~89%** | **Session 60** | 554 EBC brake products matched; 3,005 net-new catalog_fitment_v2 rows (source='ebc_catalog') |
+| PU — Eastern/Colony/brand-XML | +735 products | **Session 68** | Eastern crossref finally linked (606 products), Colony 2026 catalog mined (84), full PU brand-XML corpus mined (42), GMA Engineering manual review (3). Small relative to PU's ~35K total but exhausts the easily-parseable signal in these sources — see filter_roadmap Open Issues. |
 
-**VTwin gap remaining:** 18,890 SKUs not found on vtwinmfg.com (discontinued/removed from site). ~4,035 remain with no fitment but on-site — further scraper runs could improve this marginally.
+**VTwin gap remaining:** 18,890 SKUs not found on vtwinmfg.com (discontinued/removed from site). ~4,035 remain with no fitment but on-site — further scraper runs could improve this marginally. Fresh gap export as of session 68: `vtwin_no_fitment_2026-07-02.csv` (15,511 rows).
+
+### ⚠️ Session 68 — critical facet-pipeline fix: flat fitment columns were never populated
+
+`catalog_unified.is_harley_fitment`, `fitment_year_start/end`, `fitment_hd_families`, `fitment_hd_models`, `fitment_hd_codes`, `fitment_year_ranges` — the columns Typesense actually indexes for fitment facets and `fitment_text` search — were **0% populated across the entire 97,277-row table**, despite `catalog_fitment_v2` (the real join-table source) having data for 45,659 of those products going back years. Only `/era/[slug]` and the by-model browse API queried `catalog_fitment_v2` directly; everything else (main product API, Typesense) showed zero fitment info catalog-wide until this session.
+
+Fixed via new **`scripts/ingest/sync_fitment_flat_columns.mjs`** (idempotent aggregation from catalog_fitment_v2) — synced all 45,659 products, followed by a full Typesense reindex (90,629 docs, 0 errors). This script must be re-run after any future script writes to `catalog_fitment_v2`, before the next Typesense reindex — nothing does this automatically yet.
 
 ## Phase 4 — Facet Alignment ✅ NON-ISSUE
 Facets are Postgres-computed via same fitmentJoin + WHERE. No divergence.
@@ -123,7 +130,12 @@ catalog_fitment_v2: 6,369,578 → **5,126,957 rows** (1.24M rows removed were wr
 | OEM fitment noise rows | 130,621 year-annotation rows in oem_fitment | ✅ Fixed session 65 — filter added to build_oem_fitment_all.mjs |
 | OEM fitment universal bleed | {ALL} rows crossing family boundaries | ✅ Fixed session 65 — promote_oem_fitment.mjs universal paths family-scoped |
 | OEM part timeline | Feature unbuilt | ✅ Built session 67 — oem_part_timeline table (32,570 rows), OemPartTimeline.jsx PDP component |
+| catalog_unified flat fitment columns | 0% populated catalog-wide — Typesense facets/fitment_text blind to catalog_fitment_v2 data | ✅ Fixed session 68 — sync_fitment_flat_columns.mjs, 45,659 products synced, reindexed |
+| catalog_oem_crossref | Eastern crossref (4,832 rows) never linked to any product since session 64 import | ✅ Fixed session 68 — linked via oem_numbers[] instead of sku, 3,103 rows |
+| harley_models | 3 true duplicate Dyna rows (FXDX/FXDFSE/FXDSE) + 5 redundant generic era-bucket rows inflating catalog_fitment_v2 with redundant rows | ✅ Fixed session 68 — merged/removed, era_* flags backfilled first |
+| Typesense schema | `canonical_sku` missing from index — cart items had no way to resolve `canonical_products.canonical_sku`, blocking checkout entirely | ✅ Fixed session 69 — `index_unified.js` now LEFT JOINs canonical_products; field added to schema; `--recreate` reindex 90,629 docs, 0 errors, verified live on a real hit |
+| app/api/products/route.ts | Third product-fetching path (used by brands page) — unknown whether it has the same `canonical_sku` gap as /api/search | ⏳ Unconfirmed as of session 69 — first check next session |
 
 ---
 
-*Filter Roadmap — Last updated June 30, 2026 · Session 67*
+*Filter Roadmap — Last updated July 3, 2026 · Session 69 (see HANDOFF_LOG.md "SIXTY-NINTH PASS" for full session detail)*
