@@ -260,10 +260,10 @@ function FitmentContent({ fitment }) {
             fontFamily: 'var(--font-stencil)',
             fontSize: 11,
             color: '#7a5810',
-            minWidth: 60,
             letterSpacing: '0.04em',
+            flex: '0 0 auto',
           }}>
-            {row.model_code}
+            {row.model_name ? `${row.model_name} (${row.model_code})` : row.model_code}
           </span>
           <span style={{ fontFamily: 'var(--font-stencil)', fontSize: 11, color: '#8a7040' }}>
             {row.year_from === row.year_to ? row.year_from : `${row.year_from}–${row.year_to}`}

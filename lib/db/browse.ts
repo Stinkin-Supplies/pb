@@ -33,6 +33,7 @@ export interface CatalogProduct {
   source_vendor: 'PU' | 'WPS' | 'VTWIN';
   display_category: string;
   display_subcategory: string | null;
+  display_subcategory_detail: string | null;
   category: string;
   is_universal: boolean;
   is_active: boolean;
@@ -49,6 +50,10 @@ export interface CatalogProduct {
   /** True when surfaced via OEM supersession chain (not a direct fitment row).
    *  Only populated when year + model are active in the request. */
   oem_chain_match?: boolean;
+  /** 0 = primary product for its subcategory, 1 = accessory/hardware
+   *  (detected via keyword match on display_subcategory_detail). Used to
+   *  keep hardware from outranking real products under price-ascending sort. */
+  detail_priority?: number;
 }
 
 export interface BrowseFacet {
@@ -72,6 +77,7 @@ export interface BrowseFilters {
   subcategory?:        string;
   displayCategory?:    string;          // cu.display_category
   displaySubcategory?: string;          // cu.display_subcategory
+  subcategoryDetail?:  string;          // cu.display_subcategory_detail (tier-3)
   brand?:              string;
   inStock?:            boolean;
   search?:             string;          // full-text (ILIKE fallback; Typesense caller sets tsIds)
@@ -89,6 +95,7 @@ export interface BrowseResult {
   facets: {
     categories:    BrowseFacet[];
     subcategories: BrowseFacet[];
+    subcategoryDetails: BrowseFacet[];
     brands:        BrowseFacet[];
   };
 }
@@ -270,6 +277,11 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
     conds.push({ tag: 'subcategory', sql: 'cu.display_subcategory = ??', values: [filters.subcategory] });
   }
 
+  // Subcategory detail (tier-3) — only meaningful once a subcategory is selected
+  if (filters.subcategoryDetail) {
+    conds.push({ tag: 'subcategory_detail', sql: 'cu.display_subcategory_detail = ??', values: [filters.subcategoryDetail] });
+  }
+
   // Brand
   if (filters.brand) {
     conds.push({ tag: 'brand', sql: 'cu.brand = ??', values: [filters.brand] });
@@ -429,17 +441,34 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
   const { sql: whereAll,  params: paramsAll }  = renderWhere(conds);
   const { sql: whereNoCategory, params: paramsNoCategory } = renderWhere(conds.filter(c => c.tag !== 'category'));
   const { sql: whereNoSubcat,   params: paramsNoSubcat }   = renderWhere(conds.filter(c => c.tag !== 'subcategory'));
+  const { sql: whereNoDetail,   params: paramsNoDetail }   = renderWhere(conds.filter(c => c.tag !== 'subcategory_detail'));
   const { sql: whereNoBrand,    params: paramsNoBrand }    = renderWhere(conds.filter(c => c.tag !== 'brand'));
 
   // ── Sort ──────────────────────────────────────────────────────────────────
+  // detail_priority: pushes hardware/accessory Detail values (mounts, brackets,
+  // bolts, straps, kits, covers, bumpers, washers, knobs...) below the actual
+  // primary product for that subcategory, regardless of price. Without this,
+  // a $18 mounting bracket always outranks a $180 seat under price-ascending
+  // sort — same bug found on Sissy Bars, generalized across every category
+  // via a keyword match rather than a per-category hardcoded list, since the
+  // vocabulary ("Mounting Hardware & Straps", "Mounts & Hardware", "Install
+  // Kits & Wiring"...) has been consistent across every taxonomy rebuild this
+  // project has done so far.
+  const DETAIL_PRIORITY_CASE = `
+    CASE
+      WHEN cu.display_subcategory_detail ~* '(hardware|mount|bracket|bolt|screw|bumper|washer|knob|strap|clamp|adapter|kit|cover|liner|grommet|bushing|fastener)'
+      THEN 1 ELSE 0
+    END
+  `.trim();
+
   const SORT_MAP: Record<string, string> = {
-    price_asc:  'd.price ASC',
-    price_desc: 'd.price DESC',
-    name_asc:   'd.name ASC',
-    newest:     'd.id DESC',
-    relevance:  'd.price ASC',
+    price_asc:  'd.detail_priority ASC, d.price ASC',
+    price_desc: 'd.detail_priority ASC, d.price DESC',
+    name_asc:   'd.detail_priority ASC, d.name ASC',
+    newest:     'd.detail_priority ASC, d.id DESC',
+    relevance:  'd.detail_priority ASC, d.price ASC',
   };
-  const outerSort = SORT_MAP[filters.sort ?? ''] ?? 'd.price ASC';
+  const outerSort = SORT_MAP[filters.sort ?? ''] ?? 'd.detail_priority ASC, d.price ASC';
 
   // ── Product query ─────────────────────────────────────────────────────────
   const productSql = `
@@ -457,6 +486,7 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
         cu.source_vendor,
         cu.display_category,
         cu.display_subcategory,
+        cu.display_subcategory_detail,
         cu.category,
         cu.is_universal,
         cu.is_active,
@@ -478,7 +508,8 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
         ), cu.in_stock, false) AS in_stock,
         COALESCE(vcnt.cnt, 0)::int                AS variant_count,
         (cu.id = ANY(${chainLiteral}))            AS oem_chain_match,
-        (fv.product_id IS NOT NULL)               AS has_fitment
+        (fv.product_id IS NOT NULL)               AS has_fitment,
+        ${DETAIL_PRIORITY_CASE}                    AS detail_priority
       FROM catalog_unified cu
       LEFT JOIN canonical_products cp ON cp.id = cu.canonical_product_id
       ${fitmentJoin}
@@ -497,6 +528,7 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
       ORDER BY
         ${DEDUP_KEY},
         (fv.product_id IS NOT NULL) DESC,
+        ${DETAIL_PRIORITY_CASE} ASC,
         cu.computed_price ASC
     ) d
     ORDER BY ${outerSort}
@@ -531,6 +563,19 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
     LIMIT 50
   `;
 
+  // Detail (tier-3) facet only makes sense once a subcategory is selected —
+  // still safe to run unconditionally, it just returns nothing otherwise.
+  const detailFacetSql = `
+    SELECT cu.display_subcategory_detail AS name, COUNT(DISTINCT ${DEDUP_KEY}) AS count
+    FROM catalog_unified cu
+    ${fitmentJoin}
+    WHERE ${whereNoDetail}
+      AND cu.display_subcategory_detail IS NOT NULL
+    GROUP BY cu.display_subcategory_detail
+    ORDER BY count DESC
+    LIMIT 50
+  `;
+
   const brandFacetSql = `
     SELECT cu.brand AS name, COUNT(DISTINCT ${DEDUP_KEY}) AS count
     FROM catalog_unified cu
@@ -542,11 +587,12 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
     LIMIT 80
   `;
 
-  const [productsRes, countRes, catRes, subcatRes, brandRes] = await Promise.all([
+  const [productsRes, countRes, catRes, subcatRes, detailRes, brandRes] = await Promise.all([
     db.query<CatalogProduct & { has_fitment: boolean }>(productSql, paramsAll),
     db.query<{ total: string }>(countSql, paramsAll),
     db.query<BrowseFacet>(categoryFacetSql, paramsNoCategory),
     db.query<BrowseFacet>(subcategoryFacetSql, paramsNoSubcat),
+    db.query<BrowseFacet>(detailFacetSql, paramsNoDetail),
     db.query<BrowseFacet>(brandFacetSql, paramsNoBrand),
   ]);
 
@@ -556,6 +602,7 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
     facets: {
       categories:    catRes.rows,
       subcategories: subcatRes.rows,
+      subcategoryDetails: detailRes.rows,
       brands:        brandRes.rows,
     },
   };

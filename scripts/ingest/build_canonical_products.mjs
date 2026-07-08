@@ -60,12 +60,64 @@ const FINISH_KEYWORDS = [
   'chrome', 'black', 'polished', 'natural', 'satin', 'zinc', 'stainless',
   'brushed', 'anodized', 'smooth', 'machine', 'gloss',
   'matte', 'billet', 'raw', 'silver', 'gold',
+  // Session 75: pure colors were missing entirely (only finish/texture words
+  // were covered) — caught 2 real mismatches (e.g. "TS CLEAR LENS" vs "Turn
+  // Signal Lens Set Red") that the original list couldn't see at all.
+  'red', 'blue', 'white', 'yellow', 'green', 'orange', 'purple',
+  'gray', 'grey', 'clear', 'pink', 'burgundy',
 ];
 
 function parseFinish(name) {
   const lower = name.toLowerCase();
   for (const kw of FINISH_KEYWORDS) {
     if (lower.includes(kw)) return kw;
+  }
+  return null;
+}
+
+// Brake-pad friction material — a shared OEM number for brake pads legitimately
+// covers several materially different compounds (organic/sintered/semi-metallic/
+// ceramic/kevlar), same vocabulary already proven in build_variant_groups.cjs's
+// ATTRIBUTE_RULES. Session 75: validated against real data — every sample pair
+// checked was a genuinely different friction material, not a naming variant of
+// the same product (e.g. "Sintered Metal" vs "Organic" vs "Street Ceramic").
+function parseCompound(name) {
+  const m = name.match(/\b(organic|sintered|semi.?metallic|ceramic|kevlar)\b/i);
+  return m ? m[1].toLowerCase().replace(/[\s-]/g, '') : null;
+}
+
+// Normalizes a product name for exact-text comparison (case/punctuation-
+// insensitive). A raw fuzzy-similarity score was tried and rejected — real
+// examples like "Cam Gear Cover Oil Double Lip Seal" vs "...Single Lip Seal"
+// score high on token overlap despite being a genuine functional difference,
+// so only an EXACT match after normalization is trusted as a positive signal
+// here. Still gated by a price-sanity check below, since even identical
+// names occasionally cover different kit compositions across brands.
+function normalizeName(name) {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
+}
+
+// Gasket/shim thickness callouts are always written as a bare leading decimal
+// (.032", .045") with NO digit before the decimal point — unlike bore/stroke/
+// length specs, which always have at least one whole-number digit (3.875",
+// 10.5"). Requiring a non-digit (or start-of-string) immediately before the
+// '.' distinguishes "thickness" from "diameter/length" reliably without a
+// false-positive on piston-kit bore specs etc. Session 75: found 4 real
+// already-applied bad merges (e.g. ".043\" Head Gasket" merged with ".032\"
+// Head Gasket" — two different physical thicknesses, same OEM crossref
+// number) that this check would have caught.
+function parseThickness(name) {
+  const m1 = name.match(/(?:^|[^0-9])\.(\d{2,3})\s*["”]/);
+  if (m1) return parseFloat('0.' + m1[1]);
+  // Some vendor names (mostly abbreviated PU/WPS listings) drop the inch mark
+  // entirely (e.g. "GASKET HEAD GASKET .045 TWIN CAM") — only safe to treat a
+  // bare decimal as a thickness when the name says "gasket" somewhere, since
+  // a bare ".0XX" alone is too ambiguous outside that context. Session 75:
+  // found 19 more real mismatches this way (e.g. ".045" vs ".036" head
+  // gaskets with no inch mark at all).
+  if (/gasket/i.test(name)) {
+    const m2 = name.match(/(?:^|[^0-9])\.(\d{2,3})(?:\s|$|-)/);
+    if (m2) return parseFloat('0.' + m2[1]);
   }
   return null;
 }
@@ -192,6 +244,22 @@ async function phaseA(client) {
 
 // ─── PHASE B: OEM-based cross-vendor matching ─────────────────────────────────
 
+// Subcategories where "shares an OEM number" means "family of compatible
+// replacements" rather than "same physical product" — sharing an OEM number
+// is how the aftermarket industry lists cross-brand alternatives, not
+// evidence two listings are the same item. Session 75: verified this
+// directly — every sampled pair in these subcategories was a genuinely
+// different brand/product line (Drag Specialties vs V-Twin vs HardDrive vs
+// Duro's own Ceramic-vs-Soft compound lines), never the same physical part
+// under two vendors. These three subcategories alone accounted for ~2,864 of
+// the pending review queue with no reliable text signal either way (after
+// every other check — part number, exact name, thickness, compound, color —
+// already ran). Excluded from candidate generation entirely rather than left
+// to accumulate an ever-growing, unresolvable pending pile.
+const OEM_FAMILY_NOT_DUPLICATE_SUBCATEGORIES = [
+  'Brake Pads & Shoes', 'Batteries', 'Charging & Alternators',
+];
+
 async function phaseB(client) {
   console.log('\n── Phase B: OEM-based cross-vendor matching ──');
 
@@ -213,6 +281,7 @@ async function phaseB(client) {
         AND ocr.oem_number != ''
         AND cu.canonical_product_id IS NOT NULL
         AND cu.is_kit = false
+        AND (cu.display_subcategory IS NULL OR cu.display_subcategory != ALL($1::text[]))
       GROUP BY ocr.oem_number, cu.display_category
       HAVING COUNT(DISTINCT cu.source_vendor) > 1
     )
@@ -222,28 +291,40 @@ async function phaseB(client) {
       ARRAY(SELECT DISTINCT u FROM unnest(canonical_ids) AS u WHERE u IS NOT NULL), 1
     ) > 1
     ORDER BY vendor_count DESC, oem_number
-  `);
+  `, [OEM_FAMILY_NOT_DUPLICATE_SUBCATEGORIES]);
 
   console.log(`  Found ${candidates.length} OEM match candidates`);
 
-  // Fetch name + pack_qty for every product involved, once, so we can
-  // mismatch-check pairs without a query per pair.
+  // Fetch name + pack_qty + brand_part_number + price for every product
+  // involved, once, so we can mismatch-check pairs without a query per pair.
   const allProductIds = [...new Set(candidates.flatMap(c => c.product_ids.filter(Boolean)))];
-  const productInfo = new Map(); // id -> { name, pack_qty }
+  const productInfo = new Map(); // id -> { name, pack_qty, brand_part_number, price }
 
   if (allProductIds.length > 0) {
     const { rows: infoRows } = await client.query(`
-      SELECT id, name, pack_qty FROM catalog_unified WHERE id = ANY($1)
+      SELECT id, name, pack_qty, brand_part_number, computed_price FROM catalog_unified WHERE id = ANY($1)
     `, [allProductIds]);
     for (const r of infoRows) {
-      productInfo.set(r.id, { name: r.name, pack_qty: r.pack_qty });
+      productInfo.set(r.id, { name: r.name, pack_qty: r.pack_qty, brand_part_number: r.brand_part_number, price: r.computed_price });
     }
   }
 
+  // Normalizes a manufacturer part number for exact-match comparison
+  // (strips case/punctuation/whitespace, same convention as normalizeBrand()).
+  function normalizePartNumber(s) {
+    if (!s) return null;
+    const stripped = String(s).toUpperCase().replace(/[^A-Z0-9]/g, '');
+    return stripped || null;
+  }
+
   let proposed = 0;
+  let autoConfirmed = 0;
+  let autoRejectedPriceGap = 0;
   let alreadyExists = 0;
   let skippedPackQty = 0;
   let skippedFinish = 0;
+  let skippedThickness = 0;
+  let skippedCompound = 0;
 
   for (const c of candidates) {
     const productIds = c.product_ids.filter(Boolean);
@@ -279,15 +360,110 @@ async function phaseB(client) {
             skippedFinish++;
             continue;
           }
+
+          // Skip pairs with a differing gasket/shim thickness callout in both
+          // names — a shared OEM crossref number legitimately covers multiple
+          // distinct physical thicknesses (e.g. a .032" and a .045" head
+          // gasket both replace the same OEM part across different production
+          // years), so it's not evidence of a duplicate the way pack-qty and
+          // finish are.
+          const thickA = parseThickness(infoA.name);
+          const thickB = parseThickness(infoB.name);
+          if (thickA !== null && thickB !== null && thickA !== thickB) {
+            skippedThickness++;
+            continue;
+          }
+
+          const compoundA = parseCompound(infoA.name);
+          const compoundB = parseCompound(infoB.name);
+          if (compoundA && compoundB && compoundA !== compoundB) {
+            skippedCompound++;
+            continue;
+          }
+        }
+
+        // Two evidence-based rules requested after session 75's manual review
+        // turned up both false positives sitting in the queue and clear
+        // duplicates still needing a manual click:
+        //
+        // 1. Exact brand_part_number match (both sides non-null, normalized)
+        //    is a much stronger identity signal than shared OEM alone — an
+        //    OEM crossref number is one-to-many across distinct physical
+        //    variants (e.g. one gasket OEM# covering three different
+        //    thicknesses across decades of production), but two vendors
+        //    listing the literal same manufacturer part number is near-
+        //    certainly the same physical item. Auto-confirmed instead of
+        //    left pending — validated against 11 real examples session 75,
+        //    zero had a >3x price gap (the one signal that would suggest
+        //    otherwise).
+        //
+        // 2. A large price gap (>=2.5x) is only meaningful as a NEGATIVE
+        //    signal when BOTH sides have an explicit, differing part
+        //    number — that's corroborating evidence (two named, different
+        //    manufacturer parts), not just "we don't know." A missing part
+        //    number on either side means we have no basis for comparison at
+        //    all — price alone doesn't prove non-identity, since the same
+        //    physical part is routinely priced very differently across
+        //    vendors (that's normal markup variance, not evidence of a
+        //    different product). Session 75: an earlier version of this rule
+        //    treated "no part number" the same as "different part number"
+        //    and wrongly auto-rejected 423 pairs on price alone with zero
+        //    actual comparison — reopened to pending after the mistake was
+        //    caught.
+        let autoStatus = null;
+        let autoReviewedBy = null;
+        if (infoA && infoB) {
+          const bpnA = normalizePartNumber(infoA.brand_part_number);
+          const bpnB = normalizePartNumber(infoB.brand_part_number);
+          const exactPartMatch = bpnA && bpnB && bpnA === bpnB;
+          const explicitPartMismatch = bpnA && bpnB && bpnA !== bpnB;
+
+          // Exact name match after normalization (case/punctuation-insensitive)
+          // is a second, independent positive signal — validated against 249
+          // real examples session 75, only 2 had a wild price gap. Still
+          // gated on price ratio < 3x here as a sanity check, since a short
+          // generic name ("Top End Gasket Kit") occasionally covers a
+          // materially different kit composition across brands.
+          let exactNameMatch = false;
+          if (!exactPartMatch && infoA.price && infoB.price && infoA.price > 0 && infoB.price > 0) {
+            const priceRatio = Math.max(infoA.price, infoB.price) / Math.min(infoA.price, infoB.price);
+            if (priceRatio < 3 && normalizeName(infoA.name) === normalizeName(infoB.name)) {
+              exactNameMatch = true;
+            }
+          }
+
+          if (exactPartMatch) {
+            autoStatus = 'confirmed';
+            autoReviewedBy = 'auto-brand-part-number-match';
+          } else if (exactNameMatch) {
+            autoStatus = 'confirmed';
+            autoReviewedBy = 'auto-exact-name-match';
+          } else if (explicitPartMismatch && infoA.price && infoB.price && infoA.price > 0 && infoB.price > 0) {
+            const gap = Math.max(infoA.price, infoB.price) / Math.min(infoA.price, infoB.price);
+            if (gap >= 2.5) {
+              autoRejectedPriceGap++;
+              continue;
+            }
+          }
         }
 
         try {
-          await client.query(`
-            INSERT INTO canonical_match_proposals
-              (product_id_a, product_id_b, match_reason, match_score, shared_oem_number)
-            VALUES ($1, $2, 'oem', 0.92, $3)
-            ON CONFLICT (product_id_a, product_id_b) DO NOTHING
-          `, [a, b, c.oem_number]);
+          if (autoStatus === 'confirmed') {
+            await client.query(`
+              INSERT INTO canonical_match_proposals
+                (product_id_a, product_id_b, match_reason, match_score, shared_oem_number, status, reviewed_by, reviewed_at)
+              VALUES ($1, $2, 'oem', 0.98, $3, 'confirmed', $4, NOW())
+              ON CONFLICT (product_id_a, product_id_b) DO NOTHING
+            `, [a, b, c.oem_number, autoReviewedBy]);
+            autoConfirmed++;
+          } else {
+            await client.query(`
+              INSERT INTO canonical_match_proposals
+                (product_id_a, product_id_b, match_reason, match_score, shared_oem_number)
+              VALUES ($1, $2, 'oem', 0.92, $3)
+              ON CONFLICT (product_id_a, product_id_b) DO NOTHING
+            `, [a, b, c.oem_number]);
+          }
           proposed++;
         } catch {
           alreadyExists++;
@@ -296,10 +472,13 @@ async function phaseB(client) {
     }
   }
 
-  console.log(`  Proposed: ${proposed} new matches`);
+  console.log(`  Proposed: ${proposed} new matches (${autoConfirmed} auto-confirmed via exact brand_part_number match)`);
   console.log(`  Skipped (already exists): ${alreadyExists}`);
   console.log(`  Skipped (pack-qty mismatch): ${skippedPackQty}`);
   console.log(`  Skipped (finish/color mismatch): ${skippedFinish}`);
+  console.log(`  Skipped (thickness mismatch): ${skippedThickness}`);
+  console.log(`  Skipped (brake-pad compound mismatch): ${skippedCompound}`);
+  console.log(`  Skipped (price gap >=2.5x, no matching part number): ${autoRejectedPriceGap}`);
   console.log(`\n  Review proposals in the admin panel at /admin/canonical-matches`);
   console.log(`  or with: SELECT * FROM canonical_match_proposals WHERE status = 'pending' LIMIT 50;`);
 }

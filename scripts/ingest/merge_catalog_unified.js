@@ -4,7 +4,29 @@
 // Generates internal SKUs in format: CAT123456.p / .w / .v
 
 import pg from 'pg';
+import { normalizeBrand } from './brandNormalizationMap.mjs';
 const { Pool } = pg;
+
+// PU catalog-number range 9903-xxxx is PU's own dedicated department for
+// in-store merchandising fixtures (POP racks, slatwall graphics, clip strips,
+// fixture kits, counter displays) spanning many brands — not sellable parts.
+// Verified live against pu_catalog (2026-07-07): 10 rows under this prefix.
+const PU_DISPLAY_FIXTURE_SKU_RE = /^9903/;
+
+// Neither PU nor WPS confines all merchandising fixtures to one SKU range, so
+// also match on name — deliberately tight keywords chosen to catch clear
+// fixtures (display racks/boards/stands, slatwall, clip strips, fixture kits,
+// counter/POP displays, header cards) while NOT catching legitimately
+// sellable products that merely contain the word "display" as a product
+// attribute (e.g. Dakota Digital gauges with a "Blue Display", Dynojet
+// "Pod-300 Digital Display", Magnum Shielding "Softail Display Clamp").
+// Verified live (2026-07-07): 15 PU rows + 26 WPS rows match, all confirmed
+// dealer point-of-sale/merchandising units by cross-checking price
+// (loaded gasket-assortment display boards run $70-240, consistent with
+// containing real stock, not just an empty fixture — still a dealer
+// merchandising unit, not something an end customer buys individually).
+const DISPLAY_FIXTURE_NAME_RE =
+  /\b(DISPLAY\s+RACK|COUNTER\s+DISPLAY|POP\s+DISPLAY|SLATWALL|CLIP\s+STRIP|FIXTURE\s+KIT|DISPLAY\s+SHELF|DISPLAY\s+STAND|DISPLAY\s+BOARD|HEADER\s+CARD)\b/i;
 
 const pool = new Pool({
   connectionString: process.env.CATALOG_DATABASE_URL ||
@@ -284,6 +306,8 @@ async function main() {
       const internalSku = generateInternalSku(catCode, 'p');
       const slug = slugify(r.name, internalSku);
       const displayCategory = mapDisplayCategory('PU', r.commodity_category);
+      const isDisplayFixture = PU_DISPLAY_FIXTURE_SKU_RE.test(r.sku || '') ||
+        DISPLAY_FIXTURE_NAME_RE.test(r.name || '');
 
       try {
         await client.query(`
@@ -321,7 +345,7 @@ async function main() {
           r.name,                         // $6  name
           r.description,                  // $7  description
           r.features,                     // $8  features
-          r.brand,                        // $9  brand
+          normalizeBrand(r.brand),        // $9  brand
           r.brand_code,                   // $10 brand_code
           r.oem_part_number,              // $11 brand_part_number
           r.commodity_category,           // $12 category
@@ -359,7 +383,7 @@ async function main() {
           r.in_oldbook,                   // $44 in_oldbook
           r.in_fatbook,                   // $45 in_fatbook
           false,                          // $46 in_harddrive
-          r.part_status !== 'D',          // $47 is_active
+          r.part_status !== 'D' && !isDisplayFixture, // $47 is_active — POP/display fixtures excluded from sellable inventory
           r.part_status === 'D',          // $48 is_discontinued
           r.oem_numbers,                  // $49 oem_numbers
           r.oem_part_number,              // $50 oem_part_number
@@ -392,6 +416,7 @@ async function main() {
       const internalSku = generateInternalSku(catCode, 'w');
       const slug = slugify(r.name, internalSku);
       const displayCategory = mapDisplayCategory('WPS', r.category);
+      const isDisplayFixture = DISPLAY_FIXTURE_NAME_RE.test(r.name || '');
       const stockQty =
         (r.warehouse_boise || 0) + (r.warehouse_fresno || 0) +
         (r.warehouse_elizabethtown || 0) + (r.warehouse_ashley || 0) +
@@ -429,7 +454,7 @@ async function main() {
           r.name,                         // $6
           r.product_description,          // $7
           r.product_features ? [r.product_features] : null, // $8
-          r.brand,                        // $9
+          normalizeBrand(r.brand),        // $9
           r.category,                     // $10
           r.list_price,                   // $11 msrp
           r.dealer_price,                 // $12 cost
@@ -452,7 +477,7 @@ async function main() {
           r.image_url || r.image_uri,     // $29
           r.harddrive_catalog,            // $30
           false,                          // $31 closeout
-          r.status === 'STK' || r.status === 'LTD', // $32 is_active
+          (r.status === 'STK' || r.status === 'LTD') && !isDisplayFixture, // $32 is_active — POP/display fixtures excluded from sellable inventory
           r.status === 'NLA' || r.status === 'DSC', // $33 is_discontinued
           r.oem_numbers,                  // $34
           r.supplier_item_id,             // $35 brand_part_number
@@ -515,7 +540,7 @@ async function main() {
           'VTWIN',                        // $4
           internalSku,                    // $5
           r.name,                         // $6
-          r.manufacturer,                 // $7 brand
+          normalizeBrand(r.manufacturer), // $7 brand
           r.retail_price,                 // $8 msrp
           r.dealer_price,                 // $9 cost
           r.has_stock,                    // $10 in_stock

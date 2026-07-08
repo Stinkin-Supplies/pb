@@ -186,6 +186,7 @@ function FilterContent({ facets, filters, onChange, sections, setSections, colla
   function toggle(key) { setSections(s => ({ ...s, [key]: !s[key] })); }
 
   const subcategories = facets.subcategories ?? [];
+  const subcategoryDetails = facets.subcategoryDetails ?? [];
 
   // ── Search input (controlled locally, synced to filters.search) ──────────
   const [searchInput, setSearchInput] = useState(filters.search ?? "");
@@ -205,7 +206,7 @@ function FilterContent({ facets, filters, onChange, sections, setSections, colla
 
   const clearAll = () => {
     setSearchInput("");
-    onChange({ family: null, model: null, modelCodes: null, year: null, era: null, display_category: null, display_subcategory: null, brand: null, min_price: null, max_price: null, in_stock: false, search: null });
+    onChange({ family: null, model: null, modelCodes: null, year: null, era: null, display_category: null, display_subcategory: null, subcategory_detail: null, brand: null, min_price: null, max_price: null, in_stock: false, search: null });
   };
 
   // Active filter chips
@@ -215,8 +216,9 @@ function FilterContent({ facets, filters, onChange, sections, setSections, colla
     filters.year       && { key: "year",     label: String(filters.year),              clear: () => onChange({ year: null }) },
     filters.model      && { key: "model",    label: filters.model,                     clear: () => onChange({ model: null, modelCodes: null }) },
     filters.era        && { key: "era",      label: filters.era.replace(/-/g," "),     clear: () => onChange({ era: null }) },
-    filters.display_category && { key: "cat",    label: filters.display_category,      clear: () => onChange({ display_category: null, display_subcategory: null }) },
-    filters.display_subcategory && { key: "subcat", label: filters.display_subcategory, clear: () => onChange({ display_subcategory: null }) },
+    filters.display_category && { key: "cat",    label: filters.display_category,      clear: () => onChange({ display_category: null, display_subcategory: null, subcategory_detail: null }) },
+    filters.display_subcategory && { key: "subcat", label: filters.display_subcategory, clear: () => onChange({ display_subcategory: null, subcategory_detail: null }) },
+    filters.subcategory_detail && { key: "detail", label: filters.subcategory_detail,   clear: () => onChange({ subcategory_detail: null }) },
     filters.brand      && { key: "brand",    label: filters.brand,                     clear: () => onChange({ brand: null }) },
     filters.in_stock   && { key: "stock",    label: "In Stock",                        clear: () => onChange({ in_stock: false }) },
     (filters.min_price || filters.max_price) && { key: "price", label: `$${filters.min_price||0}–$${filters.max_price||"∞"}`, clear: () => onChange({ min_price: null, max_price: null }) },
@@ -340,7 +342,7 @@ function FilterContent({ facets, filters, onChange, sections, setSections, colla
             <FilterRow
               key={cat.name} label={cat.name} count={cat.count}
               active={filters.display_category === cat.name}
-              onClick={() => onChange({ display_category: filters.display_category === cat.name ? null : cat.name, display_subcategory: null })}
+              onClick={() => onChange({ display_category: filters.display_category === cat.name ? null : cat.name, display_subcategory: null, subcategory_detail: null })}
             />
           ))}
         </div>
@@ -355,7 +357,23 @@ function FilterContent({ facets, filters, onChange, sections, setSections, colla
               <FilterRow
                 key={sub.name} label={sub.name} count={sub.count}
                 active={filters.display_subcategory === sub.name}
-                onClick={() => onChange({ display_subcategory: filters.display_subcategory === sub.name ? null : sub.name })}
+                onClick={() => onChange({ display_subcategory: filters.display_subcategory === sub.name ? null : sub.name, subcategory_detail: null })}
+              />
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* Detail (tier-3) — indented under Subcategory, only when one is active and details exist */}
+      {filters.display_subcategory && subcategoryDetails.length > 0 && (
+        <Section label="Detail" sectionKey="detail" open={sections.detail} onToggle={toggle}
+          hasActive={!!filters.subcategory_detail} collapsed={collapsed}>
+          <div style={{ paddingBottom: 6, maxHeight: 200, overflowY: "auto", paddingLeft: 12 }}>
+            {subcategoryDetails.map(d => (
+              <FilterRow
+                key={d.name} label={d.name} count={d.count}
+                active={filters.subcategory_detail === d.name}
+                onClick={() => onChange({ subcategory_detail: filters.subcategory_detail === d.name ? null : d.name })}
               />
             ))}
           </div>
@@ -447,6 +465,7 @@ export default function FilterSidebar({ facets, filters, onChange, open, onClose
   const [sections, setSections] = useState({
     category: true,
     subcategory: false,
+    detail: false,
     era: false,
     brand: false,
     price: false,
@@ -456,6 +475,11 @@ export default function FilterSidebar({ facets, filters, onChange, open, onClose
   useEffect(() => {
     if (filters.display_category) setSections(s => ({ ...s, subcategory: true }));
   }, [filters.display_category]);
+
+  // Auto-open detail (tier-3) section when a subcategory is selected
+  useEffect(() => {
+    if (filters.display_subcategory) setSections(s => ({ ...s, detail: true }));
+  }, [filters.display_subcategory]);
 
   // Lock body scroll when mobile sheet is open
   useEffect(() => {
@@ -553,7 +577,7 @@ export default function FilterSidebar({ facets, filters, onChange, open, onClose
               }}>
                 {activeCount > 0 && (
                   <button
-                    onClick={() => onChange({ family: null, model: null, modelCodes: null, year: null, era: null, display_category: null, display_subcategory: null, brand: null, min_price: null, max_price: null, in_stock: false, search: null })}
+                    onClick={() => onChange({ family: null, model: null, modelCodes: null, year: null, era: null, display_category: null, display_subcategory: null, subcategory_detail: null, brand: null, min_price: null, max_price: null, in_stock: false, search: null })}
                     style={{
                       flex: "0 0 auto", height: 46, background: "none",
                       border: `1.5px solid ${GOLD_B}`, color: GOLD,

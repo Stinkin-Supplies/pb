@@ -55,3 +55,6 @@ public/videos/triovideo.mp4
 fitment_tag_tree.json
 oem_crossref.json
 scripts/ingest/fitment_year_ranges.csv
+
+# audit script output (dryrun/applied logs)
+audit_output/

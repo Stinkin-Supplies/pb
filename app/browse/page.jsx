@@ -60,6 +60,7 @@ function BrowsePageInner() {
     // ?category is the legacy param — fold it into display_category so old links still work
     display_category:   searchParams.get("display_category") || searchParams.get("category") || null,
     display_subcategory:searchParams.get("display_subcategory") || null,
+    subcategory_detail: searchParams.get("subcategory_detail") || null,
     year_min:           searchParams.get("year_min")          ? parseInt(searchParams.get("year_min")) : null,
     year_max:           searchParams.get("year_max")          ? parseInt(searchParams.get("year_max")) : null,
     brand:              searchParams.get("brand")            || null,
@@ -98,6 +99,7 @@ function BrowsePageInner() {
       if (f.year)                 params.set("year",               f.year);
       if (f.display_category)     params.set("display_category",   f.display_category);
       if (f.display_subcategory)  params.set("display_subcategory",f.display_subcategory);
+      if (f.subcategory_detail)   params.set("subcategory_detail", f.subcategory_detail);
       if (f.year_min)             params.set("year_min",           f.year_min);
       if (f.year_max)             params.set("year_max",           f.year_max);
       if (f.brand)                params.set("brand",              f.brand);
@@ -139,6 +141,7 @@ function BrowsePageInner() {
     if (next.year)                 p.set("year",               next.year);
     if (next.display_category)     p.set("display_category",   next.display_category);
     if (next.display_subcategory)  p.set("display_subcategory",next.display_subcategory);
+    if (next.subcategory_detail)   p.set("subcategory_detail", next.subcategory_detail);
     if (next.year_min)             p.set("year_min",           next.year_min);
     if (next.year_max)             p.set("year_max",           next.year_max);
     if (next.brand)                p.set("brand",              next.brand);
@@ -251,7 +254,7 @@ function BrowsePageInner() {
                     {contextLabel}
                   </span>
                   <button
-                    onClick={() => handleFilterChange({ family: null, model: null, year: null, era: null, display_category: null, display_subcategory: null, year_min: null, year_max: null, brand: null, min_price: null, max_price: null, in_stock: false, modelCodes: null, q: null })}
+                    onClick={() => handleFilterChange({ family: null, model: null, year: null, era: null, display_category: null, display_subcategory: null, subcategory_detail: null, year_min: null, year_max: null, brand: null, min_price: null, max_price: null, in_stock: false, modelCodes: null, q: null })}
                     style={{ background: "none", border: "none", color: GOLD, cursor: "pointer", fontSize: "13px", lineHeight: 1, padding: 0 }}
                   >×</button>
                 </div>

@@ -6,6 +6,7 @@ import BrowseBackButton from '@/components/browse/BrowseBackButton';
 import ProductImage from '@/components/browse/ProductImage';
 import ProductImageGallery from '@/components/browse/ProductImageGallery';
 import PDPTabs from '@/components/browse/PDPTabs';
+import VariantSelector from '@/components/browse/VariantSelector';
 import AdminEditPanel from '@/components/admin/AdminEditPanel';
 import { getOemPartTimeline } from '@/lib/getOemPartTimeline';
 import OemPartTimeline from '@/components/pdp/OemPartTimeline';
@@ -67,7 +68,8 @@ async function getFitmentRows(productId) {
   const { rows } = await db.query(`
     SELECT
       hm.model_code,
-      hf.name                  AS family_name,
+      hm.name                   AS model_name,
+      hf.name                   AS family_name,
       MIN(hmy.year)            AS year_from,
       MAX(hmy.year)            AS year_to,
       COUNT(DISTINCT hmy.year) AS year_count
@@ -76,8 +78,11 @@ async function getFitmentRows(productId) {
     JOIN harley_models hm       ON hm.id   = hmy.model_id
     JOIN harley_families hf     ON hf.id   = hm.family_id
     WHERE cf.product_id = $1
-    GROUP BY hm.model_code, hf.name
-    ORDER BY hf.name, hm.model_code
+    -- grouped by model_name too: some codes (e.g. FLHX) were reused for a
+    -- different model name in an earlier era, and those eras should list
+    -- separately rather than being merged under one name
+    GROUP BY hm.model_code, hm.name, hf.name
+    ORDER BY hf.name, hm.model_code, year_from
   `, [productId]);
   return rows;
 }
@@ -160,25 +165,6 @@ async function getOemAlternatives(productId) {
   return rows;
 }
 
-async function getVariantMembers(variantGroupId) {
-  if (!variantGroupId) return [];
-  const db = getCatalogDb();
-  const { rows } = await db.query(`
-    SELECT
-      cvm.product_id,
-      cvm.option_1_name,
-      cvm.option_1_value,
-      cvm.sort_order,
-      cu.name, cu.slug, cu.computed_price AS price, cu.is_active
-    FROM catalog_variant_members cvm
-    JOIN catalog_unified cu ON cu.id = cvm.product_id
-    WHERE cvm.group_id = $1
-      AND cu.is_active = true
-    ORDER BY cvm.sort_order, cvm.option_1_value
-  `, [variantGroupId]);
-  return rows;
-}
-
 /** Related products — same display_subcategory, with category fallback (session 50).
  *  Params: [$1=category, $2=currentSlug, $3=displaySubcategory] */
 async function getRelatedProducts(category, slug, displaySubcategory) {
@@ -219,10 +205,9 @@ export default async function ProductDetailPage({ params }) {
   const unifiedId = productRow.id;
 
   // Parallel fetches
-  const [fitment, oemRows, variants, related, timeline, oemAlternatives, oemTimeline] = await Promise.all([
+  const [fitment, oemRows, related, timeline, oemAlternatives, oemTimeline] = await Promise.all([
     getFitmentRows(unifiedId),
     getOemRows(unifiedId),
-    getVariantMembers(productRow.variant_group_id, unifiedId),
     getRelatedProducts(
       productRow.category,
       slug,
@@ -238,7 +223,6 @@ export default async function ProductDetailPage({ params }) {
   ]);
 
   const hasSidebar = oemAlternatives.length > 0;
-  const hasVariants = variants.length > 1;
   const firstOem = oemRows.find(r => r.oem_format?.startsWith('hd_oem') && !r.expanded_from)?.oem_number ?? null;
 
   return (
@@ -563,52 +547,12 @@ export default async function ProductDetailPage({ params }) {
               <div style={{ marginBottom: 20 }} />
             )}
 
-            {/* Variant selector */}
-            {hasVariants && (
-              <div style={{ marginBottom: 20 }}>
-                <div style={{
-                  fontFamily: 'var(--font-stencil)',
-                  fontSize: 10,
-                  color: '#8a7040',
-                  letterSpacing: '0.09em',
-                  textTransform: 'uppercase',
-                  marginBottom: 8,
-                }}>
-                  {variants[0]?.option_1_name ?? 'Options'}
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  {variants.map(v => {
-                    const isCurrent = v.product_id === unifiedId;
-                    return (
-                      <Link
-                        key={v.product_id}
-                        href={`/browse/${v.slug}`}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          padding: '6px 12px',
-                          background: isCurrent ? '#fdf6e3' : '#ffffff',
-                          border: `1px solid ${isCurrent ? '#c9a84c' : '#e6dcc0'}`,
-                          borderRadius: 6,
-                          fontFamily: 'var(--font-stencil)',
-                          fontSize: 11,
-                          color: isCurrent ? '#7a5810' : '#5a4a2a',
-                          textDecoration: 'none',
-                          letterSpacing: '0.05em',
-                          textTransform: 'uppercase',
-                        }}
-                      >
-                        {isCurrent && (
-                          <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#c9a84c' }} />
-                        )}
-                        {v.option_1_value ?? v.name}
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+            {/* Variant selector — fetches its own data from /api/browse/variants/[productId];
+                dedupes members that share the same color/finish value, and splits by
+                fitment family first when a group spans multiple bike platforms. See
+                components/browse/VariantSelector.jsx. Self-hides when there's nothing
+                to show, so no hasVariants guard needed here. */}
+            <VariantSelector productId={unifiedId} />
 
             {/* Add to cart */}
             <button style={{

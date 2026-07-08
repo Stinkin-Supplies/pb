@@ -67,7 +67,8 @@ async function getFitmentRows(productId) {
   const { rows } = await db.query(`
     SELECT
       hm.model_code,
-      hf.name                  AS family_name,
+      hm.name                   AS model_name,
+      hf.name                   AS family_name,
       MIN(hmy.year)            AS year_from,
       MAX(hmy.year)            AS year_to,
       COUNT(DISTINCT hmy.year) AS year_count
@@ -76,8 +77,11 @@ async function getFitmentRows(productId) {
     JOIN harley_models hm       ON hm.id   = hmy.model_id
     JOIN harley_families hf     ON hf.id   = hm.family_id
     WHERE cf.product_id = $1
-    GROUP BY hm.model_code, hf.name
-    ORDER BY hf.name, hm.model_code
+    -- grouped by model_name too: some codes (e.g. FLHX) were reused for a
+    -- different model name in an earlier era, and those eras should list
+    -- separately rather than being merged under one name
+    GROUP BY hm.model_code, hm.name, hf.name
+    ORDER BY hf.name, hm.model_code, year_from
   `, [productId]);
   return rows;
 }

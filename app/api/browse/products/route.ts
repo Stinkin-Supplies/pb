@@ -92,6 +92,7 @@ export async function GET(req: NextRequest) {
       subcategory:  p.get("subcategory") || undefined,
       displayCategory:    p.get("display_category") || undefined,
       displaySubcategory: p.get("display_subcategory") || undefined,
+      subcategoryDetail:  p.get("subcategory_detail") || undefined,
       modelCodes:   p.getAll("model_code").length > 0 ? p.getAll("model_code") : undefined,
       brand:        p.get("brand")       || undefined,
       inStock:      p.get("in_stock")    === "true",

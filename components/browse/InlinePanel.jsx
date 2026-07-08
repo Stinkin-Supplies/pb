@@ -264,10 +264,9 @@ export default function InlinePanel({ product, onClose }) {
                       fontFamily: 'var(--font-stencil)',
                       fontSize: 11,
                       color: '#c9a84c',
-                      minWidth: 52,
                       letterSpacing: '0.04em',
                     }}>
-                      {row.model_code}
+                      {row.model_name ? `${row.model_name} (${row.model_code})` : row.model_code}
                     </span>
                     <span style={{
                       fontFamily: 'var(--font-stencil)',

@@ -46,6 +46,7 @@ export async function GET(request) {
     db.query(`
       SELECT
         hm.model_code,
+        hm.name                   AS model_name,
         hf.name                   AS family_name,
         MIN(hmy.year)             AS year_from,
         MAX(hmy.year)             AS year_to,
@@ -55,8 +56,10 @@ export async function GET(request) {
       JOIN harley_models hm       ON hm.id   = hmy.model_id
       JOIN harley_families hf     ON hf.id   = hm.family_id
       WHERE cf.product_id = $1
-      GROUP BY hm.model_code, hf.name
-      ORDER BY hf.name, hm.model_code
+      -- grouped by model_name too: a code like FLHX was reused for a
+      -- different model name in an earlier era; keep those eras separate
+      GROUP BY hm.model_code, hm.name, hf.name
+      ORDER BY hf.name, hm.model_code, year_from
     `, [id]),
 
     // ── 3. OEM cross-reference — direct + chain products ────────────────────

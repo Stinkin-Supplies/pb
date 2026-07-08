@@ -426,12 +426,80 @@ function FitmentList({ variants, currentId, onSelect, groupDisplayName }) {
   );
 }
 
+// Detects the "two independent axes collapsed into one" failure mode: some
+// vendor grouping (WPS apparel/helmets especially) produces members that are
+// really Size × Color combos, but the name-based classifier only ever
+// captures ONE attribute per member, so option_1_value ends up mixing raw
+// size tokens (2X, LG, XS...) and raw color tokens (Matte Black, Chrome...)
+// in the same list with option_2_value left null. In that situation two
+// members both reading "2X" are NOT duplicates — one is 2X in one color,
+// the other is 2X in a different color, and the color got dropped rather
+// than recorded. Deduping by value would silently delete a real, purchasable
+// variant. When this signature is present, dedupe must not run at all —
+// showing an ugly repeated-looking label is safer than hiding real stock.
+const SIZE_TOKEN_RE  = /^(4XL|3XL|2XL|XXXL|XXL|XL|LGE?|LRG|LG|MED|M|SM|S|XS|\dX(?:-?L)?)$/i;
+const COLOR_TOKEN_RE = /(black|chrome|red|blue|gold|silver|purple|gr[ae]y|white|green|orange|yellow|brown|clear|natural|stainless)/i;
+
+function hasMixedSizeAndColor(variants) {
+  let hasSize = false, hasColor = false;
+  for (const v of variants) {
+    if (v.option_2_value) continue; // this member already carries a real second axis — not the failure mode
+    const val = v.option_1_value;
+    if (!val) continue;
+    if (SIZE_TOKEN_RE.test(val.trim()))  hasSize = true;
+    if (COLOR_TOKEN_RE.test(val)) hasColor = true;
+    if (hasSize && hasColor) return true;
+  }
+  return false;
+}
+
+// Dedupe variants that carry the identical option combination (color/finish +
+// second option + pack qty). Groups built from name-matching with no fitment
+// data recorded (common — PU/VTwin fitment coverage sits well under 100%) can
+// end up with several genuinely different products all reading "Black" with
+// nothing else to tell them apart in this list; showing 3 identical-looking
+// "Black" buttons next to 2 identical "Chrome" ones isn't a real choice for
+// the customer. Keep whichever is in stock (then cheapest), but always keep
+// the currently-viewed product so the active selection never vanishes.
+//
+// Skips entirely when hasMixedSizeAndColor() detects the collapsed-axis
+// failure mode above — deduping there would delete real inventory instead
+// of cleaning up a false duplicate.
+function dedupeByFullOption(variants, currentId) {
+  if (hasMixedSizeAndColor(variants)) return variants;
+  const seen = new Map();
+  for (const v of variants) {
+    const key = [
+      (v.option_1_value ?? '').toLowerCase(),
+      (v.option_2_value ?? '').toLowerCase(),
+      v.pack_qty ?? 1,
+    ].join('|');
+    if (!seen.has(key)) {
+      seen.set(key, v);
+      continue;
+    }
+    const existing = seen.get(key);
+    if (existing.id === currentId) continue; // never displace the active one
+    if (v.id === currentId) { seen.set(key, v); continue; }
+    const existingInStock = existing.stock_qty > 0;
+    const vInStock = v.stock_qty > 0;
+    if (!existingInStock && vInStock) { seen.set(key, v); continue; }
+    if (existingInStock === vInStock) {
+      const ep = parseFloat(existing.offer_price || existing.msrp || Infinity);
+      const vp = parseFloat(v.offer_price || v.msrp || Infinity);
+      if (vp < ep) seen.set(key, v);
+    }
+  }
+  return [...seen.values()];
+}
+
 // ── MODE C: Flat option list (original) ───────────────────────────────────────
 function OptionList({ variants, currentId, onSelect, groupDisplayName }) {
   const [expanded, setExpanded] = useState(false);
   const SHOW = 6;
 
-  const sorted = [...variants].sort((a, b) => {
+  const deduped = dedupeByFullOption(variants, currentId);
+  const sorted = [...deduped].sort((a, b) => {
     if (a.id === currentId) return -1;
     if (b.id === currentId) return 1;
     return 0;
@@ -972,7 +1040,7 @@ export default function VariantSelector({ productId }) {
           fontSize: 11, color: '#9a8870', background: '#ede8de',
           padding: '2px 8px', borderRadius: 10,
         }}>
-          {variants.length} options
+          {mode === 'options' ? dedupeByFullOption(variants, currentId).length : variants.length} options
         </span>
       </div>
 

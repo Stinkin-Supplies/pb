@@ -115,18 +115,24 @@ export async function POST(req: NextRequest) {
         )
     `);
 
-    // Confirmed proposals where a product has no canonical_product_id or is inactive
-    // — they can never be merged, reject them to clear the queue
+    // Confirmed proposals where a product is inactive can genuinely never be
+    // merged — reject those to clear the queue.
+    //
+    // A NULL canonical_product_id is NOT the same terminal case: it just means
+    // build_canonical_products.mjs Phase A hasn't linked that row yet (Phase A
+    // and Phase B/this apply step aren't guaranteed to run in lockstep). Session
+    // 75 found 58 proposals — all genuinely correct matches — permanently
+    // rejected by an earlier version of this query that treated the two cases
+    // as equivalent, well before anyone noticed. Left `confirmed` here instead
+    // of `rejected` so the next `/apply` run (after Phase A catches up) merges
+    // them automatically, with nothing to manually re-open.
     await client.query(`
       UPDATE canonical_match_proposals cmp
-      SET status = 'rejected', reviewed_by = 'auto-cleanup-no-canonical', reviewed_at = NOW()
+      SET status = 'rejected', reviewed_by = 'auto-cleanup-inactive', reviewed_at = NOW()
       FROM catalog_unified a, catalog_unified b
       WHERE a.id = cmp.product_id_a AND b.id = cmp.product_id_b
         AND cmp.status = 'confirmed'
-        AND (
-          a.canonical_product_id IS NULL OR b.canonical_product_id IS NULL
-          OR NOT a.is_active OR NOT b.is_active
-        )
+        AND (NOT a.is_active OR NOT b.is_active)
     `);
 
     return NextResponse.json({ merged, errors, total_confirmed: confirmed.length });

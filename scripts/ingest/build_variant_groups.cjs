@@ -23,17 +23,40 @@
  *   node build_variant_groups.cjs --nuke     # wipe ALL existing data first (implied by live run)
  */
 
+const path = require('path');
+// This script had NO dotenv call at all — same failure class already found
+// and fixed in fix_product_vendors_drift.mjs (session 72) and flagged as
+// still-fragile in sync_fitment_flat_columns.mjs. Resolve .env.local / .env
+// relative to this file's own location, not process.cwd(), so it works
+// whether invoked from the repo root or from inside scripts/ingest/.
+try { require('dotenv').config({ path: path.join(__dirname, '../../.env.local') }); } catch {}
+try { require('dotenv').config({ path: path.join(__dirname, '../../.env') }); } catch {}
+
 const { Pool } = require('pg');
 
 const DRY              = process.argv.includes('--dry');
 const MAX_VARIANT_MEMBERS = 20;
-const WPS_TOKEN = process.env.WPS_TOKEN;
+// .env.local actually defines WPS_API_KEY, not WPS_TOKEN — this was silently
+// sending "Authorization: Bearer undefined" on every WPS product-name lookup
+// below, caught by the surrounding try/catch and logged as a batch error
+// instead of failing loudly. Falling back to WPS_TOKEN too in case a deploy
+// env sets it under the old name.
+const WPS_TOKEN = process.env.WPS_API_KEY || process.env.WPS_TOKEN;
 const WPS_BASE         = 'http://api.wps-inc.com';
 
-const pool = new Pool({
-  host: '2a01:4ff:f0:fa6f::1', port: 5432,
-  database: 'stinkin_catalog', user: 'catalog_app', password: process.env.CATALOG_DB_PASSWORD,
-});
+// Was hardcoded to host: '2a01:4ff:f0:fa6f::1' (the IPv6 address MasterRef.md
+// explicitly warns against — "NEVER use IPv6 ... Vercel cannot resolve it";
+// same problem can bite a plain laptop network too) plus a password read from
+// CATALOG_DB_PASSWORD, a variable that doesn't exist anywhere in .env.local —
+// only the full CATALOG_DATABASE_URL does. That combination is exactly what
+// produced "SASL: ... client password must be a string": password was
+// undefined. Switched to the same connectionString pattern every other
+// script/route in this repo uses (see lib/db/catalog.ts).
+if (!process.env.CATALOG_DATABASE_URL) {
+  console.error('CATALOG_DATABASE_URL is not set — check .env.local at the repo root.');
+  process.exit(1);
+}
+const pool = new Pool({ connectionString: process.env.CATALOG_DATABASE_URL });
 const q = async (sql, p = []) => { const { rows } = await pool.query(sql, p); return rows; };
 
 /**
@@ -83,6 +106,33 @@ function stripPackIndicators(name) {
     .trim();
 }
 
+/**
+ * Strip a detected attribute value out of a product name to get the
+ * "base name" shared by variant siblings (e.g. both "Cam Shims - +0.005" -
+ * Gear #2..." and "Cam Shims - +0.010" - Gear #2..." should reduce to the
+ * same base name so they're recognized as a Size-variant pair).
+ *
+ * A plain segment-equality check (splitting on " - " and requiring an exact
+ * match against the attribute value) is too fragile: it breaks whenever the
+ * value is followed by trailing punctuation the extractor didn't capture
+ * (e.g. the name has +0.005" but attr.value is +0.005 with no inch mark),
+ * or when the vendor's naming convention doesn't use " - " as a separator
+ * at all (WPS names like "2-SLOT LEVER SET BLACK BIG TWIN 07-17" put the
+ * color word mid-string with unspaced hyphens elsewhere in the name).
+ * A word-boundary removal handles both conventions uniformly.
+ */
+function stripAttributeFromName(name, attrValue) {
+  if (!attrValue) return stripPackIndicators(name).trim();
+  // \b fails to match right before a symbol like "+" (e.g. "+0.005") because
+  // a word boundary requires one side to be a word character — a preceding
+  // space and a leading "+" are both non-word, so there's no transition for
+  // \b to anchor on. Lookaround on "not alphanumeric" works for both
+  // word-starting values ("Black") and symbol-starting ones ("+0.005").
+  return stripPackIndicators(
+    name.replace(new RegExp(`(?<![a-zA-Z0-9])${escapeRegex(attrValue)}"?(?![a-zA-Z0-9])`, 'i'), ' ')
+  ).replace(/\s+/g, ' ').replace(/\s*-\s*-\s*/g, ' - ').replace(/\s*-\s*$/, '').replace(/^\s*-\s*/, '').trim();
+}
+
 /** Extract pack quantity from a product name. Returns null if not found. */
 function nameExtractPackQty(name) {
   if (!name) return null;
@@ -102,7 +152,24 @@ function nameExtractPackQty(name) {
  */
 function nameImpliesKit(name) {
   if (!name) return false;
-  return /\b(?:kit|assembly|assm?y|complete\s+set|service\s+kit|rebuild\s+kit)\b/i.test(name);
+  // "complete set"/"service kit"/"rebuild kit" are specific enough phrases to
+  // treat as an unconditional bundle signal — low volume, low ambiguity.
+  if (/\b(?:complete\s+set|service\s+kit|rebuild\s+kit)\b/i.test(name)) return true;
+  // Bare "kit"/"assembly" is NOT a reliable bundle signal on its own —
+  // catalog-wide audit found 14,784 names (e.g. "Taillight Kit - Chrome",
+  // "Complete Plug-and-Play Cable Kit...", "Shifter Lever Assembly Chrome")
+  // were single, cohesive products using "kit"/"assembly" as their plain
+  // product-type word, not indicating a bundle of different part types — and
+  // all of them were being wrongly blocked from variant grouping entirely.
+  // Only treat kit/assembly as a real multi-part bundle when a joining
+  // word/symbol suggests two distinct components ("Nut and Seal Kit", "Lid
+  // Kit W/ PH694", "Riser & Top Clamp Kit"). Joiners require real
+  // surrounding whitespace so hyphenated compound descriptors
+  // ("Plug-and-Play") and brand names ("E&G Carbs") don't false-positive.
+  if (/\b(?:kit|assembly|assm?y)\b/i.test(name)) {
+    return /\s(?:and|with)\s| & |\bw\/\s/i.test(name);
+  }
+  return false;
 }
 
 /** Jaccard similarity on word sets (0–1). Used for base-name comparison. */
@@ -118,18 +185,37 @@ function wordSimilarity(a, b) {
 
 const ATTRIBUTE_RULES = [
   // OVERSIZE/UNDERSIZE — exact decimal precision prevents matching "+10" cable lengths
+  // "standard" (full word) added from evidence: catalog-wide vocab audit found
+  // 90 distinct product-line clusters differentiated only by "Standard" vs
+  // another size word — only the abbreviation "STD" was previously recognized.
   { name: 'Size',
-    pattern: /([+-]0\.0\d{2,3}|\bSTD\b|\bO\.?S\.?\b|\bU\.?S\.?\b|\boversize\b|\bundersize\b)/i,
+    pattern: /([+-]0\.0\d{2,3}|\bSTD\b|\bO\.?S\.?\b|\bU\.?S\.?\b|\boversize\b|\bundersize\b|\bstandard\b)/i,
     extract: m => m[1].toUpperCase() },
   // BRAKE COMPOUND
   { name: 'Compound',
     pattern: /\b(organic|sintered|semi.?metallic|ceramic)\b/i,
     extract: m => toTitleCase(m[1]) },
+  // SIDE — added from evidence: catalog-wide vocab audit found 85 distinct
+  // clusters each for "Left"/"Right" (mirrors, mufflers, brake caliper
+  // brackets sold per-side) with no recognized axis at all.
+  { name: 'Side',
+    pattern: /\b(left|right)\b/i,
+    extract: m => toTitleCase(m[1]) },
   // APPAREL SIZE — before Color so "BLACK 2X" → Apparel Size
+  // "MD" added alongside "MED" — WPS names abbreviate Medium both ways
+  // (e.g. "...MATTE BLACK MD"); without it those rows fell through to the
+  // Finish/Color rule below and got misclassified with Color as their
+  // primary axis instead of Size, which is what let genuinely different
+  // Medium-sized colorways collide under a repeated "Matte Black"/"Gloss
+  // Black" label with no size marker at all.
+  // "Large"/"Medium" full words added from evidence: vocab audit found 41 and
+  // 38 distinct clusters respectively (mostly apparel) using the spelled-out
+  // word instead of an abbreviation.
   { name: 'Apparel Size',
-    pattern: /\b(4XL|3XL|2XL|XXL|XXXL|XL|LGE?|LRG|MED|SM|XS|\dX(?:-?L)?)\b/i,
+    pattern: /\b(4XL|3XL|2XL|XXL|XXXL|XL|LARGE|LGE?|LRG|MEDIUM|MED|MD|SM|XS|\dX(?:-?L)?)\b/i,
     extract: m => m[1].toUpperCase()
-      .replace('LGE','LG').replace('LRG','LG').replace('MED','M').replace('SM','S') },
+      .replace('LARGE','LG').replace('LGE','LG').replace('LRG','LG')
+      .replace('MEDIUM','M').replace('MED','M').replace('MD','M').replace('SM','S') },
   // GAUGE — before Color
   { name: 'Gauge',
     pattern: /\b(\d{1,2})\s*-?\s*(?:gauge\b|ga\b)/i,
@@ -138,9 +224,12 @@ const ATTRIBUTE_RULES = [
   { name: 'Rise',
     pattern: /\b(\d{1,2}(?:\.\d+)?)[""]\s*(?:ape|rise|tall)/i,
     extract: m => m[1] + '" Rise' },
-  // FINISH — multi-word phrases before plain Color
+  // FINISH — multi-word phrases before plain Color. "polished" (standalone,
+  // not just "polished chrome") added from evidence: 69 distinct clusters
+  // used the bare word — listed last in the alternation so "polished chrome"
+  // still wins when both words are present.
   { name: 'Finish',
-    pattern: /\b(brushed ss|brushed stainless|brushed|raw ss|raw stainless|matte black|gloss black|satin black|flat black|polished chrome|show chrome|powder coat(?:ed)?|zinc(?: plated)?|cadmium(?: plated)?|nickel(?: plated)?|hard chrome|chrome plated)\b/i,
+    pattern: /\b(brushed ss|brushed stainless|brushed|raw ss|raw stainless|matte black|gloss black|satin black|flat black|polished chrome|show chrome|powder coat(?:ed)?|zinc(?: plated)?|cadmium(?: plated)?|nickel(?: plated)?|hard chrome|chrome plated|polished)\b/i,
     extract: m => {
       const v = m[1].toLowerCase();
       if (v === 'brushed ss')        return 'Brushed SS';
@@ -155,9 +244,35 @@ const ATTRIBUTE_RULES = [
     pattern: /\b(push-?pull|pull-?only|single cable|dual cable|single throttle|dual throttle)\b/i,
     extract: m => toTitleCase(m[1]) },
   // COLOR — last so Finish rules above win on e.g. "Matte Black"
+  // Added `pink`/`burgundy` — confirmed missing from a real Saddlemen product
+  // line (Fender Seat Washer), where their total absence from this list meant
+  // extractAttribute() found no match at all and those SKUs were skipped from
+  // grouping entirely, not merely mis-grouped.
+  // Optional (bright|dark) modifier prefix is captured as PART of the value —
+  // confirmed needed by the same product line's "Bright Green"/"Dark Green"
+  // members. Without it, only the bare "Green" got extracted, the base-name
+  // stripper below removed just that word and left "...- Bright"/"...- Dark"
+  // dangling, and each formed its own useless one-member bucket instead of
+  // joining the other 10 colors' shared "Fender Seat Washer" group.
+  // Scoped to just the two modifiers seen in real data — resist the urge to
+  // add more (neon/pastel/metallic/etc.) without the same kind of evidence;
+  // see the Bar Harness/UV2000 Cycle Cover incident for why speculative
+  // vocabulary growth here is a false-positive risk across the whole catalog.
   { name: 'Color',
-    pattern: /\b(black|chrome|red|blue|brown|silver|gold|white|yellow|green|orange|purple|gr[ae]y|clear|natural|stainless|\bSS\b)\b/i,
-    extract: m => m[1].toUpperCase() === 'SS' ? 'Stainless' : toTitleCase(m[1]) },
+    // "smoke"/"tinted"/"tint" added from evidence: 699 ungrouped Klock Werks
+    // windshield products ("Dark Smoke", "Light Smoke", "Tinted") had no
+    // recognized color word at all and couldn't become variant candidates.
+    // "light" added to the prefix group alongside bright/dark for the same reason.
+    // "blk"/"chr" added from evidence: vocab audit found 82/71 distinct
+    // clusters using these vendor abbreviations instead of the full word —
+    // listed after the full words so e.g. "CHROME" still matches "chrome"
+    // (longer/more specific) rather than accidentally short-matching "chr".
+    pattern: /\b(?:(bright|dark|light)\s+)?(black|chrome|red|blue|brown|silver|gold|white|yellow|green|orange|purple|pink|burgundy|gr[ae]y|clear|natural|stainless|smoke|tinted|tint|blk|chr|\bSS\b)\b/i,
+    extract: m => {
+      const raw = m[2].toUpperCase();
+      const color = raw === 'SS' ? 'Stainless' : raw === 'BLK' ? 'Black' : raw === 'CHR' ? 'Chrome' : toTitleCase(m[2]);
+      return m[1] ? `${toTitleCase(m[1])} ${color}` : color;
+    } },
 ];
 
 /**
@@ -284,20 +399,7 @@ function classifyGroup(candidates) {
     // Base name similarity: strip the variant value and check that remaining
     // text is sufficiently alike across all members.
     // This catches WPS product groups that bundle unrelated SKUs.
-    const baseNames = members.map((m, i) => {
-      const attr = attrs[i];
-      if (!attr) return stripPackIndicators(m.name).toLowerCase();
-      let b = m.name;
-      // Remove "-Value" and "Value" suffixes
-      const segs = b.split(/\s*-\s*/);
-      const filtered = segs.filter(s => s.trim().toLowerCase() !== attr.value.toLowerCase());
-      if (filtered.length < segs.length) {
-        b = filtered.join(' - ').trim();
-      } else {
-        b = b.replace(new RegExp('\\s+' + escapeRegex(attr.value) + '\\s*$', 'i'), '').trim();
-      }
-      return stripPackIndicators(b).replace(/\s*-\s*$/, '').toLowerCase().trim();
-    });
+    const baseNames = members.map((m, i) => stripAttributeFromName(m.name, attrs[i]?.value));
 
     const anchor = baseNames[0];
     const similar = baseNames.every(b => b === anchor || wordSimilarity(b, anchor) >= 0.65);
@@ -416,10 +518,29 @@ async function main() {
   if (!DRY) {
     // ── Nuke existing data ─────────────────────────────────────────────────
     // Full rebuild every time — avoids stale/bad groups accumulating.
-    console.log('Clearing existing variant data...');
-    await pool.query(`UPDATE catalog_unified SET variant_group_id = NULL`);
-    await pool.query(`DELETE FROM catalog_variant_members`);
-    await pool.query(`DELETE FROM catalog_variant_groups`);
+    // ⚠ EXCLUDES source_vendor IN ('ADMIN', 'MULTI'):
+    //   - 'ADMIN' rows are hand-curated fixes for groups this script's name-based
+    //     heuristics can't classify correctly (see e.g. "Bar Harness II" /
+    //     "UV2000 Cycle Cover" — width/size vocab outside the regex). A previous
+    //     run of this exact DELETE with no vendor filter silently wiped 6 such
+    //     groups; they had to be hand-recovered from a pg_dump backup.
+    //   - 'MULTI' rows are cross-vendor pack-size groups built by the separate
+    //     build_pack_size_groups.mjs script. A session-75 live run silently
+    //     wiped all 148 of these (only ADMIN was excluded at the time) — only
+    //     49 were reproducible by re-running that script afterward. Never
+    //     remove either exclusion without a deliberate reason.
+    console.log('Clearing existing variant data (preserving ADMIN-curated + MULTI pack-size groups)...');
+    await pool.query(`
+      UPDATE catalog_unified cu
+      SET variant_group_id = NULL
+      WHERE variant_group_id IS NOT NULL
+        AND variant_group_id NOT IN (SELECT id FROM catalog_variant_groups WHERE source_vendor IN ('ADMIN', 'MULTI'))
+    `);
+    await pool.query(`
+      DELETE FROM catalog_variant_members
+      WHERE group_id NOT IN (SELECT id FROM catalog_variant_groups WHERE source_vendor IN ('ADMIN', 'MULTI'))
+    `);
+    await pool.query(`DELETE FROM catalog_variant_groups WHERE source_vendor NOT IN ('ADMIN', 'MULTI')`);
     console.log('Cleared.\n');
   }
 
@@ -446,9 +567,15 @@ async function main() {
       ON  cu.vendor_sku   = w.sku
       AND cu.source_vendor = 'WPS'
       AND cu.is_active     = true
+      -- Skip products already claimed by a hand-curated ADMIN group (e.g. a
+      -- cross-vendor merge like "Regulator 74523-84A", which mixes a WPS SKU
+      -- with PU/VTWIN SKUs). Without this, Phase 1 would happily fold that
+      -- WPS member into a brand-new automated group and overwrite its
+      -- variant_group_id, silently detaching it from the ADMIN group.
+      AND cu.variant_group_id IS NULL
     WHERE w.wps_product_id IS NOT NULL
     GROUP BY w.wps_product_id
-    HAVING COUNT(DISTINCT cu.id) BETWEEN 2 AND ${MAX_VARIANT_MEMBERS}
+    HAVING COUNT(DISTINCT cu.id) >= 2
     ORDER BY COUNT(DISTINCT cu.id) DESC
   `);
 
@@ -485,70 +612,116 @@ async function main() {
       WHERE cu.id = ANY($1::int[])
     `, [g.unified_ids]);
 
-    const result = classifyGroup(memberRows);
-
-    if (!result) {
-      // Log skip reason for debugging
-      const hasKit  = memberRows.some(m => m.is_kit || nameImpliesKit(m.name));
-      const mixedQty = new Set(memberRows.filter(m => !m.is_kit).map(m => m.pack_qty ?? 1)).size > 1;
-      const reason  = hasKit ? 'has_kit' : mixedQty ? 'mixed_pack_qty' : 'no_valid_axis';
-      bump(skipReasons, reason);
-      if (DRY && reason === 'has_kit') {
-        console.log(`  SKIP [${reason}] wps_product_id=${g.wps_product_id} "${g.sample_name}"`);
-        memberRows.filter(m => m.is_kit || nameImpliesKit(m.name))
-          .forEach(m => console.log(`    kit: "${m.name}"`));
+    // A wps_product_id is WPS's umbrella grouping and sometimes bundles an
+    // entire product LINE (e.g. every lever-set style across every fitment)
+    // rather than one variant-able product. Sub-partition by attribute-stripped
+    // base name first — same technique Phase 2 uses for PU/VTWIN — so a family
+    // of e.g. "3-Hole Lever Set ... FLH/FLT 08-13" (Black/Chrome) and "5-Hole
+    // Lever Set ... Big Twin 96-06" (Black/Chrome) are evaluated as two
+    // separate candidate pairs instead of one 58-member blob that fails
+    // classifyGroup's size/similarity checks and silently produces nothing.
+    const baseNameGroups = new Map();
+    for (const row of memberRows) {
+      const attr = extractAttribute(row.name);
+      if (!attr) { // no detected axis at all — keep as its own singleton bucket
+        baseNameGroups.set(`__nogroup_${row.id}`, [row]);
+        continue;
       }
-      continue;
+      // WPS names put the color/finish word wherever it falls in the string
+      // (often mid-name, e.g. "2-SLOT LEVER SET BLACK BIG TWIN 07-17") rather
+      // than as a trailing " - Value" suffix like PU/VTWIN — stripAttributeFromName's
+      // word-boundary approach handles both conventions uniformly.
+      const baseName = stripAttributeFromName(row.name, attr.value).toLowerCase();
+      if (!baseNameGroups.has(baseName)) baseNameGroups.set(baseName, []);
+      baseNameGroups.get(baseName).push(row);
     }
+    const subPartitions = [...baseNameGroups.values()].filter(members => members.length >= 2);
+    // A single sub-partition covering the whole family is the common case
+    // (small families work exactly as before); 2+ means this family got split.
+    const isSplit = subPartitions.length !== 1 || subPartitions[0].length !== memberRows.length;
 
-    bump(axisStats, result.axis);
+    for (const partitionMembers of subPartitions) {
+      const result = classifyGroup(partitionMembers);
 
-    if (DRY) {
-      console.log(`  GROUP [${result.axis}] wps_product_id=${g.wps_product_id} — ${result.members.length} members`);
-      result.members.forEach((m, i) => {
-        const attr = result.memberAttrs[i];
-        console.log(`    ${attr?.value ?? '?'} — "${m.name}"`);
-      });
-      continue;
+      if (!result) {
+        // Log skip reason for debugging
+        const hasKit  = partitionMembers.some(m => m.is_kit || nameImpliesKit(m.name));
+        const mixedQty = new Set(partitionMembers.filter(m => !m.is_kit).map(m => m.pack_qty ?? 1)).size > 1;
+        const reason  = hasKit ? 'has_kit' : mixedQty ? 'mixed_pack_qty' : 'no_valid_axis';
+        bump(skipReasons, reason);
+        if (DRY && reason === 'has_kit') {
+          console.log(`  SKIP [${reason}] wps_product_id=${g.wps_product_id} "${g.sample_name}"`);
+          partitionMembers.filter(m => m.is_kit || nameImpliesKit(m.name))
+            .forEach(m => console.log(`    kit: "${m.name}"`));
+        }
+        continue;
+      }
+
+      bump(axisStats, result.axis);
+
+      if (DRY) {
+        console.log(`  GROUP [${result.axis}] wps_product_id=${g.wps_product_id}${isSplit ? ' (split family)' : ''} — ${result.members.length} members`);
+        result.members.forEach((m, i) => {
+          const attr  = result.memberAttrs[i];
+          const attr2 = result.memberAttrs2?.[i];
+          const dupeWarning = (!attr2 && result.members.some((m2, j) =>
+            j !== i && result.memberAttrs[j]?.value === attr?.value
+          )) ? '  ⚠ duplicate value, no second axis' : '';
+          console.log(`    ${attr?.value ?? '?'}${attr2 ? ` / ${attr2.value}` : ''} — "${m.name}"${dupeWarning}`);
+        });
+        continue;
+      }
+
+      // Only the common (non-split) case reuses wps_product_id as the group's
+      // stable identity for the ON CONFLICT upsert path. A split family's
+      // sub-groups have no single wps_product_id to key on, so they insert
+      // fresh each time — safe because already-grouped members are excluded
+      // from the candidate query on future runs (variant_group_id IS NULL).
+      const groupWpsId  = isSplit ? null : g.wps_product_id;
+      const displayName = isSplit ? result.members[0].name : (productNames[g.wps_product_id] ?? g.sample_name);
+      const [grp] = groupWpsId
+        ? await q(`
+            INSERT INTO catalog_variant_groups (wps_product_id, display_name, source_vendor)
+            VALUES ($1, $2, 'WPS')
+            ON CONFLICT (wps_product_id) DO UPDATE
+              SET display_name = EXCLUDED.display_name, updated_at = NOW()
+            RETURNING id
+          `, [groupWpsId, displayName])
+        : await q(`
+            INSERT INTO catalog_variant_groups (wps_product_id, display_name, source_vendor)
+            VALUES (NULL, $1, 'WPS')
+            RETURNING id
+          `, [displayName]);
+      if (!grp) continue;
+      wpsGroups_created++;
+
+      for (let i = 0; i < result.members.length; i++) {
+        const m     = result.members[i];
+        const attr  = result.memberAttrs[i];
+        const attr2 = result.memberAttrs2?.[i];
+        const [memberRow] = await q(`
+          INSERT INTO catalog_variant_members
+            (group_id, product_id, option_1_name, option_1_value, option_2_name, option_2_value, sort_order)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+          ON CONFLICT (group_id, product_id) DO UPDATE
+            SET option_1_name  = EXCLUDED.option_1_name,
+                option_1_value = EXCLUDED.option_1_value,
+                option_2_name  = EXCLUDED.option_2_name,
+                option_2_value = EXCLUDED.option_2_value
+          RETURNING id
+        `, [grp.id, m.id,
+            attr ? normalizeAxisName(attr.name) : null,
+            attr?.value ?? null,
+            attr2 ? normalizeAxisName(attr2.name) : null,
+            attr2?.value ?? null,
+            i]);
+        if (memberRow) await upsertMemberOptions(memberRow.id, result.memberAxes?.[i]);
+        wpsMembers_created++;
+      }
+
+      totalGroups++;
+      totalMembers += result.members.length;
     }
-
-    const displayName = productNames[g.wps_product_id] ?? g.sample_name;
-    const [grp] = await q(`
-      INSERT INTO catalog_variant_groups (wps_product_id, display_name, source_vendor)
-      VALUES ($1, $2, 'WPS')
-      ON CONFLICT (wps_product_id) DO UPDATE
-        SET display_name = EXCLUDED.display_name, updated_at = NOW()
-      RETURNING id
-    `, [g.wps_product_id, displayName]);
-    if (!grp) continue;
-    wpsGroups_created++;
-
-    for (let i = 0; i < result.members.length; i++) {
-      const m     = result.members[i];
-      const attr  = result.memberAttrs[i];
-      const attr2 = result.memberAttrs2?.[i];
-      const [memberRow] = await q(`
-        INSERT INTO catalog_variant_members
-          (group_id, product_id, option_1_name, option_1_value, option_2_name, option_2_value, sort_order)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        ON CONFLICT (group_id, product_id) DO UPDATE
-          SET option_1_name  = EXCLUDED.option_1_name,
-              option_1_value = EXCLUDED.option_1_value,
-              option_2_name  = EXCLUDED.option_2_name,
-              option_2_value = EXCLUDED.option_2_value
-        RETURNING id
-      `, [grp.id, m.id,
-          attr ? normalizeAxisName(attr.name) : null,
-          attr?.value ?? null,
-          attr2 ? normalizeAxisName(attr2.name) : null,
-          attr2?.value ?? null,
-          i]);
-      if (memberRow) await upsertMemberOptions(memberRow.id, result.memberAxes?.[i]);
-      wpsMembers_created++;
-    }
-
-    totalGroups++;
-    totalMembers += result.members.length;
   }
 
   if (!DRY) {
@@ -597,15 +770,7 @@ async function main() {
     if (!attr) continue;
 
     // Strip the variant attribute to get base name
-    let baseName = row.name;
-    const segs   = baseName.split(/\s*-\s*/);
-    const filtered = segs.filter(s => s.trim().toLowerCase() !== attr.value.toLowerCase());
-    if (filtered.length < segs.length) {
-      baseName = filtered.join(' - ').trim();
-    } else {
-      baseName = baseName.replace(new RegExp(`\\s+${escapeRegex(attr.value)}\\s*$`, 'i'), '').trim();
-    }
-    baseName = stripPackIndicators(baseName).replace(/\s*-\s*$/, '').trim();
+    const baseName = stripAttributeFromName(row.name, attr.value);
 
     if (!baseName || baseName.length < 4 || baseName === row.name) continue;
 
@@ -627,10 +792,20 @@ async function main() {
     if (group.members.length < 2) continue;
 
     // All members in a name group share the same attribute name by construction,
-    // but double-check axis coherence.
-    const axes = group.members.map(m => m.attr.name);
+    // but double-check axis coherence. Normalize first — Finish and Color are
+    // the same axis (see normalizeAxisName) and must not be treated as a
+    // mismatch just because one member's word matched the Finish pattern and
+    // another's matched the Color pattern (e.g. "Chrome" vs "Matte Black").
+    const axes = group.members.map(m => normalizeAxisName(m.attr.name));
     const dominantAxis = axes[0];
-    if (!axes.every(a => a === dominantAxis)) { bump(puSkipReasons, 'mixed_axes'); continue; }
+    if (!axes.every(a => a === dominantAxis)) {
+      bump(puSkipReasons, 'mixed_axes');
+      if (DRY && process.env.DEBUG_MIXED_AXES) {
+        console.log(`  [mixed_axes] "${group.baseName}" (${group.source_vendor}/${group.brand}):`);
+        group.members.forEach(m => console.log(`      ${m.attr.name}="${m.attr.value}"  ${m.name}`));
+      }
+      continue;
+    }
 
     // Apply classifyGroup for kit exclusion + pack_qty validation
     const result = classifyGroup(group.members.map(m => ({
@@ -644,8 +819,12 @@ async function main() {
     if (DRY) {
       console.log(`  GROUP [${result.axis}] "${group.baseName}" (${group.source_vendor}) — ${result.members.length} members`);
       result.members.forEach((m, i) => {
-        const attr = result.memberAttrs[i];
-        console.log(`    ${attr?.value ?? '?'} — "${m.name}"`);
+        const attr  = result.memberAttrs[i];
+        const attr2 = result.memberAttrs2?.[i];
+        const dupeWarning = (!attr2 && result.members.some((m2, j) =>
+          j !== i && result.memberAttrs[j]?.value === attr?.value
+        )) ? '  ⚠ duplicate value, no second axis' : '';
+        console.log(`    ${attr?.value ?? '?'}${attr2 ? ` / ${attr2.value}` : ''} — "${m.name}"${dupeWarning}`);
       });
       continue;
     }
@@ -730,6 +909,145 @@ async function main() {
   console.log(`\nPU/VTWIN result: ${puGroupsCreated} groups, ${puMembersCreated} members`);
   console.log('PU/VTWIN skip reasons:', puSkipReasons);
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PHASE 3 — brand_part_number suffix cross-reference (e.g. base "602-2001"
+  // + "602-2001B"). This connects variant siblings that Phase 1/2's
+  // name-bucketing missed because their shared generic name also matches
+  // several OTHER, differently-fitted products — e.g. "Backrest Kit - 14" -
+  // Chrome - Softail" is the literal name of 6 different Chrome backrests, so
+  // name-bucketing alone can't tell which one pairs with which of the 6
+  // Black ones; the manufacturer's own part numbering can.
+  //
+  // This is a CONNECTOR, not an override: every candidate still has to pass
+  // classifyGroup()'s full safety bar (pack_qty uniformity, recognized +
+  // distinguishing axis, base-name similarity) — SKU adjacency alone is not
+  // sufficient. Confirmed false positives in real data if used alone:
+  // coincidental suffix matches between unrelated products ("Phillips Head
+  // Chrome Screws" / "Chrome Shift Gate Screw"), and material differences
+  // that both happen to contain a recognized color word ("Stainless Braided
+  // ... Cable Kit" / "Black Vinyl ... Cable Kit" — different material, not a
+  // color choice). classifyGroup's base-name-similarity check is what's
+  // relied on to reject cases like the first; cases like the second are a
+  // known, bounded, pre-existing risk shared with Phase 1/2's own use of the
+  // same similarity threshold, not a new risk class introduced here.
+  console.log('\n── Phase 3: brand_part_number suffix cross-reference ──');
+
+  const bpnCandidates = await q(`
+    SELECT id, name, brand, source_vendor, brand_part_number, is_kit, pack_qty
+    FROM catalog_unified
+    WHERE is_active = true AND variant_group_id IS NULL
+      AND brand_part_number IS NOT NULL AND brand_part_number != ''
+      AND (is_kit IS NULL OR is_kit = false)
+  `);
+
+  // Cluster by (vendor|brand|base part number) — "base" strips one trailing
+  // alphabetic character if present (602-2001B -> 602-2001), so a bare
+  // "602-2001" and its "602-2001B"/"602-2001C" siblings land in one bucket.
+  const bpnClusters = new Map();
+  for (const row of bpnCandidates) {
+    if (nameImpliesKit(row.name)) continue;
+    const m = row.brand_part_number.match(/^(.+?)([A-Za-z])$/);
+    const base = m ? m[1] : row.brand_part_number;
+    const key = `${row.source_vendor}|${row.brand}|${base}`;
+    if (!bpnClusters.has(key)) bpnClusters.set(key, []);
+    bpnClusters.get(key).push(row);
+  }
+
+  let bpnGroupsCreated = 0, bpnMembersCreated = 0;
+  const bpnSkipReasons = {};
+
+  for (const [, clusterMembers] of bpnClusters) {
+    if (clusterMembers.length < 2) continue;
+
+    // Try the whole cluster first. If it fails and there are 3+ members, a
+    // single contaminating outlier (e.g. a coincidentally-duplicate part
+    // number on an unrelated product) can poison the base-name-similarity
+    // check for the whole group even though a valid pair exists inside it
+    // (confirmed in real data: "Backrest Kit ... Chrome" + "Backrest Kit ...
+    // Black" is a valid pair, but a third product legitimately sharing that
+    // exact part number broke the all-or-nothing similarity check). Falling
+    // back to every pairwise combination recovers the valid pair without
+    // ever loosening classifyGroup's own safety bar — each pair still has to
+    // pass the exact same checks on its own.
+    let results = [];
+    const wholeResult = classifyGroup(clusterMembers);
+    if (wholeResult) {
+      results = [wholeResult];
+    } else if (clusterMembers.length > 2) {
+      const seen = new Set();
+      for (let i = 0; i < clusterMembers.length; i++) {
+        for (let j = i + 1; j < clusterMembers.length; j++) {
+          const pairResult = classifyGroup([clusterMembers[i], clusterMembers[j]]);
+          if (!pairResult) continue;
+          const idKey = pairResult.members.map(m => m.id).sort().join(',');
+          if (seen.has(idKey)) continue;
+          seen.add(idKey);
+          results.push(pairResult);
+        }
+      }
+    }
+    if (results.length === 0) { bump(bpnSkipReasons, 'classify_failed'); continue; }
+
+    for (const result of results) {
+    if (result.members.length < 2) { bump(bpnSkipReasons, 'too_few_after_filter'); continue; }
+
+    bump(axisStats, result.axis);
+
+    if (DRY) {
+      console.log(`  GROUP [${result.axis}] "${result.members[0].name}" (${result.members[0].source_vendor}) — ${result.members.length} members [via brand_part_number]`);
+      result.members.forEach((m, i) => {
+        const attr = result.memberAttrs[i];
+        console.log(`    ${attr?.value ?? '?'} — "${m.name}" (${m.brand_part_number})`);
+      });
+      continue;
+    }
+
+    const [grp] = await q(`
+      INSERT INTO catalog_variant_groups (wps_product_id, display_name, source_vendor)
+      VALUES (NULL, $1, $2)
+      RETURNING id
+    `, [result.members[0].name, result.members[0].source_vendor]);
+    if (!grp) continue;
+    bpnGroupsCreated++;
+
+    for (let i = 0; i < result.members.length; i++) {
+      const m     = result.members[i];
+      const attr  = result.memberAttrs[i];
+      const attr2 = result.memberAttrs2?.[i];
+      const [memberRow] = await q(`
+        INSERT INTO catalog_variant_members
+          (group_id, product_id, option_1_name, option_1_value, option_2_name, option_2_value, sort_order)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        ON CONFLICT (group_id, product_id) DO NOTHING
+        RETURNING id
+      `, [grp.id, m.id,
+          attr ? normalizeAxisName(attr.name) : null,
+          attr?.value ?? null,
+          attr2 ? normalizeAxisName(attr2.name) : null,
+          attr2?.value ?? null,
+          i]);
+      if (memberRow) await upsertMemberOptions(memberRow.id, result.memberAxes?.[i]);
+      bpnMembersCreated++;
+    }
+
+    totalGroups++;
+    totalMembers += result.members.length;
+    }
+  }
+
+  if (!DRY) {
+    await pool.query(`
+      UPDATE catalog_unified cu
+      SET variant_group_id = cvm.group_id
+      FROM catalog_variant_members cvm
+      WHERE cvm.product_id = cu.id
+        AND cu.variant_group_id IS NULL
+    `);
+  }
+
+  console.log(`\nPhase 3 (brand_part_number) result: ${bpnGroupsCreated} groups, ${bpnMembersCreated} members`);
+  console.log('Phase 3 skip reasons:', bpnSkipReasons);
+
   // ── Final stats ────────────────────────────────────────────────────────────
   console.log('\n═══ COMPLETE ═══');
   console.log(`  Axis breakdown: ${JSON.stringify(axisStats)}`);
@@ -742,13 +1060,21 @@ async function main() {
         (SELECT COUNT(*) FROM catalog_variant_groups)                       AS groups,
         (SELECT COUNT(*) FROM catalog_variant_members)                      AS members,
         (SELECT COUNT(*) FROM catalog_unified WHERE variant_group_id IS NOT NULL) AS cu_tagged,
-        (SELECT COUNT(*) FROM catalog_unified WHERE is_kit = true AND variant_group_id IS NOT NULL) AS kits_in_groups
+        -- Excludes ADMIN-curated groups — this invariant polices the automated
+        -- classifier's own kit-exclusion logic (rule #1 at the top of this
+        -- file). A human reviewer can deliberately group kit-flagged products
+        -- (e.g. small hardware kits differing only by pack size) through the
+        -- admin workflow, and that's a legitimate override, not a bug.
+        (SELECT COUNT(*) FROM catalog_unified cu
+         WHERE cu.is_kit = true AND cu.variant_group_id IS NOT NULL
+           AND cu.variant_group_id NOT IN (SELECT id FROM catalog_variant_groups WHERE source_vendor = 'ADMIN')
+        ) AS kits_in_groups
     `);
     console.log(`  DB state: ${JSON.stringify(stats)}`);
     if (parseInt(stats.kits_in_groups) > 0) {
-      console.error(`\n⚠ WARNING: ${stats.kits_in_groups} kit products still have variant_group_id set — investigate!`);
+      console.error(`\n⚠ WARNING: ${stats.kits_in_groups} kit products in a non-ADMIN group — investigate!`);
     } else {
-      console.log('  ✓ No kits in variant groups');
+      console.log('  ✓ No kits in automated (non-ADMIN) variant groups');
     }
   }
 

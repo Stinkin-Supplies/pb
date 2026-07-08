@@ -30,11 +30,27 @@
 import pg from 'pg';
 import fs from 'fs';
 import path from 'path';
+import { createRequire } from 'module';
+
+// Load .env from the project root regardless of where `node` is invoked
+// from — this script previously had NO dotenv call at all and just read
+// process.env directly, which is why it needed a manual
+// `export $(grep CATALOG_DATABASE_URL scripts/ingest/.env)` workaround
+// when run from the repo root (session 71). Matches the pattern already
+// used in build_canonical_products.mjs: try .env.local first, then .env,
+// both resolved relative to this file's own location, not process.cwd().
+const require = createRequire(import.meta.url);
+try { require('dotenv').config({ path: new URL('../../.env.local', import.meta.url).pathname }); } catch {}
+try { require('dotenv').config({ path: new URL('../../.env', import.meta.url).pathname }); } catch {}
 
 const { Pool } = pg;
 const APPLY = process.argv.includes('--apply');
 
 async function main() {
+  if (!process.env.CATALOG_DATABASE_URL) {
+    console.error('CATALOG_DATABASE_URL not set — check .env/.env.local at the project root.');
+    process.exit(1);
+  }
   const pool = new Pool({ connectionString: process.env.CATALOG_DATABASE_URL });
   const client = await pool.connect();
 

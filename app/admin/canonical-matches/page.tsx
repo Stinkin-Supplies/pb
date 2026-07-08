@@ -35,6 +35,7 @@ interface ProductSide {
   display_category: string;
   display_subcategory: string | null;
   fits_all: boolean;
+  canonical_sku: string;
 }
 
 interface Proposal {
@@ -698,17 +699,31 @@ export default function CanonicalMatchesPage() {
               vendor_sku: p.a_vendor_sku, brand_part: p.a_brand_part, fits_all: p.a_fits_all,
               oem_numbers: p.a_oem_numbers, is_kit: p.a_is_kit, pack_qty: p.a_pack_qty,
               computed_price: p.a_price, image_url: p.a_image, display_category: p.a_category,
-              display_subcategory: p.a_subcategory,
+              display_subcategory: p.a_subcategory, canonical_sku: p.a_canonical_sku,
             });
             productsMap.set(p.b_id, {
               id: p.b_id, name: p.b_name, source_vendor: p.b_vendor, internal_sku: p.b_sku,
               vendor_sku: p.b_vendor_sku, brand_part: p.b_brand_part, fits_all: p.b_fits_all,
               oem_numbers: p.b_oem_numbers, is_kit: p.b_is_kit, pack_qty: p.b_pack_qty,
               computed_price: p.b_price, image_url: p.b_image, display_category: p.b_category,
-              display_subcategory: p.b_subcategory,
+              display_subcategory: p.b_subcategory, canonical_sku: p.b_canonical_sku,
             });
           }
           const products = [...productsMap.values()].sort((a, b) => a.source_vendor.localeCompare(b.source_vendor));
+
+          // A displayed card unions every product touched by ANY pair sharing
+          // this OEM number/status — so it commonly mixes products that are
+          // ALREADY correctly merged together (elsewhere, as 'applied') with
+          // the genuinely different odd-one-out that was correctly rejected
+          // against them. Without a visual cue, a 4-item "rejected" card
+          // looks like 4 unresolved items when really 3 are already resolved
+          // and only 1 relationship needed rejecting. Group by canonical_sku
+          // (when 2+ products in THIS card already share one) to surface that.
+          const canonicalGroupSizes = new Map<string, number>();
+          for (const p of products) {
+            if (!p.canonical_sku) continue;
+            canonicalGroupSizes.set(p.canonical_sku, (canonicalGroupSizes.get(p.canonical_sku) ?? 0) + 1);
+          }
           const productIds = products.map(p => p.id);
           const isBusy = busyGroups.has(oem);
           const syncMsg = syncMsgs[oem];
@@ -743,6 +758,11 @@ export default function CanonicalMatchesPage() {
           const finishMismatch = distinctFinishes.size > 1
             && finishes.filter(Boolean).length >= products.length - 1;
 
+          // Largest cluster of products in this card already sharing a
+          // canonical_sku — the "this card looks unresolved but mostly isn't"
+          // signal surfaced at the header level, not just per-tile.
+          const largestAlreadyMergedCluster = Math.max(0, ...canonicalGroupSizes.values());
+
           return (
             <div key={oem} style={{
               border: '1px solid #ddd8cc', borderRadius: 10, marginBottom: 16, overflow: 'hidden',
@@ -766,6 +786,17 @@ export default function CanonicalMatchesPage() {
                     <>OEM <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1a1a1a', fontSize: 14 }}>{oem}</span></>
                   )}
                   {' · '}{products.length} item{products.length !== 1 ? 's' : ''} ({new Set(products.map(p => p.source_vendor)).size} vendor{new Set(products.map(p => p.source_vendor)).size !== 1 ? 's' : ''}) · score {group[0].match_score}
+                  {largestAlreadyMergedCluster > 1 && (
+                    <span
+                      title="This card unions every product touched by any pair sharing this OEM number — some of these are already correctly merged together elsewhere and aren't part of what's unresolved here"
+                      style={{
+                        marginLeft: 10, fontSize: 11, fontWeight: 700, color: '#1d6b3a',
+                        background: '#e0f3e6', padding: '2px 8px', borderRadius: 10,
+                      }}
+                    >
+                      ✓ {largestAlreadyMergedCluster} of {products.length} already merged together
+                    </span>
+                  )}
                   {fitmentMismatch && (
                     <span style={{
                       marginLeft: 10, fontSize: 11, fontWeight: 700, color: '#9a5a0c',
@@ -1065,6 +1096,14 @@ export default function CanonicalMatchesPage() {
                           {p.is_kit && (
                             <span style={{ fontSize: 10, fontWeight: 700, color: '#9a5a0c', background: '#fbe8cf', padding: '2px 7px', borderRadius: 10 }}>
                               KIT
+                            </span>
+                          )}
+                          {(canonicalGroupSizes.get(p.canonical_sku) ?? 0) > 1 && (
+                            <span
+                              title={`Already merged with ${(canonicalGroupSizes.get(p.canonical_sku) ?? 1) - 1} other item(s) in this card (canonical ${p.canonical_sku}) — not part of what's unresolved here`}
+                              style={{ fontSize: 10, fontWeight: 700, color: '#1d6b3a', background: '#e0f3e6', padding: '2px 7px', borderRadius: 10 }}
+                            >
+                              ✓ ALREADY MERGED
                             </span>
                           )}
                           <button
