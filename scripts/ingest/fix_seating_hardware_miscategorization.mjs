@@ -46,6 +46,28 @@ const CARB_PART_PATTERN = /needle\s+(and\s+)?seat/i;
 // Seat Hardware (they're neither raw hardware nor a complete seat).
 const PAD_PATTERN = /^pad\s*-|memory foam.*pad|gel pad/i;
 
+// Standalone backrest products belong in the EXISTING Backrests subcategory
+// (not Seat Hardware). Seats that merely FEATURE a backrest ("Wide Solo
+// Seat - With Backrest") are unaffected — they already qualify as real
+// seats via the trusted-brand/phrase logic before this check ever runs.
+const BACKREST_PATTERN = /\bbackrest\b/i;
+
+// Sissy bar pads are a DIFFERENT category entirely — Luggage & Racks >
+// Sissy Bars > Backrest Pads (built earlier this session). Flagged only,
+// never auto-moved, since it's a category-level change, not a subcategory
+// reassignment within Seating.
+const SISSY_BAR_PATTERN = /sissy\s*bar/i;
+
+// Tour-Pak backrest pads are ALSO a different category — Luggage & Racks >
+// Tour Pak (built earlier this session). Flagged only, same reasoning.
+const TOUR_PAK_PATTERN = /tour-?pak/i;
+
+// Known Seating product-line names that identify a COMPLETE seat even when
+// the literal word "seat" doesn't appear in this specific SKU's title
+// (e.g. "RoadSofa™ - Black - with Driver Backrest - FXDWG" — RoadSofa is
+// one of Seating's own existing Detail buckets, "RoadSofa Series").
+const KNOWN_SEAT_LINE_PATTERN = /roadsofa|step-?up|predator|tailwhip|kickflip/i;
+
 // Detail rules — expanded from the full un-truncated Seats audit (not
 // guessed): stud/seal/spot/tab/collar/clevis/pivot/emblem/tee/rivet/
 // concho/handrail/hinge/yoke/extension/guide/lock/tether/strike/hanger/
@@ -117,9 +139,16 @@ const HARDWARE_SCREEN = /(hardware|mount|bracket|bolt|screw|bumper|washer|knob|s
 const REAL_SEAT_PHRASE = /\b(solo|buddy|police|pillion|passenger|bobber|saddle)\s+seat\b/i;
 const HAS_SEAT_OR_SADDLE_WORD = /\bseat(s)?\b|\bsaddle\b|\bpillion\b/i; // "saddlebag" does NOT match \bsaddle\b (no internal word boundary)
 const HW_NOUNS = 'mount(?:ing)?|bracket|bushing|bar|block|pivot|tee|clamp|bolt|screw|spacer|clevis|isolator|post|plate|rail|rod|shock|strap|washer|bumper|grommet|liner|cover|fastener|knob|assembly|stud|seal|spot|tab|collar|reinforcing|emblem|rivet|concho|handrail|hinge|yoke|extension|lock|latch|tether|strike|hanger|filler|insert|lid|anchor|stabilizer|brace|handle|clip|pin|spring|support|pan';
-const SEAT_THEN_HARDWARE = new RegExp(`seat\\s+(?!and\\b|with\\b)(?:\\S+\\s+){0,3}(${HW_NOUNS})\\b`, 'i');
-const HARDWARE_THEN_SEAT = new RegExp(`(${HW_NOUNS})\\s+(?:\\S+\\s+){0,2}seat\\b`, 'i');
-const STYLE_NAMING_BRANDS = new Set(['Corbin', 'Bates']);
+// "pan" deliberately EXCLUDED from the override noun list below — it can
+// describe a complete finished seat's shape/style (e.g. Drag Specialties
+// Seats "Large Spring Solo Seat Pan", $92.95 — priced and described like a
+// real product, not a bare stamped pan) as often as a raw component. Kept
+// in HARDWARE_SCREEN/DETAIL_RULES so it still buckets correctly for names
+// that fail the real-seat check for OTHER reasons, but it no longer force-
+// overrides a trusted-brand or seat-phrase match on its own.
+const OVERRIDE_HW_NOUNS = 'mount(?:ing)?|bracket|bushing|bar|block|pivot|tee|clamp|bolt|screw|spacer|clevis|isolator|post|plate|rail|rod|shock|strap|washer|bumper|grommet|liner|cover|fastener|knob|assembly|stud|seal|spot|tab|collar|reinforcing|emblem|rivet|concho|handrail|hinge|yoke|extension|lock|latch|tether|strike|hanger|filler|insert|lid|anchor|stabilizer|brace|handle|clip|pin|spring|support';
+const SEAT_THEN_HARDWARE = new RegExp(`seat\\s+(?!and\\b|with\\b)(?:\\S+\\s+){0,3}(${OVERRIDE_HW_NOUNS})\\b`, 'i');
+const HARDWARE_THEN_SEAT = new RegExp(`(${OVERRIDE_HW_NOUNS})\\s+(?:\\S+\\s+){0,2}seat\\b`, 'i');
 
 // Known dedicated seat manufacturers — confirmed via brand audit earlier
 // this session (their Seating-category footprint is almost entirely
@@ -134,12 +163,19 @@ const TRUSTED_SEAT_BRANDS = new Set([
 ]);
 
 function isRealSeatNotHardware(name, brand) {
-  if (!HAS_SEAT_OR_SADDLE_WORD.test(name)) return false;
   const trusted = TRUSTED_SEAT_BRANDS.has(brand);
+  const hasSeatWord = HAS_SEAT_OR_SADDLE_WORD.test(name);
+  const hasKnownLine = trusted && KNOWN_SEAT_LINE_PATTERN.test(name);
+  if (!hasSeatWord && !hasKnownLine) return false;
   const narrowPhrase = REAL_SEAT_PHRASE.test(name);
   if (!trusted && !narrowPhrase) return false;
   if (SEAT_THEN_HARDWARE.test(name)) return false;
-  if (!STYLE_NAMING_BRANDS.has(brand) && HARDWARE_THEN_SEAT.test(name)) return false;
+  // Reverse-direction check (hardware noun BEFORE "seat", e.g. "Mount
+  // Bracket Solo Seat") is only trusted for brands we DON'T already treat
+  // as seat specialists — a trusted brand's style descriptors ("Spring
+  // Solo Seat Pan", "Contour Style Frame Mount Solo Seat") routinely use
+  // words from this list without meaning hardware.
+  if (!trusted && HARDWARE_THEN_SEAT.test(name)) return false;
   return true;
 }
 
@@ -155,16 +191,26 @@ async function main() {
     `);
 
     const carbParts = allSeatsRows.filter(r => CARB_PART_PATTERN.test(r.name));
-    const padProducts = allSeatsRows.filter(r => !CARB_PART_PATTERN.test(r.name) && PAD_PATTERN.test(r.name));
-    const carbAndPadIds = new Set([...carbParts, ...padProducts].map(r => r.id));
+    const sissyBarParts = allSeatsRows.filter(r => !CARB_PART_PATTERN.test(r.name) && SISSY_BAR_PATTERN.test(r.name));
+    const tourPakParts = allSeatsRows.filter(r => !CARB_PART_PATTERN.test(r.name) && !SISSY_BAR_PATTERN.test(r.name) && TOUR_PAK_PATTERN.test(r.name));
+    const flaggedIds = new Set([...carbParts, ...sissyBarParts, ...tourPakParts].map(r => r.id));
+    const padProducts = allSeatsRows.filter(r => !flaggedIds.has(r.id) && PAD_PATTERN.test(r.name));
+    const backrestProducts = allSeatsRows.filter(r => !flaggedIds.has(r.id) && !PAD_PATTERN.test(r.name) && BACKREST_PATTERN.test(r.name) && !isRealSeatNotHardware(r.name, r.brand));
+    const carbAndPadIds = new Set([...flaggedIds, ...padProducts, ...backrestProducts].map(r => r.id));
 
     const rows = allSeatsRows.filter(r => !carbAndPadIds.has(r.id) && HARDWARE_SCREEN.test(r.name));
 
     console.log(`Total rows currently in Seats: ${allSeatsRows.length}`);
     console.log(`Carburetor parts flagged (miscategorized at CATEGORY level, NOT moved): ${carbParts.length}`);
     carbParts.forEach(c => console.log(`  [${c.brand}] ${c.name}  -- needs manual move to Carburetion & Fuel`));
+    console.log(`\nSissy bar pads flagged (wrong CATEGORY entirely, NOT moved): ${sissyBarParts.length}`);
+    sissyBarParts.forEach(s => console.log(`  [${s.brand}] ${s.name}  -- needs manual move to Luggage & Racks > Sissy Bars`));
+    console.log(`\nTour-Pak backrest pads flagged (wrong CATEGORY entirely, NOT moved): ${tourPakParts.length}`);
+    tourPakParts.forEach(t => console.log(`  [${t.brand}] ${t.name}  -- needs manual move to Luggage & Racks > Tour Pak`));
     console.log(`\nComfort pad products -> Seat Pads & Covers: ${padProducts.length}`);
-    console.log(`Candidate rows (hardware-looking name, excluding carb/pad): ${rows.length}`);
+    console.log(`Standalone backrest products -> Backrests: ${backrestProducts.length}`);
+    backrestProducts.forEach(b => console.log(`  [${b.brand}] ${b.name}`));
+    console.log(`Candidate rows (hardware-looking name, excluding carb/sissybar/tourpak/pad/backrest): ${rows.length}`);
 
     const updates = [];
     const generalBucket = [];
@@ -212,7 +258,7 @@ async function main() {
       return;
     }
 
-    console.log(`\nApplying ${updates.length} hardware updates + ${padProducts.length} pad-product updates...`);
+    console.log(`\nApplying ${updates.length} hardware updates + ${padProducts.length} pad-product updates + ${backrestProducts.length} backrest-product updates...`);
     await client.query('BEGIN');
     let done = 0;
     for (const u of updates) {
@@ -229,15 +275,21 @@ async function main() {
         [PADS_SUBCATEGORY, p.id]
       );
     }
+    for (const b of backrestProducts) {
+      await client.query(
+        `UPDATE catalog_unified SET display_subcategory = $1 WHERE id = $2`,
+        ['Backrests', b.id]
+      );
+    }
     await client.query('COMMIT');
-    console.log(`Done. ${done} hardware rows + ${padProducts.length} pad rows updated.`);
-    console.log(`\nNOTE: ${carbParts.length} carburetor part(s) were flagged above but NOT moved —`);
-    console.log('  those need a manual display_category change to Carburetion & Fuel, not a subcategory move within Seating.');
+    console.log(`Done. ${done} hardware rows + ${padProducts.length} pad rows + ${backrestProducts.length} backrest rows updated.`);
+    console.log(`\nNOTE: ${carbParts.length} carburetor part(s), ${sissyBarParts.length} sissy bar item(s), and ${tourPakParts.length} Tour-Pak item(s) were flagged above but NOT moved —`);
+    console.log('  those need a manual display_category/subcategory change (Carburetion & Fuel / Luggage & Racks), not a subcategory move within Seating.');
     console.log('\nNEXT STEPS:');
     console.log('  1. node scripts/ingest/sync_fitment_flat_columns.mjs');
     console.log('  2. node scripts/ingest/index_unified.js --recreate');
     console.log('  3. Spot-check /browse?display_category=Seating&display_subcategory=Seats — should now show real seats first');
-    console.log('  4. Manually reassign the flagged carburetor part(s) to Carburetion & Fuel');
+    console.log('  4. Manually reassign the flagged carburetor, sissy bar, and Tour-Pak items to their correct category');
   } catch (err) {
     if (APPLY) await client.query('ROLLBACK');
     console.error('ERROR:', err);

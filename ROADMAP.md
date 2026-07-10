@@ -1,5 +1,5 @@
 # STINKIN' SUPPLIES — PROJECT ROADMAP
-**Last Updated: July 7, 2026 (Seventy-Fifth Pass)**
+**Last Updated: July 8, 2026 (Seventy-Sixth Pass)**
 
 ---
 
@@ -108,6 +108,8 @@
 | **display_category rebuild — 2,028 null-category gap closed** (session 74) — `rebuild_display_category_v2.mjs`; scope deliberately narrowed to the 2,028 null rows + 2 confirmed structural bugs (SADDLEBAGS, TANK gas/oil split) + 2 decisions (Kickstands → Foot Controls, Gas Caps & Petcocks → Fenders & Body) after a full-recompute dry run showed it would silently regress thousands of already-correct rows | ✅ |
 | **display_subcategory_detail — new tier-3 column** (session 74) — Category → Subcategory → Detail, added for the 37 subcategories clearing a >700-row threshold; every split evidence-based from real name-prefix mining, not guessed; 36,350 of 76,491 eligible products classified; full FilterSidebar/browse.ts/Typesense wiring shipped as the first 3-level nested filter in the codebase | ✅ |
 | Windshield Hardware & Parts merged into Windshields subcategory (267 products) | ✅ Session 74 |
+| **Seating category — full rebuild** (session 76) — hardware/pad/backrest miscategorization fixed (239 hardware → Seat Hardware with new Detail buckets, 11 pad rows → Seat Pads & Covers, 2 backrest rows → Backrests); `lib/db/browse.ts` sort-order bug fixed (`detail_priority` computed column, hardware no longer outranks real products under price-ascending default); 256,143 fitment rows backfilled via new name-extraction script; 166 products' fitment corrected (FL/FX combo miscode → Softail, was wrongly Touring+Dyna) | ✅ |
+| **Exhaust category — full rebuild** (session 76) — 269 blank subcategories filled, 569 new Detail assignments on Exhaust Parts bucket (Heat Shields, Baffles, Clamps & Brackets, Wrap & Packing, O2 Sensors & Bungs, etc.); 838 total rows updated; 21 cross-category miscategorizations found and flagged (15 engine valves, 5 grips, 1 brake tool) | ✅ |
 
 ---
 
@@ -404,6 +406,12 @@
 | **PU/WPS in-store display fixtures in sellable inventory** | 41 rows (15 PU + 26 WPS) were live/sellable despite being dealer point-of-sale merchandising units, not real products a customer would buy | ✅ Fixed session 75 — verified against live data (not a stale offline estimate) and price signals, soft-deleted, wired into `merge_catalog_unified.js` for durability, Typesense synced |
 | **Inconsistent brand-name casing blocking grouping** | 51 duplicate normalized-brand clusters live (e.g. "ARLEN NESS" vs "Arlen Ness") — `normalize_brands.sql` existed in draft but was never run or wired into the pipeline | ✅ Fixed session 75 — extended mapping with 8 real gaps, ran live (51 → 0 clusters), wired into `merge_catalog_unified.js` for durability |
 | **Fitment tab showed bare model codes with no readable name** | e.g. "FLHX" with no indication it means "Street Glide" | ✅ Fixed session 75 — `hm.name` added alongside `hm.model_code` in every fitment-tab render path |
+| **browse.ts default sort put cheap hardware above real products** | Flat `price ASC` sort meant a $18 mounting bracket always outranked a $180 seat, regardless of category — caught via customer-facing screenshot on Seating | ✅ Fixed session 76 — new `detail_priority` computed SQL column as first sort key, keyword-matched against Detail (falling back to name when blank), no schema change |
+| **239 Seating hardware products miscategorized as "Seats"** | Brackets, rivets, springs, pins, handrails, etc. sitting in the customer-facing seat subcategory | ✅ Fixed session 76 — `fix_seating_hardware_miscategorization.mjs`; took 5 iterative rounds (trusted-brand logic for Corbin/Bates/Mustang/Saddlemen complete seats, directional adjacency to avoid over-protecting real hardware) — see HANDOFF_LOG "SEVENTY-SIXTH PASS" §4 |
+| **FL/FX combo miscoded as Touring+Dyna (physically impossible)** | `backfill_seating_name_fitment.mjs`'s multi-code splitter unioned FL(Touring)+FX(Dyna) for the combined token, when `FL/FX` together actually denotes Softail specifically | ✅ Fixed session 76 — `fix_flfx_softail_miscode.mjs` corrected 166 products; original backfill script patched for future runs |
+| **26 Sissy Bar Pads + 15 Tour-Pak Backrest Pads miscategorized under Seating** | Belong in Luggage & Racks (Sissy Bars / Tour Pak subcategories, built earlier this project) | ⏳ Flagged session 76, not yet manually moved |
+| **21 cross-category miscategorizations found in Exhaust** | 15 engine valve/valve-seat components (Kibblewhite/KPMI/Motorshop/Ultima — cylinder-head parts, not pipe-system), 5 Ultima grip products (matched on "end cap" wording), 1 Colony brake-shaft tool (matched on "crossover") | ⏳ Flagged session 76, not yet manually moved |
+| **Product-name quote-corruption pattern** | Multiple names across categories contain literal `" inch "` text where a quote character should be (e.g. "16 inch BACK", "inchButt Bucket inch") — looks like a global find/replace corrupted embedded quotes somewhere upstream | ⏳ Flagged session 76, not investigated |
 
 ---
 

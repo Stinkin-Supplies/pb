@@ -5,7 +5,59 @@
 
 ---
 
-# ——— SEVENTY-FIFTH PASS (July 7, 2026) ———
+# ——— SEVENTY-SIXTH PASS (July 8, 2026) ———
+
+## WHERE WE ARE
+
+Started as a Seating-category fitment backfill (61% of Seating had zero fitment data), then expanded into a full category-taxonomy walkthrough covering Seating and Exhaust, plus a bug hunt on the browse sort order that a customer-facing screenshot surfaced mid-session. Categories worked this pass: **Seating** (fully rebuilt) and **Exhaust** (fully rebuilt). **Carburetion & Fuel** scoping started at end of session, not yet completed.
+
+## What Was Done
+
+### 1. Seating fitment name-extraction backfill ✅
+New `backfill_seating_name_fitment.mjs` — parses model code + year range directly out of `catalog_unified.name` for Seating products with zero `catalog_fitment_v2` rows (2,258 candidates). Three-tier confidence resolution: exact `harley_models.model_code` match (0.75), confirmed shorthand→family mapping (0.70), bare family word (0.55). **256,143 rows inserted**, `fitment_source='seating_name_backfill'`. 1,215 of 2,258 candidates matched; 1,043 had no parseable fitment info (universal hardware, generic solo seats) — correctly left alone.
+
+Domain-confirmed shorthand mapping (critical — an earlier prefix-scan approach was tried and rejected first): `FL`/`FLH`/`FLT` → Touring only, `FX` → Dyna only, `XL` → Sportster only. A Touring seat physically cannot fit a Softail frame, so naive `FL%` prefix matching (which also catches Softail codes like FLST/FLFB) would have produced hundreds of false fitment rows per product.
+
+### 2. FL/FX combo miscode found and corrected ✅
+The backfill's multi-code splitter treated the combined token `FL/FX` by splitting on `/` and unioning FL (Touring) + FX (Dyna) — producing a **physically impossible "fits both Touring and Dyna" claim on 161 products**. Root cause: `FL/FX` as a *combined* token is vendor shorthand for **Softail specifically** (the one platform carrying both FL-prefix dresser-style and FX-prefix cruiser-style codes under a shared frame) — a different meaning than the bare individual letters. Confirmed via domain knowledge, not inferred.
+
+New `fix_flfx_softail_miscode.mjs`: found 167 affected products (166 correctable, 1 false-positive-regex-match left untouched), deleted the wrong `seating_name_backfill` rows, re-inserted correct Softail-family fitment for the same parsed year range (**20,907 new rows**, `fitment_source='seating_name_backfill_flfx_corrected'`). `backfill_seating_name_fitment.mjs` patched with a special-case check for the `FL/FX`/`FX/FL` combo so future runs don't repeat this.
+
+### 3. `lib/db/browse.ts` — detail_priority sort fix ✅
+Customer-facing bug (caught via screenshot: Seating browse page showing bolts/brackets before actual seats). Root cause: default sort was flat `price ASC` — cheap hardware (mounting plates, rivets) always outranks real seats ($150+) under that ordering. Fixed via a regex-based `detail_priority` computed column (0=primary product, 1=accessory/hardware, keyword-matched against `display_subcategory_detail`, falling back to product name when Detail is blank) as the first `ORDER BY` key ahead of price. No schema change, no Typesense reindex needed — pure SQL fix.
+
+### 4. Seating hardware/pad/backrest miscategorization — full rebuild ✅
+New `fix_seating_hardware_miscategorization.mjs`. Went through **five iterative rounds** of false-positive/false-negative correction (each verified against real data before applying, never guessed):
+- Initial narrow keyword screen missed a long tail of real hardware vocabulary (stud, spring, pin, clip, support, pan, handle, rivet, concho, handrail, hinge, yoke, lock, latch, filler, insert, lid, anchor, stabilizer, brace) — expanded via direct inspection of the actual "still showing as hardware" screenshots/data rather than guessing.
+- First-pass hardware screen caught **false positives**: Mustang/Saddlemen/Bates/Corbin complete named seats (e.g. "Renegade™ Solo — Studded", "Solid Mount Bates Bobber Solo Seat Kit") were being swept into hardware because their own style-line names use words like "Mount"/"Studded"/"Kit". Fixed via a **trusted-brand default** (Corbin/Bates/Mustang/Saddlemen/Le Pera/Drag Specialties Seats/Danny Gray/Wyatt Gatling/Ultima — confirmed via brand audit earlier this session to be dedicated seat manufacturers) — for these brands, presume real seat unless a hardware noun sits directly adjacent to "seat" without "and/with" bundling language.
+- That same adjacency check then caused a **false negative** in the other direction — items like "Solo Seat Front Mount" (genuine loose hardware) were wrongly protected. Fixed via directional adjacency regex (seat-then-hardware vs. hardware-then-seat, with the reverse direction only trusted for non-trusted brands).
+- Two more real bugs caught via manual review of dry-run output: "pan" was force-excluding trusted-brand complete seats (a $92 "Solo Seat Pan" from Drag Specialties Seats is a real product, not a bare stamped pan) — removed from the override noun list. Two carburetor "needle and seat" parts (S&S Cycle, V-Twin) were sitting in Seating entirely by accident (carburetor terminology, unrelated meaning) — flagged, not moved.
+
+**Applied: 239 hardware rows → Seat Hardware subcategory (with real Detail buckets: Brackets & Mounts, Rivets & Spots, Springs & Pins, Seat Pans, Plates & Trim, Locks & Latches, etc.), 11 comfort-pad rows → existing Seat Pads & Covers subcategory, 2 standalone backrest rows → existing Backrests subcategory.**
+
+Cross-category miscategorizations found and flagged (not auto-moved): 26 Sissy Bar Pads (mostly Le Pera) and 15 Saddlemen Tour-Pak® Backrest Pads sitting in Seating when they belong in Luggage & Racks (Sissy Bars / Tour Pak respectively, both built earlier this session's predecessor work).
+
+### 5. Exhaust category — full taxonomy rebuild ✅
+Audited all 2,846 active Exhaust rows. Kept the four existing subcategories (Exhaust Systems, Headers & Pipes, Mufflers, Exhaust Parts) rather than rebuilding from scratch — confirmed reasonably sound, just had the by-now-familiar "legacy ALL-CAPS SKUs never got classified" gap plus zero Detail population on the large Exhaust Parts bucket.
+
+New `fix_exhaust_taxonomy.mjs`: filled 269 blank subcategories using vocabulary proven by the correctly-tagged Title Case half of the same brand data (2-into-1/True Dual/Header/Slip-On/Muffler keyword rules, plus SAWICKI's "FULL LENGTH/MID LENGTH/SHORTY" naming convention), and populated Detail for 569 Exhaust Parts rows (Heat Shields, Baffles, Clamps & Brackets, Wrap & Packing, End Caps & Tips, O2 Sensors & Bungs, Studs & Hardware, Gaskets & Seals). **838 total rows updated.**
+
+Three cross-category miscategorizations found and flagged during this pass (not auto-moved, each caught via careful review of the sample output before applying): **15 engine valve/valve-seat components** (Kibblewhite, KPMI, Motorshop, Ultima) — "exhaust valve"/"valve seat" here is cylinder-head poppet-valve terminology, unrelated to the pipe system, belongs in Engine; **5 Ultima handlebar grip products** — matched on "end cap" wording (grips have end caps too), belongs in Handlebar & Controls > Grips; **1 Colony "Brake Shaft Crossover Bushing Tool"** — matched on "crossover" (crossover exhaust pipes), is actually a brake-linkage tool.
+
+### 6. Data-corruption pattern flagged, not yet fixed ⏳
+Multiple product names across categories contain literal `" inch "` text where a straight quote character should be (e.g. `Factory Sample Wyatt Gatling inchButt Bucket inch Solo Seat`, `Police Seat inchT inch Black`, `CG INVICTOR SEAT 16 inch BACK`). Looks like a global find/replace corrupted embedded quote marks somewhere upstream in an import script. Not investigated further this session — flagged for a dedicated pass.
+
+## Open Items For Next Session
+
+- Manually reassign the flagged cross-category items above (2 carb parts, 26 sissy bar pads, 15 Tour-Pak pads, 15 engine valves, 5 grips, 1 brake tool — 66 total).
+- Investigate the `" inch "` quote-corruption pattern (item 6).
+- Carburetion & Fuel / Fuel-Air Systems category audit was scoped (structure proposed: Turbo Kits, EFI Throttle Bodies, EFI Tuners & Diagnostic Tools, Carburetors & Components, Air Cleaner & Components, Air Filter) but not yet run — audit query issued, dry-run/apply not started.
+- Family-based Detail facet for Seating (Touring/Dyna/Softail/Sportster as a new customer-facing filter dimension, separate from existing style Detail) discussed and scoped but deferred — user is planning a full UI overhaul, doesn't want throwaway frontend work; backend-only prep (new column + Typesense field) was agreed as the right scope whenever picked back up.
+- Bulk inline category/subcategory admin editor (multi-select from the product grid) requested but not started — need to see the existing single-product `?admin=1` PDP editor component first to build on its auth/API conventions rather than reinvent them.
+
+---
+
+
 
 ## WHERE WE ARE
 

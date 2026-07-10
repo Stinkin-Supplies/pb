@@ -1,5 +1,5 @@
 # Stinkin' Supplies — Filtering System Roadmap
-**Created:** June 5, 2026 · **Last Updated:** July 7, 2026 (Session 75)
+**Created:** June 5, 2026 · **Last Updated:** July 8, 2026 (Session 76)
 **Scope:** browse.ts · FilterSidebar · Fitment data · Typesense facets · display_subcategory taxonomy
 
 ---
@@ -7,6 +7,20 @@
 ## Status: COMPLETE ✅
 
 All filter architecture phases complete. display_subcategory taxonomy complete across all 20 categories. **Session 74 added a tier-3 `display_subcategory_detail` layer** (Category → Subcategory → Detail) across the 37 largest subcategories, plus a category-level rebuild that closed the last 2,028 null-category gap.
+
+### ✅ Session 76 — browse.ts sort-order bug fixed + Seating/Exhaust taxonomy rebuilt
+
+Started from a customer-facing screenshot showing hardware (mounting brackets, rivets) ranked above real seats on the Seating browse page. Root cause was in `lib/db/browse.ts`, squarely in this doc's scope: default sort was flat `price ASC`, and cheap accessory hardware will always outrank a $150+ real product under that ordering regardless of category. Fixed via a new `detail_priority` computed SQL column (keyword-matched against `display_subcategory_detail`, falling back to product name when Detail is blank) used as the first sort key ahead of price — no schema change, no reindex needed.
+
+That surfaced the deeper issue: a large tail of genuine hardware/pad/backrest products were sitting in the Seating `Seats` subcategory in the first place, not just sorted wrong. `fix_seating_hardware_miscategorization.mjs` reclassified 239 hardware rows into `Seat Hardware` (with new Detail buckets — Brackets & Mounts, Rivets & Spots, Springs & Pins, Seat Pans, Locks & Latches, Plates & Trim, etc.), 11 comfort-pad rows into the existing `Seat Pads & Covers`, and 2 standalone backrest rows into the existing `Backrests`. Took five iterative rounds to get right (trusted-brand logic for Corbin/Bates/Mustang/Saddlemen-style complete seats being wrongly swept up as false positives, then a directional adjacency fix so genuine "Solo Seat Front Mount"-type hardware didn't get wrongly protected by that same trusted-brand logic) — full detail in HANDOFF_LOG.md "SEVENTY-SIXTH PASS" §4.
+
+Also rebuilt Exhaust's taxonomy the same way (`fix_exhaust_taxonomy.mjs`) — 269 blank subcategories filled, 569 new Detail assignments on the Exhaust Parts bucket, same underlying pattern as every prior category (legacy ALL-CAPS SKUs never got classified). 838 total rows updated. Three cross-category miscategorizations found and flagged (not auto-moved) along the way — full list in HANDOFF_LOG "SEVENTY-SIXTH PASS" §5.
+
+Separately, a real fitment-data bug was found and fixed while backfilling Seating fitment coverage (256,143 rows added via new `backfill_seating_name_fitment.mjs`): the combined vendor shorthand `FL/FX` was being parsed as "fits both Touring and Dyna" (physically impossible), when it actually denotes Softail specifically. Corrected 166 products' fitment (`fix_flfx_softail_miscode.mjs`). Not a filter-architecture bug per se, but affects the same fitment data this system's facets read from — full detail in HANDOFF_LOG "SEVENTY-SIXTH PASS" §1–2.
+
+Full detail: HANDOFF_LOG.md "SEVENTY-SIXTH PASS".
+
+---
 
 ### ✅ Session 75 — brand facet cleanup + fitment-tab model names + display-fixture exclusion
 

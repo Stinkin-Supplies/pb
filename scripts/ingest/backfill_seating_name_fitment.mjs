@@ -207,12 +207,29 @@ async function main() {
       let resolvedModels = [];
       let usedShorthandFamily = false;
       if (matchType === 'code') {
-        const codes = codeOrFamily.split('/');
-        for (const c of codes) {
-          const result = resolveCode(c);
-          if (result) {
-            resolvedModels.push(...result.models);
-            if (result.isShorthand) usedShorthandFamily = true;
+        // SPECIAL CASE, domain-confirmed: the COMBINED token "FL/FX" (either
+        // order) means SOFTAIL specifically — Softail is the one platform
+        // carrying both FL-prefix (FLST dresser-style) and FX-prefix (FXST
+        // cruiser-style) codes under a shared frame/seat-mount. This is NOT
+        // the same as splitting FL (Touring alone) + FX (Dyna alone) and
+        // unioning them — that produced a false "fits Touring AND Dyna"
+        // claim on 161 real products before this fix. Bare individual FL or
+        // FX (not combined) still resolve via the normal shorthand map below.
+        const normalizedCombo = codeOrFamily.toUpperCase().replace(/\s+/g, '');
+        if (normalizedCombo === 'FL/FX' || normalizedCombo === 'FX/FL') {
+          const softailId = familyByName.get('softail');
+          if (softailId && modelsByFamily.has(softailId)) {
+            resolvedModels = modelsByFamily.get(softailId);
+            usedShorthandFamily = true;
+          }
+        } else {
+          const codes = codeOrFamily.split('/');
+          for (const c of codes) {
+            const result = resolveCode(c);
+            if (result) {
+              resolvedModels.push(...result.models);
+              if (result.isShorthand) usedShorthandFamily = true;
+            }
           }
         }
       } else {
