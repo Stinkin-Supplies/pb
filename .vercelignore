@@ -4,3 +4,14 @@ scripts/node_modules/
 *.csv
 *.zip
 public/videos
+node_modules
+.next
+.env
+.env.local
+.env.development
+.env.production
+data/
+backups/
+tmp/
+audit_output/
+.git
