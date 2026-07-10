@@ -1,12 +1,40 @@
 # Stinkin' Supplies — Filtering System Roadmap
-**Created:** June 5, 2026 · **Last Updated:** July 8, 2026 (Session 76)
+**Created:** June 5, 2026 · **Last Updated:** July 10, 2026 (Session 77)
 **Scope:** browse.ts · FilterSidebar · Fitment data · Typesense facets · display_subcategory taxonomy
 
 ---
 
 ## Status: COMPLETE ✅
 
-All filter architecture phases complete. display_subcategory taxonomy complete across all 20 categories. **Session 74 added a tier-3 `display_subcategory_detail` layer** (Category → Subcategory → Detail) across the 37 largest subcategories, plus a category-level rebuild that closed the last 2,028 null-category gap.
+All filter architecture phases complete. display_subcategory taxonomy across **23 categories** — 9 at zero nulls after session 77, 14 still partial. **Session 74 added a tier-3 `display_subcategory_detail` layer** (Category → Subcategory → Detail) across the 37 largest subcategories, plus a category-level rebuild that closed the last 2,028 null-category gap.
+
+### ✅ Session 77 — nine taxonomy scripts shipped; two NEW top-level categories
+
+`display_category` went from 21 recorded values to **23 live values**. Two new top-level categories were created by migrating rows *across* categories: **Gaskets & Seals** (4,242 rows) and **Cables** (4,395 rows). Five more categories were rebuilt in place (Engine, Transmission & Clutch, Electrical, Lighting, Handlebar & Controls), and Carburetion & Fuel — approved at dry-run in session 76 but never applied — was applied.
+
+Nine categories now sit at **zero null subcategories**: Cables, Carburetion & Fuel, Electrical, Engine, Gaskets & Seals, Handlebar & Controls, Lighting, Transmission & Clutch, Windshields & Fairings.
+
+**⚠️ FRONTEND ACTION REQUIRED — two categories will silently disappear.** Any component holding a hardcoded 21-value category array drops **Cables** and **Gaskets & Seals**: `CategoryBentoGrid`, browse filters, nav. Needs a grep. Not yet done.
+
+**⚠️ `infer_vtwin_categories.mjs` is stale.** Its 28-source→21-display map predates both new categories. The next VTWIN import routes cable and gasket products back into Carburetion & Fuel / Transmission & Clutch / Engine.
+
+Within this doc's scope, the structural lesson from the two migrations:
+
+- **Category-level migration ≠ within-category rebuild.** Prior scripts force-assigned every unmatched row because nothing could be left blank inside a category. Pulling rows *into* a new category, an unmatched row **has not earned its way in** — force-assigning imports garbage. Cables left 19 unmatched rows exactly where they were (correctly: cable wrap, cable ties, cable lube, USB interface cable, oil lines).
+- **A `display_category NOT IN (...)` filter is insufficient.** Brake adjusters and spark/timer parts were sitting in Accessories & Misc and Carburetion & Fuel, and walked past a category-level exclusion straight into Cables on dry run 1. Needs **name-level guards**.
+- **Hardware keywords must be evaluated BEFORE type keywords.** In `Die-Cast Cable Clamp - Clutch`, the hardware word is the product noun and the cable type is a qualifier. Running hardware last sent ~40 clamps/brackets/guides/adapters into cable-type buckets.
+
+Facet-affecting oddities the new structure created, unresolved:
+- `Engine / Gaskets & Seals` (355 rows) coexists with the top-level `Gaskets & Seals` category (4,242 rows) — **same name at two levels.**
+- `Transmission & Clutch / Clutch Cables & Components` (88 rows) survives alongside Cables → `Cable Hardware`.
+- `Transmission & Clutch / Hydraulic Clutch Kits` (5) vs. Cables → `Hydraulic Clutch Lines` (134).
+- `Electric Shift Kits` (Transmission) and `Lighting Covers` (Lighting) were spec'd, rules written, **zero rows produced.**
+
+`lib/db/browse.ts` `detail_priority` — Cables populates Detail on only 2 of 8 subcategories, so most Cables rows fall through to the product-name branch of that computed column. Not verified against a live browse page.
+
+Full detail: HANDOFF_LOG.md "SEVENTY-SEVENTH PASS".
+
+---
 
 ### ✅ Session 76 — browse.ts sort-order bug fixed + Seating/Exhaust taxonomy rebuilt
 
@@ -71,7 +99,7 @@ Facets are Postgres-computed via same fitmentJoin + WHERE. No divergence.
 
 ## Phase 5 — display_subcategory Taxonomy ✅ COMPLETE
 
-All 20 categories mapped. Subcategory facets live in Typesense.
+All 23 categories mapped. Subcategory facets live in Typesense.
 
 ### ✅ Session 74 — category rebuild (2,028 null-category gap closed) + tier-3 `display_subcategory_detail`
 
@@ -105,10 +133,10 @@ Verified end-to-end via a direct Typesense facet query post-reindex — `display
 | Seating | Seats · Seat Hardware · Backrests · Seat Pads & Covers | 95.0% | |
 | Handlebar & Controls | Cables & Lines · Handlebars · Risers & Clamps · Levers & Controls · Mirrors · Grips · Throttle & Accessories · Switches & Wiring | 94.9% | |
 | Transmission & Clutch | Clutch Plates & Kits · Transmission Internals · Oil System · Trans Covers & Cases · Sprockets · Belts & Pulleys · Drive Chains & Kits · Kickstarters & Hardware · Primary Drive | 94.8% | Oil System moved in from Carb |
-| Brakes | Brake Lines & Hoses · Rotors & Drums · Brake Pads & Shoes · Calipers · Brake Hardware · Master Cylinders · Brake Conversion Kits | 94.3% | |
+| Brakes | Brake Lines & Hoses · Rotors & Drums · Brake Pads & Shoes · Calipers · Brake Hardware · Master Cylinders · Brake Conversion Kits · **Brake Pedals & Pads (NEW session 78)** | stale % — recount after session 78 (797 rows added, 96 still null/held-back) | 8 subcategories now, not 7; absorbed Foot Controls' "Brake Pedals" + Accessories & Misc antique linkage sweep |
 | Luggage & Racks | Sissy Bars · Saddlebags · Bags & Packs · Luggage Racks · Luggage Parts | 93.3% | |
 | Exhaust | Exhaust Systems · Mufflers · Headers & Pipes · Exhaust Parts | 93.1% | |
-| Foot Controls | Footpegs · Shifters · Floorboards · Kickstands · Highway Bars & Pegs · Forward Controls · Brake Pedals · Rearsets & Mid Controls | 92.9% | |
+| Foot Controls | Footpegs · Shifters · Floorboards · Kickstands · Highway Bars & Pegs · Forward Controls · ~~Brake Pedals~~ · Rearsets & Mid Controls | stale % — recount after session 78 | "Brake Pedals" subcategory (119 rows) moved wholesale to Brakes / Brake Pedals & Pads session 78 |
 | Security & Covers | Security · Bike Covers · Shelters & Storage | 92.8% | |
 | Wheels & Tires | Wheels · Axles & Spacers · Tires & Tubes · Hubs & Spokes · Bearings & Seals · Valves & Balancing | 92.2% | |
 | Electrical | Ignition · Wiring & Harnesses · Charging & Alternators · Switches & Controls · Starters & Solenoids · Batteries · Audio & Communication · Horns | 92.1% | |

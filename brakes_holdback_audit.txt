@@ -1,0 +1,26 @@
+=== 1. Current count check: display_category=Brakes AND display_subcategory IS NULL ===
+Count: 96 (expect 96 if nothing has touched this since session 78)
+
+=== 2. Full untruncated rows, grouped by source_vendor ===
+AUDIT FAILED: error: column "price" does not exist
+    at /Users/home/Desktop/Stinkin-Supplies/scripts/ingest/node_modules/pg/lib/client.js:631:17
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async main (file:///Users/home/Desktop/Stinkin-Supplies/scripts/ingest/audit_brakes_holdback.mjs:26:21) {
+  length: 106,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '135',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3665',
+  routine: 'errorMissingColumn'
+}

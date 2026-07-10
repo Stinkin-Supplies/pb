@@ -1,0 +1,220 @@
+◇ injected env (51) from .env.local // tip: ⌘ override existing { override: true }
+
+MODE: DRY RUN (read-only, no writes)
+
+
+====================================================================================================
+POPULATION 1: WITHIN-BRAKES — NULL display_subcategory (must resolve)
+====================================================================================================
+Fetched 526 rows (expected 526).
+
+Breakdown by resulting subcategory:
+┌─────────┬───────────────────────┬─────┐
+│ (index) │ subcategory           │ n   │
+├─────────┼───────────────────────┼─────┤
+│ 0       │ 'Brake Hardware'      │ 108 │
+│ 1       │ 'Brake Lines & Hoses' │ 220 │
+│ 2       │ 'Brake Pedals & Pads' │ 8   │
+│ 3       │ 'Brake Pads & Shoes'  │ 55  │
+│ 4       │ 'Calipers'            │ 49  │
+│ 5       │ 'Rotors & Drums'      │ 43  │
+│ 6       │ 'Master Cylinders'    │ 43  │
+└─────────┴───────────────────────┴─────┘
+
+====================================================================================================
+POPULATION 1 — FALLBACKS (unmatched, forced to Brake Hardware): 96 rows
+====================================================================================================
+┌─────────┬───────┬────────────────────────────────────────────────────────────────┬──────┬──────────────────┬──────────────────────┐
+│ (index) │ id    │ name                                                           │ from │ subcategory      │ reason               │
+├─────────┼───────┼────────────────────────────────────────────────────────────────┼──────┼──────────────────┼──────────────────────┤
+│ 0       │ 57145 │ 'ANTHEM SHORTY LEVER SET BLACK 22-25 SPORTSTER'                │ ''   │ 'Brake Hardware' │ 'FALLBACK_UNMATCHED' │
+│ 1       │ 57139 │ 'ANTHEM SHORTY LEVER SET BLACK 25 SOFTAIL'                     │ ''   │ 'Brake Hardware' │ 'FALLBACK_UNMATCHED' │
+│ 2       │ 42199 │ 'OLD SCHOOL HANDCONTROLS BLACK'                                │ ''   │ 'Brake Hardware' │ 'FALLBACK_UNMATCHED' │
+│ 3       │ 53559 │ 'LEVER END GOLD'                                               │ ''   │ 'Brake Hardware' │ 'FALLBACK_UNMATCHED' │
+│ 4       │ 65219 │ 'Floating Stainless Steel Mirror Polished 11.8 inch Front Bra' │ ''   │ 'Brake Hardware' │ 'FALLBACK_UNMATCHED' │
+│ 5       │ 53538 │ 'LEVER END RED'                                                │ ''   │ 'Brake Hardware' │ 'FALLBACK_UNMATCHED' │
+│ 6       │ 57029 │ '280MM HD PAN AMERICAN'                                        │ ''   │ 'Brake Hardware' │ 'FALLBACK_UNMATCHED' │
+│ 7       │ 41653 │ 'WIDE V-CUT CLUTCH LEVER CHROME XL 04-13'                      │ ''   │ 'Brake Hardware' │ 'FALLBACK_UNMATCHED' │
+│ 8       │ 48816 │ 'TORQ-DRIVE CLUTCH INDIAN FTR'                                 │ ''   │ 'Brake Hardware' │ 'FALLBACK_UNMATCHED' │
+│ 9       │ 73706 │ 'Ultima Air Cleaner Backing Plate Adapter'                     │ ''   │ 'Brake Hardware' │ 'FALLBACK_UNMATCHED' │
+│ 10      │ 87936 │ 'Reservoir Assembly Chrome'                                    │ ''   │ 'Brake Hardware' │ 'FALLBACK_UNMATCHED' │
+│ 11      │ 93700 │ 'DOT 4 Brake Fluid'                                            │ ''   │ 'Brake Hardware' │ 'FALLBACK_UNMATCHED' │
+│ 12      │ 41302 │ 'CLUTCH ACTUATOR ADAPTER CHROME'                               │ ''   │ 'Brake Hardware' │ 'FALLBACK_UNMATCHED' │
+│ 13      │ 66176 │ 'Dust Shield Set Zinc'                                         │ ''   │ 'Brake Hardware' │ 'FALLBACK_UNMATCHED' │
+│ 14      │ 57421 │ 'SHORTY MX LEVER SET BLACK 25-26 SOFTAIL'                      │ ''   │ 'Brake Hardware' │ 'FALLBACK_UNMATCHED' │
+│ 15      │ 41649 │ 'WIDE V-CUT CLUTCH LEVER CHROME BIG TWIN OE# 45015-96'         │ ''   │ 'Brake Hardware' │ 'FALLBACK_UNMATCHED' │
+│ 16      │ 41651 │ 'WIDE V-CUT CLUTCH LEVER BLACK DYNA 07-17'                     │ ''   │ 'Brake Hardware' │ 'FALLBACK_UNMATCHED' │
+│ 17      │ 41927 │ 'TRANS SHIFT LEVER BT 85-96 FLA BIG TWIN 85-96'                │ ''   │ 'Brake Hardware' │ 'FALLBACK_UNMATCHED' │
+│ 18      │ 42152 │ 'INNER SHIFT ARM W/O-RINGS CHROME 33668-90B'                   │ ''   │ 'Brake Hardware' │ 'FALLBACK_UNMATCHED' │
+│ 19      │ 42153 │ 'INNER SHIFT LEVER CHROME 33789-03'                            │ ''   │ 'Brake Hardware' │ 'FALLBACK_UNMATCHED' │
+│ 20      │ 42157 │ 'SHIFT LEVER CHR XL `04-24 34660-04A'                          │ ''   │ 'Brake Hardware' │ 'FALLBACK_UNMATCHED' │
+│ 21      │ 42159 │ 'SHIFT LEVER DYNA GLIDE CHROME 34564-90A'                      │ ''   │ 'Brake Hardware' │ 'FALLBACK_UNMATCHED' │
+│ 22      │ 42195 │ 'SPORTSTER LEVERS BLACK XL `14-24'                             │ ''   │ 'Brake Hardware' │ 'FALLBACK_UNMATCHED' │
+│ 23      │ 58491 │ 'SPORTSTER LEVERS CHROME XL `14-24'                            │ ''   │ 'Brake Hardware' │ 'FALLBACK_UNMATCHED' │
+│ 24      │ 45874 │ 'TORQ-DRIVE CLUTCH DYNA'                                       │ ''   │ 'Brake Hardware' │ 'FALLBACK_UNMATCHED' │
+│ 25      │ 46238 │ 'RACE LEVERS CABLE BLACK `96-07 FLH/T'                         │ ''   │ 'Brake Hardware' │ 'FALLBACK_UNMATCHED' │
+│ 26      │ 46239 │ 'RACE LEVERS CABLE CHROME `96-07 FLH/T'                        │ ''   │ 'Brake Hardware' │ 'FALLBACK_UNMATCHED' │
+│ 27      │ 46240 │ 'RACE LEVERS CABLE BLACK 08-13 FLH/T'                          │ ''   │ 'Brake Hardware' │ 'FALLBACK_UNMATCHED' │
+│ 28      │ 46241 │ 'RACE LEVERS CABLE CHROME `08-13 FLH/T'                        │ ''   │ 'Brake Hardware' │ 'FALLBACK_UNMATCHED' │
+│ 29      │ 46242 │ 'RACE LEVERS HYDRAULIC BLACK `14-16 FLH/T'                     │ ''   │ 'Brake Hardware' │ 'FALLBACK_UNMATCHED' │
+└─────────┴───────┴────────────────────────────────────────────────────────────────┴──────┴──────────────────┴──────────────────────┘
+  ... and 66 more
+
+====================================================================================================
+POPULATION 1b: Orphaned "Rotors" subcategory merge -> "Rotors & Drums"
+====================================================================================================
+Found 2 rows with display_subcategory = 'Rotors' (expected 2).
+┌─────────┬───────┬──────────────────────────────┬─────────────────────┐
+│ (index) │ id    │ name                         │ display_subcategory │
+├─────────┼───────┼──────────────────────────────┼─────────────────────┤
+│ 0       │ 15634 │ 'Brake Rotor - Rear - 11.5"' │ 'Rotors'            │
+│ 1       │ 848   │ 'Rotor - 11-1/2" - Rear'     │ 'Rotors'            │
+└─────────┴───────┴──────────────────────────────┴─────────────────────┘
+
+====================================================================================================
+POPULATION 2: MIGRATE Foot Controls "Brake Pedals" -> Brakes / Brake Pedals & Pads
+====================================================================================================
+Fetched 119 rows (expected 119). Wholesale move, no classify() needed.
+┌─────────┬───────┬────────────────────────────────────────────────────┬──────┬───────────────────────┬─────────────────────────┐
+│ (index) │ id    │ name                                               │ from │ subcategory           │ reason                  │
+├─────────┼───────┼────────────────────────────────────────────────────┼──────┼───────────────────────┼─────────────────────────┤
+│ 0       │ 36516 │ 'Brake Pedal Pad Mount - Black'                    │ ''   │ 'Brake Pedals & Pads' │ 'WHOLESALE_SUBCAT_MOVE' │
+│ 1       │ 13646 │ 'Brake Pedal - 9-5/8" - Chrome'                    │ ''   │ 'Brake Pedals & Pads' │ 'WHOLESALE_SUBCAT_MOVE' │
+│ 2       │ 31444 │ 'Brake Pedal Cover - Black - Serrated'             │ ''   │ 'Brake Pedals & Pads' │ 'WHOLESALE_SUBCAT_MOVE' │
+│ 3       │ 21082 │ 'Brake Pedal Pad - Black - FL'                     │ ''   │ 'Brake Pedals & Pads' │ 'WHOLESALE_SUBCAT_MOVE' │
+│ 4       │ 12559 │ 'Aggressor Brake Pedal - Gold - Touring'           │ ''   │ 'Brake Pedals & Pads' │ 'WHOLESALE_SUBCAT_MOVE' │
+│ 5       │ 21075 │ 'Brake Arm - Gloss Black'                          │ ''   │ 'Brake Pedals & Pads' │ 'WHOLESALE_SUBCAT_MOVE' │
+│ 6       │ 7090  │ 'Brake Pedal - Black - Touring'                    │ ''   │ 'Brake Pedals & Pads' │ 'WHOLESALE_SUBCAT_MOVE' │
+│ 7       │ 8789  │ 'Touring Brake Peg - Black'                        │ ''   │ 'Brake Pedals & Pads' │ 'WHOLESALE_SUBCAT_MOVE' │
+│ 8       │ 9314  │ 'Drifter Brake Lever - Toe Shift - Black Ops - FL' │ ''   │ 'Brake Pedals & Pads' │ 'WHOLESALE_SUBCAT_MOVE' │
+│ 9       │ 9439  │ "Rear Brake Lever - FL '14-'23 - Black"            │ ''   │ 'Brake Pedals & Pads' │ 'WHOLESALE_SUBCAT_MOVE' │
+│ 10      │ 12572 │ 'Brake Arm - Long - Black'                         │ ''   │ 'Brake Pedals & Pads' │ 'WHOLESALE_SUBCAT_MOVE' │
+│ 11      │ 13512 │ 'Brake Pedal - Chrome - Touring'                   │ ''   │ 'Brake Pedals & Pads' │ 'WHOLESALE_SUBCAT_MOVE' │
+│ 12      │ 14015 │ 'Brake Pedal Rubber - Black - FL'                  │ ''   │ 'Brake Pedals & Pads' │ 'WHOLESALE_SUBCAT_MOVE' │
+│ 13      │ 35824 │ "Brake Linkage - Carbon - Softail '18-'25"         │ ''   │ 'Brake Pedals & Pads' │ 'WHOLESALE_SUBCAT_MOVE' │
+│ 14      │ 15864 │ 'Brake Pedal - Mid-Mount - Black'                  │ ''   │ 'Brake Pedals & Pads' │ 'WHOLESALE_SUBCAT_MOVE' │
+└─────────┴───────┴────────────────────────────────────────────────────┴──────┴───────────────────────┴─────────────────────────┘
+  ... and 104 more
+
+====================================================================================================
+POPULATION 3: MIGRATE Accessories & Misc brake candidates (name-matched, no fallback)
+====================================================================================================
+Fetched 264 raw brake-keyword rows from Accessories & Misc.
+253 pass isBrakeCandidate() pre-filter (excludes mount-hardware + manual-review ids).
+
+  Matched (will move to Brakes):   246
+  Unmatched (left in place):       7
+  Excluded by pre-filter:          11
+
+Matched rows by destination subcategory:
+┌─────────┬───────────────────────┬─────┐
+│ (index) │ subcategory           │ n   │
+├─────────┼───────────────────────┼─────┤
+│ 0       │ 'Brake Pedals & Pads' │ 11  │
+│ 1       │ 'Brake Hardware'      │ 216 │
+│ 2       │ 'Brake Pads & Shoes'  │ 3   │
+│ 3       │ 'Rotors & Drums'      │ 9   │
+│ 4       │ 'Brake Lines & Hoses' │ 7   │
+└─────────┴───────────────────────┴─────┘
+
+====================================================================================================
+POPULATION 3 — SAMPLE: matched rows (moving to Brakes)
+====================================================================================================
+┌─────────┬───────┬────────────────────────────────────────────────────────┬──────┬───────────────────────┬─────────────────────────┐
+│ (index) │ id    │ name                                                   │ from │ subcategory           │ reason                  │
+├─────────┼───────┼────────────────────────────────────────────────────────┼──────┼───────────────────────┼─────────────────────────┤
+│ 0       │ 68031 │ 'Lone Star Brake and Shifter Peg Set Chrome'           │ ''   │ 'Brake Pedals & Pads' │ 'NAME:pedals_pegs'      │
+│ 1       │ 64423 │ 'Chrome Brake and Shifter Peg'                         │ ''   │ 'Brake Pedals & Pads' │ 'NAME:pedals_pegs'      │
+│ 2       │ 87473 │ 'Parkerized Rear Brake Pivot and Cup Kit'              │ ''   │ 'Brake Hardware'      │ 'NAME:hardware'         │
+│ 3       │ 62665 │ 'One Man Brake Bleeder'                                │ ''   │ 'Brake Hardware'      │ 'NAME:hardware'         │
+│ 4       │ 88145 │ 'Front Brake Operating Lever Right Side'               │ ''   │ 'Brake Hardware'      │ 'NAME:hardware'         │
+│ 5       │ 67866 │ 'Black Brake and Shifter Peg Set'                      │ ''   │ 'Brake Pedals & Pads' │ 'NAME:pedals_pegs'      │
+│ 6       │ 65018 │ 'Chrome Replica Forward Brake Control Kit'             │ ''   │ 'Brake Hardware'      │ 'NAME:hardware'         │
+│ 7       │ 64980 │ 'AEE Stainless Steel Brake Control Kit'                │ ''   │ 'Brake Hardware'      │ 'NAME:hardware'         │
+│ 8       │ 95199 │ 'Rear Brake Pivot Stud'                                │ ''   │ 'Brake Hardware'      │ 'NAME:hardware'         │
+│ 9       │ 92267 │ 'Rear Brake Spring Pull Kit Parkerized'                │ ''   │ 'Brake Hardware'      │ 'NAME:hardware'         │
+│ 10      │ 92894 │ 'Brake Lining Rivets Brass'                            │ ''   │ 'Brake Pads & Shoes'  │ 'NAME:pads_shoes'       │
+│ 11      │ 66227 │ 'Brake Handle Assembly'                                │ ''   │ 'Brake Hardware'      │ 'NAME:hardware'         │
+│ 12      │ 65426 │ 'Front Mechanical Brake Rod Clevis Parkerized'         │ ''   │ 'Brake Hardware'      │ 'NAME:hardware'         │
+│ 13      │ 81380 │ '19 inch x 1.85 inch Mini Brake Wheel'                 │ ''   │ 'Rotors & Drums'      │ 'NAME:rotors_drums'     │
+│ 14      │ 92726 │ 'Front Brake Clevis Pin Cadmium'                       │ ''   │ 'Brake Hardware'      │ 'NAME:hardware'         │
+│ 15      │ 94879 │ 'Front Brake Stabilizer Extension'                     │ ''   │ 'Brake Hardware'      │ 'NAME:hardware'         │
+│ 16      │ 87436 │ 'Hummer Brake Rod 23 inch'                             │ ''   │ 'Brake Hardware'      │ 'NAME:hardware'         │
+│ 17      │ 67050 │ 'Rear Brake Rod Clevis Pin Kit'                        │ ''   │ 'Brake Hardware'      │ 'NAME:hardware'         │
+│ 18      │ 65282 │ 'Mechanical Brake Cross Shaft Kit'                     │ ''   │ 'Brake Hardware'      │ 'NAME:hardware'         │
+│ 19      │ 67399 │ 'Rear Wheel Brake Rod and Cable Adjusting Nut Cadmium' │ ''   │ 'Brake Hardware'      │ 'NAME:hardware'         │
+│ 20      │ 65438 │ 'Brake Switch Banjo Bolt'                              │ ''   │ 'Brake Hardware'      │ 'NAME:light_electrical' │
+│ 21      │ 64791 │ 'Zinc Plated Brake Control Kit'                        │ ''   │ 'Brake Hardware'      │ 'NAME:hardware'         │
+│ 22      │ 65016 │ 'FX Mid Brake Control Kit'                             │ ''   │ 'Brake Hardware'      │ 'NAME:hardware'         │
+│ 23      │ 67398 │ 'Rear Wheel Brake Rod and Cable Adjusting Nut Chrome'  │ ''   │ 'Brake Hardware'      │ 'NAME:hardware'         │
+│ 24      │ 69396 │ 'Rear Brake Switch Pull Kit'                           │ ''   │ 'Brake Hardware'      │ 'NAME:light_electrical' │
+│ 25      │ 68614 │ 'Rear Brake Switch Pull Kit'                           │ ''   │ 'Brake Hardware'      │ 'NAME:light_electrical' │
+│ 26      │ 79747 │ 'Indian Brake Switch Without Cover'                    │ ''   │ 'Brake Hardware'      │ 'NAME:light_electrical' │
+│ 27      │ 87461 │ 'Rear Mechanical Brake Rod 22-1/4 inch Overall Length' │ ''   │ 'Brake Hardware'      │ 'NAME:hardware'         │
+│ 28      │ 87496 │ 'Mechanical Brake Rod Clevis Long'                     │ ''   │ 'Brake Hardware'      │ 'NAME:hardware'         │
+│ 29      │ 88051 │ 'Brake Rod Plunger End'                                │ ''   │ 'Brake Hardware'      │ 'NAME:hardware'         │
+│ 30      │ 64754 │ '1936-1937 Style Mechanical Brake Kit'                 │ ''   │ 'Brake Hardware'      │ 'NAME:hardware'         │
+│ 31      │ 87848 │ 'Rear Brake Bushing Side Plate'                        │ ''   │ 'Brake Hardware'      │ 'NAME:hardware'         │
+│ 32      │ 64794 │ 'Chrome Hydraulic Brake Control Kit'                   │ ''   │ 'Brake Hardware'      │ 'NAME:hardware'         │
+│ 33      │ 64795 │ 'Hydraulic Brake Control Kit'                          │ ''   │ 'Brake Hardware'      │ 'NAME:hardware'         │
+│ 34      │ 64803 │ 'Black Brake Control Kit'                              │ ''   │ 'Brake Hardware'      │ 'NAME:hardware'         │
+│ 35      │ 64804 │ 'Mechanical Brake Kit Parkerized'                      │ ''   │ 'Brake Hardware'      │ 'NAME:hardware'         │
+│ 36      │ 64810 │ 'AEE Forward Brake Control Kit'                        │ ''   │ 'Brake Hardware'      │ 'NAME:hardware'         │
+│ 37      │ 64816 │ 'Forward Hydraulic Brake Control Kit'                  │ ''   │ 'Brake Hardware'      │ 'NAME:hardware'         │
+│ 38      │ 64817 │ 'Chrome Forward Brake Control Kit Hydraulic'           │ ''   │ 'Brake Hardware'      │ 'NAME:hardware'         │
+│ 39      │ 64847 │ 'AEE Hydraulic Brake Kit'                              │ ''   │ 'Brake Hardware'      │ 'NAME:hardware'         │
+└─────────┴───────┴────────────────────────────────────────────────────────┴──────┴───────────────────────┴─────────────────────────┘
+  ... and 206 more
+
+====================================================================================================
+POPULATION 3 — UNMATCHED (left in Accessories & Misc, for manual review)
+====================================================================================================
+┌─────────┬───────┬───────────────────────────────────────────────────────┬──────┬─────────────┬────────────────────────┐
+│ (index) │ id    │ name                                                  │ from │ subcategory │ reason                 │
+├─────────┼───────┼───────────────────────────────────────────────────────┼──────┼─────────────┼────────────────────────┤
+│ 0       │ 78508 │ 'Ultima Pulley Brake Single Disc Spacer Black'        │ ''   │ null        │ 'NO_MATCH_LEAVE_ALONE' │
+│ 1       │ 12230 │ 'Replacement SPC+ Mounting Head - Brake/Mirror Mount' │ ''   │ null        │ 'NO_MATCH_LEAVE_ALONE' │
+│ 2       │ 78389 │ 'Ultima Pulley Brake Dual Disc Spacer Polished'       │ ''   │ null        │ 'NO_MATCH_LEAVE_ALONE' │
+│ 3       │ 87468 │ 'Rear Mechanical Brake Locating Block Zinc'           │ ''   │ null        │ 'NO_MATCH_LEAVE_ALONE' │
+│ 4       │ 81219 │ 'Weld-On Brake Tab Raw'                               │ ''   │ null        │ 'NO_MATCH_LEAVE_ALONE' │
+│ 5       │ 72820 │ 'Wheel Brake Cylinder Mount Bolts'                    │ ''   │ null        │ 'NO_MATCH_LEAVE_ALONE' │
+│ 6       │ 78405 │ 'Ultima Pulley Brake Dual Disc Spacer Black'          │ ''   │ null        │ 'NO_MATCH_LEAVE_ALONE' │
+└─────────┴───────┴───────────────────────────────────────────────────────┴──────┴─────────────┴────────────────────────┘
+
+====================================================================================================
+POPULATION 3 — EXCLUDED by isBrakeCandidate() pre-filter (mount hardware / manual-review ids)
+====================================================================================================
+┌─────────┬───────┬───────────────────────────────────────────────────────────┐
+│ (index) │ id    │ name                                                      │
+├─────────┼───────┼───────────────────────────────────────────────────────────┤
+│ 0       │ 54847 │ 'X-GRIP LARGE PHONE MOUNT W/BRAKE/CLUTCH RES BASE SHORT'  │
+│ 1       │ 16172 │ 'BRAKE/CLUTCH BASE 1" BALL'                               │
+│ 2       │ 81046 │ 'Front Engine Brake Strap'                                │
+│ 3       │ 56328 │ 'BRAKE MOUNT LARGE BLACK'                                 │
+│ 4       │ 40345 │ 'BRAKE/CLUTCH COVER BASE 1" CENTERED BALL'                │
+│ 5       │ 15707 │ 'Brake Mount - Large Phone - Black'                       │
+│ 6       │ 15714 │ 'Brake Mount - Phone - Black'                             │
+│ 7       │ 51260 │ 'BRAKE MOUNT BLACK'                                       │
+│ 8       │ 40311 │ 'BRAKE/CLUTCH RESERVOIR MOUNT W/SELF-LEVELING CUP HOLDER' │
+│ 9       │ 40347 │ 'BRAKE/CLUTCH RESERVOIR BASE W/2 1" BALLS'                │
+│ 10      │ 40348 │ 'MOTORCYCLE BRAKE/CLUTCH RESERVOIR BASE W/1" BALL'        │
+└─────────┴───────┴───────────────────────────────────────────────────────────┘
+
+====================================================================================================
+SUMMARY
+====================================================================================================
+Population 1 (Brakes NULL -> subcategory):        526 rows total — 430 confident (WILL APPLY) / 96 held back (WILL NOT APPLY, left NULL for manual review)
+Population 1b (Rotors -> Rotors & Drums merge):    2 rows
+Population 2 (Foot Controls -> Brakes):            119 rows, wholesale
+Population 3 (Accessories & Misc -> Brakes):       246 matched / 7 left in place / 11 excluded
+
+TOTAL ROWS TO BE WRITTEN IF APPLIED: 797
+(96 Population 1 rows deliberately excluded from this run — see BRAKES_SESSION_NOTES.md)
+
+
+[DRY RUN] No writes performed. Review the samples above, especially:
+  - Population 1 held-back rows (confirmed non-brake parts + ambiguous lever-sets — NOT applied this run)
+  - Population 3 unmatched (anything that should have matched but didn't = a rule gap)
+  - Population 3 excluded (confirm nothing legitimate got excluded)
+
+Re-run with --apply once this output looks correct.

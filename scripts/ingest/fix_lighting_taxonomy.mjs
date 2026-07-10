@@ -76,71 +76,122 @@ const RULES = [
     subcategory: 'Headlights',
     test: (n) =>
       /\bHEADLIGHTS?\b/.test(n) ||
+      /\bHEADLAMPS?\b/.test(n) ||
+      /\bHDLGT\b/.test(n) ||
       /\bSEALED BEAMS?\b/.test(n) ||
       /\bCRYSTAL HEADLIGHTS?\b/.test(n) ||
       /\bLED HEADLIGHTS?\b/.test(n) ||
       /\bH4\b/.test(n) ||
       /\b7.?\s?ROUND\b/.test(n) ||
       /\bAUXILIARY HEADLIGHTS?\b/.test(n) ||
-      /\bAUXILIARY (LIGHTS?|HIGH BEAM)\b/.test(n) ||
+      /\bAUXILIARY (LIGHTS?|LAMPS?|HIGH BEAM)\b/.test(n) ||
       /\bPASSING LIGHTS?\b/.test(n) ||
+      /\bPASSING LAMPS?\b/.test(n) ||
       /\bFOG LIGHTS?\b/.test(n) ||
-      /\bSPOT LIGHTS?\b/.test(n),
+      /\bFOG LAMPS?\b/.test(n) ||
+      /\bSPOTLIGHTS?\b/.test(n) ||
+      /\bSPOT LIGHTS?\b/.test(n) ||
+      /\bSPOTLAMPS?\b/.test(n),
   },
   {
     subcategory: 'Turn Signals',
     test: (n) =>
       /\bTURN SIGNALS?\b/.test(n) ||
+      /\bT\/S\b/.test(n) ||
+      /\bTS\s/.test(n) ||
       /\bAMBER (TURN )?SIGNALS?\b/.test(n) ||
       /\bLED TURN SIGNALS?\b/.test(n) ||
       /\bBULLET (STYLE )?TURN SIGNALS?\b/.test(n) ||
       /\bSMOKE (TURN )?SIGNALS?\b/.test(n) ||
       /\bMINI TURN SIGNALS?\b/.test(n) ||
       /\bCLEAR TURN SIGNALS?\b/.test(n) ||
+      /\bINDICATOR LIGHTS?\b/.test(n) ||
       /\bRELOCATION KITS?\b/.test(n),
   },
   {
     subcategory: 'Taillights',
     test: (n) =>
       /\bTAILLIGHTS?\b/.test(n) ||
+      /\bTAILLAMPS?\b/.test(n) ||
       /\bBRAKE LIGHTS?\b/.test(n) ||
-      /\bLED TAILLIGHTS?\b/.test(n),
+      /\bBRAKE LAMPS?\b/.test(n) ||
+      /\bLED TAILLIGHTS?\b/.test(n) ||
+      /\bTAIL LAMP\b/.test(n),
   },
   {
     subcategory: 'Running Lights',
-    test: (n) =>
+    test: (n, b) =>
       /\bRUNNING LIGHTS?\b/.test(n) ||
+      /\bRUNNING LAMPS?\b/.test(n) ||
       /\bLED RUNNING LIGHTS?\b/.test(n) ||
       /\bDAYTIME RUNNING LIGHTS?\b/.test(n) ||
       /\bSTRIP LIGHTS?\b/.test(n) ||
+      /\bSTRIP LAMPS?\b/.test(n) ||
       /\bSTRIP LIGHTING\b/.test(n) ||
       /\bFENDER LIGHTS?\b/.test(n) ||
-      /\bLED DAYTIME\b/.test(n),
+      /\bFENDER LAMPS?\b/.test(n) ||
+      /\bFENDER TIP\b/.test(n) ||
+      /\bLED DAYTIME\b/.test(n) ||
+      /\bSADDLEBAG LIGHTS?\b/.test(n) ||
+      /\bBAG LIGHTS?\b/.test(n) ||
+      /\bWHEEL LIGHTS?\b/.test(n) ||
+      /\bWHEEL LAMPS?\b/.test(n) ||
+      /\bPANEL LIGHTS?\b/.test(n) ||
+      /\bTOUR PACK LIGHTS?\b/.test(n) ||
+      /\bTOURPACK\b/.test(n) ||
+      /\bLATCH LIGHTS?\b/.test(n) ||
+      /\bANTENNA LIGHTS?\b/.test(n) ||
+      /\bSTRUT LIGHTS?\b/.test(n) ||
+      /\bACCENT LIGHTS?\b/.test(n) ||
+      /\bWIZARD LIGHTS?\b/.test(n) ||
+      /\bLUCIFER LIGHTS?\b/.test(n) ||
+      /\bMARKER LIGHTS?\b/.test(n) ||
+      /\bMARKER LAMPS?\b/.test(n) ||
+      /\bFAIRING LIGHTS?\b/.test(n) ||
+      /\bFAIRING LAMPS?\b/.test(n) ||
+      /\bBLADE LIGHTS?\b/.test(n) ||
+      /\bSIGNAL LIGHTS?\b/.test(n) ||
+      /\bSIGNAL INSERTS?\b/.test(n) ||
+      /\bEGG STYLE\b/.test(n) ||
+      /\bHANDLEBAR\b/.test(n) ||
+      /\bBULLET LAMPS?\b/.test(n) ||
+      /\bBLACKOUT\b/.test(n) ||
+      /\bHOT SPOT\b/.test(n) ||
+      /\bPAWN\b/.test(n) ||
+      /\bLIGHTNING BOLTS?\b/.test(n) ||
+      /\bASTRO\b/.test(n) ||
+      b === 'CUSTOM DYNAMICS',
   },
   {
     subcategory: 'License Plate Lights',
     test: (n) =>
       /\bLICENSE PLATES?\b/.test(n) ||
       /\bPLATE LIGHTS?\b/.test(n) ||
-      /\bLED PLATE\b/.test(n),
+      /\bLED PLATE\b/.test(n) ||
+      /\bLIGHTED.*LIC\b/.test(n),
   },
   {
     subcategory: 'Reflectors & Lenses',
     test: (n) =>
-      (/\bREFLECTORS?\b/.test(n) || /\bLENSES?\b/.test(n)) &&
+      (/\bREFLECTORS?\b/.test(n) || /\bLENSES?\b/.test(n) || /\bREPLACEMENT\b/.test(n)) &&
       !/\bHEADLIGHT/.test(n),
   },
   {
     subcategory: 'Lighting Covers',
     test: (n) =>
       /\bHEADLIGHT (COVERS?|VISORS?|TRIM RINGS?|FACEPLATES?|BUCKET COVERS?|BRACKETS?|BUCKETS?|HOUSINGS?|SHELLS?|TRIMS?)\b/.test(n) ||
-      /\bLED VISORS?\b/.test(n),
+      /\bLED VISORS?\b/.test(n) ||
+      /\bMOUNT KITS?\b/.test(n) ||
+      /\bCOWLS?\b/.test(n),
   },
   {
     // Broadest catch-all — runs LAST so specific names claim themselves first.
     subcategory: 'Lighting Components & Accessories',
     test: (n) =>
       /\bBULBS?\b/.test(n) ||
+      /\bLED INSERTS?\b/.test(n) ||
+      /\bLED BAU\b/.test(n) ||
+      /\bFILAMENT\b/.test(n) ||
       /\bSOCKETS?\b/.test(n) ||
       /\bWIRES?\b/.test(n) ||
       /\bWIRING\b/.test(n) ||
@@ -155,18 +206,23 @@ const RULES = [
   },
 ];
 
-// Fallback net — starts empty since the real old-subcategory names for this
-// category aren't known yet. Populate after the first audit run, same
-// pattern as every previous rebuild's FALLBACK_BY_OLD_SUBCAT.
+// Fallback net — informed by the real old-subcategory names from the audit.
 const FALLBACK_BY_OLD_SUBCAT = {
-  // e.g. 'Headlights & Housings': 'Headlights',
+  'Auxiliary Lighting': 'Running Lights',
+  'Headlights': 'Headlights',
+  'Taillights': 'Taillights',
+  'Bulbs': 'Lighting Components & Accessories',
+  'Lighting Controls': 'Lighting Parts',  // Control modules are cross-category (Electrical), not a real Lighting subcategory
+  'License Plate Lighting': 'License Plate Lights',
+  'Turn Signals': 'Turn Signals',
 };
 const DEFAULT_FALLBACK = 'Lighting Parts'; // not in the original spec — added so nothing is left unclassified
 
-function classify(name) {
+function classify(name, brand) {
   const n = (name || '').toUpperCase();
+  const b = (brand || '').toUpperCase();
   for (const rule of RULES) {
-    if (rule.test(n)) return rule.subcategory;
+    if (rule.test(n, b)) return rule.subcategory;
   }
   return null;
 }
@@ -198,7 +254,7 @@ async function main() {
 
     for (const row of candidates.rows) {
       const oldSub = row.display_subcategory || '(blank)';
-      let result = classify(row.name);
+      let result = classify(row.name, row.brand);
       let isFallback = false;
       if (!result) {
         result = FALLBACK_BY_OLD_SUBCAT[oldSub] || DEFAULT_FALLBACK;

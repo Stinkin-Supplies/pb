@@ -1,5 +1,5 @@
 # STINKIN' SUPPLIES — PROJECT ROADMAP
-**Last Updated: July 8, 2026 (Seventy-Sixth Pass)**
+**Last Updated: July 10, 2026 (Seventy-Seventh Pass)**
 
 ---
 
@@ -95,20 +95,39 @@
 
 ---
 
+## ▶ NEXT UP — BRAKES, then the 8-category queue
+
+**Next target: `Brakes`** — 5,881 rows, 526 null subcategory. Within-category rebuild. Brakes was deliberately excluded from both the Cables and Gaskets & Seals migrations (Laken's explicit call, twice) — do not undo that. See HANDOFF_LOG "NEXT SESSION: START HERE" for the full brief, including the 6 `Cable Clamp - Throttle/Idle/Brake` rows to adjudicate and the brake parts found stranded in Accessories & Misc and Suspension.
+
+**Then: ~8 more categories, three named so far.** None map cleanly onto live categories — each is a different operation and they overlap, so confirm scope and run order before touching any:
+- **Tanks & Oil Filters** — new category / migration. Gas tanks currently in `Fenders & Body`; oil filters in Engine and/or Tools & Chemicals.
+- **Dashes & Gauges** — rename of `Instrumentation` (1,026 rows), or a migration that also pulls dash panels from `Fenders & Body`?
+- **Frames & Suspension** — merge of `Frame & Hardware` (2,906) + `Suspension` (3,369)? Would eliminate two live categories.
+
+Five more unnamed. A migration pulling from `Fenders & Body` and a merge consuming `Suspension` will collide depending on order.
+
+**`Accessories & Misc` is 82% null (3,980 of 4,836)** — the largest gap, but likely a *re-routing* problem (VTWIN `COMMON MISC` dumping) rather than a subcategory problem. Don't attack it before the eight new categories are defined; those rows may be about to move.
+
+---
+
 ## ✅ PHASE 4 — TAXONOMY (Complete)
 
 | Item | Status |
 |------|--------|
-| display_category (21 confirmed values) | ✅ |
-| display_subcategory across all 20 display categories | ✅ |
-| Coverage 87–97% across categories | ✅ |
-| infer_vtwin_categories.mjs — VTWIN_CATEGORY_TO_DISPLAY map (28 source → 21 display); 566 products updated | ✅ |
+| display_category (**23 confirmed values** — Gaskets & Seals + Cables added session 77; Windshields & Fairings was already live but never recorded here) | ✅ |
+| display_subcategory across all **23** display categories | ✅ |
+| **9 of 23 categories at ZERO null subcategories** (Cables, Carburetion & Fuel, Electrical, Engine, Gaskets & Seals, Handlebar & Controls, Lighting, Transmission & Clutch, Windshields & Fairings). Remaining 14 still have nulls — Accessories & Misc worst at 82% | ✅ |
+| infer_vtwin_categories.mjs — VTWIN_CATEGORY_TO_DISPLAY map (28 source → 21 display); 566 products updated | ⚠️ **STALE** — map predates Cables and Gaskets & Seals (session 77). Next VTWIN import will route cable/gasket products back into Carburetion & Fuel, Transmission & Clutch, Engine. Must be updated before any re-import |
 | generate_vtwin_skus.js — full rewrite; reads catalog_unified, display_category→prefix map, writes internal_sku directly | ✅ |
 | Typesense reindexed with full subcategory facets | ✅ |
 | **display_category rebuild — 2,028 null-category gap closed** (session 74) — `rebuild_display_category_v2.mjs`; scope deliberately narrowed to the 2,028 null rows + 2 confirmed structural bugs (SADDLEBAGS, TANK gas/oil split) + 2 decisions (Kickstands → Foot Controls, Gas Caps & Petcocks → Fenders & Body) after a full-recompute dry run showed it would silently regress thousands of already-correct rows | ✅ |
 | **display_subcategory_detail — new tier-3 column** (session 74) — Category → Subcategory → Detail, added for the 37 subcategories clearing a >700-row threshold; every split evidence-based from real name-prefix mining, not guessed; 36,350 of 76,491 eligible products classified; full FilterSidebar/browse.ts/Typesense wiring shipped as the first 3-level nested filter in the codebase | ✅ |
 | Windshield Hardware & Parts merged into Windshields subcategory (267 products) | ✅ Session 74 |
 | **Seating category — full rebuild** (session 76) — hardware/pad/backrest miscategorization fixed (239 hardware → Seat Hardware with new Detail buckets, 11 pad rows → Seat Pads & Covers, 2 backrest rows → Backrests); `lib/db/browse.ts` sort-order bug fixed (`detail_priority` computed column, hardware no longer outranks real products under price-ascending default); 256,143 fitment rows backfilled via new name-extraction script; 166 products' fitment corrected (FL/FX combo miscode → Softail, was wrongly Touring+Dyna) | ✅ |
+| **Nine taxonomy scripts shipped** (session 77) — Engine, Transmission & Clutch, Electrical, Lighting, Handlebar & Controls rebuilt in place; Carburetion & Fuel applied (was left at dry-run stage session 76); **Gaskets & Seals** and **Cables** created as new top-level categories. All nine now at zero null subcategories | ✅ |
+| **Gaskets & Seals — NEW top-level display_category** (session 77) — `audit_gaskets_seals_scope.mjs` (read-only scoping first) → `fix_gaskets_seals_migration.mjs`. 4,242 rows migrated from Engine (3,030 + scattered name-matches), Transmission & Clutch, Suspension (`Fork Seals & Boots` wholesale), Wheels & Tires (name-matched *within* `Bearings & Seals` only — dry run 1 revealed the audit's "34 rows" was the seal-named subset, not the 238-row subcategory total, so moving it wholesale would have dragged 200 unrelated bearings), Exhaust. Brakes and Tools & Chemicals deliberately untouched | ✅ |
+| **Cables — NEW top-level display_category** (session 77) — `fix_cables_taxonomy.mjs`. 4,395 rows from six categories (Handlebar & Controls 3,874, Carburetion & Fuel 229, Transmission & Clutch 196, Instrumentation 60, Accessories & Misc 29, Foot Controls 3, Frame & Hardware 3, Luggage & Racks 1). 8 subcategories; Detail on Cable & Line Kits and Cable Hardware. `LINE` = hydraulic, `CABLE` = mechanical, uniform across vendors. Brakes/Electrical untouched. **⚠️ Known live bug:** the `HOSE HYDRAULIC CLUTCH` raw-subcategory shortcut misfiles 9 rows named `Clutch Cable` as hydraulic lines — hand-corrected post-apply, script not yet patched | ✅ |
+| **Category-level migration is a different script shape than within-category rebuilds** (session 77) — no blanket fallback (an unmatched row hasn't earned its way into a new category); name-level EXCLUDE guards, because a `display_category NOT IN (...)` filter is insufficient when out-of-scope products sit in the wrong category to begin with; a REROUTE stage moving mis-netted rows to their correct home in the same transaction; a read-only scoping audit before any classification logic is written | ✅ |
 | **Exhaust category — full rebuild** (session 76) — 269 blank subcategories filled, 569 new Detail assignments on Exhaust Parts bucket (Heat Shields, Baffles, Clamps & Brackets, Wrap & Packing, O2 Sensors & Bungs, etc.); 838 total rows updated; 21 cross-category miscategorizations found and flagged (15 engine valves, 5 grips, 1 brake tool) | ✅ |
 
 ---
