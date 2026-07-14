@@ -6,6 +6,13 @@
 // Run: node scripts/ingest/audit_brakes_holdback.mjs > brakes_holdback_audit.txt 2>&1
 
 import pg from 'pg';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, '../../.env.local') });
+
 const { Pool } = pg;
 
 const pool = new Pool({
@@ -25,7 +32,7 @@ async function main() {
     console.log('\n=== 2. Full untruncated rows, grouped by source_vendor ===');
     const rowsRes = await client.query(`
       SELECT id, source_vendor, sku, vendor_sku, name, category AS raw_category,
-             subcategory AS raw_subcategory, brand, price
+             subcategory AS raw_subcategory, brand
       FROM catalog_unified
       WHERE display_category = 'Brakes' AND display_subcategory IS NULL AND is_active = true
       ORDER BY source_vendor, raw_category, name
@@ -39,7 +46,7 @@ async function main() {
       // "Floating Stainless Steel Mirror..." truncated name check
     ];
     const nameLikeRes = await client.query(`
-      SELECT id, source_vendor, sku, name, category AS raw_category, subcategory AS raw_subcategory, price
+      SELECT id, source_vendor, sku, name, category AS raw_category, subcategory AS raw_subcategory
       FROM catalog_unified
       WHERE is_active = true AND (
         name ILIKE '%DOT 4%Brake Fluid%'
@@ -57,7 +64,7 @@ async function main() {
     console.log('\n=== 4. Lever-set ambiguous rows (brake+clutch combined SKUs) ===');
     const leverSetRes = await client.query(`
       SELECT id, source_vendor, sku, name, category AS raw_category, subcategory AS raw_subcategory,
-             display_category, display_subcategory, price
+             display_category, display_subcategory
       FROM catalog_unified
       WHERE is_active = true
         AND (name ILIKE '%lever set%' OR name ILIKE '%RACE LEVERS%' OR name ILIKE '%ANTHEM%LEVER%')
@@ -69,7 +76,7 @@ async function main() {
 
     console.log('\n=== 5. Confirmed non-brake rows sitting in display_category=Brakes (clutch/shifter/air-cleaner) ===');
     const wrongCatRes = await client.query(`
-      SELECT id, source_vendor, sku, name, category AS raw_category, subcategory AS raw_subcategory, price
+      SELECT id, source_vendor, sku, name, category AS raw_category, subcategory AS raw_subcategory
       FROM catalog_unified
       WHERE is_active = true AND display_category = 'Brakes'
         AND (
@@ -85,7 +92,7 @@ async function main() {
 
     console.log('\n=== 6. Still-carried-forward out-of-scope items (Colony tool, Spring Fork Cable Kit) ===');
     const carriedRes = await client.query(`
-      SELECT id, source_vendor, sku, name, display_category, display_subcategory, price
+      SELECT id, source_vendor, sku, name, display_category, display_subcategory
       FROM catalog_unified
       WHERE is_active = true AND (
         name ILIKE '%Brake Shaft Crossover Bushing Tool%'
