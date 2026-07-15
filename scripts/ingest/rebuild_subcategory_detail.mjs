@@ -292,6 +292,205 @@ const CLASSIFIERS = {
     if (/rear/.test(n)) return 'Rear Turn Signals';
     return null;
   },
+  // Added 2026-07-15 at Laken's request ("there is a ton of hardware inside
+  // the speedometer subcat" led into "how do I get a 3rd level filter on gas
+  // tanks") — 1,387-row subcategory, 99.7% coverage after folding a few
+  // sub-50-row clusters (tank bibs, fuel doors, tank lift kits, grommets)
+  // into neighboring buckets per this script's stopping rule. 2 genuinely
+  // misfiled "Quickbob Rear Fender" rows left unclassified on purpose --
+  // those belong in a different top-level subcategory entirely, not a
+  // tier-3 fix.
+  'Tanks & Body|Gas Tanks & Gas Caps': (n) => {
+    if (/non.?vented/.test(n)) return 'Non-Vented Gas Caps';
+    if (/vented/.test(n)) return 'Vented Gas Caps';
+    if (/petcock|shut.?off (rod|knob|valve)/.test(n)) return 'Fuel Petcocks';
+    if (/emblem|trim|tank bib|\bdoor\b|\bconsole\b|panel insert|panel for.*tank/.test(n)) return 'Gas Tank Trim & Emblems';
+    if (/sender|mount|bracket|spacer|fitting|bung|grommet|adapter|lift kit|blockoff/.test(n)) return 'Gas Tank Hardware';
+    if (/gas cap|fuel cap/.test(n)) return 'Gas Caps (Other)';
+    if (/gallon|gas tank|fuel tank|\btank\b/.test(n)) return 'Gas Tanks';
+    return null;
+  },
+
+  // Added 2026-07-15, second request: "run the details tier category option
+  // on any buckets over 150" across every category audited this session.
+  // 24 buckets, one classifier each, built from real-name sampling per
+  // bucket (not guessed from the subcategory label). Coverage varies --
+  // some content is naturally hard to split further (e.g. plain hardware
+  // bolt/nut listings), accepted per this script's stopping rule.
+  'Windshields & Fairings|Windshields': (n) => {
+    if (/dark smoke/.test(n)) return 'Dark Smoke Tint';
+    if (/smoke/.test(n)) return 'Smoke Tint';
+    if (/\bclear\b/.test(n)) return 'Clear';
+    if (/solar/.test(n)) return 'Solar Tint';
+    if (/light tint/.test(n)) return 'Light Tint';
+    return null;
+  },
+  'Windshields & Fairings|Mounts, Brackets & Hardware': (n) => {
+    if (/trigger.?lock/.test(n)) return 'Trigger-Lock Mounting Kits';
+    if (/mounting kit|mount kit/.test(n)) return 'Mounting Kits';
+    if (/bracket/.test(n)) return 'Brackets';
+    if (/strap|screw|nut|bushing|assembly/.test(n)) return 'Hardware';
+    return null;
+  },
+  'Windshields & Fairings|Fairings': (n) => {
+    if (/batwing/.test(n)) return 'Batwing Fairings';
+    if (/mounting kit|mount kit|support/.test(n)) return 'Mounting Kits';
+    if (/bracket/.test(n)) return 'Brackets';
+    if (/vent|screen/.test(n)) return 'Vents & Screens';
+    if (/fairing/.test(n)) return 'Fairings';
+    return null;
+  },
+  'Dashes & Gauges|Speedometers': (n) => {
+    if (/gps/.test(n)) return 'GPS Speedometers';
+    if (/tachometer/.test(n)) return 'Speedo/Tach Combos';
+    if (/programmable|electronic|digital|\bled\b/.test(n)) return 'Electronic Speedometers';
+    if (/\bface\b|tin/.test(n)) return 'Speedometer Faces';
+    if (/housing/.test(n)) return 'Speedometer Housings';
+    if (/ratio|needle|mechanical/.test(n)) return 'Mechanical Speedometers';
+    return null;
+  },
+  'Dashes & Gauges|Tank Dashes/ Console & Accessories': (n) => {
+    if (/dash panel/.test(n)) return 'Dash Panels';
+    if (/dash cover|dash kit/.test(n)) return 'Dash Covers & Kits';
+    if (/bracket|mount/.test(n)) return 'Dash Mounting Hardware';
+    if (/dash base/.test(n)) return 'Dash Bases';
+    return null;
+  },
+  'Dashes & Gauges|Mounts, Housing & Hardware': (n) => {
+    if (/t-bar gauge mount|gauge mount|gauge cup/.test(n)) return 'Gauge Mounts';
+    if (/adapter ring|adapter kit/.test(n)) return 'Adapter Rings';
+    if (/oil (gauge|pressure)/.test(n)) return 'Oil Gauge Hardware';
+    if (/indicator light|instrument panel/.test(n)) return 'Indicator & Panel Hardware';
+    if (/handlebar clamp|clamp mount/.test(n)) return 'Handlebar Clamp Mounts';
+    return null;
+  },
+  'Dashes & Gauges|Misc Gauges': (n) => {
+    if (/oil pressure gauge/.test(n)) return 'Oil Pressure Gauges';
+    if (/oil temp/.test(n)) return 'Oil Temperature Gauges';
+    if (/fuel gauge/.test(n)) return 'Fuel Gauges';
+    if (/gauge kit|multi.?function|gauge cluster/.test(n)) return 'Multi-Gauge Kits';
+    if (/fitting/.test(n)) return 'Gauge Fittings';
+    return null;
+  },
+  'Tanks & Body|Oil & Fuel Lines': (n) => {
+    if (/fuel valve|petcock/.test(n)) return 'Fuel Valves & Petcocks';
+    if (/fuel line|fuel hose/.test(n)) return 'Fuel Lines & Hoses';
+    if (/oil line|oil hose/.test(n)) return 'Oil Lines & Hoses';
+    if (/fuel pump|fuel injector|regulator/.test(n)) return 'Fuel Pumps & Injectors';
+    if (/fitting|clamp|barb/.test(n)) return 'Fittings & Clamps';
+    return null;
+  },
+  'Tanks & Body|Front Fender & Hardware': (n) => {
+    if (/mount|bracket|relocator/.test(n)) return 'Mounting Hardware';
+    if (/tip|trim|rail/.test(n)) return 'Trim & Tips';
+    if (/front fender/.test(n)) return 'Front Fenders';
+    return null;
+  },
+  'Tanks & Body|Rear Fender, Struts & Hardware': (n) => {
+    if (/strut/.test(n)) return 'Fender Struts';
+    if (/mount|bracket|bolt kit|stud plate/.test(n)) return 'Mounting Hardware';
+    if (/tip|trim|insert/.test(n)) return 'Trim & Tips';
+    if (/rear fender/.test(n)) return 'Rear Fenders';
+    return null;
+  },
+  'Tanks & Body|License Plates': (n) => {
+    if (/light|lamp|\bled\b/.test(n)) return 'License Plate Lights';
+    if (/frame/.test(n)) return 'License Plate Frames';
+    if (/mount|bracket/.test(n)) return 'License Plate Mounts & Brackets';
+    if (/topper/.test(n)) return 'License Plate Toppers';
+    if (/bolt|screw/.test(n)) return 'License Plate Hardware';
+    return null;
+  },
+  'Tanks & Body|Oil Tank & Dipsticks': (n) => {
+    if (/dipstick/.test(n)) return 'Dipsticks';
+    if (/\bcap\b|cover/.test(n)) return 'Oil Tank Caps & Covers';
+    if (/mount|bracket|plate/.test(n)) return 'Oil Tank Mounting Hardware';
+    if (/oil tank/.test(n)) return 'Oil Tanks';
+    return null;
+  },
+  'Tanks & Body|General': (n) => {
+    if (/spacer|brace/.test(n)) return 'Fender Spacers';
+    if (/skin|bib|chap/.test(n)) return 'Fender Skins & Bibs';
+    if (/trim|ornament/.test(n)) return 'Fender Trim';
+    if (/mud flap/.test(n)) return 'Mud Flaps';
+    if (/\btip\b/.test(n)) return 'Fender Tips';
+    if (/fender/.test(n)) return 'Fender Accessories (Other)';
+    return null;
+  },
+  'Frames & Suspension|Front Forks': (n) => {
+    if (/spring(er)? fork/.test(n)) return 'Springer Fork Parts';
+    if (/fork tube/.test(n)) return 'Fork Tubes';
+    if (/slider|assembly/.test(n)) return 'Fork Sliders & Assemblies';
+    if (/bushing|seal|cartridge/.test(n)) return 'Fork Internals';
+    if (/steering damper/.test(n)) return 'Steering Dampers';
+    if (/\bbolt\b|\bnut\b|\bwasher\b|\bstud\b/.test(n)) return 'Fork Hardware';
+    return null;
+  },
+  'Frames & Suspension|Shocks': (n) => {
+    if (/lowering kit/.test(n)) return 'Lowering Kits';
+    if (/reservoir/.test(n)) return 'Remote Reservoir Shocks';
+    if (/mount|stud|bracket/.test(n)) return 'Shock Mounting Hardware';
+    if (/shock/.test(n)) return 'Shocks';
+    return null;
+  },
+  'Frames & Suspension|Frames': (n) => {
+    if (/swingarm/.test(n)) return 'Swingarms';
+    if (/replica.*frame|rigid.*frame|frame.*kit|ensemble/.test(n)) return 'Complete Frame Kits';
+    if (/\bbolt\b|\bnut\b|bracket|bushing|\btab\b/.test(n)) return 'Frame Hardware';
+    return null;
+  },
+  'Frames & Suspension|Triple Trees': (n) => {
+    if (/triple tree set|dominator tree|tree set/.test(n)) return 'Complete Triple Tree Sets';
+    if (/upper.*tree|lower.*tree|top tree|bottom tree/.test(n)) return 'Individual Trees';
+    if (/\bnut\b|\bbolt\b|\bstud\b|stem|cover|shield/.test(n)) return 'Triple Tree Hardware';
+    return null;
+  },
+  'Hardware|Bolts & Screws': (n) => {
+    if (/bolt kit|bolt set/.test(n)) return 'Bolt Kits';
+    if (/screw/.test(n)) return 'Screws';
+    if (/bolt/.test(n)) return 'Bolts';
+    return null;
+  },
+  'Hardware|Nuts & Washers': (n) => {
+    if (/washer/.test(n)) return 'Washers';
+    if (/acorn|cap nut/.test(n)) return 'Acorn & Cap Nuts';
+    if (/nylon nut/.test(n)) return 'Nylon Nuts';
+    if (/nut/.test(n)) return 'Hex Nuts';
+    return null;
+  },
+  'Hardware|Bolt Caps': (n) => {
+    if (/allen socket cap (bolt|screw)|allen cap screw/.test(n)) return 'Allen Socket Cap Bolts';
+    if (/hex cap bolt/.test(n)) return 'Hex Cap Bolts';
+    if (/plug/.test(n)) return 'Socket Plugs';
+    return null;
+  },
+  'Accessories & Gear|Merchandising': (n) => {
+    if (/t-shirt|hoodie|\bhat\b|knit/.test(n)) return 'Apparel';
+    if (/patch/.test(n)) return 'Patches';
+    if (/belt buckle/.test(n)) return 'Belt Buckles';
+    if (/model|plaque|\bsign\b/.test(n)) return 'Décor & Models';
+    return null;
+  },
+  'Accessories & Gear|Phone Accessories': (n) => {
+    if (/\bcase\b/.test(n)) return 'Phone Cases';
+    if (/charg/.test(n)) return 'Charging';
+    if (/mount|\bball\b|\barm\b|clamp|\bbase\b/.test(n)) return 'Mounts';
+    return null;
+  },
+  'Accessories & Gear|Towing Equipment': (n) => {
+    if (/lock|alarm/.test(n)) return 'Locks & Alarms';
+    if (/\bchain\b/.test(n)) return 'Chains';
+    if (/trailer hitch/.test(n)) return 'Trailer Hitches';
+    if (/cargo net/.test(n)) return 'Cargo Nets';
+    if (/tie.?down|\bstrap\b|harness/.test(n)) return 'Straps & Tie-Downs';
+    if (/anchor/.test(n)) return 'Anchors';
+    return null;
+  },
+  'Accessories & Gear|Shop Books': (n) => {
+    if (/parts (book|manual)/.test(n)) return 'Parts Manuals';
+    if (/service.*manual|repair manual/.test(n)) return 'Service/Repair Manuals';
+    return null;
+  },
 };
 
 async function ensureShadowColumn(client) {

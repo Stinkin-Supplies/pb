@@ -32,13 +32,15 @@ const MONO    = "'IBM Plex Mono','Courier New',monospace";
 const DISPLAY = "'Bebas Neue','Barlow Condensed',sans-serif";
 const BODY    = "'Barlow','Barlow Condensed',sans-serif";
 
-// ── All 20 display categories ──────────────────────────────────
-const DISPLAY_CATEGORIES = [
+// Fallback only — used if /api/admin/catalog/categories can't be reached.
+// The real list is fetched live so it never drifts from catalog_unified
+// after a taxonomy merge/split (see HANDOFF_LOG "hardcoded category array").
+const FALLBACK_DISPLAY_CATEGORIES = [
   "Engine",
   "Exhaust",
   "Transmission & Clutch",
   "Handlebar & Controls",
-  "Suspension",
+  "Frames & Suspension",
   "Brakes",
   "Foot Controls",
   "Lighting",
@@ -46,39 +48,18 @@ const DISPLAY_CATEGORIES = [
   "Seating",
   "Carburetion & Fuel",
   "Wheels & Tires",
-  "Fenders & Body",
-  "Frame & Hardware",
-  "Instrumentation",
+  "Tanks & Body",
+  "Windshields & Fairings",
+  "Dashes & Gauges",
+  "Cables",
+  "Gaskets & Seals",
   "Luggage & Racks",
-  "Security & Covers",
+  "Hardware",
+  "Accessories & Gear",
   "Tools & Chemicals",
   "Riding Gear & Apparel",
-  "Accessories & Misc",
+  "Chopper Supplies",
 ];
-
-// Common subcategories per category — used for datalist suggestions
-const SUBCATEGORY_HINTS = {
-  "Engine":                  ["Gaskets & Seals", "Pistons & Rings", "Cams & Valvetrain", "Heads & Cylinders", "Oiling", "Primary Drive", "Covers & Hardware"],
-  "Exhaust":                 ["Headers", "Mufflers", "Full Systems", "Heat Shields", "Gaskets"],
-  "Transmission & Clutch":   ["Clutch Kits", "Clutch Plates", "Transmission Parts", "Shifter Parts", "Cables"],
-  "Handlebar & Controls":    ["Handlebars", "Grips", "Levers", "Mirrors", "Cables", "Risers & Clamps"],
-  "Suspension":              ["Fork Springs", "Fork Seals", "Rear Shocks", "Fork Tubes", "Triple Trees"],
-  "Brakes":                  ["Rotors", "Pads", "Calipers", "Master Cylinders", "Lines & Hoses", "Hardware"],
-  "Foot Controls":           ["Pegs & Boards", "Brake Pedals", "Shift Levers", "Heel-Toe Shifters"],
-  "Lighting":                ["Headlights", "Turn Signals", "Tail Lights", "Auxiliary Lights", "Bulbs"],
-  "Electrical":              ["Batteries", "Stators", "Regulators", "Ignition", "Wiring", "Switches"],
-  "Seating":                 ["Solo Seats", "Two-Up Seats", "Pads & Pans", "Seat Hardware"],
-  "Carburetion & Fuel":      ["Carburetors", "Jets & Needles", "Fuel Petcocks", "Air Cleaners", "Fuel Filters", "EFI Parts"],
-  "Wheels & Tires":          ["Wheels", "Tires", "Tubes", "Bearings", "Axles", "Sprockets"],
-  "Fenders & Body":          ["Front Fenders", "Rear Fenders", "Tanks", "Side Covers", "Fairing Parts"],
-  "Frame & Hardware":        ["Frame Parts", "Fasteners", "Footpegs Mounts", "Engine Mounts", "Swingarm"],
-  "Instrumentation":         ["Speedometers", "Tachometers", "Gauges", "Dash Hardware"],
-  "Luggage & Racks":         ["Saddlebags", "Tour Packs", "Racks", "Bag Hardware"],
-  "Security & Covers":       ["Covers", "Locks", "Alarms"],
-  "Tools & Chemicals":       ["Shop Tools", "Lubricants", "Cleaners", "Thread Lockers"],
-  "Riding Gear & Apparel":   ["Helmets", "Jackets", "Gloves", "Footwear", "Accessories"],
-  "Accessories & Misc":      ["Decorative", "Trim", "Universal Hardware", "NOS / Vintage"],
-};
 
 // ── Flag types ─────────────────────────────────────────────────
 const FLAG_TYPES = [
@@ -117,20 +98,50 @@ function parseCsvList(value) {
 // ── Main component ─────────────────────────────────────────────
 export default function AdminEditPanel({ product }) {
   const searchParams = useSearchParams();
-  const isAdmin = searchParams.get("admin") === "1";
+  const adminParam = searchParams.get("admin") === "1";
 
   // Read only the URL param during render (server-safe).
-  // sessionStorage is read after mount to avoid hydration mismatch.
+  // localStorage is read after mount to avoid hydration mismatch.
   const tokenFromQuery = searchParams.get("token") ?? "";
   const [storedToken, setStoredToken] = useState("");
   const [adminTokenInput, setAdminTokenInput] = useState("");
+  const [persistedAdminMode, setPersistedAdminMode] = useState(false);
 
   useEffect(() => {
-    const saved = sessionStorage.getItem("stinkin_admin_token") ?? "";
+    const saved = localStorage.getItem("stinkin_admin_token") ?? "";
     setStoredToken(saved);
+    setPersistedAdminMode(localStorage.getItem("stinkin_admin_mode") === "1");
   }, []);
 
+  // Visiting once with ?admin=1 turns the pencil button on for good --
+  // no need to keep adding the query param on every link.
+  useEffect(() => {
+    if (adminParam) localStorage.setItem("stinkin_admin_mode", "1");
+  }, [adminParam]);
+
+  const isAdmin = adminParam || persistedAdminMode;
+
   const activeToken = tokenFromQuery || storedToken || adminTokenInput.trim();
+
+  // Live category/subcategory list, straight from catalog_unified — falls
+  // back to the static list only if the fetch fails.
+  const [liveCategories, setLiveCategories] = useState(null);
+  useEffect(() => {
+    let active = true;
+    fetch("/api/admin/catalog/categories")
+      .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
+      .then((data) => { if (active) setLiveCategories(Array.isArray(data.categories) ? data.categories : null); })
+      .catch(() => { if (active) setLiveCategories(null); });
+    return () => { active = false; };
+  }, []);
+
+  const displayCategories = liveCategories
+    ? liveCategories.map((c) => c.name)
+    : FALLBACK_DISPLAY_CATEGORIES;
+
+  const subcategoryHints = liveCategories
+    ? Object.fromEntries(liveCategories.map((c) => [c.name, c.subcategories.map((s) => s.name)]))
+    : {};
 
   const [open, setOpen]         = useState(false);
   const [saving, setSaving]     = useState(false);
@@ -174,7 +185,7 @@ export default function AdminEditPanel({ product }) {
     return () => window.removeEventListener("keydown", handler);
   }, [open]);
 
-  const hints = SUBCATEGORY_HINTS[category] ?? [];
+  const hints = subcategoryHints[category] ?? [];
   const dirty = category    !== (product.displayCategory    ?? "")
              || subcategory !== (product.displaySubcategory ?? "")
              || fitsAll     !== Boolean(product.fitsAllModels ?? product.isUniversal ?? product.is_universal ?? false)
@@ -252,7 +263,7 @@ export default function AdminEditPanel({ product }) {
             image_urls:  images,
           };
 
-          sessionStorage.setItem("stinkin_admin_token", activeToken);
+          localStorage.setItem("stinkin_admin_token", activeToken);
           const res = await fetch(`/api/admin/products/${product.id}?token=${encodeURIComponent(activeToken)}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
@@ -400,7 +411,7 @@ export default function AdminEditPanel({ product }) {
                 type="button"
                 onClick={() => {
                   if (adminTokenInput.trim()) {
-                    sessionStorage.setItem("stinkin_admin_token", adminTokenInput.trim());
+                    localStorage.setItem("stinkin_admin_token", adminTokenInput.trim());
                   }
                 }}
                 style={{
@@ -484,7 +495,7 @@ export default function AdminEditPanel({ product }) {
                 }}
               >
                 <option value="">— Uncategorized —</option>
-                {DISPLAY_CATEGORIES.map((cat) => (
+                {(category && !displayCategories.includes(category) ? [category, ...displayCategories] : displayCategories).map((cat) => (
                   <option key={cat} value={cat}>{cat}</option>
                 ))}
               </select>
