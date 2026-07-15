@@ -179,11 +179,11 @@ export function useCart() {
 const EMPTY_CART = {
   cartItems:  [],
   isOpen:     false,
-  setIsOpen:  () => {},
-  addItem:    () => {},
-  updateQty:  () => {},
-  removeItem: () => {},
-  clearCart:  () => {},
+  setIsOpen:  (..._args) => {},
+  addItem:    (..._args) => {},
+  updateQty:  (..._args) => {},
+  removeItem: (..._args) => {},
+  clearCart:  (..._args) => {},
   itemCount:  0,
   subtotal:   0,
   userId:        null, // ← matches shape of real context

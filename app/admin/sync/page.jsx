@@ -7,7 +7,6 @@
 // ============================================================
 
 import { useState, useEffect, useCallback } from "react";
-import NavBar from "@/components/NavBar";
 
 const css = `
   *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
@@ -850,7 +849,6 @@ export default function SyncAdminPage() {
   return (
     <div className="sync-wrap">
       <style>{css}</style>
-      <NavBar activePage="admin" />
 
       <div className="sync-header">
         <div style={M({fontSize:9, color:"#a3822c", letterSpacing:"0.25em", marginBottom:6})}>ADMIN</div>

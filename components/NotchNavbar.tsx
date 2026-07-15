@@ -345,7 +345,7 @@ export default function NotchNavbar() {
         .notchnav-mobile-divider { height: 1px; }
 
         @media (max-width: 900px) {
-          .notchnav-links--left, .notchnav-links--right > a { display: none; }
+          .notchnav-links--left, .notchnav-links--right { display: none; }
           .notchnav-utility { border-left: none; padding-left: 0; margin-left: 0; }
           .notchnav-burger { display: flex; }
           .notchnav-mobile-actions { display: flex; }

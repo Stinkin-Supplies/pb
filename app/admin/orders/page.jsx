@@ -13,7 +13,6 @@
 // ============================================================
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import NavBar from "@/components/NavBar";
 
 // ── Styles (matches sync dashboard exactly) ───────────────────
 const css = `
@@ -329,7 +328,6 @@ export default function AdminOrdersPage() {
   return (
     <div className="wrap">
       <style>{css}</style>
-      <NavBar activePage="admin" />
 
       {/* Header */}
       <div className="hdr">

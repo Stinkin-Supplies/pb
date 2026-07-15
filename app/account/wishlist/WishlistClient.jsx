@@ -1,7 +1,6 @@
 "use client";
 // app/account/wishlist/WishlistClient.jsx
 import { useState } from "react";
-import NavBar from "@/components/NavBar";
 import { useCartSafe } from "@/components/CartContext";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 
@@ -78,8 +77,6 @@ export default function WishlistClient({ userId, initialItems }) {
   return (
     <div className="wl-wrap">
       <style>{css}</style>
-
-      <NavBar activePage="account" />
 
       {/* HEADER */}
       <div className="wl-header">

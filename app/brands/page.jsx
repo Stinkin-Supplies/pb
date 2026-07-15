@@ -7,7 +7,6 @@
 // ============================================================
 
 import { useState, useMemo, useEffect } from "react";
-import NavBar from "@/components/NavBar";
 
 const css = `
   *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
@@ -118,7 +117,6 @@ export default function BrandsPage() {
   return (
     <div className="brands-wrap">
       <style>{css}</style>
-      <NavBar activePage="brands" />
 
       {/* HERO */}
       <div className="brands-hero">

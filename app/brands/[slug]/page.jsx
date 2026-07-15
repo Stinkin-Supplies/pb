@@ -7,7 +7,6 @@
 // ============================================================
 
 import { useState, useEffect, useCallback, use } from "react";
-import NavBar from "@/components/NavBar";
 import { useCartSafe } from "@/components/CartContext";
 import { getProductImage } from "@/lib/getProductImage";
 import Image from "next/image";
@@ -169,7 +168,6 @@ export default function BrandDetailPage({ params }) {
   return (
     <div className="wrap">
       <style>{css}</style>
-      <NavBar activePage="brands" />
 
       {/* BREADCRUMB */}
       <div className="breadcrumb">

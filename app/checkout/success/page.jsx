@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 import { useCart } from "@/components/CartContext";
-import NavBar from "@/components/NavBar";
 
 export default function CheckoutSuccessPage() {
   const { clearCart } = useCart();
@@ -17,7 +16,6 @@ export default function CheckoutSuccessPage() {
   return (
     <div style={{ background:"#0a0909", minHeight:"100vh", color:"#f0ebe3",
                   fontFamily:"var(--font-stencil),sans-serif" }}>
-      <NavBar />
       <div style={{ maxWidth:600, margin:"0 auto", padding:"80px 24px", textAlign:"center" }}>
         <div style={{ fontFamily:"var(--font-caesar),sans-serif", fontSize:52,
                       letterSpacing:"0.05em", color:"#22c55e", marginBottom:12 }}>

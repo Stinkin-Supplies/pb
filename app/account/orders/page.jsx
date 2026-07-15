@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { formatMoney } from "@/lib/utils/money";
-import NavBar from "@/components/NavBar";
 
 const css = `
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -182,8 +181,6 @@ export default async function OrdersPage() {
   return (
     <div className="orders-wrap">
       <style>{css}</style>
-
-      <NavBar activePage="account" />
 
       <div className="orders-header">
         <div className="orders-header-inner">

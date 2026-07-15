@@ -5,7 +5,6 @@ const POINTS_TO_DOLLAR = 0.01; // 100 pts = $1
 const POINTS_PER_DOLLAR = 10;  // earn 10 pts per $1 spent
 const EXPIRY_DAYS = 365;
 
-import NavBar from "@/components/NavBar";
 
 const css = `
   *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
@@ -84,8 +83,6 @@ export default function PointsClient({ user, points, lifetimeSpend, orderCount, 
   return (
     <div className="pts-wrap">
       <style>{css}</style>
-
-      <NavBar activePage="account" />
 
       {/* HERO */}
       <div className="pts-hero">

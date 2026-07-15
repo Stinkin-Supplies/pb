@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import NavBar from "@/components/NavBar";
 import { useCart } from "@/components/CartContext";
 import AddressAutocomplete from "@/components/AddressAutocomplete";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
@@ -566,7 +565,6 @@ export default function CheckoutPage() {
     return (
       <div className="checkout-wrap">
         <style>{css}</style>
-        <NavBar activePage="shop" />
         <div className="empty">YOUR CART IS EMPTY</div>
       </div>
     );
@@ -575,7 +573,6 @@ export default function CheckoutPage() {
   return (
     <div className="checkout-wrap">
       <style>{css}</style>
-      <NavBar activePage="shop" />
       <div className="checkout-inner">
         {/* LEFT — Order Summary */}
         <div>

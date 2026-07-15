@@ -1,7 +1,6 @@
 "use client";
 // app/account/AccountClient.jsx
 import { useState } from "react";
-import NavBar from "@/components/NavBar";
 import AddressAutocomplete from "@/components/AddressAutocomplete";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 
@@ -135,8 +134,6 @@ export default function AccountClient({ user, initialAddresses }) {
   return (
     <div className="acc-wrap">
       <style>{css}</style>
-
-      <NavBar activePage="account" />
 
       {/* HEADER */}
       <div className="acc-header">
