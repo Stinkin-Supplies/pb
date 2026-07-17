@@ -2,7 +2,6 @@ import { Analytics }     from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import CartRoot     from "@/components/CartRoot";
 import Footer       from "@/components/Footer";
-import BottomNav    from "@/components/BottomNav";
 import NotchNavbar  from "@/components/NotchNavbar";
 import { Share_Tech_Mono, Barlow } from "next/font/google";
 import localFont from "next/font/local";
@@ -95,7 +94,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <NotchNavbar />
           {children}
           <Footer />
-          <BottomNav />
           <Analytics />
           <SpeedInsights />
         </CartRoot>

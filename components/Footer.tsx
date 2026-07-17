@@ -5,7 +5,7 @@ export default function Footer() {
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
-        padding: "12px 16px 80px", // 80px bottom clears the BottomNav pill
+        padding: "12px 16px",
         backgroundColor: "#0a0a0a",
         borderTop: "1px solid #111",
       }}

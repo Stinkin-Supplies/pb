@@ -4,7 +4,7 @@
  * app/browse/page.jsx
  * Mobile-first: sidebar is always-visible on desktop (≥769px).
  * On mobile: sidebar is hidden, filter opens as bottom sheet triggered by
- * floating pill button OR the BottomNav hamburger (via 'stinkin:filterToggle' window event).
+ * the floating "FILTER" pill button.
  */
 
 import { useState, useEffect, useCallback, Suspense } from "react";
@@ -70,13 +70,6 @@ function BrowsePageInner() {
     max_price:          searchParams.get("max_price")        ? parseFloat(searchParams.get("max_price")) : null,
     sort:               searchParams.get("sort")             || "relevance",
   });
-
-  // ── Listen for BottomNav hamburger event ─────────────────────
-  useEffect(() => {
-    const handler = () => setSidebarOpen(o => !o);
-    window.addEventListener("stinkin:filterToggle", handler);
-    return () => window.removeEventListener("stinkin:filterToggle", handler);
-  }, []);
 
   // ── Debounce search input → filters.q ────────────────────────
   useEffect(() => {

@@ -9,11 +9,9 @@
 // Rebuilt with plain CSS + inline styles against the site's real design
 // tokens (--black/--gold/--cream, Tanker/Bespoke/Barlow) and real routes.
 //
-// This is a DESKTOP-FIRST top nav. BottomNav.tsx remains the mobile-first
-// bottom orb nav for now — see UI_OVERHAUL_ROADMAP.md Phase 1 for the plan
-// to eventually consolidate into one responsive nav. Until then this
-// renders top on all sizes but is tuned to stay out of BottomNav's way on
-// mobile (compact single-row, no notch cutouts below 769px).
+// The site's only nav — BottomNav.tsx was retired (see UI_OVERHAUL_ROADMAP.md
+// Phase 1). Renders top on all sizes: full pill on desktop, compact
+// single-row with hamburger panel below 900px.
 //
 // Reads userId / cart count from CartContext (useCartSafe) so it works
 // even if ever rendered outside <CartProvider>.
@@ -78,7 +76,7 @@ export default function NotchNavbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { itemCount, userId, setIsOpen: setCartOpen } = useCartSafe();
 
-  // Keep off the DB/admin console the same way BottomNav does
+  // Keep off the DB/admin console
   if (pathname === "/database" || pathname?.startsWith("/admin")) return null;
 
   const isActive = (href: string) => pathname === href || (href !== "/" && pathname?.startsWith(href));

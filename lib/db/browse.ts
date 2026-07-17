@@ -168,6 +168,65 @@ const DEDUP_KEY = `
   )
 `.trim();
 
+// ── Manually curated subcategory display groups ────────────────────────────
+// Session 89: Laken's standing policy — subcategory facets should present
+// "like things grouped together, alphabetical within the group" rather than
+// raw count-DESC, at least for categories that have been through a full
+// taxonomy pass. Per-category opt-in: the array below is the "type" group
+// (the primary product-style choices for that category) shown first,
+// alphabetically; everything else in the category follows, also
+// alphabetical. Categories with no entry here are unaffected — they keep
+// the original count-DESC order until they get the same curation pass (see
+// project-catalog-taxonomy-cleanup memory: retroactive work is tracked for
+// every category finished before this policy existed).
+const SUBCATEGORY_DISPLAY_GROUPS: Record<string, string[]> = {
+  'Handlebars & Hand Controls': [
+    // the actual handlebar-style choices — grouped first, alphabetical
+    'Ape Hangers', 'Drag Style Bars', 'Moto Style', 'Plain Handlebar',
+    'Replica Handlebars', 'T-Bars', 'Z-Bars',
+  ],
+  // Session 89 retroactive pass: every subcategory here is a distinct
+  // product type (no leftover/support bucket), so the "type group" is
+  // just the full alphabetized list.
+  'Saddlebags, Sissy Bars & Luggage': [
+    'Bags, Packs & Duffels', 'Luggage Racks', 'Saddle Bag Accessories',
+    'Saddlebag Latches, Mounts & Hardware', 'Saddlebags, Lids & Covers',
+    'Sissy Bar Pads & Bags', 'Sissy Bars, Sideplates & Hardware',
+    'Tool Boxes & Mounts', 'Tour Pak & Accessories',
+  ],
+  'Gaskets & Seals': [
+    'Brakes', 'Carbs', 'Electric & Lighting', 'Engine', 'Exhaust', 'Forks',
+    'Transmission',
+  ],
+  // Seating splits primarily by motorcycle platform/usage, not part type —
+  // the "type" choices are the platform/usage buckets; the remaining
+  // support buckets (Accessories, Seat Knobs/Screws, Seating Hardware)
+  // sort alphabetically after.
+  'Seating': [
+    'Chopper/Rigid/Buddy', 'Dyna (FXD)', 'FXR', 'Pillion Pads',
+    'Softail (FL/FX) (FLS/FXS)', 'Solo Seats', 'Sportster (XL)',
+    'Touring (FLH/FLT)', 'Touring Back Rest', 'Universal & Styled Seats',
+  ],
+  // Session 90: rebuilt from Laken's finalized 15-bucket spec; no separate
+  // non-type leftover bucket (General is one of her own named buckets), so
+  // the type group is the full alphabetized list.
+  'Fuel, Air & Carburetors': [
+    'Air Cleaner', 'Air Cleaner Adapters', 'Air Cleaner Mounts, Brackets & Hardware',
+    'Air Filter', 'Backing Plates', 'Breather Bolts', 'Carburetor', 'Flange',
+    'Fuel Filters', 'General', 'Jets, Needles, Screws, etc.', 'Manifold',
+    'Modules', 'Rebuild Kits', 'Throttle Body',
+  ],
+};
+
+function applySubcategoryGrouping(displayCategory: string | undefined, rows: BrowseFacet[]): BrowseFacet[] {
+  const typeGroup = displayCategory ? SUBCATEGORY_DISPLAY_GROUPS[displayCategory] : undefined;
+  if (!typeGroup) return rows; // no curated grouping yet for this category — leave count-DESC order as-is
+  const typeSet = new Set(typeGroup);
+  const inGroup = rows.filter(r => typeSet.has(r.name)).sort((a, b) => a.name.localeCompare(b.name));
+  const rest = rows.filter(r => !typeSet.has(r.name)).sort((a, b) => a.name.localeCompare(b.name));
+  return [...inGroup, ...rest];
+}
+
 // ── Main browse function ──────────────────────────────────────────────────────
 
 export async function browseProducts(filters: BrowseFilters): Promise<BrowseResult> {
@@ -601,7 +660,7 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
     total:    parseInt(countRes.rows[0]?.total ?? '0', 10),
     facets: {
       categories:    catRes.rows,
-      subcategories: subcatRes.rows,
+      subcategories: applySubcategoryGrouping(filters.displayCategory ?? filters.category, subcatRes.rows),
       subcategoryDetails: detailRes.rows,
       brands:        brandRes.rows,
     },
