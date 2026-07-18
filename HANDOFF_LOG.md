@@ -7,6 +7,110 @@
 
 # ——— NEXT SESSION: START HERE ———
 
+## Session 90 continued a ninth time — Engine rebuilt onto Laken's finalized 14-bucket spec, plus 3 extra buckets kept for content with no named home
+
+Same "full and final audit" method, but this rebuild surfaced bigger structural gaps than Fuel/Air/Carbs or Foot Controls — roughly 18% of the 8,715-row category (1,532 rows across 4 buckets) had no home in Laken's 14 names at all, so this one needed more back-and-forth before applying anything.
+
+**Real contamination found**: "Pistons & Cylinders" (1,822 rows) had **241 rows that are brake calipers and seat springs**, not engine parts — an old keyword classifier matched "piston" (brake calipers are named by piston count, e.g. "4 Piston Caliper") and "cylinder" (brake *master* cylinders) without knowing those words mean something completely different on a brake system. Moved to Brakes/Calipers (158), Brakes/Master Cylinders (52), Brakes/Brake Hardware (15 — brake shoe springs), Seating/Seating Hardware (28 — seat springs). One more brake misfile (a caliper seal kit) found inside the old "Gaskets & Seals" bucket.
+
+**Structural gaps, all confirmed with Laken before applying:**
+- **Bottom End** (830 rows: crankcase, flywheel, bearings, pinion shaft, connecting rods) and **Complete Engines** (229 rows: long blocks, whole assemblies, top-end kits) — Laken initially asked whether these should go to Transmission & Clutch instead; clarified that bottom-end assembly is mechanically distinct from the gearbox/clutch/primary-drive system Transmission covers, and she agreed to keep both as extra Engine subcategories (same treatment as Highway Bars & Pegs in the Foot Controls rebuild).
+- **Cylinder Heads** (119 rows carved out of the old "Heads & Valves") — got its own new extra subcategory, separate from Valves.
+- **Engine's own internal "Gaskets & Seals"** (342 rows after the 1 brake misfile above) — Laken's call: consolidate into the *standalone* Gaskets & Seals category's own Engine subcategory (built session 88) rather than staying as a redundant duplicate bucket inside Engine.
+- Old "Engine Parts" catch-all (29 rows, stale) and old "Valves & Valve Train" (81 rows, simply forgotten in the first pass of the rebuild script — caught by checking the dry-run tally before applying, not after) folded into General and Valves respectively.
+
+**Two more cross-bucket misfiles caught while sampling for detail-groups, same session, same pattern as prior passes**: 140 genuine pushrod rows (solid/adjustable/hydraulic pushrod sets) were sitting in "Cam Chest" while the separately-named "Pushrods" bucket (renamed from "Pushrod Covers") only had the tube covers for them — merged, since Laken's spec names one "Pushrods" bucket, not split by rod-vs-cover. 6 "Rocker Box Cover Set" rows were also in Cam Chest instead of Rocker Boxes.
+
+**Final Engine (17 subcategories)**: Cam Chest 1,513 / Valves 1,401 / Pistons 1,226 / Oil Pump & System 935 / Bottom End 830 / Engine Mounts 390 / Cylinders 354 / Pushrods 303 / Rocker Boxes 288 / Complete Engines 229 / Performance Kits 205 / Cylinder Heads 126 / Accessories 104 / Cooling System 75 / Engine Dress Up Kit 62 / Inspection Covers 49 / General 30.
+
+Detail-grouped all 11 buckets over 150 rows (`scripts/ingest/detail_engine.mjs`, 7,674 rows tagged, 0 stragglers in any bucket). Added `SUBCATEGORY_DISPLAY_GROUPS` entry to `lib/db/browse.ts`. Reindexed (90,483 docs, 0 errors), verified live — sidebar grouping, Pistons DETAIL tier, and the Brakes/Calipers cross-category move all confirmed on the actual site. See `scripts/ingest/rebuild_engine_taxonomy.mjs` (backup table `backup_engine_20260718`), `fix_pushrods_in_camchest.mjs`.
+
+---
+
+## Session 90 continued an eighth time — cross-category cleanup: Brake Pedals consolidated into Foot Controls, catalog-wide sensor sweep, Cables audited
+
+**Brakes / Brake Pedals & Pads (140 rows) → Foot Controls & Pegs / Brake Arm & Pedals.** Laken: "we will need to pull brake arms and pedals from braking tier one category." Sampled the bucket first — confirmed it was the exact same foot-operated brake arm/pedal/lever/cover product family as the Brake Arm & Pedals bucket built earlier this session in the Foot Controls rebuild, just duplicated across two top-level categories. Consolidated via `scripts/ingest/move_brake_pedals_to_foot_controls.mjs`; bucket now 202 rows total. Brakes down to 7 subcategories.
+
+**Catalog-wide sensor sweep, 76 rows → Electrical / Sensors & Switches.** Laken: "pull sensors and put into electrical sensors." Full-catalog search for "sensor" outside Electrical found 126 rows; most were false positives (a gasket/seal/O-ring *for* a sensor, a wrench/socket *tool* for removing one, a bracket/bolt-kit compatible with a sensor mount, a manifold with/without a sensor hole) that correctly stay put. Two real groups found and moved via `scripts/ingest/sweep_sensors_to_electrical.mjs`:
+- 56 unambiguous sensor units: 27 O2/oxygen sensors in Exhaust (excluding the ~16 bung/plug/adapter/harness fitting rows, which are exhaust hardware, not sensors, and correctly stayed), 17 ABS brake sensors in Brakes, 10 crankshaft position sensors in Engine, 3 Manifold Absolute Pressure Sensors in Fuel/Air/Carbs that the recent rebuild's rule-priority missed (its "Manifold" rule fired before a sensor-specific check would have).
+- 19 speedometer/shift-position sensors scattered across Dashes & Gauges, Tools & Chemicals, Transmission, Cables, and Foot Controls. **Note**: this directly overrides a session-87 precedent ("gauge senders kept bundled with the instruments, not moved to hardware") — asked Laken explicitly given the conflict, and her call this time was to move all 19 to Electrical anyway. Worth remembering this isn't a permanent reversal of the session-87 rule, just this specific case.
+
+**Cables category audited (not yet rebuilt) — one real contamination cluster found.** Sampled all 9 subcategories (4,794 rows). Clutch Cables, Cable & Line Kits, Throttle Cables, Idle Cables, Cable Hardware, Hydraulic Clutch Lines, Speedometer & Tachometer Cables, and Choke Cables are all clean and correctly scoped. **"Universal/Build Your Own" (274 rows) is 28% misfiled** (78 rows) — genuinely unrelated product types that happen to contain the word "cable":
+- 11 security cable locks (OnGuard/Kryptonite/Abus) → likely Accessories & Gear/Towing Equipment (existing Locks & Alarms detail group)
+- 18 USB/phone-charging cables (RIDEPOWER, SP Connect, Sena) → likely Accessories & Gear/Phone Accessories
+- 12 battery cables/accessories (Terry Components, Battery Tender) → likely Electrical/Batteries, Cables & Accessories
+- 9 whole clutch kits/covers/baskets (Barnett Scorpion, Rekluse RadiusCX, APM Comp Master, Arlen Ness side covers) → likely Transmission & Clutch
+- 10 S&S Throttle Hog throttle body kits → likely Fuel, Air & Carburetors/Throttle Body
+- 18 lever sets (PSR Anthem, HardDrive) → likely Handlebars & Hand Controls/Levers & Hand Controls
+
+**Applied same session** — Laken confirmed all 6 moves. `scripts/ingest/fix_cables_universal_misfiles.mjs`, 78 rows moved to their proposed homes (security locks → Accessories & Gear/Towing Equipment, USB/phone cables → Accessories & Gear/Phone Accessories, battery cables → Electrical/Batteries Cables & Accessories, clutch kits/covers → Transmission & Clutch/Clutch Kits & Components, throttle body kits → Fuel Air & Carburetors/Throttle Body, lever sets → Handlebars & Hand Controls/Levers & Hand Controls). Cables/Universal/Build Your Own down to 196 clean rows. Reindexed (90,483 docs, 0 errors).
+
+---
+
+## Session 90 continued a seventh time — Foot Controls renamed and rebuilt onto Laken's finalized 14-bucket "Foot Controls & Pegs" spec
+
+Same "full and final audit" method as the Fuel/Air/Carbs rebuild. Old "Foot Controls" category: 3,379 active rows, 10 loose subcats dominated by a 1,583-row "Footpegs, Shift Pegs, & HW" catch-all that actually contained pieces of nearly all 14 of Laken's target buckets mixed together. New spec: **Foot Pegs & Passenger Peg, Shift Peg, Floorboard, Foot Peg Mounts/Bracket/Hardware, Floorboard Mounts/Bracket/Hardware, Shifter Lever/Shaft & Hardware, Forward Control Sets, Mid Control Sets, Jockey Shift Components, Shift Linkage, Accessories, Kickstands, Brake Arm & Pedals, General.**
+
+Classified all 3,379 rows from scratch via `scripts/ingest/rebuild_foot_controls_taxonomy.mjs`. Word-order and abbreviation misses were dense here too — same lesson as every prior rebuild this session: Avon's entire shift/brake-peg line uses reversed naming ("PEG SHIFTER..." instead of "Shifter Peg..."), Hawg Halters abbreviates "Forward Controls" as "FORWARD CNTRLS" (missing the first "o"), GMA Engineering reverses it entirely ("CONTROLS FWD"), and "Heel/Toe Shifter" doesn't contain the literal phrase "shift lever" anywhere. General landed at a clean 34/3,013 (1.1%) after two refinement passes.
+
+**Two things surfaced that needed Laken's call before applying, not guessed at:**
+- **"Highway Bars & Pegs" (353 rows)** wasn't in her 14-name list at all — turned out to be two different things (216 crash bars/engine guards, 137 actual highway-peg-mount items). Her call: **keep it as a 15th subcategory, unchanged** — not split, not renamed.
+- **13 "Spring Fork Front Brake ..." rows** (brake shoe lining, caliper kit, seal kit, anchor stud kit) sitting in Foot Controls were actually vintage springer-fork **front-wheel brake** components, unrelated to foot pedals/levers entirely. Her call: **move to Brakes** — routed by part type into Brake Pads & Shoes (2), Calipers (1), Brake Conversion Kits (2), Brake Hardware (8, the default for seal/stud/plate/tab parts).
+
+**Final Foot Controls & Pegs**: Foot Pegs & Passenger Peg 641 / Kickstands 477 / Floorboard 413 / Shifter Lever, Shaft & Hardware 363 / Highway Bars & Pegs 353 / Foot Peg Mounts, Bracket, Hardware 264 / Shift Peg 256 / Floorboard Mounts, Bracket, Hardware 133 / Forward Control Sets 126 / Shift Linkage 106 / Mid Control Sets 67 / Brake Arm & Pedals 62 / Jockey Shift Components 46 / General 34 / Accessories 25.
+
+Added `SUBCATEGORY_DISPLAY_GROUPS` entry to `lib/db/browse.ts`, reindexed (90,483 docs, 0 errors), verified live — category rename, alphabetized sidebar, and the 13-row Brakes move all confirmed on the actual site. Category rename + rebuild used the same backup-table convention as every prior pass (`backup_foot_controls_20260717`).
+
+---
+
+## Session 90 continued a sixth time — Air Cleaner cleaned up (complete kits + bolts pulled out, breather tubes promoted to its own subcategory, 18th)
+
+Laken: "in air cleaner there are a few complete air cleaner kits and breather tubes and bolts." Full read of the 78-row "Air Cleaner" leftover (breather-hardware pile after the two earlier promotions) via `scripts/ingest/fix_air_cleaner_kits_tubes_bolts.mjs`:
+- **11 rows were actually complete air cleaners**, not breather accessories — word order gave it away: "Heavy Breather [Performance] Air Cleaner Kit" (Wyatt Gatling/V-Twin) and "M8 ROUND HI PERFORM ... A/C AND BREATHER KIT" (HardDrive) are complete air cleaner products whose style-line name happens to include "Heavy Breather," not a breather-kit accessory for an existing air cleaner. Moved to Complete Air Cleaner Kits & Assemblies.
+- **2 rows explicitly named "Bolt(s)"** ("Breather Banjo Bolt Set", "Breather Fittings W/ Bolts") → moved into the existing Breather Bolts subcategory (confirmed first that every one of its pre-existing 16 rows also has literal "Bolt" in the name — it's a genuinely bolt-specific bucket, not a general breather catch-all).
+- **Remaining 65 rows detail-grouped** by type (Breather Accessory Kits 16, Washers & Fittings 11, Tubes 11, Snoots & Scoops 9, Catch Cans & Vent Systems 7, Hoses 6, Pipes & Nipples 5).
+- Laken then asked to promote "Breather Tubes" out to its own subcategory too, same treatment Breather Bolts already had (bolts already had a dedicated bucket from the original spec; tubes didn't). Promoted via `scripts/ingest/promote_breather_tubes.mjs` — 11 rows. Fuel, Air & Carburetors is now **18 subcategories**.
+
+Added to `SUBCATEGORY_DISPLAY_GROUPS`, reindexed (90,483 docs, 0 errors), verified live.
+
+---
+
+## Session 90 continued a fifth time — the 9 remaining General stragglers pushed to the admin review queue
+
+Rather than leaving the 9 genuine stragglers from the General audit above as a silent leftover, pushed them into `catalog_review_flags` (the same review-queue table from session 87's 47 flagged Hardware leftovers — `/admin/review-queue`) via `scripts/ingest/flag_fuel_air_carbs_general_stragglers.mjs`, each with a specific note on why it couldn't be confidently classified (bare spacer/cap/clamp with no system named, an ambiguous "Tank Seal"/"Deluxe Auxiliary Tank" that might belong in Tanks & Body instead, and the one that looks like a data-quality issue rather than a categorization one). Additive only — doesn't touch `display_category`/`display_subcategory`, rows stay visible in General on the live site until someone resolves the flag. Verified all 9 landed unresolved in the table.
+
+---
+
+## Session 90 continued a fourth time — full-read audit of the "General" leftover bucket in Fuel, Air & Carburetors
+
+Laken: "fuel air carbs- general needs serious audit." Full read of all 136 rows (not a re-run of the original regex, an actual read) turned up the same lesson as every other "General" audit this project has done: naming variants the first-pass rebuild's regex didn't anticipate. **127 of 136 rows (93%) had a real, confident home** — none of it force-fit:
+
+- **20 → Fuel Filters**: "Fuel Check Valve"/"Fuel Rod ..."/"Gas Filter"/"CLEAR FUEL/PRIMER LINE" (slash between the two words defeated the original `fuel line` phrase match)/"Grooved Hose Ends"/siphon hose/sight tube — all fuel-line-family items the original rebuild's narrower patterns missed.
+- **16 → Electrical/Sensors & Switches**: broadened well past the original O2/MAP/throttle-position-only match — "SENSOR AIR TEMP", "SENSOR CRANK", "SENSOR,OXYGEN" (comma, no space), "SENSOR THRTL POS" (abbreviated) all read as sensors on inspection but didn't match the narrower original regex. Also caught "VOES Cap Fitting" (a Vacuum Operated Electric Switch — a switch by definition, same bucket).
+- **16 → Carburetor**: an 11-item Mikuni HSR carb-kit family missed because the model numbers run digit-adjacent with no space ("HSR42MM" pattern variants) and 5 more (Braided Pull Wire, "L" Series Throttle Arm Kit, 70mm Induction Kits).
+- **14 → Air Cleaner Inserts & Covers**: ROUGH CRAFTS "AIR CLNR FIN/RND ..." — the abbreviation has a space (`AIR CLNR`), which the original no-space `aircln?r` pattern didn't cover.
+- **14 → Jets, Needles, Screws, etc.**: small internal carb parts by name only an actual read catches — emulsion tube, nozzle, air horn kit, throttle disc, idle air control, packing kit, adjuster boot, Tillotson tickler kit, vacuum piston.
+- **6 → Air Filter, 5 → Modules** (incl. a brand-only match: "F1200R CL DYNA 12-17" is a Fi2000 product with a typo dropping the "I" from "FI2000R" — caught by matching on `brand = 'Fi2000'` directly instead of the name), **5 → Complete Air Cleaner Kits & Assemblies**.
+- **7 rows moved out of the category entirely**, genuinely misfiled from the start (not naming-variant misses): 2 Trask "CheckM8 Vented Transmission Top Cover" rows → Transmission & Clutch (a transmission part, not fuel/air/carb at all), 1 chain-oiler kit → Transmission & Clutch, 1 seat-tab repair kit → Seating, 1 staking-dowel-pin pack → Engine, 1 LA Choppers bar-end bottle-opener insert → Handlebars & Hand Controls, 1 EFI relay → Electrical/Relays. Plus 1 more crankcase-vent-filter row (same family as the main rebuild's crankcase-breather moves, missed because it said "Crankcase Vent Filter" not one of the phrases the original out-of-category rule checked for) → Engine, 1 vented gas cap → Tanks & Body, 2 oil-line-elbow rows → Tanks & Body, 1 oil drip cap → Tanks & Body, 1 fuel stabilizer chemical → Tools & Chemicals, 1 air-cleaner-kit wash bag → Tools & Chemicals.
+
+**9 genuine stragglers left** (down from 136, checked and confirmed via a full per-row read before applying, not just the tally — same "read before trusting a tally" discipline as every prior General audit): a compression-release cap, a bare spacer, a hose clamp, an unlabeled part cap, a thread reducer, a "Tank Seal" (Quantum, no further signal in the name), a "Deluxe Auxiliary Tank" (Motion Pro), an EFI gas plate, and one broken/truncated product name (JAGG "ALL TWIN CAM & FUEL INJECTED EVO MODELS" — reads like a fitment note with the actual product name missing, a data-quality issue rather than a categorization one, flagged but not fixed here).
+
+See `scripts/ingest/audit_fuel_air_carbs_general.mjs`. Reindexed (90,483 docs, 0 errors), verified live — General shows exactly the 9 stragglers on the actual site.
+
+---
+
+## Session 90 continued a third time — "Complete Air Cleaner Kits & Assemblies" promoted to its own subcategory (17th)
+
+Same pattern again: Laken asked to split the remaining "Air Cleaner" bucket's dominant detail group (Complete Air Cleaner Kits & Assemblies, 1,072 rows) into its own subcategory. Promoted via `scripts/ingest/promote_complete_air_cleaner_kits.mjs`. **Note left for Laken**: this leaves "Air Cleaner" holding only the 76 Breather Hardware rows — the name no longer really describes its contents (it's now just breather pipes/tubes/nipples/kits). Not renamed yet since she didn't ask for that specifically; flagged rather than decided unilaterally. Added to `SUBCATEGORY_DISPLAY_GROUPS`, reindexed (90,483 docs, 0 errors), verified live. Fuel, Air & Carburetors is now 17 subcategories.
+
+---
+
+## Session 90 continued again — "Air Cleaner Inserts & Covers" promoted to its own subcategory (16th)
+
+Laken asked to split air cleaner inserts/covers out of the main "Air Cleaner" bucket into their own subcategory. Mapped directly onto the two detail groups already inside Air Cleaner from the rebuild above (Air Cleaner Covers 190 + Inserts & Windows 22 = 212 rows) — promoted via `scripts/ingest/promote_air_cleaner_inserts_covers.mjs`, left the existing `display_subcategory_detail` tags in place so the new subcategory gets its own tier-3 DETAIL breakdown for free. Added to `SUBCATEGORY_DISPLAY_GROUPS` in `lib/db/browse.ts`, reindexed (90,483 docs, 0 errors), verified live. Fuel, Air & Carburetors is now 16 subcategories.
+
+---
+
 ## Session 90 continued — Carburetion & Fuel renamed and rebuilt onto Laken's finalized 15-bucket "Fuel, Air & Carburetors" spec
 
 Laken handed over a finalized spec for the old "Carburetion & Fuel" category (4,550 active rows, previously 8 loose subcats dominated by a 2,061-row "Carburetors & Components" and a 1,808-row "Air Cleaner & Components"): **Air Cleaner, Air Filter, Air Cleaner Mounts/Brackets & Hardware, Carburetor, Jets/Needles/Screws etc., Air Cleaner Adapters, Rebuild Kits, Backing Plates, Flange, General, Fuel Filters, Throttle Body, Modules, Breather Bolts, Manifold** — plus her own spot-check list of misfiled item types (belt buckles, shop books, crankcase filters, oil tank items, air/oil separators, digital-display gauges).

@@ -211,10 +211,32 @@ const SUBCATEGORY_DISPLAY_GROUPS: Record<string, string[]> = {
   // non-type leftover bucket (General is one of her own named buckets), so
   // the type group is the full alphabetized list.
   'Fuel, Air & Carburetors': [
-    'Air Cleaner', 'Air Cleaner Adapters', 'Air Cleaner Mounts, Brackets & Hardware',
-    'Air Filter', 'Backing Plates', 'Breather Bolts', 'Carburetor', 'Flange',
+    'Air Cleaner', 'Air Cleaner Adapters', 'Air Cleaner Inserts & Covers',
+    'Air Cleaner Mounts, Brackets & Hardware',
+    'Air Filter', 'Backing Plates', 'Breather Bolts', 'Breather Tubes', 'Carburetor',
+    'Complete Air Cleaner Kits & Assemblies', 'Flange',
     'Fuel Filters', 'General', 'Jets, Needles, Screws, etc.', 'Manifold',
     'Modules', 'Rebuild Kits', 'Throttle Body',
+  ],
+  // Session 90: rebuilt from Laken's finalized 14-bucket spec (renamed from
+  // "Foot Controls"). "Highway Bars & Pegs" isn't in her named list -- kept
+  // as-is per her call, sorts in alphabetically with the rest.
+  'Foot Controls & Pegs': [
+    'Accessories', 'Brake Arm & Pedals', 'Floorboard',
+    'Floorboard Mounts, Bracket, Hardware', 'Foot Peg Mounts, Bracket, Hardware',
+    'Foot Pegs & Passenger Peg', 'Forward Control Sets', 'General',
+    'Highway Bars & Pegs', 'Jockey Shift Components', 'Kickstands',
+    'Mid Control Sets', 'Shift Linkage', 'Shift Peg',
+    'Shifter Lever, Shaft & Hardware',
+  ],
+  // Session 90: rebuilt from Laken's finalized 14-name spec. "Bottom End,"
+  // "Complete Engines," and "Cylinder Heads" aren't in her named list --
+  // kept as extra buckets per her call, sort alphabetically with the rest.
+  'Engine': [
+    'Accessories', 'Cam Chest', 'Cooling System', 'Cylinders',
+    'Engine Dress Up Kit', 'Engine Mounts', 'General', 'Inspection Covers',
+    'Oil Pump & System', 'Performance Kits', 'Pistons', 'Pushrods',
+    'Rocker Boxes', 'Valves',
   ],
 };
 
