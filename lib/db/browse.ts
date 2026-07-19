@@ -238,6 +238,17 @@ const SUBCATEGORY_DISPLAY_GROUPS: Record<string, string[]> = {
     'Oil Pump & System', 'Performance Kits', 'Pistons', 'Pushrods',
     'Rocker Boxes', 'Valves',
   ],
+  // Session 90 (continued): rebuilt from Laken's finalized 16-name spec
+  // (collapsed a duplicate "Primary- Inner & Outer" / "Inner & Outer
+  // Primary" entry down to one). No separate leftover bucket beyond her
+  // own named General, so the type group is the full alphabetized list.
+  'Transmission & Clutch': [
+    'Bearings & Seals', 'Belts', 'Chains', 'Clutch Components', 'Clutch Kits',
+    'Clutch Plates', 'Covers & Guards', 'Derby Covers', 'Dip Sticks',
+    'Gear Sets', 'General', 'Kickstarters', 'Mainshaft',
+    'Primary Inner & Outer', 'Pulley & Sprocket', 'Rebuild Kits',
+    'Shifter Forks',
+  ],
 };
 
 function applySubcategoryGrouping(displayCategory: string | undefined, rows: BrowseFacet[]): BrowseFacet[] {

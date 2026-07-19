@@ -188,8 +188,18 @@ const ATTRIBUTE_RULES = [
   // "standard" (full word) added from evidence: catalog-wide vocab audit found
   // 90 distinct product-line clusters differentiated only by "Standard" vs
   // another size word — only the abbreviation "STD" was previously recognized.
+  // Bare decimal (no +/- sign) added from evidence: 1,833 ungrouped products
+  // (piston rings, gaskets, valve guides, bearing shims) use tolerance/oversize
+  // values like ".020 Oversize" or ".005" with no leading sign — the signed
+  // pattern never matched these at all. Lookaround (not \b) because \b can't
+  // anchor on a boundary between two non-word characters (space, then ".").
+  // Checked before shipping: the handful of pre-existing "OVERSIZE"-only Size
+  // groups were all single-member noise (the bare word alone doesn't
+  // distinguish ".020 Oversize" from ".030 Oversize" — both extracted the
+  // literal string "OVERSIZE"), so this is a strict improvement, not a
+  // regression risk.
   { name: 'Size',
-    pattern: /([+-]0\.0\d{2,3}|\bSTD\b|\bO\.?S\.?\b|\bU\.?S\.?\b|\boversize\b|\bundersize\b|\bstandard\b)/i,
+    pattern: /([+-]0\.0\d{2,3}|(?<![\w.])\.0\d{2,3}(?!\d)|\bSTD\b|\bO\.?S\.?\b|\bU\.?S\.?\b|\boversize\b|\bundersize\b|\bstandard\b)/i,
     extract: m => m[1].toUpperCase() },
   // BRAKE COMPOUND
   { name: 'Compound',

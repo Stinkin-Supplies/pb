@@ -7,6 +7,37 @@
 
 # ——— NEXT SESSION: START HERE ———
 
+## Session 90 continued an eleventh time — Transmission & Clutch rebuilt onto Laken's finalized 17-name spec
+
+Laken handed over a finalized 17-name spec (collapsed from her pasted list after confirming "Primary- Inner & Outer" / "Inner & Outer Primary" was a duplicate, not two buckets). This superseded a v1 16-subcategory structure (`fix_transmission_taxonomy.mjs`) that had already been applied in an earlier, uncommitted session — full re-audit and rebuild via `rebuild_transmission_taxonomy_v2.mjs`, same "full and final audit" method as Fuel/Air/Carbs, Foot Controls, and Engine.
+
+**Cross-category misfiles found and confirmed with Laken before applying** (194 rows total, all judgment calls surfaced via structured questions first, none guessed):
+- 43 wheel axle spacers/kits (`AXLE SPACER CHROME...`, `FRONT AXLE KIT...`) + 7 wheel weights → Wheels & Tires (Axles & Spacers / Rim Strips, Valve Stems, Valve Stem Cap, Wheel Weights).
+- 79 specialty transmission/clutch service tools (Jims/Motorshop pullers, compressors, bearing-race tools) → Tools & Chemicals > Engine & Drivetrain Tools.
+- 20 speedometer drive gears/units → Electrical > Sensors & Switches, same precedent as the session-90 speedo/sender sweep.
+- 17 literal oil/lube consumable products (Spectro Transmission Oil/Lube, Oilzum oil cans) → Tools & Chemicals > Engine & Motor Oil — kept oil-*adjacent hardware* (dipsticks, funnels, deflectors, slingers) in place.
+- 8 Frame Stabilizers (Alloy Art) → Frames & Suspension > Frames, 6 Forward Control Extension Kits → Foot Controls & Pegs > Forward Control Sets, 3 brake disc/rotor adapters → Brakes > Rotors & Drums, plus the Neutral Switch items folded into the same Electrical move as speedo — all four were small (3-8 rows) leftover-pile finds, confirmed together in one round rather than re-asking per cluster.
+
+**Bearings & Seals scope, decided explicitly**: new bucket is bearings/races only (~252 rows) — true oil seals/gaskets already live in the standalone Gaskets & Seals > Transmission bucket (1,118 rows) and were left alone, avoiding duplication (same non-duplication precedent as session 90's Engine gasket consolidation).
+
+**Keyword-trap lessons reconfirmed, this time from vendor abbreviation/typo variety rather than cross-domain collisions**: three dry-run + full-leftover-read cycles were needed to get General down from 711 (9.7%) to 74 (1.0%) — each pass caught a new abbreviation family: Rekluse's `CVR DRBY` (Derby), PBI's `SPKT`/`SPRKT`/`SPRCKT` and HardDrive's `PULLY` typo (all Sprocket/Pulley), BAKER DRIVETRAIN's `BRG` (Bearing), Diamond's `PRI CH`/`PRI CHN` (Primary Chain), and PANTHER's smashed part-number format (`BELT40012-90`, no word boundary before the digits — required relaxing several regexes from `\bWORD\b` to leading-boundary-only `\bWORD`). Also a Performance Machine "Race Series" product line collided with the bearing-race RACE keyword — excluded explicitly.
+
+Verified: 7,306 → 7,112 rows remain in Transmission & Clutch (194 moved out), all 17 subcategory counts match the proposed mapping exactly (Pulley & Sprocket 1047, Clutch Components 948, Chains 658, Primary Inner & Outer 609, Shifter Forks 575, Kickstarters 461, Belts 409, Mainshaft 395, Clutch Kits 376, Gear Sets 373, Derby Covers 321, Bearings & Seals 252, Covers & Guards 220, Clutch Plates 211, Dip Sticks 128, General 74, Rebuild Kits 55), all 8 cross-category destination subcategories gained the expected counts. Applied the general-bucket policy in the same pass: `display_subcategory_detail` groupings on all 14 subcategories over 150 rows (`detail_transmission_taxonomy.mjs`) and a `SUBCATEGORY_DISPLAY_GROUPS` entry for Transmission & Clutch in `lib/db/browse.ts`. Reindexed. See `scripts/ingest/rebuild_transmission_taxonomy_v2.mjs` and `scripts/ingest/detail_transmission_taxonomy.mjs`.
+
+---
+
+## Session 90 continued a tenth time — same General-bucket audit treatment applied to Engine and Foot Controls & Pegs
+
+Laken asked directly: "are you still putting unknowns into the general bucket for review later?" Answer was mixed — General is a legitimate named bucket in both specs (not a holding pen by itself), but only Fuel/Air/Carbs' leftover had gotten the full-read-audit-then-review-queue treatment; Engine's 30 and Foot Controls & Pegs' 34 hadn't. Asked to do the same for both.
+
+Full read of all 64 rows (not another regex pass) via `scripts/ingest/audit_engine_footcontrols_general.mjs`: **24 rows had a real home** — Engine: 2 crankcase case sets → Bottom End, a Cometic "T/E KIT ... H/G" → Gaskets & Seals/Engine (Top End gasket kit, missed because it doesn't say "gasket" or "cylinder" anywhere), a HOT CAMS "Installation Kit" → Cam Chest (brand-only signal, no product-type keyword), an oil-screen separator plate and a plunger/ball/spring assembly → Oil Pump & System. Foot Controls & Pegs: 2 SANTORO "Shifter" products, 2 shifter spline covers, and a Pro-One item with a "Shfiter" typo (missed by every prior regex pass) → Shifter Lever, Shaft & Hardware; a heel-rest bracket → Floorboard Mounts; 2 items → Highway Bars & Pegs (highway peg clamp, engine guard clamp — same family already kept there); 2 heel-stirrup peg accessories → Foot Pegs & Passenger Peg; 8 small trim/rubber-pad/peg-tip items → Accessories.
+
+**40 genuine stragglers** (Engine 24, Foot Controls & Pegs 16) pushed into `catalog_review_flags`, each with a specific note — mostly bare hardware names with zero descriptor ("Rebuild Kit," "RETAINING RING," "Top Bushing Set") or real multi-way ambiguity (a "Foot Control Kit" with no Mid/Forward qualifier; "ULH Retainer Clip" — abbreviation not identified; "Wick and Holder" — could be a cam-lube wick or a distributor wick; "Exhaust Studs" — could be Engine or the Exhaust category). One likely data-quality issue flagged, not fixed: V-Twin "MACHINING PROCESS" reads like a broken/incomplete product name, same pattern as the JAGG entry found in the Fuel/Air/Carbs audit.
+
+Verified: 90,483 active rows unchanged, General now 24 (Engine) / 16 (Foot Controls & Pegs) — both counts matching exactly what stayed unmoved-and-flagged. Reindexed (90,483 docs, 0 errors).
+
+---
+
 ## Session 90 continued a ninth time — Engine rebuilt onto Laken's finalized 14-bucket spec, plus 3 extra buckets kept for content with no named home
 
 Same "full and final audit" method, but this rebuild surfaced bigger structural gaps than Fuel/Air/Carbs or Foot Controls — roughly 18% of the 8,715-row category (1,532 rows across 4 buckets) had no home in Laken's 14 names at all, so this one needed more back-and-forth before applying anything.

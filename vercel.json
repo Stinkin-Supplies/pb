@@ -1,5 +1,6 @@
 {
   "crons": [
+    { "path": "/api/cron/backup-catalog-db", "schedule": "0 2 * * *" },
     { "path": "/api/admin/run-pricing", "schedule": "0 3 * * *" },
     { "path": "/api/admin/pu-price-sync", "schedule": "0 4 * * *" },
     { "path": "/api/admin/reindex", "schedule": "0 5 * * *" }

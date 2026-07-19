@@ -36,13 +36,12 @@ const header = `-- Brand normalization for catalog_unified
 -- GENERATED FILE — do not hand-edit. Edit brandNormalizationMap.mjs, then run
 -- \`node scripts/ingest/generate_normalize_brands_sql.mjs\` to regenerate this file.
 --
--- IMPORTANT — this is only half the fix: merge_catalog_unified.js does a full
--- TRUNCATE + rebuild of catalog_unified from pu_catalog/wps_catalog/vtwin_catalog every time
--- it runs, so any UPDATE applied directly here will be wiped out on the next rebuild. The
--- durable fix lives in merge_catalog_unified.js itself (imports normalizeBrand() from
--- brandNormalizationMap.mjs and applies it at all 3 insert points), so future rebuilds stay
--- normalized automatically. This .sql file is for catching up whatever is already loaded
--- right now.
+-- IMPORTANT — this is only half the fix: sync_catalog_unified.mjs imports
+-- normalizeBrand() from brandNormalizationMap.mjs and applies it at insert time
+-- for new products, so newly-synced rows stay normalized automatically. It does
+-- NOT retroactively renormalize existing rows on every sync (it's an upsert, not
+-- a truncate+rebuild — see HANDOFF_LOG.md). This .sql file is for catching up
+-- whatever is already loaded right now.
 
 UPDATE catalog_unified SET brand = CASE
 
