@@ -659,8 +659,9 @@ export default async function ProductDetailPage({ params }) {
 /** Sidebar row — links directly to the alternative product's PDP */
 function SidebarProductRow({ product, isLast }) {
   const src = resolveImageSrc(product.image_url);
-  const vendorColor = { PU: '#2a4a7a', WPS: '#7a3810', VTWIN: '#2a5a2a' }[product.source_vendor] ?? '#5a4a2a';
-  const vendorLabel = { PU: 'PU', WPS: 'WPS', VTWIN: 'VTwin' }[product.source_vendor] ?? product.source_vendor;
+  // Vendor identity (PU/WPS/VTwin) is intentionally not shown here — the
+  // customer should see one consolidated catalog, not which vendor backs a
+  // given SKU. Source vendor is still visible in AdminEditPanel for staff.
 
   return (
     <Link
@@ -699,11 +700,11 @@ function SidebarProductRow({ product, isLast }) {
         <div style={{
           fontFamily: 'var(--font-stencil)',
           fontSize: 8,
-          color: vendorColor,
+          color: '#5a4a2a',
           letterSpacing: '0.06em',
           marginBottom: 2,
         }}>
-          {vendorLabel}{product.brand ? ` · ${product.brand}` : ''}
+          {product.brand ?? ''}
           {product.via_chain && (
             <span style={{ marginLeft: 4, color: '#8a7040' }}>· SUPERSESSION</span>
           )}

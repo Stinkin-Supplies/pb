@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import AxisDropdownSelector from './AxisDropdownSelector';
 
 const GOLD   = '#b8922a';
 const BORDER = '#e0d8c8';
@@ -94,6 +95,14 @@ function hasFitmentData(variants) {
  * MODE D — color+qty:
  *   Two separate radio groups when variants differ by BOTH color and pack qty.
  *
+ * MODE F — dropdown:
+ *   No fitment, exactly one named axis (from the generic options[] array —
+ *   e.g. "Length" for brake/clutch lines), with more than 4 distinct values.
+ *   A flat card list (Mode C) doesn't scale past a handful of options; a
+ *   native <select> does. Reads options[] rather than option_1_value so it
+ *   isn't tied to any specific axis name — a future single-axis case (Angle,
+ *   Compound, ...) falls into this mode automatically.
+ *
  * MODE E — style+finish:
  *   Sibling groups represent different visual styles (e.g. rotor designs).
  *   Each sibling group has finish variants within it (Chrome/Polished/Stainless).
@@ -121,6 +130,13 @@ function getRenderMode(variants, siblingGroups, groupDisplayName) {
     const colors = new Set(variants.map(v => v.option_1_value).filter(Boolean));
     const qtys   = new Set(variants.map(v => v.pack_qty).filter(q => q && q > 1));
     if (colors.size > 1 && qtys.size > 1) return 'color+qty';
+  }
+  if (hasOptions && !hasFitment) {
+    const axisNames = new Set(variants.flatMap(v => (v.options ?? []).map(o => o.name)));
+    if (axisNames.size === 1) {
+      const distinctValues = new Set(variants.map(v => v.options?.[0]?.value).filter(Boolean));
+      if (distinctValues.size > 4) return 'dropdown';
+    }
   }
   return 'options';
 }
@@ -1090,6 +1106,13 @@ export default function VariantSelector({ productId }) {
       )}
       {mode === 'color+qty' && (
         <ColorQtySelector
+          variants={variants}
+          currentId={currentId}
+          onSelect={handleSelect}
+        />
+      )}
+      {mode === 'dropdown' && (
+        <AxisDropdownSelector
           variants={variants}
           currentId={currentId}
           onSelect={handleSelect}

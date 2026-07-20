@@ -12,11 +12,9 @@ function resolveImageSrc(url) {
   return url;
 }
 
-const VENDOR_COLORS = {
-  PU:    { bg: '#e8edf8', color: '#2a4a7a', label: 'PU' },
-  WPS:   { bg: '#fdf0e3', color: '#7a3810', label: 'WPS' },
-  VTWIN: { bg: '#e8f5e3', color: '#2a5a2a', label: 'VTwin' },
-};
+// Vendor identity (PU/WPS/VTwin) is intentionally not shown in this panel —
+// the customer should see one consolidated catalog, not which vendor backs
+// a given SKU. Source vendor is still visible in AdminEditPanel for staff.
 
 function useOutsideClick(ref, callback) {
   useEffect(() => {
@@ -36,8 +34,6 @@ function useOutsideClick(ref, callback) {
 // ── Collapsed list row ────────────────────────────────────────────────────────
 
 function OemRow({ product, onExpand, isLast, isChain }) {
-  const vc = VENDOR_COLORS[product.source_vendor] ?? { bg: '#f0ece4', color: '#5a4a2a', label: product.source_vendor };
-
   return (
     <button
       onClick={() => onExpand(product)}
@@ -87,17 +83,6 @@ function OemRow({ product, onExpand, isLast, isChain }) {
       {/* Brand + name + badges */}
       <div style={{ minWidth: 0 }}>
         <div style={{ display: 'flex', gap: 5, marginBottom: 5, flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{
-            fontFamily: 'var(--font-stencil)',
-            fontSize: 9,
-            letterSpacing: '0.07em',
-            color: vc.color,
-            background: vc.bg,
-            borderRadius: 4,
-            padding: '2px 7px',
-          }}>
-            {vc.label}
-          </span>
           {product.is_kit && (
             <span style={{ fontFamily: 'var(--font-stencil)', fontSize: 8, color: '#5a5ab0', background: '#eaeaf5', borderRadius: 4, padding: '2px 6px' }}>KIT</span>
           )}
@@ -177,7 +162,6 @@ function OemExpanded({ product, onClose }) {
     };
   }, [onClose]);
 
-  const vc = VENDOR_COLORS[product.source_vendor] ?? { bg: '#f0ece4', color: '#5a4a2a', label: product.source_vendor };
   const details = product.product_details || {};
   const features = details.features?.slice(0, 4) ?? [];
   const description = details.description ?? null;
@@ -265,17 +249,6 @@ function OemExpanded({ product, onClose }) {
         <div style={{ padding: '20px 24px 24px' }}>
           {/* Badges */}
           <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
-            <span style={{
-              fontFamily: 'var(--font-stencil)',
-              fontSize: 9,
-              letterSpacing: '0.07em',
-              color: vc.color,
-              background: vc.bg,
-              borderRadius: 4,
-              padding: '3px 7px',
-            }}>
-              {vc.label}
-            </span>
             {product.via_chain && (
               <span style={{
                 fontFamily: 'var(--font-stencil)',

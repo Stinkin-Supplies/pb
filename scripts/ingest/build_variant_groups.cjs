@@ -528,7 +528,7 @@ async function main() {
   if (!DRY) {
     // ── Nuke existing data ─────────────────────────────────────────────────
     // Full rebuild every time — avoids stale/bad groups accumulating.
-    // ⚠ EXCLUDES source_vendor IN ('ADMIN', 'MULTI'):
+    // ⚠ EXCLUDES source_vendor IN ('ADMIN', 'MULTI', 'LENGTH'):
     //   - 'ADMIN' rows are hand-curated fixes for groups this script's name-based
     //     heuristics can't classify correctly (see e.g. "Bar Harness II" /
     //     "UV2000 Cycle Cover" — width/size vocab outside the regex). A previous
@@ -539,18 +539,24 @@ async function main() {
     //     wiped all 148 of these (only ADMIN was excluded at the time) — only
     //     49 were reproducible by re-running that script afterward. Never
     //     remove either exclusion without a deliberate reason.
-    console.log('Clearing existing variant data (preserving ADMIN-curated + MULTI pack-size groups)...');
+    //   - 'LENGTH' rows are built by the separate build_length_variant_groups.mjs
+    //     script for cable/brake-line products that vary by length_in with no
+    //     color/size word in the name at all (so this script's regex extractor
+    //     never sees an axis to classify them by). Same reasoning as MULTI above —
+    //     removing this exclusion would silently wipe that script's output on
+    //     every run of this one.
+    console.log('Clearing existing variant data (preserving ADMIN-curated + MULTI pack-size + LENGTH groups)...');
     await pool.query(`
       UPDATE catalog_unified cu
       SET variant_group_id = NULL
       WHERE variant_group_id IS NOT NULL
-        AND variant_group_id NOT IN (SELECT id FROM catalog_variant_groups WHERE source_vendor IN ('ADMIN', 'MULTI'))
+        AND variant_group_id NOT IN (SELECT id FROM catalog_variant_groups WHERE source_vendor IN ('ADMIN', 'MULTI', 'LENGTH'))
     `);
     await pool.query(`
       DELETE FROM catalog_variant_members
-      WHERE group_id NOT IN (SELECT id FROM catalog_variant_groups WHERE source_vendor IN ('ADMIN', 'MULTI'))
+      WHERE group_id NOT IN (SELECT id FROM catalog_variant_groups WHERE source_vendor IN ('ADMIN', 'MULTI', 'LENGTH'))
     `);
-    await pool.query(`DELETE FROM catalog_variant_groups WHERE source_vendor NOT IN ('ADMIN', 'MULTI')`);
+    await pool.query(`DELETE FROM catalog_variant_groups WHERE source_vendor NOT IN ('ADMIN', 'MULTI', 'LENGTH')`);
     console.log('Cleared.\n');
   }
 

@@ -156,9 +156,24 @@ async function fetchChainProductIds(
 // Single-quoted SQL regex string (no dollar-quoting) — avoids parse confusion
 // in Postgres extended query protocol.
 
+// canonical_product_id sits SECOND, after variant_group_id, not first.
+// canonical_product_id links "same physical item, different vendor" (e.g.
+// PU's "SENSOR PICKUP 32400-94" and WPS's "CAM POSITION PLATE ASSEMBLY"
+// are the same physical part, canonical_product_id 91100 \u2014 today they show
+// as separate tiles because nothing dedupes on it). variant_group_id has to
+// win when both are present, though: canonical-product linking is a
+// heuristic match (build_canonical_products.mjs Phase B, with a documented
+// history of false positives), and 38 confirmed cases exist where two
+// genuinely different variants (e.g. "Grips Old School Black" / "...White",
+// different variant_group_ids) share one bad canonical_product_id match \u2014
+// putting canonical_product_id first would silently merge those into one
+// tile. variant_group_id-first protects those known-good splits;
+// canonical_product_id still collapses the vast majority of real
+// cross-vendor duplicates, which have no variant_group_id at all.
 const DEDUP_KEY = `
   COALESCE(
     cu.variant_group_id::text,
+    cu.canonical_product_id::text,
     cu.brand || '||' || REGEXP_REPLACE(
       LOWER(cu.name),
       '\\s*[-\u2013]\\s*(black|chrome|silver|gold|red|blue|green|brown|pink|white|natural|polished|wrinkle|gloss|matte|satin)\\s*$',
