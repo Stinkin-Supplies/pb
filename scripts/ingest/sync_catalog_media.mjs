@@ -84,28 +84,41 @@ async function main() {
       return;
     }
 
-    console.log('\nApplying (single transaction)...');
-    await client.query('BEGIN');
+    // Batched multi-row upserts, not one query per row -- a per-row
+    // SAVEPOINT loop against vendor_offers (90k rows) hung indefinitely
+    // twice this session at a batch boundary (confirmed via pg_stat_activity
+    // as a stuck client-side await, not a Postgres-side timeout). Cutting
+    // round trips from one-per-row to one-per-500-rows sidesteps it. See
+    // sync_vendor_offers.mjs for the fuller writeup.
+    console.log('\nApplying (batched)...');
+    const BATCH_SIZE = 500;
     let written = 0, errors = 0;
-    for (const item of productItems) {
+    for (let i = 0; i < productItems.length; i += BATCH_SIZE) {
+      const batch = productItems.slice(i, i + BATCH_SIZE);
+      const values = [];
+      const params = [];
+      batch.forEach((item, j) => {
+        values.push(`($${j * 3 + 1}, $${j * 3 + 2}, 'image', $${j * 3 + 3}, 'wps_csv')`);
+        params.push(item.productId, item.url, item.priority);
+      });
       try {
-        await client.query('SAVEPOINT media_sp');
-        await client.query(`
-          INSERT INTO catalog_media (product_id, url, media_type, priority, source)
-          VALUES ($1, $2, 'image', $3, 'wps_csv')
-          ON CONFLICT (product_id, url) DO UPDATE SET priority = EXCLUDED.priority
-        `, [item.productId, item.url, item.priority]);
-        await client.query('RELEASE SAVEPOINT media_sp');
-        written++;
+        await client.query('BEGIN');
+        await client.query(
+          `INSERT INTO catalog_media (product_id, url, media_type, priority, source)
+           VALUES ${values.join(',')}
+           ON CONFLICT (product_id, url) DO UPDATE SET priority = EXCLUDED.priority`,
+          params
+        );
+        await client.query('COMMIT');
+        written += batch.length;
       } catch (e) {
-        await client.query('ROLLBACK TO SAVEPOINT media_sp').catch(() => {});
-        errors++;
-        if (errors <= 5) console.error(`  Error on product_id ${item.productId}:`, e.message);
+        await client.query('ROLLBACK').catch(() => {});
+        errors += batch.length;
+        if (errors <= 5 * BATCH_SIZE) console.error(`  Batch error at offset ${i}:`, e.message);
       }
-      if (written % 10000 === 0) process.stdout.write(`\r  ${written}/${productItems.length}`);
+      process.stdout.write(`\r  ${written}/${productItems.length}`);
     }
     console.log(`\r  ${written}/${productItems.length} written, ${errors} errors`);
-    await client.query('COMMIT');
 
     const { rows: [{ count }] } = await client.query('SELECT COUNT(*) FROM catalog_media');
     console.log(`\nDone. catalog_media now has ${count} rows.`);

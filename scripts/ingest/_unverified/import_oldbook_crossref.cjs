@@ -62,7 +62,7 @@ async function main() {
       SELECT DISTINCT ON (sku, oem_number) sku, oem_number, 'HD', page, 'oldbook_crossref'
       FROM tmp_oldbook_xref
       ORDER BY sku, oem_number, page
-      ON CONFLICT (sku, oem_number, oem_manufacturer)
+      ON CONFLICT (sku, oem_number)
         DO UPDATE SET oldbook_page = EXCLUDED.oldbook_page
     `);
     console.log(`catalog_oem_crossref upsert: ${upsertRes.rowCount} rows`);

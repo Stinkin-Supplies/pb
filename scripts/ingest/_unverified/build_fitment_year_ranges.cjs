@@ -193,9 +193,15 @@ function buildRangeQuery(familyFilter, modelFilter) {
 async function insertBatch(client, rows) {
   if (rows.length === 0) return;
 
+  // oem_numbers/source_vendors are inserted directly alongside the rest of
+  // the row instead of via a separate per-row UPDATE pass afterward -- the
+  // original two-pass version (bulk INSERT, then one UPDATE per row matched
+  // on a 4-column WHERE with no covering index) ran at ~9 rows/sec, which
+  // would have taken ~16h for the full 538k-row set. A single INSERT with
+  // all columns populated up front avoids the second pass entirely.
   const values = [];
   const placeholders = rows.map((r, i) => {
-    const o = i * 10;
+    const o = i * 12;
     values.push(
       r.product_id,
       r.model_code,
@@ -207,37 +213,19 @@ async function insertBatch(client, rows) {
       r.product_name,
       r.brand    || null,
       r.category || null,
+      r.oem_numbers   || null,
+      r.source_vendors || null,
     );
-    return `($${o+1},$${o+2},$${o+3},$${o+4},$${o+5},$${o+6},$${o+7},$${o+8},$${o+9},$${o+10})`;
+    return `($${o+1},$${o+2},$${o+3},$${o+4},$${o+5},$${o+6},$${o+7},$${o+8},$${o+9},$${o+10},$${o+11},$${o+12})`;
   });
 
   await client.query(`
     INSERT INTO product_fitment_year_model
       (product_id, model_code, family_id, family_name,
        year_start, year_end, span_label,
-       product_name, brand, category)
+       product_name, brand, category, oem_numbers, source_vendors)
     VALUES ${placeholders.join(',')}
   `, values);
-
-  // oem_numbers and source_vendors are arrays — update separately to keep batch simple
-  for (const r of rows) {
-    await client.query(`
-      UPDATE product_fitment_year_model
-         SET oem_numbers   = $1,
-             source_vendors = $2
-       WHERE product_id = $3
-         AND model_code  = $4
-         AND year_start  = $5
-         AND year_end    = $6
-    `, [
-      r.oem_numbers   || null,
-      r.source_vendors || null,
-      r.product_id,
-      r.model_code,
-      r.year_start,
-      r.year_end,
-    ]);
-  }
 }
 
 // ── CSV writer ────────────────────────────────────────────────────────────────

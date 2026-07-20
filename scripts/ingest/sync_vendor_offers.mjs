@@ -82,18 +82,48 @@ function puQty(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
-async function upsertOffer(client, offer) {
+const COLS_PER_ROW = 23;
+
+function offerToParams(offer) {
+  return [
+    offer.catalogProductId, offer.vendorCode, offer.vendorPartNumber ?? null, offer.manufacturerPartNumber ?? null,
+    offer.wholesaleCost, offer.mapPrice, offer.msrp, offer.dropShipFee, offer.dropShipEligible ?? false,
+    offer.totalQty ?? 0, offer.inStock ?? false,
+    offer.wiQty ?? 0, offer.nyQty ?? 0, offer.txQty ?? 0, offer.caQty ?? 0, offer.nvQty ?? 0, offer.ncQty ?? 0,
+    offer.gaQty ?? 0, offer.idQty ?? 0, offer.inQty ?? 0, offer.paQty ?? 0,
+    offer.ourPrice ?? offer.msrp ?? null,
+    offer.warehouseJson ? JSON.stringify(offer.warehouseJson) : null,
+  ];
+}
+
+// Multi-row upsert (a single INSERT with N VALUES tuples), not one query per
+// row. The original per-row-with-SAVEPOINT version made ~90k individual
+// round trips and, twice, hung indefinitely at a batch boundary with a
+// *completed* query sitting in an "idle in transaction" connection state --
+// confirmed via pg_stat_activity this wasn't a network/Postgres timeout
+// (query duration was near-zero, wait_event was ClientRead) but a stuck
+// client-side await somewhere in the per-row retry control flow. Cutting
+// the round-trip count from ~90,000 to ~180 sidesteps whatever that bug
+// was, rather than chasing it further, and is faster regardless.
+async function upsertOfferBatch(client, offers) {
+  if (!offers.length) return;
+  const values = [];
+  const params = [];
+  offers.forEach((offer, i) => {
+    const base = i * COLS_PER_ROW;
+    const placeholders = Array.from({ length: COLS_PER_ROW }, (_, j) => `$${base + j + 1}`);
+    // is_active, last_stock_sync, computed_at aren't per-row inputs -- true/now()/now() inline
+    values.push(`(${placeholders.slice(0, 9).join(',')}, true, ${placeholders.slice(9, 21).join(',')}, ${placeholders[21]}, now(), now(), ${placeholders[22]})`);
+    params.push(...offerToParams(offer));
+  });
+
   await client.query(
     `INSERT INTO vendor_offers (
        catalog_product_id, vendor_code, vendor_part_number, manufacturer_part_number,
        wholesale_cost, map_price, msrp, drop_ship_fee, drop_ship_eligible, is_active,
        total_qty, in_stock, wi_qty, ny_qty, tx_qty, ca_qty, nv_qty, nc_qty, ga_qty, id_qty, in_qty, pa_qty,
        our_price, last_stock_sync, computed_at, warehouse_json
-     ) VALUES (
-       $1,$2,$3,$4, $5,$6,$7,$8,$9,true,
-       $10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,
-       $22,now(),now(),$23
-     )
+     ) VALUES ${values.join(',')}
      ON CONFLICT (catalog_product_id, vendor_code) DO UPDATE SET
        vendor_part_number = EXCLUDED.vendor_part_number,
        manufacturer_part_number = EXCLUDED.manufacturer_part_number,
@@ -114,25 +144,14 @@ async function upsertOffer(client, offer) {
        warehouse_json = EXCLUDED.warehouse_json,
        updated_at = now()
     `,
-    [
-      offer.catalogProductId, offer.vendorCode, offer.vendorPartNumber ?? null, offer.manufacturerPartNumber ?? null,
-      offer.wholesaleCost, offer.mapPrice, offer.msrp, offer.dropShipFee, offer.dropShipEligible ?? false,
-      offer.totalQty ?? 0, offer.inStock ?? false,
-      offer.wiQty ?? 0, offer.nyQty ?? 0, offer.txQty ?? 0, offer.caQty ?? 0, offer.nvQty ?? 0, offer.ncQty ?? 0,
-      offer.gaQty ?? 0, offer.idQty ?? 0, offer.inQty ?? 0, offer.paQty ?? 0,
-      offer.ourPrice ?? offer.msrp ?? null,
-      offer.warehouseJson ? JSON.stringify(offer.warehouseJson) : null,
-    ]
+    params
   );
 }
 
-// Batched commits, not one giant transaction -- a 90k-row single transaction
-// over individual per-row round trips ran long enough to hit a dropped
-// connection with nothing committed at all (confirmed: vendor_offers had 0
-// rows after the crash, full rollback). Committing every BATCH_SIZE rows
-// means a dropped connection only loses the in-progress batch; upserts are
-// idempotent (ON CONFLICT DO UPDATE), so re-running is always safe.
-const BATCH_SIZE = 1000;
+// 500 rows/batch * 23 cols = 11,500 params -- comfortably under Postgres's
+// 65,535 bound-parameter limit per query, while still cutting round trips
+// by ~500x versus one query per row.
+const BATCH_SIZE = 500;
 
 function isConnectionError(e) {
   return /connection|ECONNRESET|ETIMEDOUT|terminated|timeout/i.test(e?.message ?? '');
@@ -143,67 +162,53 @@ function isConnectionError(e) {
 // VTWIN's ~38k rows), and a plain client has no way to recover once its
 // socket dies. Reconnects on a fresh client from the pool and retries the
 // SAME row, rather than restarting the whole phase from scratch.
+function chunk(arr, size) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
 async function runPhase(pool, label, rows, buildOffer) {
   console.log(`\n── ${label}: ${rows.length} candidate rows ──`);
+  const offers = rows.map(buildOffer).filter(Boolean);
   let written = 0, errors = 0;
 
   if (!APPLY) {
-    for (const row of rows) { if (buildOffer(row)) written++; }
-    console.log(`\r  ${written}/${rows.length} would be written, 0 errors`);
-    return { written, errors };
+    console.log(`\r  ${offers.length}/${rows.length} would be written, 0 errors`);
+    return { written: offers.length, errors: 0 };
   }
 
-  let client = await pool.connect();
-  client.on('error', () => {}); // swallow the async socket-error event -- failures are handled via query rejection below, not this listener
-  let inBatch = false;
-
-  async function reconnect(attemptNote) {
-    console.error(`\n  [${label}] ${attemptNote} -- reconnecting...`);
-    try { client.release(true); } catch (_) {}
-    client = await pool.connect();
-    client.on('error', () => {});
-    inBatch = false;
-  }
-
-  for (const row of rows) {
-    const offer = buildOffer(row);
-    if (!offer) continue;
-
+  for (const batch of chunk(offers, BATCH_SIZE)) {
     let attempts = 0;
     while (attempts < 3) {
       attempts++;
+      // Fresh client + fresh transaction per batch, not one long-lived
+      // client reused across the whole phase -- a stuck connection now only
+      // costs one 500-row batch, and every batch starts clean.
+      const client = await pool.connect();
+      client.on('error', () => {});
       try {
-        if (!inBatch) { await client.query('BEGIN'); inBatch = true; }
-        await client.query('SAVEPOINT offer_sp');
-        await upsertOffer(client, offer);
-        await client.query('RELEASE SAVEPOINT offer_sp');
-        written++;
-        break;
-      } catch (e) {
-        if (isConnectionError(e) && attempts < 3) {
-          await reconnect(`connection lost on catalog_product_id ${offer.catalogProductId} (attempt ${attempts})`);
-          continue; // retry this same row on the fresh connection
-        }
-        await client.query('ROLLBACK TO SAVEPOINT offer_sp').catch(() => {});
-        errors++;
-        if (errors <= 5) console.error(`  Error on catalog_product_id ${offer.catalogProductId}:`, e.message);
-        break;
-      }
-    }
-
-    if (written % BATCH_SIZE === 0 && inBatch) {
-      try {
+        await client.query('BEGIN');
+        await upsertOfferBatch(client, batch);
         await client.query('COMMIT');
-        inBatch = false;
+        written += batch.length;
+        client.release();
+        break;
       } catch (e) {
-        await reconnect('connection lost during batch commit');
+        await client.query('ROLLBACK').catch(() => {});
+        client.release(true);
+        if (isConnectionError(e) && attempts < 3) {
+          console.error(`\n  [${label}] batch failed (attempt ${attempts}): ${e.message} -- retrying on a fresh connection...`);
+          continue;
+        }
+        errors += batch.length;
+        if (errors <= 5 * BATCH_SIZE) console.error(`  [${label}] batch error:`, e.message);
+        break;
       }
     }
-    if (written % 5000 === 0) process.stdout.write(`\r  ${written}/${rows.length}`);
+    process.stdout.write(`\r  ${written}/${offers.length}`);
   }
-  if (inBatch) await client.query('COMMIT').catch(() => reconnect('connection lost on final commit'));
-  client.release();
-  console.log(`\r  ${written}/${rows.length} written, ${errors} errors`);
+  console.log(`\r  ${written}/${offers.length} written, ${errors} errors`);
   return { written, errors };
 }
 

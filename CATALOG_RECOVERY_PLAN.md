@@ -13,26 +13,25 @@ then the phase list.
 
 ---
 
-## Start here (2026-07-19)
+## Start here (2026-07-20)
 
 **What's fully done:** base catalog rebuild, all three vendor source tables
 refreshed, category/subcategory/canonical-links/variant-groups/most-fitment
-restored via a lucky Typesense snapshot find (see Phase 2). The catalog is
-in genuinely good shape for browsing/search already.
+restored via a lucky Typesense snapshot find (see Phase 2). Phase 6
+(relational fitment) and Phase 7 (OEM crossref, vendor offers, media) are
+now also done (session 91-92) — see the status table below. The catalog is
+in genuinely good shape end-to-end now.
 
 **What's still missing, in priority order:**
-1. **Phase 6** — relational fitment tables (`catalog_fitment_v2`,
-   `product_fitment_year_model`) are still at 0 rows. The *flat* fitment
-   data on `catalog_unified` itself (year ranges, HD model codes) is back,
-   but year-by-year/model-by-model fitment lookups aren't. **Do this next.**
-2. **Phase 7** — `catalog_oem_crossref`, `vendor_offers`, `catalog_media` all
-   still at 0 rows.
-3. **Phase 3 (reduced scope)** — ~6,794 `catalog_unified` rows (new products
+1. **Phase 3 (reduced scope)** — ~6,794 `catalog_unified` rows (new products
    added after the July 17 Typesense snapshot, or previously-inactive rows)
    only have a rough regex-guessed `display_category`, no subcategory.
-4. **Phase 1 (WPS)** — blocked, needs fresh source files from you (see below).
-5. **Phase 9** — full Typesense reindex once the above land, so search
-   reflects everything that's been restored.
+   **Do this next** — nothing higher-priority is outstanding.
+2. **Phase 9** — full Typesense reindex, so search reflects everything
+   that's been restored (fitment/crossref data landed after the last
+   reindex).
+3. **Phase 8** — low-priority orphaned-ID cleanup (`catalog_review_flags`,
+   `catalog_variant_candidates`).
 
 **What needs you specifically:**
 - WPS refresh is blocked on `scripts/data/wps/master_item_wps.csv` and
@@ -50,13 +49,13 @@ Review before committing.
 
 ---
 
-## Current state (verified 2026-07-19)
+## Current state (verified 2026-07-20)
 
 | Table | Rows | Notes |
 |---|---|---|
-| `catalog_unified` | 97,122 | 100% have `display_category`; 90,328 have subcategory/canonical link/most fitment (Typesense restore); 53,479 have subcategory detail; 46,384 have OEM part number; 45,358 have flat fitment data; 20,334 tagged with a variant group |
+| `catalog_unified` | 97,122 | 100% have `display_category`; 90,328 have subcategory/canonical link/most fitment (Typesense restore); 53,479 have subcategory detail; 46,384 have OEM part number; 65,014 have `is_harley_fitment=true` (re-synced from `catalog_fitment_v2` after Phase 6); 20,334 tagged with a variant group |
 | `pu_catalog` | 36,701 | Refreshed 2026-07-19, dealer price included |
-| `wps_catalog` | 22,278 | Untouched by incident; **stale**, blocked on source files |
+| `wps_catalog` | 22,288 | Refreshed 2026-07-19 (session 91), plus `fitment` JSONB populated 2026-07-20 for 17,765 items |
 | `vtwin_catalog` | 38,315 | Refreshed 2026-07-19 |
 | `canonical_products` | 91,283 | Intact, now fully relinked to `catalog_unified` |
 | `catalog_variant_groups` | 6,940 | Rebuilt 2026-07-19 |
@@ -64,11 +63,11 @@ Review before committing.
 | `catalog_variant_candidates` | 235 | Intact but orphaned `product_id` refs (Phase 8, low priority) |
 | `catalog_review_flags` | 111 | Intact but orphaned `product_id` refs (Phase 8, low priority) |
 | `oem_supersession` | 283 | Intact, survived untouched |
-| `catalog_oem_crossref` | 0 | **Needs Phase 7** |
-| `catalog_fitment_v2` | 0 | **Needs Phase 6** |
-| `product_fitment_year_model` | 0 | **Needs Phase 6** |
-| `vendor_offers` | 0 | **Needs Phase 7** |
-| `catalog_media` | 0 | **Needs Phase 7** |
+| `catalog_oem_crossref` | 29,835 | **Phase 7 DONE 2026-07-20** — fatbook (3,940), oldbook (net ~1,973 new), WPS Harley (1,651), VTwin scrape (6,635), PU_PIES brand-XML (15,636); some cross-source overlap collapsed via `ON CONFLICT` |
+| `catalog_fitment_v2` | 2,473,673 | **Phase 6 DONE 2026-07-20** — PU (1,405,416 via `pu_fitment_expanded`), WPS (715,983), VTwin (352,274 via new `promote_vtwin_scrape_fitment.mjs`, sourced from `vtwin_scrape_data` not the stale CSV) |
+| `product_fitment_year_model` | 538,093 | **Phase 6 DONE 2026-07-20** — rebuilt via `build_fitment_year_ranges.cjs` (patched to drop a per-row-`UPDATE` perf bug that made it ~1800x slower than necessary) |
+| `vendor_offers` | 90,544 | Done session 91 |
+| `catalog_media` | 59,325 | Session 91 (WPS, 23,195) + PU brand-XML enrichment 2026-07-20 (36,130) |
 
 ---
 
@@ -126,26 +125,57 @@ Typesense match.
 
 `canonical_products` (91,283 rows) survived intact; `restore_from_typesense_snapshot.mjs` resolved `canonical_sku` → `canonical_products.id` and set `catalog_unified.canonical_product_id` for all 90,328 matched rows. No separate script needed.
 
-## Phase 6 — Relational fitment tables (NEXT UP)
+## Phase 6 — Relational fitment tables ✅ DONE (2026-07-20)
 
-`catalog_fitment_v2` and `product_fitment_year_model` are both still at 0
-rows — the *flat* fitment columns on `catalog_unified` are back (Phase 2),
-but these relational tables (used for fitment-filtered browse/search, not
-just display) are not.
+`catalog_fitment_v2` (2,473,673 rows) and `product_fitment_year_model`
+(538,093 rows) both rebuilt.
 
-- [ ] PU fitment: `scripts/ingest/_unverified/import_pu_fitment.mjs` or `import_pu_fitment_fixed.mjs` — read both first, confirm which is current
-- [ ] WPS fitment: `scripts/ingest/_unverified/import_wps_fitment.mjs`
-- [ ] VTwin fitment: `scripts/ingest/_unverified/import_vtwin_fitment_full.mjs` or `import_vtwin_fitment_partial.mjs` — check for local source CSVs first (several large ones got archived to `_unverified/` during the pre-recovery cleanup pass, e.g. `vtwin_fitment_combined.csv`)
-- [ ] `scripts/ingest/_unverified/build_fitment_year_ranges.cjs` — may already be redundant given Phase 2 restored `fitment_year_start`/`_end` directly; check before running
-- [ ] `oem_supersession` table survived intact (283 rows, untouched) — no action needed there, but verify `mv_oem_fitment_coverage` materialized view (referenced in old HANDOFF sessions) still works / doesn't need a `REFRESH MATERIALIZED VIEW`
+- [x] **PU fitment** — used `scripts/ingest/_unverified/promote_pu_fitment.cjs` against `pu_fitment_expanded` (1,640,065 source rows, already populated in the DB — not the CSV path originally assumed). 1,405,416 rows promoted, 18,610 products backfilled with `is_harley_fitment=true`. The CSV-based `import_pu_fitment.mjs`/`import_pu_fitment_fixed.mjs` scripts were **not used** — `pu_fitment_expanded` was the real, already-staged source.
+- [x] **WPS fitment** — `import_wps_fitment.mjs` (live WPS API pagination, ~22K items, writes `wps_catalog.fitment` JSONB) then `promote_wps_fitment.cjs` (JSONB → `catalog_fitment_v2`, resolves model/year via `harley_model_years` + `model_alias_map`). 715,983 rows.
+- [x] **VTwin fitment** — the CSV-based `import_vtwin_fitment_partial.mjs` was rejected: it also upserts new bare-bones `catalog_unified` products for unmatched SKUs (447 of 13,275), which would have reintroduced NULL-category rows. `import_vtwin_fitment_full.mjs` was confirmed broken (writes columns that don't exist on the current schema, deletes good data first — **do not use**). Instead wrote new `scripts/ingest/promote_vtwin_scrape_fitment.mjs`, sourcing directly from `vtwin_scrape_data` (19,695 rows, fresher and a 98% match rate against existing products, vs. 97% for the stale CSV) and touching only already-existing products. 352,274 rows.
+- [x] `build_fitment_year_ranges.cjs` — rebuilds `product_fitment_year_model` from `catalog_fitment_v2` via gaps-and-islands SQL. **Patched a real perf bug**: the original did a bulk 500-row INSERT then a *separate per-row UPDATE* (no covering index) to set the array columns — ~9 rows/sec, ~16h projected for 538K rows. Fixed to insert everything in one pass; full run then took under a minute.
+- [x] `oem_supersession` (283 rows) — confirmed untouched, no action needed.
 
 ## Phase 7 — OEM crossref, vendor offers, media
 
-All three still at 0 rows.
+`vendor_offers` (90,544) and `catalog_media` (23,195) done session 91.
+`catalog_oem_crossref` (14,199) done 2026-07-20:
 
-- [ ] `catalog_oem_crossref`: multiple `import_oem_crossref.*` versions exist across `scripts/ingest/_unverified/` — identify the current one (check file dates / HANDOFF_LOG mentions) plus HardDrive/WPS OEM crossref CSVs already in `scripts/data/` or `data/`
-- [ ] `vendor_offers`: `scripts/ingest/_unverified/populate_wps_vendor_offers.cjs` (or `.js` sibling)
-- [ ] `catalog_media`: current image/media pipeline not yet identified — likely tied to the fflate-based image proxy mentioned in old HANDOFF sessions; needs investigation before picking a script
+- [x] `import_fatbook_crossref.js` — **fixed a real bug**: referenced a `vendor_sku` column that doesn't exist on `catalog_oem_crossref` (real column is `sku`) and would have failed on first run; also needed `DISTINCT ON` to avoid an `ON CONFLICT` double-update error from intra-file duplicates. Renamed to `.cjs` (this directory's `package.json` sets `"type": "module"`, so a bare `.js` fails as ESM). 3,940 rows, 95.5% match rate.
+- [x] `import_oldbook_crossref.cjs` — fixed `ON CONFLICT` target (was `(sku, oem_number, oem_manufacturer)`, needed to be `(sku, oem_number)` to match the actual narrower unique index `catalog_oem_crossref_sku_oem_uniq`). ~1,973 net-new rows after cross-source overlap, 96.1% match rate.
+- [x] `import_wps_harley_oem_crossref.js` — fixed a relative-path bug (`.env.local` resolution was two `../` short, silently loading nothing and falling back to a localhost DB connection). 1,651 rows, 603 WPS SKUs not found in `catalog_products` (skipped, not created).
+- [x] `import_vtwin_oem_crossref.mjs --apply` — worked as-is (already dry-run-by-default). 6,635 rows from `vtwin_scrape_data.oem_no`.
+- Explicitly **not used**: `import_oem_crossref.js` (unguarded `TRUNCATE oem_crossref`, wrong/legacy table — do not run), `import-oem-crossref.cjs`/`.js` hyphenated pair (stub/sample data only). HardDrive crossref (`import-harddrive-crossref.js`) skipped as optional/unconfirmed, not part of this pass.
+- [x] `sync_fitment_flat_columns.mjs` (found in `scripts/ingest/_retired/` — archived after use, not superseded) re-run afterward: 31,996 products' flat fitment columns re-synced from the now-populated `catalog_fitment_v2`.
+
+### Phase 7 addendum — PU brand XML enrichment ✅ DONE (2026-07-20)
+
+A separate, previously-missed gap: the 133 PU brand XML files
+(`scripts/data/pu_pricefile/brand_files/`) feed `catalog_media` (multi-image
+galleries), `catalog_unified.product_details` (features/description JSONB),
+and a `PU_PIES`-sourced slice of `catalog_oem_crossref` — none of which
+`pu_fitment_expanded` (used above) touches. Both scripts live in
+`scripts/ingest/_retired/`, not deleted:
+
+- [x] `extract_pu_images.mjs` — **fixed a real bug**: it joined XML part
+  numbers against `catalog_unified.vendor_sku`, but PU part numbers
+  (`DS373701`, `99040977`, etc.) live in `catalog_unified.sku` — `vendor_sku`
+  is frequently empty or holds an unrelated manufacturer code for PU rows
+  (the same "PU joins on sku" gotcha documented elsewhere in this doc and in
+  `VENDOR_DATA_PIPELINE.md`). The unfixed version matched <1% of rows
+  (e.g. 0/6,753 for PU's own core Drag Specialties brand file). Also
+  **fixed a perf bug**: the per-row `UPDATE` loop for features/descriptions
+  (~25K individual round trips) was batched into set-based updates via
+  `json_to_recordset`, matching the pattern established elsewhere this
+  session. Result: 36,130 `catalog_media` rows (`source='pu_xml'`), 15,592
+  products gained `product_details.features`, 9,492 gained
+  `product_details.description`, 15,636 `catalog_oem_crossref` rows
+  (`source='PU_PIES'`) — all consistent with the pre-incident historical
+  figures (33,740 / — / 8,828 / 15,330).
+- [x] `backfill_pu_brand_xml_fitment.mjs` — already correct (joins on `sku`,
+  already batched, dry-run gated). Found 0 gap products to backfill, which
+  is expected: the much larger `pu_fitment_expanded` promotion above already
+  covers what this supplementary pass used to target.
 
 ## Phase 8 — Low-priority cleanup
 

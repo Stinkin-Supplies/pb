@@ -125,20 +125,31 @@ function parseCatalogContent(xmlText) {
 async function main() {
   console.log(`=== PU Enrichment Extraction (${APPLY ? 'APPLY' : 'DRY RUN'}) ===\n`);
 
-  // Load PU vendor_sku → { id, internal_sku } map (no-dash normalized)
+  // Load PU sku → { id, internal_sku } map (no-dash normalized).
+  // NB: PU brand XML part numbers match catalog_unified.sku, not
+  // vendor_sku -- vendor_sku is frequently empty or holds an unrelated
+  // manufacturer code for PU rows (see VENDOR_DATA_PIPELINE.md gotcha #1,
+  // "PU joins on sku, WPS/VTwin join on vendor_sku"). The original version
+  // of this script joined on vendor_sku and silently matched <1% of rows.
   console.log('Loading PU product map...');
   const { rows: puRows } = await db.query(`
-    SELECT id, vendor_sku, internal_sku
+    SELECT id, sku, vendor_sku, internal_sku
     FROM catalog_unified
-    WHERE source_vendor = 'PU' AND is_active = true AND vendor_sku IS NOT NULL
+    WHERE source_vendor = 'PU' AND is_active = true AND sku IS NOT NULL
   `);
   const skuToProduct = new Map();
   for (const r of puRows) {
-    const plain  = r.vendor_sku.trim();
+    const val = { id: r.id, internal_sku: r.internal_sku };
+    const plain  = r.sku.trim();
     const noDash = plain.replace(/-/g, '');
-    const val    = { id: r.id, internal_sku: r.internal_sku };
     skuToProduct.set(plain,  val);
     if (noDash !== plain) skuToProduct.set(noDash, val);
+    if (r.vendor_sku && r.vendor_sku.trim()) {
+      const vPlain  = r.vendor_sku.trim();
+      const vNoDash = vPlain.replace(/-/g, '');
+      if (!skuToProduct.has(vPlain))  skuToProduct.set(vPlain, val);
+      if (!skuToProduct.has(vNoDash)) skuToProduct.set(vNoDash, val);
+    }
   }
   console.log(`  ${skuToProduct.size.toLocaleString()} PU SKU entries\n`);
 
@@ -289,47 +300,53 @@ async function main() {
     }
 
     // 2. Features → product_details
+    // Batched set-based UPDATE (one query per 500 rows via json_to_recordset),
+    // not one UPDATE per row -- the original per-row version made ~15,600
+    // individual round trips for this step alone. See the fitment-year-range
+    // and per-row-UPDATE writeups elsewhere in this recovery pass for the
+    // same anti-pattern found (and fixed) in build_fitment_year_ranges.cjs.
     if (featureUpdates.length) {
       process.stdout.write('Updating features... ');
       let updated = 0;
       for (let i = 0; i < featureUpdates.length; i += BATCH) {
         const batch = featureUpdates.slice(i, i + BATCH);
-        for (const { id, features } of batch) {
-          const res = await client.query(`
-            UPDATE catalog_unified
-            SET product_details = COALESCE(product_details, '{}'::jsonb)
-              || jsonb_build_object('features', $2::text[])
-            WHERE id = $1
-              AND (product_details IS NULL
-                OR jsonb_array_length(COALESCE(product_details->'features','[]'::jsonb)) = 0)
-          `, [id, features]);
-          updated += res.rowCount ?? 0;
-        }
+        const payload = JSON.stringify(batch.map(r => ({ id: r.id, features: r.features })));
+        const res = await client.query(`
+          UPDATE catalog_unified cu
+          SET product_details = COALESCE(cu.product_details, '{}'::jsonb)
+            || jsonb_build_object('features', to_jsonb(v.features))
+          FROM json_to_recordset($1::json) AS v(id INT, features TEXT[])
+          WHERE cu.id = v.id
+            AND (cu.product_details IS NULL
+              OR jsonb_array_length(COALESCE(cu.product_details->'features','[]'::jsonb)) = 0)
+        `, [payload]);
+        updated += res.rowCount ?? 0;
         process.stdout.write(`\rUpdating features... ${Math.min(i+BATCH, featureUpdates.length)}/${featureUpdates.length}`);
       }
       console.log(`\rUpdating features... ${updated.toLocaleString()} rows ✅             `);
     }
 
-    // 3. Descriptions → product_details
+    // 3. Descriptions → product_details (same batched pattern as features)
     if (descUpdates.length) {
       process.stdout.write('Updating descriptions... ');
       let updated = 0;
       for (let i = 0; i < descUpdates.length; i += BATCH) {
         const batch = descUpdates.slice(i, i + BATCH);
-        for (const { id, description } of batch) {
-          const res = await client.query(`
-            UPDATE catalog_unified
-            SET product_details = COALESCE(product_details, '{}'::jsonb)
-              || jsonb_build_object('description', $2::text)
-            WHERE id = $1
-              AND (product_details IS NULL
-                OR product_details->>'description' IS NULL
-                OR product_details->>'description' = '')
-          `, [id, description]);
-          updated += res.rowCount ?? 0;
-        }
+        const payload = JSON.stringify(batch.map(r => ({ id: r.id, description: r.description })));
+        const res = await client.query(`
+          UPDATE catalog_unified cu
+          SET product_details = COALESCE(cu.product_details, '{}'::jsonb)
+            || jsonb_build_object('description', to_jsonb(v.description))
+          FROM json_to_recordset($1::json) AS v(id INT, description TEXT)
+          WHERE cu.id = v.id
+            AND (cu.product_details IS NULL
+              OR cu.product_details->>'description' IS NULL
+              OR cu.product_details->>'description' = '')
+        `, [payload]);
+        updated += res.rowCount ?? 0;
+        process.stdout.write(`\rUpdating descriptions... ${Math.min(i+BATCH, descUpdates.length)}/${descUpdates.length}`);
       }
-      console.log(`${updated.toLocaleString()} rows ✅`);
+      console.log(`\rUpdating descriptions... ${updated.toLocaleString()} rows ✅             `);
     }
 
     // 4. OEM crossref

@@ -7,6 +7,120 @@
 
 # ——— NEXT SESSION: START HERE ———
 
+## Session 92 (July 20 2026) — Recovery Phases 6/7 finished (relational fitment, OEM crossref) + PU brand-XML enrichment gap found and closed
+
+Continued directly from session 91's paused state (uncommitted batch-write
+fixes) into `CATALOG_RECOVERY_PLAN.md` Phases 6 and 7, the two tables still
+at 0 rows since the July 18 TRUNCATE incident: `catalog_fitment_v2` /
+`product_fitment_year_model` (relational fitment) and `catalog_oem_crossref`.
+
+**Fitment (Phase 6)**: Before running anything, read every candidate script
+in `scripts/ingest/_unverified/` via a research pass — found real landmines
+(a VTwin fitment script writing to columns that don't exist on the current
+schema while deleting good data first; a schema mismatch confirmed directly
+against the live DB, not just docs) and entered plan mode before touching
+the DB. PU turned out to have a major correction mid-plan: the user flagged
+that `pu_fitment_expanded` (1,640,065 rows, already staged in Postgres) was
+being ignored in favor of an assumed-necessary CSV import — promoted via
+the already-correct `promote_pu_fitment.cjs`, 1,405,416 rows. WPS via
+`import_wps_fitment.mjs` (live API pagination) + `promote_wps_fitment.cjs`,
+715,983 rows. VTwin: rejected both existing CSV-based scripts (one writes
+schema-mismatched columns and deletes good data; the other also upserts new
+bare-bones `catalog_unified` products for the 447 CSV SKUs with no existing
+match, which would have reintroduced NULL-category rows) — wrote a new
+script, `scripts/ingest/promote_vtwin_scrape_fitment.mjs`, sourcing directly
+from `vtwin_scrape_data` (98% match rate vs. 97% for the CSV, fresher, no
+side-effect product creation), 352,274 rows. `build_fitment_year_ranges.cjs`
+(→ `product_fitment_year_model`) had a real perf bug — bulk INSERT followed
+by a *separate per-row UPDATE* with no covering index, ~9 rows/sec, ~16h
+projected for 538K rows — fixed to insert everything in one pass, then ran
+in under a minute. Final: `catalog_fitment_v2` 2,473,673 rows,
+`product_fitment_year_model` 538,093 rows.
+
+**OEM crossref (Phase 7)**: four sources, three had real bugs fixed in
+place — `import_fatbook_crossref.js` referenced a `vendor_sku` column that
+doesn't exist (real column is `sku`), renamed to `.cjs` (directory's
+`package.json` sets `type: module`); `import_oldbook_crossref.cjs` had the
+wrong `ON CONFLICT` target (needed the narrower `(sku, oem_number)` index,
+not `(sku, oem_number, oem_manufacturer)`); `import_wps_harley_oem_crossref.js`
+had a relative `.env.local` path that was one `../` short, silently loading
+nothing and falling back to a dead localhost connection. `import_vtwin_oem_crossref.mjs`
+worked as-is. Explicitly did not run `import_oem_crossref.js` (unguarded
+`TRUNCATE` against a legacy, wrong table) or the hyphenated
+`import-oem-crossref.*` pair (stub/sample data only). Final:
+`catalog_oem_crossref` 14,199 rows after Phase 7 proper.
+
+**PU brand-XML enrichment (Phase 7 addendum, user-flagged)**: after
+reporting Phase 6/7 done, the user asked whether the 133 PU brand XML files
+(`scripts/data/pu_pricefile/brand_files/`) had been pulled — a real gap,
+separate from `pu_fitment_expanded`, that historically fed `catalog_media`
+(multi-image), `catalog_unified.product_details` (features/description),
+and a `PU_PIES`-sourced slice of OEM crossref. `extract_pu_images.mjs`
+(in `_retired/`, not deleted) had the same class of bug as the fitment
+scripts — joined XML part numbers against `vendor_sku` instead of `sku`,
+matching <1% of rows (0/6,753 on PU's own core Drag Specialties file) until
+fixed. Also batched its per-row feature/description `UPDATE` loop
+(~25K round trips) via `json_to_recordset`. Result: 36,130 new
+`catalog_media` rows (`source='pu_xml'`), 15,592 products gained
+`product_details.features`, 9,492 gained `product_details.description`,
+15,636 new OEM crossref rows (`source='PU_PIES'`) — all consistent with
+pre-incident historical figures. The companion `backfill_pu_brand_xml_fitment.mjs`
+was already correct but found 0 gap products (expected — `pu_fitment_expanded`
+already covers what it used to target).
+
+**Verified end state**: `catalog_fitment_v2` 2,473,673 rows;
+`product_fitment_year_model` 538,093 rows; `catalog_oem_crossref` 29,835
+rows; `catalog_media` 59,325 rows (23,195 WPS + 36,130 PU); 65,014
+`catalog_unified` rows have `is_harley_fitment=true`. `CATALOG_RECOVERY_PLAN.md`
+and `VENDOR_DATA_PIPELINE.md` updated to match. Remaining, in priority
+order: Phase 3 (~6,794 rows still need subcategory), Phase 9 (full
+Typesense reindex — search doesn't reflect any of this session's or
+session 91's data yet), Phase 8 (low-priority orphaned-ID cleanup).
+
+---
+
+## Session 91 (July 19–20 2026) — Catalog recovery finished (WPS refresh, vendor_offers, catalog_media); new variant-dropdown UI; cross-vendor duplicate-tile fix; category/shop-display cleanup; large-batch-write hang bug found and fixed
+
+Picked up directly from the July 18 TRUNCATE incident recovery (`CATALOG_RECOVERY_PLAN.md`). Two threads ran in parallel across this session: closing out the remaining recovery gaps, and a new feature request (variant-selector dropdowns) that turned into a much larger cross-vendor consolidation + data-quality pass once the underlying `DEDUP_KEY` logic was actually read closely.
+
+### Feature: multi-attribute variant dropdowns for cable/line products
+
+User asked for a dropdown selector (e.g. "Brake Line — Color — Length") on products that come in multiple purchasable options. Investigation found the schema/API already supported unlimited named variant axes (`catalog_variant_member_options`, already returned by `app/api/browse/variants/[productId]/route.ts`) — the actual gaps were (1) cable/line products are frequently ingested with the *exact same name* across every length (e.g. Magnum Shielding "Clutch Line," 43 rows, 20 distinct lengths, nothing in the name to tell them apart), so the existing name-based classifier (`build_variant_groups.cjs`) never grouped them, and (2) no UI mode used a real `<select>` — the five existing `VariantSelector.jsx` modes are all pill/card based.
+
+Built `scripts/ingest/build_length_variant_groups.mjs` — group by exact name + `length_in` (a column that existed but was unused for grouping), scoped to `display_category = 'Cables'` and `Brakes > Brake Lines & Hoses`, tagged `source_vendor='LENGTH'` (added to `build_variant_groups.cjs`'s wipe-exclusion list alongside `ADMIN`/`MULTI`, same reasoning as those two). 175 groups, 509 members. New `components/browse/AxisDropdownSelector.jsx` — generic N-axis `<select>` selector reading the `options[]` array, wired into `VariantSelector.jsx` as a new `dropdown` render mode (single axis, >4 distinct values, no fitment data). Verified live in the browser preview.
+
+### Cross-vendor duplicate tiles
+
+While explaining the dropdown work, traced why some products still looked duplicated: `lib/db/browse.ts`'s `DEDUP_KEY` never referenced `canonical_product_id` at all — only `variant_group_id` and a name-similarity fallback. Confirmed 6,263 canonical products currently have 2-3 active `catalog_unified` rows each (same physical item, different vendor, often unrecognizably different names — e.g. one ignition sensor plate as "SENSOR PICKUP 32400-94" / PU, "CAM POSITION PLATE ASSEMBLY" / WPS, "Ignition Sensor Plate Assembly" / VTwin).
+
+Fix: added `canonical_product_id` as a **second** priority in `DEDUP_KEY`, after `variant_group_id` — an independent review pass caught that putting it *first* (the original plan) would have been a real regression, incorrectly merging 38 confirmed-different variant pairs that happen to share a bad canonical match (canonical linking is heuristic, not exact — `build_canonical_products.mjs`'s own comments document prior false positives). `variant_group_id`-first protects those via `COALESCE` short-circuit; `canonical_product_id` still catches the vast majority of cross-vendor dupes, which have no `variant_group_id` at all. Also removed the customer-facing vendor badge (PU/WPS/VTwin) from `app/browse/[slug]/page.jsx`'s `SidebarProductRow` and `components/browse/OemAlternativesPanel.jsx` — the business model is "one consolidated catalog," vendor identity shouldn't be customer-visible. `AdminEditPanel` still shows it for staff.
+
+### Category cleanup + shop-display removal
+
+At the user's request: merged 10 small leftover/duplicate `display_category` values (Handlebar & Controls, Carburetion & Fuel, Foot Controls, Suspension, Fenders & Body, Frame & Hardware, Instrumentation, Luggage & Racks, Security & Covers, Accessories & Misc — 1,021 rows total, none had ever been subcategorized) into a single `Uncategorized` catch-all for later manual dispersal, rather than trying to auto-route each into its nearest sibling. Also deactivated (`is_active=false`, reversible) 114 shop-display/retail-fixture items that don't belong in a direct-to-consumer catalog — canopies, banners, table cloths, slat-wall display hardware, dealer promo packs, battery/glove/boot/helmet display racks, hang tags, shop bags. Excluded 4 false-positive pattern matches (real products) and separately caught + flagged (not auto-fixed) one brake rotor whose name got corrupted with a leftover banner SKU — fixed by hand once located (`6 PIST FRONT DUAL CALIPER KIT BLACK W/ 11.8" ROTOR`, was `BANNER-HARDDRIVE2 BLACK W/ 11.8" ROTOR`).
+
+### Variant Term Review tool (Artifact)
+
+User compiled a ~120-term list of product-title words they suspected needed variant grouping. Built a searchable/filterable Claude Artifact (categorizing each term by real duplication ratio: likely-safe / worth-a-look / broad-category / no-match) rather than trying to auto-process the raw list — several terms turned out to be broad mechanical category words (valve guide, tappet, camshaft — hundreds of matches spanning unrelated engines) that would be actively wrong to group as "variants." Iterated the tool twice more on user feedback: added per-term Approve/Decline/Unsure decisions + a checkbox-driven custom-group builder (hand-pick specific SKUs within a large bucket) with local persistence and a copyable export, then fixed the export's copy mechanism after discovering Artifacts' sandboxed iframe silently blocks both `navigator.clipboard.writeText` and `window.prompt()` — replaced with a visible pre-selected `<textarea>` panel, which always works since it's a user-initiated native copy, not a scripted one.
+
+From two rounds of the user's exported decisions: built 17 new hand-curated (`ADMIN`-tagged) variant groups (rotors, rings, shims, axles, brake lines, spoke nipples, etc.) and fixed 3 real data gaps found along the way — a "Standard" or "Black Cut"/"Bronze" variant missing from an otherwise-complete automated group (piston ring set, two Marlin wheel groups, 883 XL piston rings). Also caught and declined to build several user-proposed groups that were actually wrong: two "circlip" groups turned out to be the same 3 physical parts already correctly cross-vendor-linked via `canonical_product_id` (no new group needed); a "spoke nipples" set of 4 overlapping 2-item groups was actually one real 2-axis (Finish × Length) product, consolidated into one correct group instead of built as submitted; "fork slider covers" and "rocker arm shims" were already fully and correctly grouped by the automated pipeline, and the user's proposed re-groupings would have mixed genuinely different lengths/finishes together. Flagged (not built) a Crankshaft Bearing Race Kit pair that's actually two different-engine fitments, not a color/size variant, and a "crush washer" group mixing metric/imperial sizing at identical prices with no way to confirm whether they're the same physical part. Session ended paused mid-list at the user's request ("hold off on anything questionable") — proposed and about to run a DB-driven audit (already-grouped vs. genuine gap vs. ambiguous) instead of continuing the manual-checkbox approach, to cut down what actually needs human review.
+
+### Recovery gaps closed: WPS catalog refresh, vendor_offers, catalog_media
+
+User supplied the three files that had been blocking the WPS refresh since the incident (`master_item_wps.csv`-equivalent, `hdmstr_with_urls.csv`-equivalent image list, and a separate pricing/drop-ship-fee CSV) in three separate drops across the session. Ran `pull_wps_catalog.mjs --apply`: `wps_catalog` refreshed, 22,288 rows (10 new, 15,327 updated with current dealer price/list price/stock).
+
+Built `scripts/ingest/sync_vendor_offers.mjs` — populates `vendor_offers` (0 rows since the incident; this is the table `lib/db/browse.ts` and the variants API route read for live stock/price) from all three vendor source tables. Confirmed the PU join key is `catalog_unified.sku = pu_catalog.sku`, **not** `vendor_sku` (only 880/36,701 matched on the wrong column — WPS and VTwin do use `vendor_sku`). Built `scripts/ingest/sync_catalog_media.mjs` for the WPS image export → `catalog_media` (0 rows since the incident), file-encounter-order as display priority.
+
+**Infrastructure bug found and fixed, worth remembering for any future large-batch script against this DB**: the first `vendor_offers` run (one query per row, ~90k rows, wrapped in batched-but-still-per-row transactions) hung silently for 4 hours with zero progress and no error — confirmed via `pg_stat_activity` this was a stuck client-side `await` (connection state `idle in transaction`, last query duration near-zero, `wait_event=ClientRead`), not a network drop or a slow query, so `statement_timeout`/`query_timeout` didn't help and the reconnect-on-error logic never triggered because nothing ever threw. It hung at the *exact same row count* (32,000, a clean batch-size multiple) on two separate attempts. Fix: rewrote both `sync_vendor_offers.mjs` and `sync_catalog_media.mjs` from one-query-per-row to multi-row batched `INSERT ... VALUES (...),(...),(...) ON CONFLICT` upserts (500 rows/query) with a fresh client + fresh transaction per batch. Cut round trips from ~90,000 to ~180; both scripts then completed in under 2 minutes with 0 errors. Any future ingest script writing more than a few thousand rows to this DB should use this pattern from the start, not per-row `SAVEPOINT` loops.
+
+Also fixed two data-quality issues surfaced along the way: a corrupted product name (above), and a vendor-side (WPS/Caliber) photo mislabel — the "Flex & Fold Funnel" Small-Blue and Medium-Yellow SKUs had their product photos completely swapped (verified by actually opening the image URLs, not just trusting the filename/SKU association) — fixed `catalog_unified.image_url` for both.
+
+Wrote `VENDOR_DATA_PIPELINE.md` — new, dedicated start-to-finish walkthrough of the vendor ingestion pipeline (source files → source tables → `catalog_unified` merge → every enrichment layer → Typesense) with a consolidated gotchas section (the PU join-key trap, PU's text-typed warehouse quantity columns with `"20+"` values, WPS's `mapp_price` column-name typo, the hardcoded WPS inventory filename, the `ADMIN`/`MULTI`/`LENGTH` wipe-exclusion requirement, the large-batch hang lesson above). `MasterRef.md` and `HANDOFF_LOG.md` have the same facts scattered across a scripts inventory and 2,600+ lines of session narrative respectively; this is the first version meant to be read start-to-finish rather than searched.
+
+**Verified end state**: `catalog_unified` 97,122 rows (90,544 active, 100% categorized, 98% subcategorized, 98% canonical-linked); `vendor_offers` 90,544 rows (real cost/stock, all 3 vendors); `catalog_media` 23,195 rows (15,321 products); `catalog_variant_groups` 7,132 (20,914 products in a selectable variant group). Still genuinely at 0 rows and not started this session: `catalog_oem_crossref`, `catalog_fitment_v2`, `product_fitment_year_model` (relational fitment) — see `CATALOG_RECOVERY_PLAN.md` Phases 6/7 for intended sources.
+
+---
+
 ## Session 90 continued an eleventh time — Transmission & Clutch rebuilt onto Laken's finalized 17-name spec
 
 Laken handed over a finalized 17-name spec (collapsed from her pasted list after confirming "Primary- Inner & Outer" / "Inner & Outer Primary" was a duplicate, not two buckets). This superseded a v1 16-subcategory structure (`fix_transmission_taxonomy.mjs`) that had already been applied in an earlier, uncommitted session — full re-audit and rebuild via `rebuild_transmission_taxonomy_v2.mjs`, same "full and final audit" method as Fuel/Air/Carbs, Foot Controls, and Engine.

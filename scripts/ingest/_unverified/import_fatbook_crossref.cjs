@@ -1,15 +1,35 @@
-const fs = require('fs');
+#!/usr/bin/env node
+/**
+ * import_fatbook_crossref.js
+ *
+ * Reads fatbookcrossref.txt and does two things:
+ *   1. Inserts OEM → DS part number pairs into catalog_oem_crossref
+ *   2. Sets in_fatbook = true on catalog_unified rows whose SKU matches
+ *      a DS part number in the file
+ *
+ * Usage:
+ *   node import_fatbook_crossref.cjs [path/to/fatbookcrossref.txt]
+ */
+
+const fs   = require('fs');
 const path = require('path');
 const { Client } = require('pg');
 
+// ── Config ────────────────────────────────────────────────────────────────────
+
 const FILE = process.argv[2] || path.join(__dirname, 'fatbookcrossref.txt');
 
-const DB_CONFIG = {
-  host:     '2a01:4ff:f0:fa6f::1',
-  user:     'catalog_app',
-  password: 'smelly',
-  database: 'stinkin_catalog',
-};
+// Pass params as object to avoid IPv6 URL parsing issues
+const DB_CONFIG = process.env.DATABASE_URL
+  ? { connectionString: process.env.DATABASE_URL }
+  : {
+      host:     '2a01:4ff:f0:fa6f::1',
+      user:     'catalog_app',
+      password: 'smelly',
+      database: 'stinkin_catalog',
+    };
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function normalizeSku(raw) {
   return raw.replace(/-/g, '').toUpperCase().trim();
@@ -18,20 +38,33 @@ function normalizeSku(raw) {
 function parseFile(filePath) {
   const lines = fs.readFileSync(filePath, 'utf8').split('\n');
   const rows = [];
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
     if (i === 0 && line.toLowerCase().startsWith('oem')) continue;
+
     const parts = line.split(',');
     if (parts.length < 3) continue;
-    const oem = parts[0].trim().toUpperCase();
-    const dsSkuRaw = parts[1].trim();
+
+    const oem         = parts[0].trim().toUpperCase();
+    const dsSkuRaw    = parts[1].trim();
     const fatbookPage = parseInt(parts[2].trim(), 10);
+
     if (!oem || !dsSkuRaw || isNaN(fatbookPage)) continue;
-    rows.push({ oem, dsSkuRaw, dsSku: normalizeSku(dsSkuRaw), fatbookPage });
+
+    rows.push({
+      oem,
+      dsSkuRaw,
+      dsSku: normalizeSku(dsSkuRaw),
+      fatbookPage,
+    });
   }
+
   return rows;
 }
+
+// ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main() {
   const rows = parseFile(FILE);
@@ -44,60 +77,102 @@ async function main() {
   try {
     await client.query('BEGIN');
 
-    await client.query(`ALTER TABLE catalog_oem_crossref ADD COLUMN IF NOT EXISTS fatbook_page INTEGER`);
+    // ── Step 0: Add fatbook_page column if missing ─────────────────────────
+    await client.query(`
+      ALTER TABLE catalog_oem_crossref
+        ADD COLUMN IF NOT EXISTS fatbook_page INTEGER
+    `);
+    console.log('Ensured fatbook_page column on catalog_oem_crossref');
 
-    await client.query(`CREATE TEMP TABLE tmp_fatbook_xref (oem_number TEXT, sku TEXT, sku_raw TEXT, fatbook_page INTEGER) ON COMMIT DROP`);
+    // ── Step 1: Inspect table ──────────────────────────────────────────────
+    const constraintRes = await client.query(`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_name = 'catalog_oem_crossref'
+      ORDER BY ordinal_position
+    `);
+    console.log('catalog_oem_crossref columns:', constraintRes.rows.map(r => r.column_name).join(', '));
+
+    const idxRes = await client.query(`
+      SELECT indexdef FROM pg_indexes WHERE tablename = 'catalog_oem_crossref'
+    `);
+    console.log('Indexes:');
+    idxRes.rows.forEach(r => console.log(' ', r.indexdef));
+
+    // ── Step 2: Load into temp table ───────────────────────────────────────
+    await client.query(`
+      CREATE TEMP TABLE tmp_fatbook_xref (
+        oem_number    TEXT,
+        sku    TEXT,
+        vendor_sku_raw TEXT,
+        fatbook_page  INTEGER
+      ) ON COMMIT DROP
+    `);
 
     const BATCH = 500;
+    let loaded = 0;
     for (let i = 0; i < rows.length; i += BATCH) {
       const slice = rows.slice(i, i + BATCH);
-      const placeholders = slice.map((_, j) => `($${j*4+1}, $${j*4+2}, $${j*4+3}, $${j*4+4})`).join(', ');
+      const placeholders = slice.map((_, j) => {
+        const b = j * 4;
+        return `($${b+1}, $${b+2}, $${b+3}, $${b+4})`;
+      }).join(', ');
       const values = slice.flatMap(r => [r.oem, r.dsSku, r.dsSkuRaw, r.fatbookPage]);
-      await client.query(`INSERT INTO tmp_fatbook_xref VALUES ${placeholders}`, values);
+      await client.query(
+        `INSERT INTO tmp_fatbook_xref (oem_number, sku, vendor_sku_raw, fatbook_page) VALUES ${placeholders}`,
+        values
+      );
+      loaded += slice.length;
     }
-    console.log(`Loaded ${rows.length} rows into temp table`);
+    console.log(`Loaded ${loaded} rows into temp table`);
 
+    // ── Step 3: Upsert into catalog_oem_crossref ───────────────────────────
     const upsertRes = await client.query(`
-      INSERT INTO catalog_oem_crossref (sku, oem_number, oem_manufacturer, fatbook_page, source)
-      SELECT DISTINCT ON (sku, oem_number) sku, oem_number, 'HD', fatbook_page, 'fatbook_crossref'
+      INSERT INTO catalog_oem_crossref (oem_number, sku, fatbook_page)
+      SELECT DISTINCT ON (oem_number, sku) oem_number, sku, fatbook_page
       FROM tmp_fatbook_xref
-      ORDER BY sku, oem_number, fatbook_page
-      ON CONFLICT (sku, oem_number, oem_manufacturer)
+      ORDER BY oem_number, sku, fatbook_page
+      ON CONFLICT (oem_number, sku)
         DO UPDATE SET fatbook_page = EXCLUDED.fatbook_page
     `);
-    console.log(`catalog_oem_crossref upsert: ${upsertRes.rowCount} rows`);
+    console.log(`catalog_oem_crossref upsert: ${upsertRes.rowCount} rows affected`);
 
-    const f1 = await client.query(`
+    // ── Step 4: Backfill in_fatbook on catalog_unified ─────────────────────
+    const flagRes = await client.query(`
       UPDATE catalog_unified cu
       SET in_fatbook = true
       FROM tmp_fatbook_xref fx
       WHERE cu.sku = fx.sku
         AND cu.in_fatbook IS DISTINCT FROM true
     `);
-    console.log(`in_fatbook (normalized): ${f1.rowCount} updated`);
+    console.log(`catalog_unified in_fatbook (normalized): ${flagRes.rowCount} rows updated`);
 
-    const f2 = await client.query(`
+    const flagRes2 = await client.query(`
       UPDATE catalog_unified cu
       SET in_fatbook = true
       FROM tmp_fatbook_xref fx
-      WHERE cu.sku = fx.sku_raw
+      WHERE cu.sku = fx.vendor_sku_raw
         AND cu.in_fatbook IS DISTINCT FROM true
     `);
-    console.log(`in_fatbook (raw): ${f2.rowCount} updated`);
+    console.log(`catalog_unified in_fatbook (raw SKU): ${flagRes2.rowCount} additional rows updated`);
 
+    // ── Step 5: Match rate report ──────────────────────────────────────────
     const matchRes = await client.query(`
-      SELECT COUNT(DISTINCT fx.sku) AS ds_skus_in_file, COUNT(DISTINCT cu.sku) AS matched_in_catalog
+      SELECT
+        COUNT(DISTINCT fx.sku)  AS ds_skus_in_file,
+        COUNT(DISTINCT cu.sku)         AS matched_in_catalog
       FROM tmp_fatbook_xref fx
-      LEFT JOIN catalog_unified cu ON cu.sku = fx.sku OR cu.sku = fx.sku_raw
+      LEFT JOIN catalog_unified cu
+        ON cu.sku = fx.sku OR cu.sku = fx.vendor_sku_raw
     `);
     const { ds_skus_in_file, matched_in_catalog } = matchRes.rows[0];
     console.log(`\nMatch report:`);
-    console.log(`  Distinct DS SKUs in file:   ${ds_skus_in_file}`);
+    console.log(`  Distinct DS SKUs in file:  ${ds_skus_in_file}`);
     console.log(`  Matched in catalog_unified: ${matched_in_catalog}`);
     console.log(`  Match rate: ${((matched_in_catalog / ds_skus_in_file) * 100).toFixed(1)}%`);
 
     await client.query('COMMIT');
-    console.log('\nDone.');
+    console.log('\nDone. Transaction committed.');
 
   } catch (err) {
     await client.query('ROLLBACK');
