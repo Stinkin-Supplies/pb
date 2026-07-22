@@ -36,6 +36,11 @@ const FLAG_LABELS: Record<string, string> = {
   wrong_fitment: 'Incorrect fitment',
   bad_image: 'Bad / missing image',
   duplicate: 'Possible duplicate',
+  oem_conflict: 'OEM# conflict (points to different product)',
+  oem_duplicate: 'OEM# already cross-referenced',
+  fitment_no_model_match: 'Fitment: unknown model code',
+  fitment_ambiguous_model: 'Fitment: ambiguous model code',
+  fitment_needs_manual_review: 'Fitment: year range only, model unverified',
   other: 'Other issue',
 };
 

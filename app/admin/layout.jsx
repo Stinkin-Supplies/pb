@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import AdminSidebarNav from "@/components/admin/AdminSidebarNav";
 
 const css = `
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -174,23 +175,22 @@ export default async function AdminLayout({ children }) {
     {
       section: "OVERVIEW",
       links: [
-        { href: "/admin/build-tracker", icon: "⌁", label: "BUILD TRACKER" },
-        { href: "/admin/database", icon: "◫", label: "DATABASE SNAPSHOT" },
-        { href: "/admin",         icon: "◈", label: "DASHBOARD"   },
+        { href: "/admin",          icon: "◈", label: "DASHBOARD"          },
+        { href: "/admin/database", icon: "◫", label: "DATABASE SNAPSHOT"  },
+        { href: "/admin/documents", icon: "▥", label: "DOCUMENTS"         },
       ],
     },
     {
       section: "COMMERCE",
       links: [
-        { href: "/admin/orders",  icon: "◫", label: "ORDERS"      },
-        { href: "/admin/points",  icon: "★", label: "POINTS"      },
+        { href: "/admin/orders",     icon: "◫", label: "ORDERS"      },
+        { href: "/admin/backorders", icon: "◔", label: "BACKORDERS"  },
       ],
     },
     {
       section: "PRICING",
       links: [
-        { href: "/admin/map",        icon: "⚑", label: "MAP COMPLIANCE"  },
-        { href: "/admin/competitors", icon: "◎", label: "COMPETITOR PRICING" },
+        { href: "/admin/map", icon: "⚑", label: "MAP COMPLIANCE" },
       ],
     },
     {
@@ -202,6 +202,7 @@ export default async function AdminLayout({ children }) {
         { href: "/admin/products",     icon: "▤", label: "PRODUCTS"            },
         { href: "/admin/oem-crossref", icon: "⇄", label: "OEM CROSS-REF"       },
         { href: `/admin/canonical-matches?token=${process.env.ADMIN_SECRET}`, icon: "⇆", label: "CANONICAL MATCHES" },
+        { href: "/admin/variant-candidates", icon: "⋈", label: "VARIANT CANDIDATES" },
         { href: `/admin/parts-timeline?token=${process.env.ADMIN_SECRET}`, icon: "▬", label: "PARTS TIMELINE"     },
         { href: `/admin/review-queue?token=${process.env.ADMIN_SECRET}`, icon: "⚑", label: "REVIEW QUEUE"        },
       ],
@@ -239,17 +240,7 @@ export default async function AdminLayout({ children }) {
               <div className="sidebar-logo-sub">ADMIN PANEL</div>
             </div>
 
-            {NAV.map(({ section, links }) => (
-              <div key={section} className="sidebar-section">
-                <div className="sidebar-section-label">{section}</div>
-                {links.map(({ href, icon, label }) => (
-                  <Link key={href} href={href} className="sidebar-link">
-                    <span className="sidebar-link-icon">{icon}</span>
-                    {label}
-                  </Link>
-                ))}
-              </div>
-            ))}
+            <AdminSidebarNav nav={NAV} />
 
             <div className="sidebar-footer">
               <div className="sidebar-footer-email">{profile?.email ?? user.email}</div>

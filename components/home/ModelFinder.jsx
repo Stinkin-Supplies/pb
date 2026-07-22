@@ -305,7 +305,7 @@ export default function ModelFinder({ compact = false, onSelect }) {
   // Pick era → navigate directly to browse filtered by that era.
   // No year slider, no model-code step — user refines on the browse page.
   const pickEra = (e) => {
-    const url = `/browse?eraSlug=${e.slug}`;
+    const url = `/browse?era=${e.slug}`;
     if (onSelect) onSelect({ era: e, url });
     else router.push(url);
   };

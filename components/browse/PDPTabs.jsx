@@ -246,33 +246,115 @@ function OemContent({ oemRows }) {
 function FitmentContent({ fitment }) {
   if (!fitment?.length) return <Empty>No fitment data on file.</Empty>;
 
+  // Rows already arrive one-per-model (year_from/year_to already collapsed
+  // server-side, see getFitmentRows in app/browse/[slug]/page.jsx) and
+  // pre-ordered by family_name — group them for display rather than
+  // re-fetching or re-sorting.
+  const groups = [];
+  const indexByFamily = new Map();
+  for (const row of fitment) {
+    const key = row.family_name || 'Other';
+    if (!indexByFamily.has(key)) {
+      indexByFamily.set(key, groups.length);
+      groups.push({ family: key, rows: [] });
+    }
+    groups[indexByFamily.get(key)].rows.push(row);
+  }
+
+  const [query, setQuery] = useState('');
+  const [openFamily, setOpenFamily] = useState(groups[0]?.family ?? null);
+
+  const q = query.trim().toLowerCase();
+  const visibleGroups = q
+    ? groups
+        .map(g => ({
+          ...g,
+          rows: g.rows.filter(r =>
+            g.family.toLowerCase().includes(q) ||
+            r.model_code?.toLowerCase().includes(q) ||
+            r.model_name?.toLowerCase().includes(q) ||
+            String(r.year_from).includes(q) ||
+            String(r.year_to).includes(q)
+          ),
+        }))
+        .filter(g => g.rows.length > 0)
+    : groups;
+
+  const showSearch = fitment.length > 8 || groups.length > 1;
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', maxHeight: 340, overflowY: 'auto' }}>
-      {fitment.map((row, i) => (
-        <div key={i} style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          padding: '5px 0',
-          borderBottom: '1px solid #f0e8d4',
-        }}>
-          <span style={{
-            fontFamily: 'var(--font-stencil)',
-            fontSize: 11,
-            color: '#7a5810',
-            letterSpacing: '0.04em',
-            flex: '0 0 auto',
-          }}>
-            {row.model_name ? `${row.model_name} (${row.model_code})` : row.model_code}
-          </span>
-          <span style={{ fontFamily: 'var(--font-stencil)', fontSize: 11, color: '#8a7040' }}>
-            {row.year_from === row.year_to ? row.year_from : `${row.year_from}–${row.year_to}`}
-          </span>
-          <span style={{ fontFamily: 'var(--font-stencil)', fontSize: 10, color: '#5a7a5a', marginLeft: 'auto' }}>
-            ✓
-          </span>
-        </div>
-      ))}
+    <div>
+      {showSearch && (
+        <input
+          type="text"
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder="Filter by model, family, or year…"
+          style={{
+            width: '100%', boxSizing: 'border-box', marginBottom: 10,
+            padding: '7px 10px', fontFamily: 'var(--font-stencil)', fontSize: 11,
+            color: '#2a2010', background: '#fdfaf2', border: '1px solid #e6dcc0',
+            borderRadius: 5, outline: 'none',
+          }}
+        />
+      )}
+
+      <div style={{ maxHeight: 340, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {visibleGroups.length === 0 && <Empty>No matching fitment.</Empty>}
+        {visibleGroups.map(group => {
+          const isOpen = q ? true : openFamily === group.family;
+          return (
+            <div key={group.family} style={{ border: '1px solid #e6dcc0', borderRadius: 6, overflow: 'hidden' }}>
+              <button
+                onClick={() => !q && setOpenFamily(isOpen ? null : group.family)}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  width: '100%', padding: '8px 12px', cursor: q ? 'default' : 'pointer',
+                  background: isOpen ? '#fdf6e3' : '#fffdf8', border: 'none',
+                  textAlign: 'left',
+                }}
+              >
+                <span style={{
+                  fontFamily: 'var(--font-stencil)', fontSize: 11, color: '#7a5810',
+                  letterSpacing: '0.08em', textTransform: 'uppercase',
+                }}>
+                  {group.family} <span style={{ color: '#a89878' }}>({group.rows.length})</span>
+                </span>
+                {!q && (
+                  <span style={{
+                    color: '#a89878', fontSize: 10, transition: 'transform 0.15s',
+                    transform: isOpen ? 'rotate(180deg)' : 'none',
+                  }}>▾</span>
+                )}
+              </button>
+
+              {isOpen && (
+                <div style={{ padding: '2px 12px 6px' }}>
+                  {group.rows.map((row, i) => (
+                    <div key={i} style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '5px 0', borderBottom: i < group.rows.length - 1 ? '1px solid #f0e8d4' : 'none',
+                    }}>
+                      <span style={{
+                        fontFamily: 'var(--font-stencil)', fontSize: 11, color: '#2a2010',
+                        letterSpacing: '0.04em', flex: '0 0 auto',
+                      }}>
+                        {row.model_name ? `${row.model_name} (${row.model_code})` : row.model_code}
+                      </span>
+                      <span style={{ fontFamily: 'var(--font-stencil)', fontSize: 11, color: '#8a7040' }}>
+                        {row.year_from === row.year_to ? row.year_from : `${row.year_from}–${row.year_to}`}
+                      </span>
+                      <span style={{ fontFamily: 'var(--font-stencil)', fontSize: 10, color: '#5a7a5a', marginLeft: 'auto' }}>
+                        ✓
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

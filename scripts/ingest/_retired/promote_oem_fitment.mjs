@@ -66,6 +66,7 @@ SELECT DISTINCT
   'oem_catalog_hd',
   0.95
 FROM oem_fitment f
+JOIN catalog_unified cu ON cu.id = f.matched_product_id
 JOIN LATERAL unnest(f.model_codes) AS mc(code) ON true
 JOIN harley_models hm ON hm.model_code = mc.code
 JOIN harley_model_years hmy
@@ -208,6 +209,7 @@ ${UPSERT_SUFFIX}
 const DRY_A_SPECIFIC = `
 SELECT COUNT(DISTINCT (f.matched_product_id, hmy.id)) AS would_insert
 FROM oem_fitment f
+JOIN catalog_unified cu ON cu.id = f.matched_product_id
 JOIN LATERAL unnest(f.model_codes) AS mc(code) ON true
 JOIN harley_models hm ON hm.model_code = mc.code
 JOIN harley_model_years hmy ON hmy.model_id = hm.id

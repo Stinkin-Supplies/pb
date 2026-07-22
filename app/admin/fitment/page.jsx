@@ -165,7 +165,10 @@ const css = `
 `;
 
 const TABS = ["PRODUCTS", "REPORTS"];
-const FAMILIES = ["Softail","Touring","Dyna","Sportster","FX","FL","Vintage","Street","CVO"];
+// Matches harley_families.name exactly (families with 0 model-years —
+// Evolution, Twin Cam — omitted, same convention as FilterSidebar.jsx's
+// HD_FAMILIES).
+const FAMILIES = ["Touring","Softail","Dyna","Sportster","FXR","Trike","Revolution Max","V-Rod","Street","Shovelhead","Panhead","Knucklehead","Flathead"];
 const LIMIT_OPTIONS = [25, 50, 100];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -193,6 +196,32 @@ export default function AdminFitmentPage() {
   const [editProduct, setEditProduct] = useState(null);
   const [toast, showToast]      = useToast();
   const searchRef               = useRef(null);
+
+  // Bulk selection — mirrors the pattern already proven in
+  // app/admin/oem-crossref/page.jsx (checkboxes + "select all on page" +
+  // a bulk-action modal), ported here since /admin/fitment had no bulk
+  // tooling despite editing being the main workflow for closing the
+  // FITMENT_MASTER_REF.md gap list.
+  const [selected, setSelected] = useState(() => new Set());
+  const [showBulkAdd, setShowBulkAdd] = useState(false);
+
+  function toggleSelect(id) {
+    setSelected(s => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+  function toggleSelectPage() {
+    setSelected(s => {
+      const allOnPage = products.every(p => s.has(p.id));
+      const next = new Set(s);
+      if (allOnPage) products.forEach(p => next.delete(p.id));
+      else products.forEach(p => next.add(p.id));
+      return next;
+    });
+  }
+  function clearSelection() { setSelected(new Set()); }
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -308,6 +337,17 @@ export default function AdminFitmentPage() {
                 ✕ CLEAR
               </button>
             )}
+            {selected.size > 0 && (
+              <>
+                <span style={{ fontSize: 9, color: "var(--orange)", letterSpacing: "0.1em", marginLeft: "auto" }}>
+                  {selected.size} SELECTED
+                </span>
+                <button className="btn btn-primary" onClick={() => setShowBulkAdd(true)}>
+                  ⇌ BULK ADD FITMENT
+                </button>
+                <button className="btn btn-ghost" onClick={clearSelection}>CLEAR SELECTION</button>
+              </>
+            )}
           </div>
 
           {/* TABLE */}
@@ -320,7 +360,14 @@ export default function AdminFitmentPage() {
               <table className="fm-table">
                 <thead>
                   <tr>
-                    <th style={{width:"28%"}}>PRODUCT</th>
+                    <th style={{width:"3%"}}>
+                      <input
+                        type="checkbox"
+                        checked={products.length > 0 && products.every(p => selected.has(p.id))}
+                        onChange={toggleSelectPage}
+                      />
+                    </th>
+                    <th style={{width:"25%"}}>PRODUCT</th>
                     <th style={{width:"11%"}}>BRAND</th>
                     <th style={{width:"8%"}}>VENDOR</th>
                     <th style={{width:"13%"}}>VENDOR PART #</th>
@@ -333,6 +380,13 @@ export default function AdminFitmentPage() {
                 <tbody>
                   {products.map(p => (
                     <tr key={p.id}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selected.has(p.id)}
+                          onChange={() => toggleSelect(p.id)}
+                        />
+                      </td>
                       <td>
                         <span className="cell-name" title={p.name}>{p.name}</span>
                         <span className="cell-sku">{p.internal_sku ?? p.sku}</span>
@@ -415,6 +469,20 @@ export default function AdminFitmentPage() {
           onClose={() => setEditProduct(null)}
           onSaved={() => { fetchData(); showToast("Saved successfully"); }}
           showToast={showToast}
+        />
+      )}
+
+      {/* BULK ADD FITMENT MODAL */}
+      {showBulkAdd && (
+        <BulkAddFitmentModal
+          productIds={[...selected]}
+          onClose={() => setShowBulkAdd(false)}
+          onDone={(summary) => {
+            setShowBulkAdd(false);
+            clearSelection();
+            fetchData();
+            showToast(`Bulk add: ${summary.inserted} added, ${summary.skipped} already existed, ${summary.failed} failed`);
+          }}
         />
       )}
 
@@ -933,6 +1001,169 @@ function ProductFitmentModal({ product, onClose, onSaved, showToast }) {
         <div className="modal-footer">
           <button className="btn btn-ghost" onClick={onClose}>CLOSE</button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Bulk Add Fitment Modal ────────────────────────────────────────────────────
+// Applies one family + one or more model codes + a year range to every
+// selected product. Reuses the existing single-row /api/admin/fitment/add
+// endpoint (already handles model-year lookup, dedup via 409, and the
+// insert itself) in a bounded-concurrency loop rather than adding a new
+// bulk endpoint — the per-row logic is already correct and tested.
+function BulkAddFitmentModal({ productIds, onClose, onDone }) {
+  const [family, setFamily]     = useState("");
+  const [codesInput, setCodesInput] = useState("");
+  const [yearFrom, setYearFrom] = useState("");
+  const [yearTo, setYearTo]     = useState("");
+  const [running, setRunning]   = useState(false);
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
+  const [formError, setFormError] = useState("");
+
+  const modelCodes = codesInput
+    .split(",")
+    .map(c => c.trim().toUpperCase())
+    .filter(Boolean);
+
+  const yFrom = parseInt(yearFrom);
+  const yTo   = parseInt(yearTo) || yFrom;
+  const years = (Number.isFinite(yFrom) && yFrom > 1900)
+    ? Array.from({ length: Math.max(1, yTo - yFrom + 1) }, (_, i) => yFrom + i)
+    : [];
+
+  const totalOps = productIds.length * modelCodes.length * years.length;
+
+  async function runBulk() {
+    setFormError("");
+    if (!family) return setFormError("Pick a family.");
+    if (modelCodes.length === 0) return setFormError("Enter at least one model code.");
+    if (years.length === 0) return setFormError("Enter a valid starting year.");
+    if (totalOps === 0) return setFormError("Nothing to do.");
+    if (totalOps > 5000) return setFormError(`${totalOps.toLocaleString()} operations is too many for one bulk run — narrow the selection, codes, or year range.`);
+
+    setRunning(true);
+    setProgress({ done: 0, total: totalOps });
+
+    const jobs = [];
+    for (const productId of productIds) {
+      for (const model_code of modelCodes) {
+        for (const year of years) {
+          jobs.push({ product_id: productId, family, model_code, year });
+        }
+      }
+    }
+
+    let inserted = 0, skipped = 0, failed = 0, done = 0;
+    const CONCURRENCY = 6;
+    let cursor = 0;
+
+    async function worker() {
+      while (cursor < jobs.length) {
+        const job = jobs[cursor++];
+        try {
+          const res = await fetch("/api/admin/fitment/add", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(job),
+          });
+          if (res.ok) inserted++;
+          else if (res.status === 409) skipped++;
+          else failed++;
+        } catch {
+          failed++;
+        }
+        done++;
+        setProgress({ done, total: jobs.length });
+      }
+    }
+
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, jobs.length) }, worker));
+    setRunning(false);
+    onDone({ inserted, skipped, failed });
+  }
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && !running && onClose()}>
+      <div className="modal">
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">BULK ADD <span>FITMENT</span></div>
+            <div className="modal-subtitle">{productIds.length} PRODUCT{productIds.length === 1 ? "" : "S"} SELECTED</div>
+          </div>
+          {!running && <button className="modal-close" onClick={onClose}>✕</button>}
+        </div>
+
+        <div className="modal-body">
+          {formError && <div className="modal-error">{formError}</div>}
+
+          {running ? (
+            <div style={{ padding: "20px 0" }}>
+              <div style={{ fontSize: 10, color: "var(--chrome)", letterSpacing: "0.1em", marginBottom: 10 }}>
+                APPLYING {progress.total.toLocaleString()} FITMENT ROWS…
+              </div>
+              <div style={{ background: "var(--iron)", border: "1px solid var(--steel)", height: 8, borderRadius: 4, overflow: "hidden" }}>
+                <div style={{
+                  width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%`,
+                  height: "100%", background: "var(--orange)", transition: "width 0.15s",
+                }} />
+              </div>
+              <div style={{ fontSize: 9, color: "var(--chrome)", letterSpacing: "0.1em", marginTop: 8 }}>
+                {progress.done.toLocaleString()} / {progress.total.toLocaleString()}
+              </div>
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: 9, color: "var(--chrome)", letterSpacing: "0.1em", marginBottom: 16, lineHeight: 1.6 }}>
+                Applies the same family + model code(s) + year range to every selected
+                product — useful for working through a known category gap
+                (e.g. from FITMENT_MASTER_REF.md) in one pass instead of
+                editing each product individually.
+              </div>
+
+              <div className="modal-section">
+                <label className="form-label">FAMILY</label>
+                <select className="form-select" style={{ width: "100%", marginBottom: 10 }} value={family} onChange={e => setFamily(e.target.value)}>
+                  <option value="">Select…</option>
+                  {FAMILIES.map(f => <option key={f} value={f}>{f}</option>)}
+                </select>
+
+                <label className="form-label">MODEL CODE(S) — comma-separated</label>
+                <input
+                  className="form-input"
+                  style={{ marginBottom: 10 }}
+                  placeholder="e.g. FLHR, FLHRC, FLHRCI"
+                  value={codesInput}
+                  onChange={e => setCodesInput(e.target.value)}
+                />
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <div>
+                    <label className="form-label">YEAR FROM</label>
+                    <input className="form-input" type="number" min="1903" max="2030" placeholder="e.g. 2010" value={yearFrom} onChange={e => setYearFrom(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="form-label">YEAR TO (optional)</label>
+                    <input className="form-input" type="number" min="1903" max="2030" placeholder="e.g. 2016" value={yearTo} onChange={e => setYearTo(e.target.value)} />
+                  </div>
+                </div>
+              </div>
+
+              {totalOps > 0 && (
+                <div style={{ fontSize: 10, color: "var(--gold)", letterSpacing: "0.08em" }}>
+                  {productIds.length} products × {modelCodes.length} model code{modelCodes.length === 1 ? "" : "s"} × {years.length} year{years.length === 1 ? "" : "s"} = {totalOps.toLocaleString()} fitment rows
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {!running && (
+          <div className="modal-footer">
+            <button className="btn btn-ghost" onClick={onClose}>CANCEL</button>
+            <button className="btn btn-primary" onClick={runBulk}>APPLY TO {productIds.length} PRODUCTS</button>
+          </div>
+        )}
       </div>
     </div>
   );

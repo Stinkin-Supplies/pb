@@ -29,6 +29,14 @@ const MUTED  = "#888";
 
 // ── Static data ───────────────────────────────────────────────
 
+// Matches harley_families.name exactly — BrowseFilters.family is compared
+// directly against this column (see lib/db/browse.ts), no slug translation.
+const HD_FAMILIES = [
+  "Touring", "Softail", "Dyna", "Sportster", "FXR", "Trike",
+  "Revolution Max", "V-Rod", "Street", "Shovelhead", "Panhead",
+  "Knucklehead", "Flathead",
+];
+
 const HD_ERAS = [
   { label: "Milwaukee-Eight",    slug: "milwaukee-8",        years: "2017+" },
   { label: "Twin Cam",           slug: "twin-cam",           years: "1999–2017" },
@@ -182,11 +190,48 @@ function Section({ label, sectionKey, open, onToggle, children, hasActive = fals
 
 // ── FilterContent (shared between desktop + mobile) ───────────
 
+const selectStyle = {
+  width: "100%", background: "#fff", border: `1px solid ${GOLD_B}`,
+  color: DARK, fontFamily: "var(--font-stencil, monospace)",
+  fontSize: 11, letterSpacing: "0.4px", padding: "7px 8px",
+  outline: "none", textTransform: "uppercase",
+};
+
 function FilterContent({ facets, filters, onChange, sections, setSections, collapsed = false }) {
   function toggle(key) { setSections(s => ({ ...s, [key]: !s[key] })); }
 
   const subcategories = facets.subcategories ?? [];
   const subcategoryDetails = facets.subcategoryDetails ?? [];
+
+  // ── Model & Year cascade — family -> model -> year ────────────────────
+  // filters.family/model already exist in the shared filters shape (chips
+  // above already display them) but nothing wrote to them until now.
+  // /api/fitment/models and /api/fitment/years already exist and support
+  // exactly this cascade -- no new backend needed.
+  const [familyModels, setFamilyModels] = useState([]);
+  const [modelYears, setModelYears] = useState([]);
+
+  useEffect(() => {
+    if (!filters.family) { setFamilyModels([]); return; }
+    let cancelled = false;
+    fetch(`/api/fitment/models?family=${encodeURIComponent(filters.family)}`)
+      .then(r => r.json())
+      .then(d => { if (!cancelled) setFamilyModels(d.models ?? []); })
+      .catch(() => { if (!cancelled) setFamilyModels([]); });
+    return () => { cancelled = true; };
+  }, [filters.family]);
+
+  const selectedModelObj = familyModels.find(m => m.model_code === filters.model);
+
+  useEffect(() => {
+    if (!selectedModelObj) { setModelYears([]); return; }
+    let cancelled = false;
+    fetch(`/api/fitment/years?model=${selectedModelObj.id}`)
+      .then(r => r.json())
+      .then(d => { if (!cancelled) setModelYears(d.years ?? []); })
+      .catch(() => { if (!cancelled) setModelYears([]); });
+    return () => { cancelled = true; };
+  }, [selectedModelObj?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Search input (controlled locally, synced to filters.search) ──────────
   const [searchInput, setSearchInput] = useState(filters.search ?? "");
@@ -380,6 +425,45 @@ function FilterContent({ facets, filters, onChange, sections, setSections, colla
         </Section>
       )}
 
+      {/* Model & Year — precise fitment picker, alongside the broader Engine Era facet below */}
+      <Section label="Model & Year" sectionKey="modelYear" open={sections.modelYear} onToggle={toggle}
+        hasActive={!!(filters.family || filters.model || filters.year)} collapsed={collapsed}>
+        <div style={{ padding: "8px 14px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
+          <select
+            value={filters.family ?? ""}
+            onChange={e => onChange({ family: e.target.value || null, model: null, modelCodes: null, year: null })}
+            style={selectStyle}
+          >
+            <option value="">Any Family</option>
+            {HD_FAMILIES.map(f => <option key={f} value={f}>{f}</option>)}
+          </select>
+
+          {filters.family && (
+            <select
+              value={filters.model ?? ""}
+              onChange={e => onChange({ model: e.target.value || null, modelCodes: null, year: null })}
+              style={selectStyle}
+            >
+              <option value="">Any Model</option>
+              {familyModels.map(m => (
+                <option key={m.model_code} value={m.model_code}>{m.name} ({m.model_code})</option>
+              ))}
+            </select>
+          )}
+
+          {filters.model && (
+            <select
+              value={filters.year ?? ""}
+              onChange={e => onChange({ year: e.target.value ? parseInt(e.target.value) : null })}
+              style={selectStyle}
+            >
+              <option value="">Any Year</option>
+              {modelYears.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          )}
+        </div>
+      </Section>
+
       {/* Engine Era */}
       <Section label="Engine Era" sectionKey="era" open={sections.era} onToggle={toggle}
         hasActive={!!filters.era} collapsed={collapsed}>
@@ -466,6 +550,7 @@ export default function FilterSidebar({ facets, filters, onChange, open, onClose
     category: true,
     subcategory: false,
     detail: false,
+    modelYear: false,
     era: false,
     brand: false,
     price: false,
@@ -480,6 +565,11 @@ export default function FilterSidebar({ facets, filters, onChange, open, onClose
   useEffect(() => {
     if (filters.display_subcategory) setSections(s => ({ ...s, detail: true }));
   }, [filters.display_subcategory]);
+
+  // Auto-open Model & Year when a family arrives from elsewhere (e.g. a PDP fitment link)
+  useEffect(() => {
+    if (filters.family) setSections(s => ({ ...s, modelYear: true }));
+  }, [filters.family]);
 
   // Lock body scroll when mobile sheet is open
   useEffect(() => {

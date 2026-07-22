@@ -63,9 +63,9 @@ Review before committing.
 | `catalog_variant_candidates` | 235 | Intact but orphaned `product_id` refs (Phase 8, low priority) |
 | `catalog_review_flags` | 111 | Intact but orphaned `product_id` refs (Phase 8, low priority) |
 | `oem_supersession` | 283 | Intact, survived untouched |
-| `catalog_oem_crossref` | 29,835 | **Phase 7 DONE 2026-07-20** — fatbook (3,940), oldbook (net ~1,973 new), WPS Harley (1,651), VTwin scrape (6,635), PU_PIES brand-XML (15,636); some cross-source overlap collapsed via `ON CONFLICT` |
-| `catalog_fitment_v2` | 2,473,673 | **Phase 6 DONE 2026-07-20** — PU (1,405,416 via `pu_fitment_expanded`), WPS (715,983), VTwin (352,274 via new `promote_vtwin_scrape_fitment.mjs`, sourced from `vtwin_scrape_data` not the stale CSV) |
-| `product_fitment_year_model` | 538,093 | **Phase 6 DONE 2026-07-20** — rebuilt via `build_fitment_year_ranges.cjs` (patched to drop a per-row-`UPDATE` perf bug that made it ~1800x slower than necessary) |
+| `catalog_oem_crossref` | 43,316 | **Phase 7 DONE 2026-07-20** — fatbook/oldbook/WPS-Harley/VTwin-scrape/PU_PIES (29,835) + user-supplied structured CSV + merged XLSX (+13,481 net new). ~56% of the 76,937 historical peak. |
+| `catalog_fitment_v2` | 3,223,471 | **Phase 6 DONE 2026-07-20** — base: PU (1,405,416 via `pu_fitment_expanded`), WPS (715,983), VTwin (352,274 via new `promote_vtwin_scrape_fitment.mjs`); + OEM-catalog promotion (`promote_oem_fitment.mjs`, 3 paths, run twice — once after base rebuild, once after the crossref-file addendum). ~55% of the 5,874,564 historical peak — see Phase 6/7 addenda for the known remaining gap. |
+| `product_fitment_year_model` | 786,372 | **Phase 6 DONE 2026-07-20** — rebuilt via `build_fitment_year_ranges.cjs` (patched to drop a per-row-`UPDATE` perf bug that made it ~1800x slower than necessary), re-run twice as `catalog_fitment_v2` grew |
 | `vendor_offers` | 90,544 | Done session 91 |
 | `catalog_media` | 59,325 | Session 91 (WPS, 23,195) + PU brand-XML enrichment 2026-07-20 (36,130) |
 
@@ -176,6 +176,81 @@ and a `PU_PIES`-sourced slice of `catalog_oem_crossref` — none of which
   already batched, dry-run gated). Found 0 gap products to backfill, which
   is expected: the much larger `pu_fitment_expanded` promotion above already
   covers what this supplementary pass used to target.
+
+### Phase 6 addendum — OEM-catalog fitment promotion ✅ DONE (2026-07-20)
+
+After reporting the above as "done," the user asked whether we were back to
+the pre-incident row counts. Honest answer: no — `catalog_fitment_v2` was at
+2,473,673 vs. a last-recorded historical peak of 5,874,564 (21 distinct
+sources, MasterRef.md). The dominant missing piece turned out to be a
+two-stage pipeline, both scripts in `scripts/ingest/_retired/`:
+
+- **`oem_fitment`** — a raw table of HD OEM part numbers mined from 121
+  official Harley-Davidson OEM parts catalog PDFs (`build_oem_fitment_all.mjs`,
+  source PDFs at `/Users/home/Desktop/Stanky/parts-catalogs`, outside the
+  repo). This table **survived the incident** (no FK into `catalog_unified`,
+  so the `TRUNCATE ... CASCADE` never touched it) — 315,427 rows, all 121
+  catalogs already loaded. Ran `--match-only` to re-link `matched_product_id`
+  against the now-current `catalog_unified`/`catalog_oem_crossref` — 95.8%
+  of existing links were still valid, +2,326 new matches picked up (total
+  38.6% matched — most of the remainder needs a bigger `catalog_oem_crossref`
+  than we currently have, see below).
+- **`promote_oem_fitment.mjs`** — promotes `oem_fitment` → `catalog_fitment_v2`
+  via three paths: direct match (`oem_catalog_hd`, 0.95 confidence),
+  VTwin-OEM-crossref bridge (`oem_crossref_vtwin`, 0.90), and
+  fatbook/OEM-crossref bridge (`oem_crossref_fatbook`, 0.88), each with a
+  lower-confidence "universal" (fits-all-models) variant. Already
+  well-engineered — single set-based `INSERT...SELECT` per path (not
+  per-row), `ON CONFLICT` upsert that keeps the highest confidence score and
+  never downgrades a manual/higher-confidence row, dry-run support. **Fixed
+  one real bug**: `PATH_A_SPECIFIC` inserted `oem_fitment.matched_product_id`
+  directly with no validity check, unlike `PATH_A_UNIVERSAL` which correctly
+  joins `catalog_unified` — hit a foreign-key violation on the ~5,072 rows
+  whose `matched_product_id` still pointed at a pre-incident (now-deleted)
+  ID. Added the same `JOIN catalog_unified` guard. The failed query left no
+  partial writes (verified row count unchanged before re-running).
+
+**Result**: +746,489 net-new rows. `catalog_fitment_v2` 2,473,673 →
+**3,220,162** (~55% of the 5,874,564 historical peak, up from ~42%).
+`product_fitment_year_model` rebuilt again: 538,093 → **785,218** rows.
+`catalog_unified` flat fitment columns re-synced: 35,910 products (up from
+31,996).
+
+**Still not at full historical parity** — remaining known gaps, roughly in
+order of likely size: Seating name-extraction backfill (+256,143 rows,
+session 76, category-specific text-mining not yet re-run), Eastern/Colony/GMA-
+specific historical backfills, EBC catalog fitment (3,005 rows), HD battery
+fitment. Each of these was originally a separate, smaller one-off
+script/session — lower priority than the two big pipelines above, not
+investigated further this pass.
+
+### Phase 7 addendum #2 — supplementary OEM crossref files, user-supplied (2026-07-20)
+
+User supplied two files directly (outside the repo, at
+`/Users/home/Desktop/Stanky/FITMENT/`): `Cross Reference Data-Table 1.csv`
+(8,729 rows, structured fatbook/oldbook export — cleaner than the raw
+`.txt` files parsed earlier, page numbers and dedup metadata intact) and
+`OEM_Crossref_Merged.xlsx` (`OEM Crossref - Full` sheet, 8,291 wide rows —
+one row per OEM number with a column per vendor: OldBook/FatBook/VTwin/
+WPS — unpivoted into 10,677 long-format triples via a one-off script, saved
+to `scripts/ingest/_unverified/oem_crossref_merged_xlsx_unpivoted.csv` for
+re-runnability). Checked overlap against the DB before importing anything:
+8,665/8,729 and 8,107/9,652 distinct pairs respectively were net-new.
+
+New script `scripts/ingest/import_supplementary_oem_crossref.mjs` (dry-run
+gated, batched, `ON CONFLICT (sku, oem_number) DO NOTHING`) combined both,
+deduped within the import batch, inserted **13,481 net-new rows**.
+`catalog_oem_crossref`: 29,835 → **43,316** (~56% of the 76,937 historical
+peak, up from ~39%).
+
+Re-ran the downstream chain since a bigger `catalog_oem_crossref` feeds
+`promote_oem_fitment.mjs`'s Path C: `build_oem_fitment_all.mjs --match-only`
+(+94 newly-matched `oem_fitment` rows), then `promote_oem_fitment.mjs`
+again (+3,309 net-new `catalog_fitment_v2` rows — smaller gain than
+expected, since most of the new crossref rows' OEM numbers don't overlap
+with the HD-catalog-derived `oem_fitment.oem_part_no` values). Final:
+`catalog_fitment_v2` **3,223,471** rows (~55% of peak), `product_fitment_year_model`
+rebuilt again to **786,372** rows, flat columns re-synced for 35,929 products.
 
 ## Phase 8 — Low-priority cleanup
 
