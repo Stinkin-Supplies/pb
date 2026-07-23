@@ -15,34 +15,35 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
 import gsap from 'gsap';
 
-// ── Category data ──────────────────────────────────────────────────────────
+// ── Category data — verified against live display_category values ──────────
 const CATEGORIES = [
-  { label: 'Engine',                href: '/browse?display_category=Engine',                        img: null },
-  { label: 'Transmission & Clutch', href: '/browse?display_category=Transmission+%26+Clutch',       img: null },
-  { label: 'Exhaust',               href: '/browse?display_category=Exhaust',                       img: null },
-  { label: 'Brakes',                href: '/browse?display_category=Brakes',                        img: null },
-  { label: 'Electrical',            href: '/browse?display_category=Electrical',                    img: null },
-  { label: 'Handlebar & Controls',  href: '/browse?display_category=Handlebar+%26+Controls',        img: null },
-  { label: 'Carburetion & Fuel',    href: '/browse?display_category=Carburetion+%26+Fuel',          img: null },
-  { label: 'Foot Controls',         href: '/browse?display_category=Foot+Controls',                 img: null },
-  { label: 'Lighting',              href: '/browse?display_category=Lighting',                      img: null },
-  { label: 'Suspension',            href: '/browse?display_category=Suspension',                    img: null },
-  { label: 'Wheels & Tires',        href: '/browse?display_category=Wheels+%26+Tires',              img: null },
-  { label: 'Fenders & Body',        href: '/browse?display_category=Fenders+%26+Body',              img: null },
-  { label: 'Seating',               href: '/browse?display_category=Seating',                       img: null },
-  { label: 'Frame & Hardware',      href: '/browse?display_category=Frame+%26+Hardware',            img: null },
-  { label: 'Instrumentation',       href: '/browse?display_category=Instrumentation',               img: null },
-  { label: 'Luggage & Racks',       href: '/browse?display_category=Luggage+%26+Racks',             img: null },
-  { label: 'Security & Covers',     href: '/browse?display_category=Security+%26+Covers',           img: null },
-  { label: 'Oils & Chemicals',      href: '/browse?display_category=Oils+%26+Chemicals',            img: null },
-  { label: 'Tools & Chemicals',     href: '/browse?display_category=Tools+%26+Chemicals',           img: null },
-  { label: 'Riding Gear & Apparel', href: '/browse?display_category=Riding+Gear+%26+Apparel',       img: null },
-  { label: 'Accessories & Misc',    href: '/browse?display_category=Accessories+%26+Misc',          img: null },
+  { label: 'Engine',                        href: '/browse?display_category=Engine',                                      img: '/images/categories/engine.png' },
+  { label: 'Foot Controls & Pegs',          href: '/browse?display_category=Foot+Controls+%26+Pegs',                     img: '/images/categories/foot-controls.png' },
+  { label: 'Transmission & Clutch',         href: '/browse?display_category=Transmission+%26+Clutch',                    img: null },
+  { label: 'Handlebars & Hand Controls',    href: '/browse?display_category=Handlebars+%26+Hand+Controls',               img: null },
+  { label: 'Brakes',                        href: '/browse?display_category=Brakes',                                      img: null },
+  { label: 'Riding Gear & Apparel',         href: '/browse?display_category=Riding+Gear+%26+Apparel',                    img: null },
+  { label: 'Cables',                        href: '/browse?display_category=Cables',                                      img: null },
+  { label: 'Gaskets & Seals',               href: '/browse?display_category=Gaskets+%26+Seals',                          img: null },
+  { label: 'Fuel, Air & Carburetors',       href: '/browse?display_category=Fuel%2C+Air+%26+Carburetors',                img: null },
+  { label: 'Tanks & Body',                  href: '/browse?display_category=Tanks+%26+Body',                             img: null },
+  { label: 'Lighting',                      href: '/browse?display_category=Lighting',                                    img: null },
+  { label: 'Frames & Suspension',           href: '/browse?display_category=Frames+%26+Suspension',                      img: null },
+  { label: 'Wheels & Tires',                href: '/browse?display_category=Wheels+%26+Tires',                           img: null },
+  { label: 'Seating',                       href: '/browse?display_category=Seating',                                     img: null },
+  { label: 'Electrical',                    href: '/browse?display_category=Electrical',                                  img: null },
+  { label: 'Exhaust',                       href: '/browse?display_category=Exhaust',                                     img: null },
+  { label: 'Hardware',                      href: '/browse?display_category=Hardware',                                    img: null },
+  { label: 'Accessories & Gear',            href: '/browse?display_category=Accessories+%26+Gear',                       img: null },
+  { label: 'Tools & Chemicals',             href: '/browse?display_category=Tools+%26+Chemicals',                        img: null },
+  { label: 'Saddlebags, Sissy Bars & Luggage', href: '/browse?display_category=Saddlebags%2C+Sissy+Bars+%26+Luggage',   img: null },
+  { label: 'Windshields & Fairings',        href: '/browse?display_category=Windshields+%26+Fairings',                   img: null },
+  { label: 'Dashes & Gauges',               href: '/browse?display_category=Dashes+%26+Gauges',                          img: null },
 ];
 
-const col1 = CATEGORIES.slice(0, 7);
-const col2 = CATEGORIES.slice(7, 14);
-const col3 = CATEGORIES.slice(14, 21);
+const col1 = CATEGORIES.slice(0, 8);
+const col2 = CATEGORIES.slice(8, 15);
+const col3 = CATEGORIES.slice(15, 22);
 
 function buildSubcatHref(categoryLabel, subcatName) {
   const params = new URLSearchParams({ display_category: categoryLabel });
@@ -137,9 +138,9 @@ export default function CategoryPhotoGrid() {
     offset: ['start end', 'end start'],
   });
 
-  const y1 = useTransform(scrollYProgress, [0, 1], [400, -900]);
-  const y2 = useTransform(scrollYProgress, [0, 1], [-400, 900]);
-  const y3 = useTransform(scrollYProgress, [0, 1], [400, -900]);
+  const y1 = useTransform(scrollYProgress, [0, 1], [100, -700]);
+  const y2 = useTransform(scrollYProgress, [0, 1], [-100, 700]);
+  const y3 = useTransform(scrollYProgress, [0, 1], [100, -700]);
 
   // ── Modal state ──────────────────────────────────────────────────────────
   const [active, setActive]       = useState(null); // { label, href }
@@ -330,8 +331,13 @@ export default function CategoryPhotoGrid() {
           overflow: hidden;
           background: #0c0a06;
           border: none;
+          border-bottom: 4px solid rgba(255,255,255,0.85);
           padding: 0;
           cursor: pointer;
+          transition: border-color 0.25s;
+        }
+        .cpg-tile:hover {
+          border-bottom-color: #c9a84c;
         }
         .cpg-img {
           position: absolute;
@@ -387,13 +393,13 @@ export default function CategoryPhotoGrid() {
         }
         .cpg-label {
           font-family: var(--font-tanker), sans-serif;
-          font-size: clamp(18px, 2vw, 28px);
+          font-size: clamp(28px, 3.2vw, 48px);
           font-weight: 400;
-          line-height: 0.95;
+          line-height: 0.92;
           letter-spacing: -0.01em;
           text-transform: uppercase;
-          color: #f0e8d8;
-          text-shadow: 0 1px 10px rgba(0,0,0,0.7);
+          color: #ffffff;
+          text-shadow: 0 2px 16px rgba(0,0,0,0.8);
           margin-bottom: 10px;
           transition: color 0.2s;
         }

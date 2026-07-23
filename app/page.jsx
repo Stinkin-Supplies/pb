@@ -4,10 +4,10 @@
  * app/page.jsx — Stinkin' Supplies Homepage
  *
  * Section order:
- *   1. VideoHero       — full-bleed video with hero copy + CTAs
- *   2. ModelFinder     — era → browse, technical blueprint panel
- *   3. ScrollVelocity     — kinetic marquee band
- *   4. CategoryPhotoGrid  — image-backed category browse buttons
+ *   1. VideoHero          — full-bleed video with hero copy + CTAs
+ *   2. ScrollVelocity     — kinetic marquee band
+ *   3. CategoryPhotoGrid  — image-backed category browse buttons
+ *   4. ModelFinder        — era → browse, technical blueprint panel
  *   5. CategoryIndex      — parts catalog table of contents (paper)
  *   6. BrandRolodex       — vendor brand showcase
  */
@@ -36,7 +36,18 @@ export default function HomePage() {
         {/* ── 1. Video Hero ───────────────────────────────────────────── */}
         <VideoHero />
 
-        {/* ── 2. Model Finder ─────────────────────────────────────────── */}
+        {/* ── 2. ScrollVelocity band ──────────────────────────────────── */}
+        <div className="hp-velocity-band">
+          <ScrollVelocity
+            text="THE RIGHT STINKIN PARTS · "
+            defaultVelocity={1.5}
+          />
+        </div>
+
+        {/* ── 3. Category Photo Grid ──────────────────────────────────── */}
+        <CategoryPhotoGrid />
+
+        {/* ── 4. Model Finder ─────────────────────────────────────────── */}
         <section className="hp-model-section">
 
           {/* Blueprint grid texture behind the section */}
@@ -54,17 +65,6 @@ export default function HomePage() {
           </div>
 
         </section>
-
-        {/* ── 3. ScrollVelocity band ──────────────────────────────────── */}
-        <div className="hp-velocity-band">
-          <ScrollVelocity
-            text="THE RIGHT STINKIN PARTS · "
-            defaultVelocity={1.5}
-          />
-        </div>
-
-        {/* ── 4. Category Photo Grid ──────────────────────────────────── */}
-        <CategoryPhotoGrid />
 
         {/* ── 5. Category Index ───────────────────────────────────────── */}
         <CategoryIndex />
