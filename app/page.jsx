@@ -6,16 +6,18 @@
  * Section order:
  *   1. VideoHero       — full-bleed video with hero copy + CTAs
  *   2. ModelFinder     — era → browse, technical blueprint panel
- *   3. ScrollVelocity  — kinetic marquee band
- *   4. CategoryIndex   — parts catalog table of contents (paper)
- *   5. BrandRolodex    — vendor brand showcase
+ *   3. ScrollVelocity     — kinetic marquee band
+ *   4. CategoryPhotoGrid  — image-backed category browse buttons
+ *   5. CategoryIndex      — parts catalog table of contents (paper)
+ *   6. BrandRolodex       — vendor brand showcase
  */
 
 import dynamic from 'next/dynamic';
 import VideoHero      from '@/components/home/VideoHero';
 import ScrollVelocity from '@/components/home/ScrollVelocity';
 import ModelFinder    from '@/components/home/ModelFinder';
-import CategoryIndex  from '@/components/home/CategoryIndex';
+import CategoryIndex     from '@/components/home/CategoryIndex';
+import CategoryPhotoGrid from '@/components/home/CategoryPhotoGrid';
 import { BrandRolodex } from '@/components/home/BrandRolodex';
 
 // SmokeBackground is canvas-heavy — lazy load it
@@ -61,7 +63,10 @@ export default function HomePage() {
           />
         </div>
 
-        {/* ── 4. Category Index ───────────────────────────────────────── */}
+        {/* ── 4. Category Photo Grid ──────────────────────────────────── */}
+        <CategoryPhotoGrid />
+
+        {/* ── 5. Category Index ───────────────────────────────────────── */}
         <CategoryIndex />
 
         {/* ── 5. Brand Rolodex ────────────────────────────────────────── */}
