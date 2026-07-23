@@ -430,15 +430,18 @@ export default function FilterSidebar({ facets, filters, onChange, total = 0 }) 
                   borderLeft: `1px solid rgba(197,167,34,0.18)`,
                   borderBottom: "2px solid transparent",
                   color: CHROME,
-                  fontSize: 18,
-                  lineHeight: 1,
                   cursor: "pointer",
                   transition: "color 0.12s",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                 }}
                 onMouseEnter={e => { e.currentTarget.style.color = GOLD; }}
                 onMouseLeave={e => { e.currentTarget.style.color = CHROME; }}
               >
-                ✕
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="2,4.5 7,9.5 12,4.5"/>
+                </svg>
               </button>
             </div>
 
@@ -898,8 +901,8 @@ export default function FilterSidebar({ facets, filters, onChange, total = 0 }) 
             flexShrink: 0,
             padding: "0 16px",
             height: 36,
-            background: isOpen ? GOLD_MUT : "rgba(255,255,255,0.03)",
-            border: `1px solid ${isOpen ? GOLD_DIM : STEEL}`,
+            background: isOpen ? "rgba(197,167,34,0.18)" : "rgba(255,255,255,0.03)",
+            border: `1px solid ${isOpen ? GOLD : STEEL}`,
             color: isOpen ? GOLD : SILVER,
             fontFamily: "var(--font-body), sans-serif",
             fontSize: 13,
@@ -908,13 +911,10 @@ export default function FilterSidebar({ facets, filters, onChange, total = 0 }) 
             transition: "background 0.15s, border-color 0.15s, color 0.15s",
           }}
         >
-          {/* Hamburger / X icon */}
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+          {/* Hamburger (closed) / Chevron-down (open = collapse panel) */}
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             {isOpen ? (
-              <>
-                <line x1="2" y1="2" x2="12" y2="12"/>
-                <line x1="12" y1="2" x2="2" y2="12"/>
-              </>
+              <polyline points="2,4.5 7,9.5 12,4.5"/>
             ) : (
               <>
                 <line x1="1" y1="3.5" x2="13" y2="3.5"/>
