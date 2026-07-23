@@ -224,27 +224,27 @@ export default async function ProductDetailPage({ params }) {
 
   const hasSidebar = oemAlternatives.length > 0;
   const firstOem = oemRows.find(r => r.oem_format?.startsWith('hd_oem') && !r.expanded_from)?.oem_number ?? null;
+  const primaryOems = oemRows.filter(r => r.oem_format?.startsWith('hd_oem') && !r.expanded_from);
 
   return (
-    <div style={{ background: '#f5f0e8', minHeight: '100vh', display: 'flex' }}>
+    <div style={{ background: 'var(--coal)', minHeight: '100vh', display: 'flex', color: '#f5f0e8' }}>
 
       {/* ── Left sidebar: OEM alternatives ── */}
       {hasSidebar && (
         <aside style={{
-          width: 320,
+          width: 290,
           flexShrink: 0,
           display: 'flex',
           position: 'sticky',
           top: 0,
           height: '100vh',
-          borderRight: '1px solid #e6dcc0',
-          zIndex: 10,
-          background: '#faf6ee',
+          borderRight: '1px solid rgba(197,167,34,0.18)',
+          background: '#080604',
         }}>
 
           {/* Gold accent strip */}
           <div style={{
-            width: 30,
+            width: 28,
             background: '#c9a84c',
             display: 'flex',
             alignItems: 'center',
@@ -255,8 +255,8 @@ export default async function ProductDetailPage({ params }) {
               writingMode: 'vertical-rl',
               transform: 'rotate(180deg)',
               fontFamily: 'var(--font-tanker)',
-              fontSize: 10,
-              letterSpacing: '0.14em',
+              fontSize: 9,
+              letterSpacing: '0.16em',
               color: '#1a1208',
               textTransform: 'uppercase',
               whiteSpace: 'nowrap',
@@ -269,17 +269,17 @@ export default async function ProductDetailPage({ params }) {
           {/* Panel content */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-            {/* Sticky header */}
+            {/* Header */}
             <div style={{
               padding: '14px 14px 12px',
-              borderBottom: '1px solid #e6dcc0',
+              borderBottom: '1px solid rgba(197,167,34,0.12)',
               flexShrink: 0,
             }}>
               <div style={{
                 fontFamily: 'var(--font-tanker)',
-                fontSize: 14,
-                letterSpacing: '0.06em',
-                color: '#1a1208',
+                fontSize: 13,
+                letterSpacing: '0.08em',
+                color: '#f5f0e8',
                 textTransform: 'uppercase',
                 marginBottom: firstOem ? 8 : 0,
               }}>
@@ -289,10 +289,9 @@ export default async function ProductDetailPage({ params }) {
                 <span style={{
                   fontFamily: 'var(--font-stencil)',
                   fontSize: 9,
-                  color: '#7a5810',
-                  background: '#fdf6e3',
-                  border: '1px solid #c9a84c',
-                  borderRadius: 4,
+                  color: '#c9a84c',
+                  background: 'rgba(201,168,76,0.08)',
+                  border: '1px solid rgba(201,168,76,0.35)',
                   padding: '3px 8px',
                   letterSpacing: '0.08em',
                   display: 'inline-block',
@@ -302,23 +301,25 @@ export default async function ProductDetailPage({ params }) {
               )}
             </div>
 
-            {/* Scrollable rows — current product first, then alternatives */}
+            {/* Scrollable rows */}
             <div style={{ flex: 1, overflowY: 'auto' }}>
 
-              {/* Current product — always shown at top, highlighted */}
+              {/* Current product — highlighted at top */}
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: 10,
                 padding: '10px 14px',
-                borderBottom: '1px solid #ede5d0',
+                borderBottom: '1px solid rgba(197,167,34,0.10)',
                 borderLeft: '3px solid #c9a84c',
-                background: '#fdf8f0',
+                background: 'rgba(201,168,76,0.05)',
               }}>
                 <div style={{
-                  width: 52, height: 52, flexShrink: 0, position: 'relative',
-                  borderRadius: 6, background: '#ffffff',
-                  border: '1px solid #e6dcc0', overflow: 'hidden',
+                  width: 48, height: 48, flexShrink: 0,
+                  background: '#ffffff',
+                  border: '1px solid rgba(197,167,34,0.20)',
+                  overflow: 'hidden',
+                  position: 'relative',
                 }}>
                   <ProductImage
                     src={productRow.image_url}
@@ -329,75 +330,120 @@ export default async function ProductDetailPage({ params }) {
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{
-                    fontFamily: 'var(--font-stencil)', fontSize: 8, color: '#7a5810',
-                    background: '#fdf6e3', border: '1px solid #c9a84c',
-                    borderRadius: 3, padding: '1px 5px', display: 'inline-block',
-                    letterSpacing: '0.08em', marginBottom: 4,
+                    fontFamily: 'var(--font-stencil)',
+                    fontSize: 8,
+                    color: '#c9a84c',
+                    background: 'rgba(201,168,76,0.10)',
+                    border: '1px solid rgba(201,168,76,0.30)',
+                    padding: '1px 5px',
+                    display: 'inline-block',
+                    letterSpacing: '0.08em',
+                    marginBottom: 4,
                   }}>
                     VIEWING
                   </div>
                   <div style={{
-                    fontFamily: 'var(--font-bespoke)', fontSize: 12, color: '#1a1208',
-                    lineHeight: 1.3, overflow: 'hidden',
-                    display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                    fontFamily: 'var(--font-bespoke)',
+                    fontSize: 11,
+                    color: '#f5f0e8',
+                    lineHeight: 1.3,
+                    overflow: 'hidden',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
                   }}>
                     {productRow.name}
                   </div>
                 </div>
                 <div style={{
-                  fontFamily: 'var(--font-tanker)', fontSize: 15, color: '#c9a84c',
-                  flexShrink: 0, letterSpacing: '0.03em',
+                  fontFamily: 'var(--font-tanker)',
+                  fontSize: 14,
+                  color: '#c9a84c',
+                  flexShrink: 0,
+                  letterSpacing: '0.02em',
                 }}>
                   ${Number(productRow.price ?? 0).toFixed(2)}
                 </div>
               </div>
 
               {/* Alternatives */}
-              {oemAlternatives.length === 0 ? (
-                <div style={{
-                  padding: '16px 14px',
-                  fontFamily: 'var(--font-stencil)', fontSize: 10,
-                  color: '#a89878', letterSpacing: '0.06em',
-                }}>
-                  No other options on file
-                </div>
-              ) : (
-                oemAlternatives.map((alt, i) => (
-                  <SidebarProductRow
-                    key={alt.id}
-                    product={alt}
-                    isLast={i === oemAlternatives.length - 1}
-                  />
-                ))
-              )}
+              {oemAlternatives.map((alt, i) => (
+                <SidebarProductRow
+                  key={alt.id}
+                  product={alt}
+                  isLast={i === oemAlternatives.length - 1}
+                />
+              ))}
             </div>
           </div>
         </aside>
       )}
 
       {/* ── Main content ── */}
-      <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', color: '#2a2010' }}>
+      <div style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
 
-        {/* Back nav */}
-        <div style={{ padding: '16px 24px 0' }}>
-          <div className="pdp-back-wrap">
+        {/* ── Page ident header ── */}
+        <div style={{
+          padding: '18px 28px',
+          borderBottom: '1px solid rgba(197,167,34,0.12)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 20,
+          position: 'relative',
+          overflow: 'hidden',
+        }}>
+          {/* Blueprint grid texture */}
+          <div style={{
+            position: 'absolute', inset: 0, pointerEvents: 'none',
+            backgroundImage: [
+              'linear-gradient(rgba(61,90,122,0.04) 1px, transparent 1px)',
+              'linear-gradient(90deg, rgba(61,90,122,0.04) 1px, transparent 1px)',
+            ].join(', '),
+            backgroundSize: '48px 48px',
+          }} />
+
+          <div className="pdp-back-wrap" style={{ position: 'relative', flexShrink: 0 }}>
             <BrowseBackButton />
           </div>
+
+          <span style={{ flex: 1, height: 1, background: 'rgba(197,167,34,0.18)', position: 'relative' }} />
+
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
+            <span style={{
+              fontFamily: 'var(--font-stencil)',
+              fontSize: 9,
+              letterSpacing: '0.14em',
+              color: 'rgba(197,167,34,0.55)',
+              textTransform: 'uppercase',
+            }}>
+              STINKIN&apos; SUPPLIES
+            </span>
+            <span style={{ width: 1, height: 10, background: 'rgba(197,167,34,0.20)' }} />
+            <span style={{
+              fontFamily: 'var(--font-stencil)',
+              fontSize: 9,
+              letterSpacing: '0.14em',
+              color: 'rgba(197,167,34,0.35)',
+              textTransform: 'uppercase',
+            }}>
+              PRODUCT SPECIFICATION
+            </span>
+          </div>
         </div>
+
         <style>{`
           .pdp-back-wrap a,
           .pdp-back-wrap button {
             color: #c9a84c !important;
-            border: 1px solid #c9a84c !important;
-            border-radius: 6px !important;
+            border: 1px solid rgba(201,168,76,0.35) !important;
+            border-radius: 0 !important;
             padding: 6px 14px !important;
             font-family: var(--font-stencil) !important;
-            font-size: 11px !important;
-            letter-spacing: 0.08em !important;
+            font-size: 10px !important;
+            letter-spacing: 0.10em !important;
             text-transform: uppercase !important;
             background: transparent !important;
-            box-shadow: 0 0 10px rgba(201,168,76,0.25), inset 0 0 0 0 rgba(201,168,76,0) !important;
-            transition: background 0.18s, box-shadow 0.18s, transform 0.12s !important;
+            transition: background 0.15s, border-color 0.15s !important;
             cursor: pointer !important;
             text-decoration: none !important;
             display: inline-flex !important;
@@ -406,43 +452,59 @@ export default async function ProductDetailPage({ params }) {
           }
           .pdp-back-wrap a:hover,
           .pdp-back-wrap button:hover {
-            background: rgba(201,168,76,0.12) !important;
-            box-shadow: 0 0 18px rgba(201,168,76,0.45) !important;
-            transform: translateX(-2px) !important;
+            background: rgba(201,168,76,0.08) !important;
+            border-color: #c9a84c !important;
           }
-          .pdp-back-wrap a:active,
-          .pdp-back-wrap button:active {
-            transform: translateX(-5px) scale(0.96) !important;
-            box-shadow: 0 0 8px rgba(201,168,76,0.2) !important;
-          }
-          .sidebar-row { transition: background 0.12s; }
-          .sidebar-row:hover { background: #ede8df; }
+          .pdp-sidebar-row { transition: background 0.12s; }
+          .pdp-sidebar-row:hover { background: rgba(201,168,76,0.05); }
+          .pdp-mini-card { transition: border-color 0.15s; }
+          .pdp-mini-card:hover { border-color: rgba(201,168,76,0.45) !important; }
         `}</style>
 
         {/* ── Product hero ── */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',
-          gap: 32,
-          padding: '20px 28px 0',
+          gap: 0,
+          borderBottom: '1px solid rgba(197,167,34,0.12)',
         }}>
-          {/* Image gallery */}
-          <ProductImageGallery
-            primaryUrl={productRow.image_url}
-            imageUrls={productRow.image_urls}
-            alt={productRow.name}
-          />
 
-          {/* Info panel */}
-          <div>
+          {/* Left: Image gallery */}
+          <div style={{
+            padding: '36px 32px',
+            borderRight: '1px solid rgba(197,167,34,0.12)',
+            position: 'relative',
+            overflow: 'hidden',
+          }}>
+            {/* Blueprint grid */}
+            <div style={{
+              position: 'absolute', inset: 0, pointerEvents: 'none',
+              backgroundImage: [
+                'linear-gradient(rgba(61,90,122,0.04) 1px, transparent 1px)',
+                'linear-gradient(90deg, rgba(61,90,122,0.04) 1px, transparent 1px)',
+              ].join(', '),
+              backgroundSize: '48px 48px',
+            }} />
+            <div style={{ position: 'relative' }}>
+              <ProductImageGallery
+                primaryUrl={productRow.image_url}
+                imageUrls={productRow.image_urls}
+                alt={productRow.name}
+              />
+            </div>
+          </div>
+
+          {/* Right: Info panel */}
+          <div style={{ padding: '36px 36px 36px' }}>
+
             {/* Breadcrumb */}
             <div style={{
               fontFamily: 'var(--font-stencil)',
-              fontSize: 10,
-              color: '#8a7040',
-              letterSpacing: '0.09em',
+              fontSize: 9,
+              color: 'rgba(197,167,34,0.45)',
+              letterSpacing: '0.12em',
               textTransform: 'uppercase',
-              marginBottom: 12,
+              marginBottom: 18,
             }}>
               <Link href="/browse" style={{ color: 'inherit', textDecoration: 'none' }}>Browse</Link>
               {productRow.display_category && (
@@ -464,70 +526,52 @@ export default async function ProductDetailPage({ params }) {
             {/* Brand */}
             <div style={{
               fontFamily: 'var(--font-stencil)',
-              fontSize: 11,
+              fontSize: 10,
               color: '#8a7040',
-              letterSpacing: '0.08em',
+              letterSpacing: '0.10em',
               textTransform: 'uppercase',
-              marginBottom: 6,
+              marginBottom: 8,
             }}>
               {productRow.brand}
             </div>
 
-            {/* Name */}
+            {/* Product name */}
             <h1 style={{
-              fontFamily: 'var(--font-bespoke)',
-              fontSize: 26,
-              fontWeight: 600,
-              color: '#1a1208',
-              lineHeight: 1.25,
-              margin: '0 0 10px',
+              fontFamily: 'var(--font-tanker)',
+              fontSize: 'clamp(28px, 3vw, 52px)',
+              fontWeight: 400,
+              color: '#f5f0e8',
+              lineHeight: 0.92,
+              letterSpacing: '-0.01em',
+              textTransform: 'uppercase',
+              margin: '0 0 18px',
             }}>
               {productRow.name}
             </h1>
 
-            {/* Divider */}
+            {/* Gold rule */}
             <div style={{
-              height: 3,
-              background: 'linear-gradient(90deg, #c9a84c 0%, rgba(201,168,76,0.15) 100%)',
-              borderRadius: 2,
-              marginBottom: 18,
+              height: 2,
+              background: 'linear-gradient(90deg, #c9a84c 0%, rgba(201,168,76,0.10) 100%)',
+              marginBottom: 22,
             }} />
 
-            {/* Price */}
-            <div style={{
-              fontFamily: 'var(--font-bespoke)',
-              fontSize: 30,
-              fontWeight: 700,
-              color: '#c9a84c',
-              marginBottom: 20,
-            }}>
-              ${Number(productRow.price).toFixed(2)}
-            </div>
-
-            {/* SKU */}
-            <div style={{
-              fontFamily: 'var(--font-stencil)',
-              fontSize: 10,
-              color: '#8a7040',
-              letterSpacing: '0.07em',
-              marginBottom: 12,
-            }}>
-              SKU: {productRow.internal_sku || productRow.sku}
-            </div>
-
-            {/* Primary OEM number */}
-            {oemRows.filter(r => r.oem_format?.startsWith('hd_oem') && !r.expanded_from).slice(0, 1).map(oem => (
+            {/* OEM number — large Tanker display */}
+            {primaryOems.slice(0, 1).map(oem => (
               <div key={oem.oem_number} style={{
                 display: 'inline-flex',
                 alignItems: 'baseline',
-                gap: 8,
-                marginBottom: 20,
+                gap: 10,
+                marginBottom: 18,
+                padding: '8px 14px',
+                border: '1px solid rgba(197,167,34,0.20)',
+                background: 'rgba(197,167,34,0.04)',
               }}>
                 <span style={{
                   fontFamily: 'var(--font-stencil)',
-                  fontSize: 9,
-                  color: '#8a7040',
-                  letterSpacing: '0.1em',
+                  fontSize: 8,
+                  color: 'rgba(197,167,34,0.45)',
+                  letterSpacing: '0.14em',
                   textTransform: 'uppercase',
                 }}>
                   OEM#
@@ -535,49 +579,127 @@ export default async function ProductDetailPage({ params }) {
                 <span style={{
                   fontFamily: 'var(--font-tanker)',
                   fontSize: 28,
-                  color: '#1a1208',
-                  letterSpacing: '0.04em',
+                  color: '#c9a84c',
+                  letterSpacing: '0.05em',
                   lineHeight: 1,
                 }}>
                   {oem.oem_number}
                 </span>
               </div>
             ))}
-            {oemRows.filter(r => r.oem_format?.startsWith('hd_oem') && !r.expanded_from).length === 0 && (
-              <div style={{ marginBottom: 20 }} />
-            )}
+            {primaryOems.length === 0 && <div style={{ marginBottom: 18 }} />}
 
-            {/* Variant selector — fetches its own data from /api/browse/variants/[productId];
-                dedupes members that share the same color/finish value, and splits by
-                fitment family first when a group spans multiple bike platforms. See
-                components/browse/VariantSelector.jsx. Self-hides when there's nothing
-                to show, so no hasVariants guard needed here. */}
+            {/* Price */}
+            <div style={{
+              fontFamily: 'var(--font-tanker)',
+              fontSize: 'clamp(40px, 5vw, 64px)',
+              fontWeight: 400,
+              color: '#c9a84c',
+              letterSpacing: '0.02em',
+              lineHeight: 1,
+              marginBottom: 22,
+            }}>
+              ${Number(productRow.price).toFixed(2)}
+            </div>
+
+            {/* SKU / Part# data row */}
+            <div style={{
+              display: 'flex',
+              gap: 24,
+              marginBottom: 20,
+              flexWrap: 'wrap',
+              paddingBottom: 20,
+              borderBottom: '1px solid rgba(197,167,34,0.10)',
+            }}>
+              <div>
+                <div style={{
+                  fontFamily: 'var(--font-stencil)',
+                  fontSize: 8,
+                  color: 'rgba(197,167,34,0.35)',
+                  letterSpacing: '0.14em',
+                  textTransform: 'uppercase',
+                  marginBottom: 3,
+                }}>SKU</div>
+                <div style={{
+                  fontFamily: 'var(--font-stencil)',
+                  fontSize: 11,
+                  color: '#a09890',
+                  letterSpacing: '0.06em',
+                }}>
+                  {productRow.internal_sku || productRow.sku}
+                </div>
+              </div>
+              {productRow.brand_part_number && (
+                <div>
+                  <div style={{
+                    fontFamily: 'var(--font-stencil)',
+                    fontSize: 8,
+                    color: 'rgba(197,167,34,0.35)',
+                    letterSpacing: '0.14em',
+                    textTransform: 'uppercase',
+                    marginBottom: 3,
+                  }}>PART#</div>
+                  <div style={{
+                    fontFamily: 'var(--font-stencil)',
+                    fontSize: 11,
+                    color: '#a09890',
+                    letterSpacing: '0.06em',
+                  }}>
+                    {productRow.brand_part_number}
+                  </div>
+                </div>
+              )}
+              {productRow.pack_qty > 1 && (
+                <div>
+                  <div style={{
+                    fontFamily: 'var(--font-stencil)',
+                    fontSize: 8,
+                    color: 'rgba(197,167,34,0.35)',
+                    letterSpacing: '0.14em',
+                    textTransform: 'uppercase',
+                    marginBottom: 3,
+                  }}>QTY</div>
+                  <div style={{
+                    fontFamily: 'var(--font-stencil)',
+                    fontSize: 11,
+                    color: '#a09890',
+                    letterSpacing: '0.06em',
+                  }}>
+                    {productRow.pack_qty} pack
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Variant selector */}
             <VariantSelector productId={unifiedId} />
 
             {/* Add to cart */}
             <button style={{
               width: '100%',
-              padding: '14px 24px',
+              padding: '16px 24px',
               background: '#c9a84c',
-              border: 'none',
-              borderRadius: 8,
+              border: '2px solid #b8963a',
+              borderRadius: 0,
               fontFamily: 'var(--font-tanker)',
-              fontSize: 18,
-              letterSpacing: '0.06em',
+              fontSize: 20,
+              letterSpacing: '0.10em',
               color: '#1a1208',
               cursor: 'pointer',
-              marginBottom: 12,
+              marginBottom: 14,
+              textTransform: 'uppercase',
+              transition: 'background 0.15s',
             }}>
               ADD TO CART
             </button>
 
-            {/* Fitment / kit badges */}
+            {/* Badges */}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {productRow.is_universal && (
-                <span style={badge('#eaf3ea', '#3a7a3a')}>UNIVERSAL FIT</span>
+                <span style={badge('rgba(58,122,58,0.12)', '#5a9a5a')}>UNIVERSAL FIT</span>
               )}
               {productRow.is_kit && (
-                <span style={badge('#eaeaf5', '#5a5ab0')}>KIT</span>
+                <span style={badge('rgba(90,90,176,0.12)', '#8888cc')}>KIT</span>
               )}
             </div>
           </div>
@@ -618,15 +740,17 @@ export default async function ProductDetailPage({ params }) {
 
         {/* ── Chronological timeline ── */}
         {timeline.length > 0 && (
-          <section style={{ margin: '40px 28px 0' }}>
-            <SectionHeader>Part Timeline</SectionHeader>
+          <section style={{ margin: '48px 28px 0' }}>
+            <DarkSectionHeader>Part Timeline</DarkSectionHeader>
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-              gap: 10,
+              gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+              gap: 1,
+              background: 'rgba(197,167,34,0.15)',
+              outline: '1px solid rgba(197,167,34,0.15)',
             }}>
               {timeline.map(p => (
-                <MiniProductCard key={p.id} product={p} />
+                <DarkMiniProductCard key={p.id} product={p} />
               ))}
             </div>
           </section>
@@ -634,17 +758,19 @@ export default async function ProductDetailPage({ params }) {
 
         {/* ── Related products ── */}
         {related.length > 0 && (
-          <section style={{ margin: '40px 28px 48px' }}>
-            <SectionHeader>
+          <section style={{ margin: '48px 28px 72px' }}>
+            <DarkSectionHeader>
               {productRow.display_subcategory ?? productRow.display_category}
-            </SectionHeader>
+            </DarkSectionHeader>
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-              gap: 10,
+              gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+              gap: 1,
+              background: 'rgba(197,167,34,0.15)',
+              outline: '1px solid rgba(197,167,34,0.15)',
             }}>
               {related.map(p => (
-                <MiniProductCard key={p.id} product={p} />
+                <DarkMiniProductCard key={p.id} product={p} />
               ))}
             </div>
           </section>
@@ -659,32 +785,28 @@ export default async function ProductDetailPage({ params }) {
 /** Sidebar row — links directly to the alternative product's PDP */
 function SidebarProductRow({ product, isLast }) {
   const src = resolveImageSrc(product.image_url);
-  // Vendor identity (PU/WPS/VTwin) is intentionally not shown here — the
-  // customer should see one consolidated catalog, not which vendor backs a
-  // given SKU. Source vendor is still visible in AdminEditPanel for staff.
 
   return (
     <Link
       href={`/browse/${product.slug}`}
-      className="sidebar-row"
+      className="pdp-sidebar-row"
       style={{
         display: 'flex',
         alignItems: 'center',
         gap: 10,
         padding: '10px 14px',
-        borderBottom: isLast ? 'none' : '1px solid #ede5d0',
+        borderBottom: isLast ? 'none' : '1px solid rgba(197,167,34,0.08)',
         textDecoration: 'none',
       }}
     >
       {/* Thumbnail */}
       <div style={{
-        width: 52,
-        height: 52,
+        width: 48,
+        height: 48,
         flexShrink: 0,
         position: 'relative',
-        borderRadius: 6,
         background: '#ffffff',
-        border: '1px solid #e6dcc0',
+        border: '1px solid rgba(197,167,34,0.18)',
         overflow: 'hidden',
       }}>
         <ProductImage
@@ -700,19 +822,19 @@ function SidebarProductRow({ product, isLast }) {
         <div style={{
           fontFamily: 'var(--font-stencil)',
           fontSize: 8,
-          color: '#5a4a2a',
+          color: '#7a6840',
           letterSpacing: '0.06em',
           marginBottom: 2,
         }}>
           {product.brand ?? ''}
           {product.via_chain && (
-            <span style={{ marginLeft: 4, color: '#8a7040' }}>· SUPERSESSION</span>
+            <span style={{ marginLeft: 4, color: 'rgba(197,167,34,0.40)' }}>· SUPERSESSION</span>
           )}
         </div>
         <div style={{
           fontFamily: 'var(--font-bespoke)',
-          fontSize: 12,
-          color: '#1a1208',
+          fontSize: 11,
+          color: '#d8d0c0',
           lineHeight: 1.3,
           overflow: 'hidden',
           display: '-webkit-box',
@@ -726,10 +848,10 @@ function SidebarProductRow({ product, isLast }) {
       {/* Price */}
       <div style={{
         fontFamily: 'var(--font-tanker)',
-        fontSize: 15,
+        fontSize: 14,
         color: '#c9a84c',
         flexShrink: 0,
-        letterSpacing: '0.03em',
+        letterSpacing: '0.02em',
       }}>
         ${Number(product.price ?? 0).toFixed(2)}
       </div>
@@ -737,18 +859,17 @@ function SidebarProductRow({ product, isLast }) {
   );
 }
 
-function MiniProductCard({ product }) {
+function DarkMiniProductCard({ product }) {
   return (
     <Link
       href={`/browse/${product.slug}`}
+      className="pdp-mini-card"
       style={{
         display: 'block',
-        background: '#ffffff',
-        border: '1px solid #e6dcc0',
-        borderRadius: 8,
+        background: '#0e0b06',
+        border: '1px solid transparent',
         overflow: 'hidden',
         textDecoration: 'none',
-        transition: 'border-color 0.15s',
       }}
     >
       <div style={{
@@ -767,8 +888,8 @@ function MiniProductCard({ product }) {
       <div style={{ padding: '8px 10px' }}>
         <div style={{
           fontFamily: 'var(--font-bespoke)',
-          fontSize: 12,
-          color: '#2a2010',
+          fontSize: 11,
+          color: '#c8c0b0',
           lineHeight: 1.3,
           marginBottom: 6,
           display: '-webkit-box',
@@ -779,10 +900,10 @@ function MiniProductCard({ product }) {
           {product.name}
         </div>
         <div style={{
-          fontFamily: 'var(--font-bespoke)',
+          fontFamily: 'var(--font-tanker)',
           fontSize: 13,
-          fontWeight: 600,
           color: '#c9a84c',
+          letterSpacing: '0.02em',
         }}>
           ${Number(product.price ?? 0).toFixed(2)}
         </div>
@@ -791,23 +912,30 @@ function MiniProductCard({ product }) {
   );
 }
 
-function SectionHeader({ children }) {
+function DarkSectionHeader({ children }) {
   return (
     <div style={{
-      fontFamily: 'var(--font-tanker)',
-      fontSize: 22,
-      letterSpacing: '0.04em',
-      color: '#1a1208',
-      marginBottom: 14,
-      textTransform: 'uppercase',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 16,
+      marginBottom: 16,
     }}>
-      {children}
+      <div style={{
+        fontFamily: 'var(--font-tanker)',
+        fontSize: 'clamp(20px, 2.5vw, 32px)',
+        letterSpacing: '0.03em',
+        color: '#f5f0e8',
+        textTransform: 'uppercase',
+        flexShrink: 0,
+      }}>
+        {children}
+      </div>
+      <div style={{ flex: 1, height: 1, background: 'rgba(197,167,34,0.18)' }} />
     </div>
   );
 }
 
 // ── Style helpers ─────────────────────────────────────────────────────────────
-
 
 const badge = (bg, color) => ({
   fontFamily: 'var(--font-stencil)',
@@ -815,7 +943,7 @@ const badge = (bg, color) => ({
   color,
   background: bg,
   border: `1px solid ${color}`,
-  borderRadius: 4,
+  borderRadius: 0,
   padding: '3px 8px',
   letterSpacing: '0.08em',
   textTransform: 'uppercase',

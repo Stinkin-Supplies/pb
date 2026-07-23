@@ -22,6 +22,19 @@ restored via a lucky Typesense snapshot find (see Phase 2). Phase 6
 now also done (session 91-92) — see the status table below. The catalog is
 in genuinely good shape end-to-end now.
 
+> **Update (session 93, 2026-07-22)**: Phase 6/7's row counts below are from
+> 2026-07-20 and are now stale — session 93 built a staging/validation gate
+> (`oem_crossref_staging`/`fitment_staging`, see `OEM_FITMENT_DATA_MODEL.md`)
+> and pushed several more source documents through it. Current totals:
+> `catalog_fitment_v2` 3,426,836 rows, `catalog_oem_crossref` 48,817 rows.
+> Session 93 also found the `is_harley_fitment` flag this doc's Phase 6
+> entries lean on is unreliable (many products have the flag set with no
+> real backing `catalog_fitment_v2` row) — see `FITMENT_MASTER_REF.md`,
+> which now measures coverage relationally instead. Full session-93 writeup
+> in `HANDOFF_LOG.md`. Phase 9 (Typesense reindex) is still outstanding and
+> now even more overdue given how much new fitment/crossref data has landed
+> since the last reindex.
+
 **What's still missing, in priority order:**
 1. **Phase 3 (reduced scope)** — ~6,794 `catalog_unified` rows (new products
    added after the July 17 Typesense snapshot, or previously-inactive rows)

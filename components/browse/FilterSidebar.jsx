@@ -1,36 +1,42 @@
 "use client";
 // ============================================================
 // components/browse/FilterSidebar.jsx
-// Desktop: sticky left column — collapsible
-// Mobile:  bottom sheet — slides up when open=true, mobileSheet=true
+//
+// AwwwardsNav-style bottom pill that expands upward to reveal
+// a 4-column filter panel (GSAP power4.inOut animation).
+//
+// Columns:
+//   1. FITMENT  — Family → Model → Year cascade + Engine Era
+//   2. CATEGORY — display_category → subcategory → detail
+//   3. BRAND    — brand facet list
+//   4. REFINE   — In Stock · Price · Clear All
+//
+// Props:
+//   facets   — { categories, subcategories, subcategoryDetails, brands }
+//   filters  — current filter state
+//   onChange — filter update callback
+//   total    — result count (shown in pill)
 // ============================================================
 
 import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import gsap from "gsap";
 
-// Debounce search input so we don't hit Typesense on every keystroke
-function useDebounce(value, delay) {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const t = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(t);
-  }, [value, delay]);
-  return debounced;
-}
+// ── Constants ────────────────────────────────────────────────
+const PILL_H     = 56;
+const EXPANDED_H = 460;
 
-// ── Palette ───────────────────────────────────────────────────
-const GOLD   = "#b8922a";
-const GOLD_L = "rgba(184,146,42,0.12)";
-const GOLD_B = "rgba(184,146,42,0.25)";
-const CREAM  = "#faf7f2";
-const CREAM2 = "#f2ede4";
-const DARK   = "#0a0909";
-const MUTED  = "#888";
+const GOLD     = "#c5a722";
+const GOLD_DIM = "rgba(197,167,34,0.30)";
+const GOLD_MUT = "rgba(197,167,34,0.10)";
+const GOLD_ACT = "rgba(197,167,34,0.16)";
+const IRON     = "#181614";
+const COAL     = "#0f0e0d";
+const STEEL    = "rgba(255,255,255,0.06)";
+const SILVER   = "#a09890";
+const CHROME   = "#706860";
+const CREAM    = "#f0e8d8";
 
-// ── Static data ───────────────────────────────────────────────
-
-// Matches harley_families.name exactly — BrowseFilters.family is compared
-// directly against this column (see lib/db/browse.ts), no slug translation.
+// ── Static fitment data ──────────────────────────────────────
 const HD_FAMILIES = [
   "Touring", "Softail", "Dyna", "Sportster", "FXR", "Trike",
   "Revolution Max", "V-Rod", "Street", "Shovelhead", "Panhead",
@@ -50,166 +56,173 @@ const HD_ERAS = [
   { label: "Chopper",            slug: "chopper",            years: "All eras" },
 ];
 
-// ── Micro-components ──────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────
+function useDebounce(value, delay) {
+  const [d, setD] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setD(value), delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  return d;
+}
 
+// ── Sub-components ───────────────────────────────────────────
+
+// Square checkbox (13×13, no border-radius)
 function Checkbox({ active }) {
   return (
-    <motion.div
-      animate={{ background: active ? GOLD : "rgba(0,0,0,0)", borderColor: active ? GOLD : GOLD_B }}
-      transition={{ duration: 0.12 }}
-      style={{
-        width: 13, height: 13,
-        borderWidth: "1.5px", borderStyle: "solid", borderColor: active ? GOLD : GOLD_B,
-        flexShrink: 0, display: "grid", placeContent: "center",
-      }}
-    >
+    <span style={{
+      width: 13, height: 13, flexShrink: 0,
+      border: `1.5px solid ${active ? GOLD : GOLD_DIM}`,
+      background: active ? GOLD : "transparent",
+      display: "grid", placeContent: "center",
+      transition: "border-color 0.12s, background 0.12s",
+    }}>
       {active && (
         <svg width="7" height="6" viewBox="0 0 7 6" fill="none">
-          <path d="M1 3L2.8 5L6 1" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M1 3L2.8 5L6 1" stroke="#0f0e0d" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       )}
-    </motion.div>
+    </span>
   );
 }
 
-function FilterRow({ label, count, active, onClick, indent = false }) {
+// Single filter row with checkbox + label + optional count
+function FilterRow({ label, count, active, onClick, small = false }) {
+  const [hov, setHov] = useState(false);
   return (
-    <motion.button
+    <button
       onClick={onClick}
-      whileHover={{ background: active ? GOLD_L : "rgba(184,146,42,0.04)" }}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
       style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        width: "100%", background: active ? GOLD_L : "transparent",
-        border: "none", padding: indent ? "5px 14px 5px 28px" : "6px 14px",
-        cursor: "pointer", gap: 8, textAlign: "left",
+        width: "100%", gap: 8, padding: small ? "5px 0" : "6px 0",
+        background: "none", border: "none", cursor: "pointer", textAlign: "left",
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
         <Checkbox active={active} />
         <span style={{
-          fontFamily: "var(--font-stencil, monospace)", fontSize: indent ? 11 : 12,
-          color: active ? DARK : MUTED, textTransform: "uppercase",
-          letterSpacing: "0.6px", whiteSpace: "nowrap", overflow: "hidden",
-          textOverflow: "ellipsis", lineHeight: 1.3,
+          fontFamily: "var(--font-body), sans-serif",
+          fontSize: small ? 12 : 13,
+          fontWeight: 500,
+          color: active ? CREAM : hov ? CREAM : SILVER,
+          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+          lineHeight: 1.3,
+          transition: "color 0.12s",
         }}>
           {label}
         </span>
       </div>
       {count != null && (
-        <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 10, color: "#ccc", flexShrink: 0 }}>
+        <span style={{
+          fontFamily: "var(--font-stencil), monospace",
+          fontSize: 10, color: CHROME, flexShrink: 0,
+        }}>
           {count.toLocaleString()}
         </span>
       )}
-    </motion.button>
+    </button>
   );
 }
 
-// Gold pill for active filter chips at top of sidebar
-function ActiveChip({ label, onRemove }) {
+// Column wrapper with dashed left separator (except first col)
+function Col({ title, children, first = false }) {
   return (
     <div style={{
-      display: "inline-flex", alignItems: "center", gap: 4,
-      background: GOLD_L, border: `1px solid ${GOLD_B}`,
-      padding: "3px 6px 3px 8px", borderRadius: 2,
+      display: "flex", flexDirection: "column",
+      borderLeft: first ? "none" : `1px dashed rgba(197,167,34,0.18)`,
+      padding: first ? "20px 20px 20px 0" : "20px",
+      minWidth: 0, overflow: "hidden",
     }}>
-      <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 9, color: GOLD, textTransform: "uppercase", letterSpacing: "0.8px" }}>
+      {/* Column header — matches section ident style */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 8, marginBottom: 14,
+      }}>
+        <span style={{
+          width: 5, height: 5, flexShrink: 0,
+          background: GOLD_DIM, display: "inline-block",
+        }} />
+        <span style={{
+          fontFamily: "var(--font-stencil), monospace",
+          fontSize: 11,
+          letterSpacing: "3px",
+          color: GOLD,
+          textTransform: "uppercase",
+        }}>
+          {title}
+        </span>
+      </div>
+      <div style={{ flex: 1, overflowY: "auto", scrollbarWidth: "none" }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// Dropdown select styled to match design system
+function StyledSelect({ value, onChange, children }) {
+  return (
+    <select
+      value={value}
+      onChange={onChange}
+      style={{
+        width: "100%", background: COAL,
+        border: `1px solid ${GOLD_DIM}`,
+        color: value ? CREAM : SILVER,
+        fontFamily: "var(--font-body), sans-serif",
+        fontSize: 13, fontWeight: 500,
+        padding: "9px 10px", outline: "none",
+        cursor: "pointer", marginBottom: 8,
+        borderRadius: 0,
+        appearance: "none",
+      }}
+    >
+      {children}
+    </select>
+  );
+}
+
+// Active filter chip — shown in the collapsed pill row
+function Chip({ label, onRemove }) {
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 4,
+      background: GOLD_ACT, border: `1px solid ${GOLD_DIM}`,
+      padding: "2px 6px 2px 8px", flexShrink: 0,
+    }}>
+      <span style={{
+        fontFamily: "var(--font-body), sans-serif",
+        fontSize: 11, fontWeight: 600,
+        color: GOLD,
+        whiteSpace: "nowrap",
+      }}>
         {label}
       </span>
       <button
-        onClick={onRemove}
-        style={{ background: "none", border: "none", cursor: "pointer", color: GOLD, fontSize: 13, lineHeight: 1, padding: "0 1px", display: "flex", alignItems: "center" }}
-      >×</button>
-    </div>
-  );
-}
-
-// Collapsible section wrapper
-function Section({ label, sectionKey, open, onToggle, children, hasActive = false, collapsed = false }) {
-  return (
-    <div style={{ borderBottom: `1px solid rgba(184,146,42,0.1)` }}>
-      <button
-        onClick={() => !collapsed && onToggle(sectionKey)}
-        title={collapsed ? label : undefined}
+        onClick={(e) => { e.stopPropagation(); onRemove(); }}
         style={{
-          display: "flex", alignItems: "center",
-          justifyContent: collapsed ? "center" : "space-between",
-          width: "100%", background: "none", border: "none",
-          padding: collapsed ? "13px 0" : "10px 14px",
-          cursor: "pointer",
+          background: "none", border: "none", cursor: "pointer",
+          color: GOLD, fontSize: 13, lineHeight: 1,
+          padding: "0 1px", display: "flex", alignItems: "center",
         }}
-      >
-        {collapsed ? (
-          <span style={{
-            fontSize: 9, fontFamily: "var(--font-stencil, monospace)",
-            color: hasActive ? GOLD : "#bbb", letterSpacing: "1px",
-            writingMode: "vertical-rl", transform: "rotate(180deg)",
-          }}>
-            {label.slice(0,3)}
-          </span>
-        ) : (
-          <>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{
-                fontFamily: "var(--font-stencil, monospace)", fontSize: 11,
-                letterSpacing: "2.5px", textTransform: "uppercase",
-                color: open || hasActive ? GOLD : "#999",
-                transition: "color 0.15s",
-              }}>
-                {label}
-              </span>
-              {hasActive && !open && (
-                <div style={{ width: 5, height: 5, borderRadius: "50%", background: GOLD }} />
-              )}
-            </div>
-            <motion.span
-              animate={{ rotate: open ? 180 : 0 }}
-              transition={{ duration: 0.18 }}
-              style={{ color: open ? GOLD : "#ccc", fontSize: 10, display: "block", lineHeight: 1 }}
-            >▼</motion.span>
-          </>
-        )}
-      </button>
-
-      <AnimatePresence initial={false}>
-        {!collapsed && open && (
-          <motion.div
-            key="body"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2, ease: "easeInOut" }}
-            style={{ overflow: "hidden" }}
-          >
-            {children}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+      >×</button>
+    </span>
   );
 }
 
-// ── FilterContent (shared between desktop + mobile) ───────────
+// ── Main export ──────────────────────────────────────────────
+export default function FilterSidebar({ facets, filters, onChange, total = 0 }) {
+  const panelRef   = useRef(null);
+  const expandedRef = useRef(null);
+  const openRef    = useRef(false);
+  const animRef    = useRef(false);
+  const [isOpen, setIsOpen] = useState(false);
 
-const selectStyle = {
-  width: "100%", background: "#fff", border: `1px solid ${GOLD_B}`,
-  color: DARK, fontFamily: "var(--font-stencil, monospace)",
-  fontSize: 11, letterSpacing: "0.4px", padding: "7px 8px",
-  outline: "none", textTransform: "uppercase",
-};
-
-function FilterContent({ facets, filters, onChange, sections, setSections, collapsed = false }) {
-  function toggle(key) { setSections(s => ({ ...s, [key]: !s[key] })); }
-
-  const subcategories = facets.subcategories ?? [];
-  const subcategoryDetails = facets.subcategoryDetails ?? [];
-
-  // ── Model & Year cascade — family -> model -> year ────────────────────
-  // filters.family/model already exist in the shared filters shape (chips
-  // above already display them) but nothing wrote to them until now.
-  // /api/fitment/models and /api/fitment/years already exist and support
-  // exactly this cascade -- no new backend needed.
+  // Cascading fitment state
   const [familyModels, setFamilyModels] = useState([]);
-  const [modelYears, setModelYears] = useState([]);
+  const [modelYears,   setModelYears]   = useState([]);
 
   useEffect(() => {
     if (!filters.family) { setFamilyModels([]); return; }
@@ -233,559 +246,507 @@ function FilterContent({ facets, filters, onChange, sections, setSections, colla
     return () => { cancelled = true; };
   }, [selectedModelObj?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Search input (controlled locally, synced to filters.search) ──────────
-  const [searchInput, setSearchInput] = useState(filters.search ?? "");
-  const debouncedSearch = useDebounce(searchInput, 320);
-
-  // Push debounced value up to browse page
+  // Establish collapsed baseline
   useEffect(() => {
-    const v = debouncedSearch.trim();
-    const current = filters.search ?? "";
-    if (v !== current) onChange({ search: v || null });
-  }, [debouncedSearch]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!panelRef.current || !expandedRef.current) return;
+    gsap.set(panelRef.current, { height: PILL_H });
+    gsap.set(expandedRef.current, { opacity: 0, y: 12, display: "none" });
+    return () => {
+      gsap.killTweensOf([panelRef.current, expandedRef.current]);
+    };
+  }, []);
 
-  // Reset local input when filter is cleared externally (chip × or clear-all)
-  useEffect(() => {
-    if (!filters.search && searchInput) setSearchInput("");
-  }, [filters.search]); // eslint-disable-line react-hooks/exhaustive-deps
+  const toggle = () => {
+    if (animRef.current || !panelRef.current || !expandedRef.current) return;
+    animRef.current = true;
+    const opening = !openRef.current;
+    openRef.current = opening;
+    setIsOpen(opening);
 
-  const clearAll = () => {
-    setSearchInput("");
-    onChange({ family: null, model: null, modelCodes: null, year: null, era: null, display_category: null, display_subcategory: null, subcategory_detail: null, brand: null, min_price: null, max_price: null, in_stock: false, search: null });
+    if (opening) {
+      gsap.to(panelRef.current, { height: EXPANDED_H, duration: 0.72, ease: "power4.inOut" });
+      gsap.to(expandedRef.current, {
+        opacity: 1, y: 0, duration: 0.28, delay: 0.48,
+        onStart: () => gsap.set(expandedRef.current, { display: "block" }),
+        onComplete: () => { animRef.current = false; },
+      });
+    } else {
+      gsap.to(expandedRef.current, {
+        opacity: 0, y: 8, duration: 0.16,
+        onComplete: () => gsap.set(expandedRef.current, { display: "none" }),
+      });
+      gsap.to(panelRef.current, {
+        height: PILL_H, duration: 0.6, ease: "power4.inOut", delay: 0.12,
+        onComplete: () => { animRef.current = false; },
+      });
+    }
   };
 
-  // Active filter chips
+  // Build active chips for the pill summary row
+  const clearAll = () => onChange({
+    family: null, model: null, modelCodes: null, year: null,
+    era: null, display_category: null, display_subcategory: null,
+    subcategory_detail: null, brand: null,
+    min_price: null, max_price: null, in_stock: false, q: null,
+  });
+
   const chips = [
-    filters.search     && { key: "search",   label: `"${filters.search}"`,             clear: () => { setSearchInput(""); onChange({ search: null }); } },
-    filters.family     && { key: "family",   label: filters.family,                    clear: () => onChange({ family: null, model: null, modelCodes: null, year: null }) },
-    filters.year       && { key: "year",     label: String(filters.year),              clear: () => onChange({ year: null }) },
-    filters.model      && { key: "model",    label: filters.model,                     clear: () => onChange({ model: null, modelCodes: null }) },
-    filters.era        && { key: "era",      label: filters.era.replace(/-/g," "),     clear: () => onChange({ era: null }) },
-    filters.display_category && { key: "cat",    label: filters.display_category,      clear: () => onChange({ display_category: null, display_subcategory: null, subcategory_detail: null }) },
-    filters.display_subcategory && { key: "subcat", label: filters.display_subcategory, clear: () => onChange({ display_subcategory: null, subcategory_detail: null }) },
-    filters.subcategory_detail && { key: "detail", label: filters.subcategory_detail,   clear: () => onChange({ subcategory_detail: null }) },
-    filters.brand      && { key: "brand",    label: filters.brand,                     clear: () => onChange({ brand: null }) },
-    filters.in_stock   && { key: "stock",    label: "In Stock",                        clear: () => onChange({ in_stock: false }) },
-    (filters.min_price || filters.max_price) && { key: "price", label: `$${filters.min_price||0}–$${filters.max_price||"∞"}`, clear: () => onChange({ min_price: null, max_price: null }) },
+    filters.family     && { key: "family", label: filters.family,           clear: () => onChange({ family: null, model: null, modelCodes: null, year: null }) },
+    filters.model      && { key: "model",  label: filters.model,            clear: () => onChange({ model: null, modelCodes: null }) },
+    filters.year       && { key: "year",   label: String(filters.year),     clear: () => onChange({ year: null }) },
+    filters.era        && { key: "era",    label: filters.era.replace(/-/g," "), clear: () => onChange({ era: null }) },
+    filters.display_category && { key: "cat", label: filters.display_category, clear: () => onChange({ display_category: null, display_subcategory: null, subcategory_detail: null }) },
+    filters.display_subcategory && { key: "sub", label: filters.display_subcategory, clear: () => onChange({ display_subcategory: null, subcategory_detail: null }) },
+    filters.brand      && { key: "brand",  label: filters.brand,            clear: () => onChange({ brand: null }) },
+    filters.in_stock   && { key: "stock",  label: "In Stock",               clear: () => onChange({ in_stock: false }) },
+    (filters.min_price || filters.max_price) && {
+      key: "price",
+      label: `$${filters.min_price ?? 0}–$${filters.max_price ?? "∞"}`,
+      clear: () => onChange({ min_price: null, max_price: null }),
+    },
   ].filter(Boolean);
 
   const activeCount = chips.length;
 
+  // In-stock toggle convenience
+  const [priceMin, setPriceMin] = useState(filters.min_price ?? "");
+  const [priceMax, setPriceMax] = useState(filters.max_price ?? "");
+  const dPriceMin = useDebounce(priceMin, 400);
+  const dPriceMax = useDebounce(priceMax, 400);
+
+  useEffect(() => {
+    onChange({ min_price: dPriceMin ? parseFloat(dPriceMin) : null });
+  }, [dPriceMin]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    onChange({ max_price: dPriceMax ? parseFloat(dPriceMax) : null });
+  }, [dPriceMax]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const subcategories     = facets.subcategories     ?? [];
+  const subcategoryDetails = facets.subcategoryDetails ?? [];
+
+  // ── Render ──────────────────────────────────────────────────
   return (
-    <>
-      {/* Search box — hidden in collapsed mode (sidebar too narrow) */}
-      {!collapsed && (
-        <div style={{ padding: "10px 14px 8px", borderBottom: `1px solid rgba(184,146,42,0.1)` }}>
-          <div style={{
-            display: "flex", alignItems: "center",
-            border: `1.5px solid ${searchInput ? GOLD_B : "rgba(184,146,42,0.15)"}`,
-            background: "rgba(255,255,255,0.45)",
-            padding: "0 8px 0 10px", gap: 6,
-            transition: "border-color 0.18s",
-          }}>
-            {/* Search icon */}
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={searchInput ? GOLD : MUTED} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transition: "stroke 0.15s" }}>
-              <circle cx="11" cy="11" r="7" />
-              <line x1="16.5" y1="16.5" x2="22" y2="22" />
-            </svg>
-            <input
-              type="text"
-              value={searchInput}
-              onChange={e => setSearchInput(e.target.value)}
-              placeholder="Search parts, OEM#…"
-              style={{
-                flex: 1, border: "none", outline: "none",
-                background: "transparent",
-                fontSize: 11, fontFamily: "var(--font-stencil, monospace)",
-                letterSpacing: "0.5px", color: DARK,
-                padding: "8px 0",
-              }}
-            />
-            {searchInput && (
-              <button
-                onClick={() => { setSearchInput(""); onChange({ search: null }); }}
-                style={{
-                  background: "none", border: "none", cursor: "pointer",
-                  color: "#bbb", padding: "0 1px", fontSize: 15,
-                  lineHeight: 1, display: "flex", alignItems: "center",
-                }}
-              >×</button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Active filter chips — only when not collapsed */}
-      {!collapsed && activeCount > 0 && (
-        <div style={{ padding: "10px 14px 8px", borderBottom: `1px solid rgba(184,146,42,0.1)`, display: "flex", flexWrap: "wrap", gap: 5 }}>
-          {chips.map(chip => (
-            <ActiveChip key={chip.key} label={chip.label} onRemove={chip.clear} />
-          ))}
-          <button
-            onClick={clearAll}
-            style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-stencil, monospace)", fontSize: 9, color: "#bbb", letterSpacing: "1px", textTransform: "uppercase", padding: "3px 4px" }}
-          >
-            Clear all
-          </button>
-        </div>
-      )}
-
-      {/* Fitment coverage hint — shown when bike context is active */}
-      {!collapsed && (filters.family || filters.model) && (
-        <div style={{ padding: "5px 14px 6px", borderBottom: `1px solid rgba(184,146,42,0.08)`, display: "flex", alignItems: "center", gap: 5 }}>
-          <div style={{ width: 5, height: 5, borderRadius: "50%", background: GOLD, flexShrink: 0, opacity: 0.6 }} />
-          <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 9, color: "#aaa", letterSpacing: "0.6px", textTransform: "uppercase" }}>
-            Fitment-matched + universal parts
-          </span>
-        </div>
-      )}
-
-      {/* In Stock toggle */}
-      <div
-        onClick={() => onChange({ in_stock: !filters.in_stock })}
-        style={{
-          display: "flex", alignItems: "center",
-          justifyContent: collapsed ? "center" : "space-between",
-          padding: collapsed ? "11px 0" : "9px 14px",
-          cursor: "pointer",
-          borderBottom: `1px solid rgba(184,146,42,0.1)`,
-          background: filters.in_stock ? GOLD_L : "transparent",
-          transition: "background 0.15s",
-        }}
-      >
-        {collapsed ? (
-          <span style={{ fontSize: 12, color: filters.in_stock ? GOLD : "#bbb" }} title="In Stock Only">◉</span>
-        ) : (
-          <>
-            <span style={{
-              fontFamily: "var(--font-stencil, monospace)", fontSize: 11,
-              letterSpacing: "2px", textTransform: "uppercase",
-              color: filters.in_stock ? GOLD : "#999",
-            }}>
-              In Stock
-            </span>
-            {/* Pill toggle */}
-            <motion.div
-              animate={{ background: filters.in_stock ? GOLD : "rgba(184,146,42,0.15)" }}
-              style={{ width: 34, height: 18, borderRadius: 9, position: "relative", flexShrink: 0 }}
-            >
-              <motion.div
-                animate={{ x: filters.in_stock ? 17 : 2 }}
-                transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                style={{ position: "absolute", top: 2, width: 14, height: 14, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }}
-              />
-            </motion.div>
-          </>
-        )}
-      </div>
-
-      {/* Category */}
-      <Section label="Category" sectionKey="category" open={sections.category} onToggle={toggle}
-        hasActive={!!filters.display_category} collapsed={collapsed}>
-        <div style={{ paddingBottom: 6, maxHeight: 260, overflowY: "auto" }}>
-          {facets.categories.slice(0, 30).map(cat => (
-            <FilterRow
-              key={cat.name} label={cat.name} count={cat.count}
-              active={filters.display_category === cat.name}
-              onClick={() => onChange({ display_category: filters.display_category === cat.name ? null : cat.name, display_subcategory: null, subcategory_detail: null })}
-            />
-          ))}
-        </div>
-      </Section>
-
-      {/* Subcategory — only when a category is active and subcats exist */}
-      {filters.display_category && subcategories.length > 0 && (
-        <Section label="Subcategory" sectionKey="subcategory" open={sections.subcategory} onToggle={toggle}
-          hasActive={!!filters.display_subcategory} collapsed={collapsed}>
-          <div style={{ paddingBottom: 6, maxHeight: 200, overflowY: "auto" }}>
-            {subcategories.map(sub => (
-              <FilterRow
-                key={sub.name} label={sub.name} count={sub.count}
-                active={filters.display_subcategory === sub.name}
-                onClick={() => onChange({ display_subcategory: filters.display_subcategory === sub.name ? null : sub.name, subcategory_detail: null })}
-              />
-            ))}
-          </div>
-        </Section>
-      )}
-
-      {/* Detail (tier-3) — indented under Subcategory, only when one is active and details exist */}
-      {filters.display_subcategory && subcategoryDetails.length > 0 && (
-        <Section label="Detail" sectionKey="detail" open={sections.detail} onToggle={toggle}
-          hasActive={!!filters.subcategory_detail} collapsed={collapsed}>
-          <div style={{ paddingBottom: 6, maxHeight: 200, overflowY: "auto", paddingLeft: 12 }}>
-            {subcategoryDetails.map(d => (
-              <FilterRow
-                key={d.name} label={d.name} count={d.count}
-                active={filters.subcategory_detail === d.name}
-                onClick={() => onChange({ subcategory_detail: filters.subcategory_detail === d.name ? null : d.name })}
-              />
-            ))}
-          </div>
-        </Section>
-      )}
-
-      {/* Model & Year — precise fitment picker, alongside the broader Engine Era facet below */}
-      <Section label="Model & Year" sectionKey="modelYear" open={sections.modelYear} onToggle={toggle}
-        hasActive={!!(filters.family || filters.model || filters.year)} collapsed={collapsed}>
-        <div style={{ padding: "8px 14px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
-          <select
-            value={filters.family ?? ""}
-            onChange={e => onChange({ family: e.target.value || null, model: null, modelCodes: null, year: null })}
-            style={selectStyle}
-          >
-            <option value="">Any Family</option>
-            {HD_FAMILIES.map(f => <option key={f} value={f}>{f}</option>)}
-          </select>
-
-          {filters.family && (
-            <select
-              value={filters.model ?? ""}
-              onChange={e => onChange({ model: e.target.value || null, modelCodes: null, year: null })}
-              style={selectStyle}
-            >
-              <option value="">Any Model</option>
-              {familyModels.map(m => (
-                <option key={m.model_code} value={m.model_code}>{m.name} ({m.model_code})</option>
-              ))}
-            </select>
-          )}
-
-          {filters.model && (
-            <select
-              value={filters.year ?? ""}
-              onChange={e => onChange({ year: e.target.value ? parseInt(e.target.value) : null })}
-              style={selectStyle}
-            >
-              <option value="">Any Year</option>
-              {modelYears.map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
-          )}
-        </div>
-      </Section>
-
-      {/* Engine Era */}
-      <Section label="Engine Era" sectionKey="era" open={sections.era} onToggle={toggle}
-        hasActive={!!filters.era} collapsed={collapsed}>
-        <div style={{ paddingBottom: 6 }}>
-          {HD_ERAS.map(era => (
-            <motion.button
-              key={era.slug}
-              onClick={() => onChange({ era: filters.era === era.slug ? null : era.slug })}
-              whileHover={{ background: filters.era === era.slug ? GOLD_L : "rgba(184,146,42,0.04)" }}
-              style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                width: "100%", background: filters.era === era.slug ? GOLD_L : "transparent",
-                border: "none", padding: "6px 14px", cursor: "pointer", gap: 8,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <Checkbox active={filters.era === era.slug} />
-                <span style={{
-                  fontFamily: "var(--font-stencil, monospace)", fontSize: 12,
-                  color: filters.era === era.slug ? DARK : MUTED,
-                  textTransform: "uppercase", letterSpacing: "0.6px",
-                }}>
-                  {era.label}
-                </span>
-              </div>
-              <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 10, color: "#ccc", flexShrink: 0 }}>
-                {era.years}
-              </span>
-            </motion.button>
-          ))}
-        </div>
-      </Section>
-
-      {/* Brand */}
-      {facets.brands?.length > 0 && (
-        <Section label="Brand" sectionKey="brand" open={sections.brand} onToggle={toggle}
-          hasActive={!!filters.brand} collapsed={collapsed}>
-          <div style={{ paddingBottom: 6, maxHeight: 240, overflowY: "auto" }}>
-            {facets.brands.slice(0, 25).map(b => (
-              <FilterRow
-                key={b.name} label={b.name} count={b.count}
-                active={filters.brand === b.name}
-                onClick={() => onChange({ brand: filters.brand === b.name ? null : b.name })}
-              />
-            ))}
-          </div>
-        </Section>
-      )}
-
-      {/* Price */}
-      <Section label="Price" sectionKey="price" open={sections.price} onToggle={toggle}
-        hasActive={!!(filters.min_price || filters.max_price)} collapsed={collapsed}>
-        <div style={{ padding: "8px 14px 14px", display: "flex", gap: 8, alignItems: "center" }}>
-          <input
-            type="number" placeholder="Min" value={filters.min_price ?? ""}
-            onChange={e => onChange({ min_price: e.target.value ? parseFloat(e.target.value) : null })}
-            style={{
-              flex: 1, background: "#fff", border: `1px solid ${GOLD_B}`,
-              color: DARK, fontFamily: "var(--font-stencil, monospace)",
-              fontSize: 11, padding: "7px 10px", outline: "none", width: 0,
-            }}
-          />
-          <span style={{ fontFamily: "var(--font-stencil, monospace)", fontSize: 10, color: "#ccc" }}>—</span>
-          <input
-            type="number" placeholder="Max" value={filters.max_price ?? ""}
-            onChange={e => onChange({ max_price: e.target.value ? parseFloat(e.target.value) : null })}
-            style={{
-              flex: 1, background: "#fff", border: `1px solid ${GOLD_B}`,
-              color: DARK, fontFamily: "var(--font-stencil, monospace)",
-              fontSize: 11, padding: "7px 10px", outline: "none", width: 0,
-            }}
-          />
-        </div>
-      </Section>
-    </>
-  );
-}
-
-// ── Main export ───────────────────────────────────────────────
-
-export default function FilterSidebar({ facets, filters, onChange, open, onClose, mobileSheet = false }) {
-  const [collapsed, setCollapsed] = useState(false);
-  const [sections, setSections] = useState({
-    category: true,
-    subcategory: false,
-    detail: false,
-    modelYear: false,
-    era: false,
-    brand: false,
-    price: false,
-  });
-
-  // Auto-open subcategory section when a category is selected
-  useEffect(() => {
-    if (filters.display_category) setSections(s => ({ ...s, subcategory: true }));
-  }, [filters.display_category]);
-
-  // Auto-open detail (tier-3) section when a subcategory is selected
-  useEffect(() => {
-    if (filters.display_subcategory) setSections(s => ({ ...s, detail: true }));
-  }, [filters.display_subcategory]);
-
-  // Auto-open Model & Year when a family arrives from elsewhere (e.g. a PDP fitment link)
-  useEffect(() => {
-    if (filters.family) setSections(s => ({ ...s, modelYear: true }));
-  }, [filters.family]);
-
-  // Lock body scroll when mobile sheet is open
-  useEffect(() => {
-    if (!mobileSheet) return;
-    document.body.style.overflow = open ? "hidden" : "";
-    return () => { document.body.style.overflow = ""; };
-  }, [open, mobileSheet]);
-
-  const activeCount = [
-    filters.search, filters.family, filters.model, filters.year,
-    filters.era, filters.display_category,
-    filters.brand, filters.min_price, filters.max_price, filters.in_stock,
-  ].filter(Boolean).length;
-
-  // ── Mobile bottom sheet ───────────────────────────────────────
-  if (mobileSheet) {
-    return (
-      <AnimatePresence>
-        {open && (
-          <>
-            {/* Backdrop */}
-            <motion.div
-              key="backdrop"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 0.5 }}
-              exit={{ opacity: 0 }}
-              onClick={onClose}
-              style={{ position: "fixed", inset: 0, background: "#000", zIndex: 300 }}
-            />
-
-            {/* Sheet */}
-            <motion.div
-              key="sheet"
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", stiffness: 420, damping: 42 }}
-              style={{
-                position: "fixed",
-                bottom: 0, left: 0, right: 0,
-                zIndex: 301,
-                background: CREAM2,
-                borderRadius: "18px 18px 0 0",
-                maxHeight: "88vh",
-                display: "flex",
-                flexDirection: "column",
-                boxShadow: "0 -12px 48px rgba(0,0,0,0.2)",
-              }}
-            >
-              {/* Drag handle + header */}
-              <div style={{ padding: "10px 16px 8px", flexShrink: 0, borderBottom: `1px solid rgba(184,146,42,0.12)` }}>
-                <div style={{ width: 40, height: 4, background: GOLD_B, borderRadius: 2, margin: "0 auto 10px" }} />
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{
-                      fontFamily: "var(--font-stencil, monospace)", fontSize: 10,
-                      letterSpacing: "3px", color: GOLD, textTransform: "uppercase",
-                    }}>
-                      Filters
-                    </span>
-                    {activeCount > 0 && (
-                      <span style={{
-                        background: GOLD, color: "#fff", fontFamily: "var(--font-stencil, monospace)",
-                        fontSize: 9, padding: "2px 6px", borderRadius: 2, letterSpacing: "0.5px",
-                      }}>
-                        {activeCount} active
-                      </span>
-                    )}
-                  </div>
-                  <button
-                    onClick={onClose}
-                    style={{ background: "none", border: "none", cursor: "pointer", color: "#aaa", padding: "4px 6px", fontSize: 20, lineHeight: 1 }}
-                  >×</button>
-                </div>
-              </div>
-
-              {/* Scrollable content */}
-              <div style={{ flex: 1, overflowY: "auto", paddingBottom: 100 }}>
-                <FilterContent
-                  facets={facets}
-                  filters={filters}
-                  onChange={(updates) => { onChange(updates); }}
-                  sections={sections}
-                  setSections={setSections}
-                  collapsed={false}
-                />
-              </div>
-
-              {/* Footer: clear + apply */}
-              <div style={{
-                padding: "12px 16px 28px", flexShrink: 0,
-                borderTop: `1px solid rgba(184,146,42,0.12)`,
-                background: CREAM2,
-                display: "flex", gap: 10,
-              }}>
-                {activeCount > 0 && (
-                  <button
-                    onClick={() => onChange({ family: null, model: null, modelCodes: null, year: null, era: null, display_category: null, display_subcategory: null, subcategory_detail: null, brand: null, min_price: null, max_price: null, in_stock: false, search: null })}
-                    style={{
-                      flex: "0 0 auto", height: 46, background: "none",
-                      border: `1.5px solid ${GOLD_B}`, color: GOLD,
-                      fontFamily: "var(--font-stencil, monospace)", fontSize: 10,
-                      letterSpacing: "2px", textTransform: "uppercase",
-                      cursor: "pointer", borderRadius: 3, padding: "0 16px",
-                    }}
-                  >
-                    Clear
-                  </button>
-                )}
-                <button
-                  onClick={onClose}
-                  style={{
-                    flex: 1, height: 46, background: GOLD, border: "none",
-                    color: "#fff", fontFamily: "var(--font-stencil, monospace)",
-                    fontSize: 10, letterSpacing: "3px", textTransform: "uppercase",
-                    cursor: "pointer", borderRadius: 3,
-                  }}
-                >
-                  {activeCount > 0 ? `Show Results` : "Done"}
-                </button>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-    );
-  }
-
-  // ── Desktop sticky sidebar ────────────────────────────────────
-  return (
-    <motion.nav
-      layout
+    <nav
+      ref={panelRef}
+      aria-label="Filter panel"
       style={{
-        position: "sticky",
-        top: 0,
-        height: "100vh",
-        background: CREAM2,
-        borderRight: `1px solid rgba(184,146,42,0.18)`,
-        display: "flex",
-        flexDirection: "column",
+        position: "fixed",
+        bottom: 24,
+        left: "50%",
+        transform: "translateX(-50%)",
+        width: "min(1200px, 94vw)",
+        zIndex: 200,
+        background: IRON,
+        border: `1px solid ${GOLD_DIM}`,
         overflow: "hidden",
-        flexShrink: 0,
-        width: collapsed ? 42 : 236,
-        transition: "width 0.22s ease",
-        zIndex: 10,
+        /* Subtle shadow so it lifts above the page */
+        boxShadow: "0 -4px 40px rgba(0,0,0,0.60), 0 2px 8px rgba(0,0,0,0.40)",
       }}
     >
-      {/* Sidebar header */}
-      <div style={{
-        display: "flex", alignItems: "center",
-        justifyContent: collapsed ? "center" : "space-between",
-        padding: collapsed ? "14px 0" : "14px 14px 10px",
-        borderBottom: `1px solid rgba(184,146,42,0.12)`,
-        flexShrink: 0,
-      }}>
-        {!collapsed && (
-          <span style={{
-            fontFamily: "var(--font-stencil, monospace)", fontSize: 9,
-            letterSpacing: "3px", color: GOLD, textTransform: "uppercase",
-          }}>
-            Filters {activeCount > 0 && (
-              <span style={{ background: GOLD, color: "#fff", padding: "1px 5px", borderRadius: 2, marginLeft: 4, fontSize: 8 }}>
-                {activeCount}
-              </span>
-            )}
-          </span>
-        )}
-        {collapsed && activeCount > 0 && (
-          <div style={{ width: 7, height: 7, borderRadius: "50%", background: GOLD }} />
-        )}
-      </div>
-
-      {/* Scrollable filter content */}
-      <div style={{
-        flex: 1, overflowY: "auto", overflowX: "hidden",
-        padding: collapsed ? "4px 0" : 0,
-        scrollbarWidth: "none",
-      }}>
-        <FilterContent
-          facets={facets}
-          filters={filters}
-          onChange={onChange}
-          sections={sections}
-          setSections={setSections}
-          collapsed={collapsed}
-        />
-      </div>
-
-      {/* Collapse toggle */}
-      <button
-        onClick={() => setCollapsed(c => !c)}
+      {/* ── Expanded panel content ──────────────────────────── */}
+      <div
+        ref={expandedRef}
         style={{
-          display: "flex", alignItems: "center",
-          padding: collapsed ? "12px 0" : "11px 14px",
-          background: "none", border: "none",
-          borderTop: `1px solid rgba(184,146,42,0.12)`,
-          cursor: "pointer", width: "100%", flexShrink: 0,
-          justifyContent: collapsed ? "center" : "flex-start",
-          gap: 8,
+          display: "none",
+          height: EXPANDED_H - PILL_H,
+          borderBottom: `1px solid ${GOLD_DIM}`,
+          overflow: "hidden",
         }}
       >
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <path
-            d={collapsed ? "M4 2 L10 7 L4 12" : "M10 2 L4 7 L10 12"}
-            stroke={GOLD} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-          />
-        </svg>
-        {!collapsed && (
+        {/* Inner border frame */}
+        <div style={{
+          margin: 10,
+          height: "calc(100% - 20px)",
+          border: `1px solid rgba(197,167,34,0.08)`,
+          background: COAL,
+          display: "grid",
+          gridTemplateColumns: "repeat(4, 1fr)",
+          overflow: "hidden",
+        }}>
+
+          {/* ── COL 1: FITMENT ──────────────────────────────── */}
+          <Col title="Fitment" first>
+            <StyledSelect
+              value={filters.family ?? ""}
+              onChange={e => onChange({ family: e.target.value || null, model: null, modelCodes: null, year: null })}
+            >
+              <option value="">Any Family</option>
+              {HD_FAMILIES.map(f => <option key={f} value={f}>{f}</option>)}
+            </StyledSelect>
+
+            {filters.family && (
+              <StyledSelect
+                value={filters.model ?? ""}
+                onChange={e => onChange({ model: e.target.value || null, modelCodes: null, year: null })}
+              >
+                <option value="">Any Model</option>
+                {familyModels.map(m => (
+                  <option key={m.model_code} value={m.model_code}>
+                    {m.name} ({m.model_code})
+                  </option>
+                ))}
+              </StyledSelect>
+            )}
+
+            {filters.model && (
+              <StyledSelect
+                value={filters.year ?? ""}
+                onChange={e => onChange({ year: e.target.value ? parseInt(e.target.value) : null })}
+              >
+                <option value="">Any Year</option>
+                {modelYears.map(y => <option key={y} value={y}>{y}</option>)}
+              </StyledSelect>
+            )}
+
+            {/* Separator */}
+            <div style={{
+              height: 1, background: GOLD_DIM, margin: "12px 0 10px",
+              opacity: 0.5,
+            }} />
+
+            {/* Engine Era */}
+            <div style={{
+              fontFamily: "var(--font-stencil), monospace",
+              fontSize: 10, letterSpacing: "2.5px", color: SILVER,
+              textTransform: "uppercase", marginBottom: 8,
+            }}>
+              Engine Era
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {HD_ERAS.map(era => (
+                <button
+                  key={era.slug}
+                  onClick={() => onChange({ era: filters.era === era.slug ? null : era.slug })}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    width: "100%", gap: 8, padding: "5px 0",
+                    background: "none", border: "none", cursor: "pointer",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <Checkbox active={filters.era === era.slug} />
+                    <span style={{
+                      fontFamily: "var(--font-body), sans-serif",
+                      fontSize: 13, fontWeight: 500,
+                      color: filters.era === era.slug ? CREAM : SILVER,
+                      transition: "color 0.12s",
+                    }}>
+                      {era.label}
+                    </span>
+                  </div>
+                  <span style={{
+                    fontFamily: "var(--font-stencil), monospace",
+                    fontSize: 10, color: CHROME, flexShrink: 0,
+                  }}>
+                    {era.years}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </Col>
+
+          {/* ── COL 2: CATEGORY ─────────────────────────────── */}
+          <Col title="Category">
+            <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              {(facets.categories ?? []).slice(0, 24).map(cat => (
+                <FilterRow
+                  key={cat.name}
+                  label={cat.name}
+                  count={cat.count}
+                  active={filters.display_category === cat.name}
+                  onClick={() => onChange({
+                    display_category: filters.display_category === cat.name ? null : cat.name,
+                    display_subcategory: null, subcategory_detail: null,
+                  })}
+                />
+              ))}
+            </div>
+
+            {filters.display_category && subcategories.length > 0 && (
+              <>
+                <div style={{ height: 1, background: GOLD_DIM, margin: "10px 0", opacity: 0.4 }} />
+                <div style={{
+                  fontFamily: "var(--font-stencil), monospace",
+                  fontSize: 10, letterSpacing: "2.5px", color: SILVER,
+                  textTransform: "uppercase", marginBottom: 8,
+                }}>
+                  Subcategory
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                  {subcategories.map(sub => (
+                    <FilterRow
+                      key={sub.name} label={sub.name} count={sub.count} small
+                      active={filters.display_subcategory === sub.name}
+                      onClick={() => onChange({
+                        display_subcategory: filters.display_subcategory === sub.name ? null : sub.name,
+                        subcategory_detail: null,
+                      })}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+
+            {filters.display_subcategory && subcategoryDetails.length > 0 && (
+              <>
+                <div style={{ height: 1, background: GOLD_DIM, margin: "10px 0", opacity: 0.4 }} />
+                <div style={{
+                  fontFamily: "var(--font-stencil), monospace",
+                  fontSize: 10, letterSpacing: "2.5px", color: SILVER,
+                  textTransform: "uppercase", marginBottom: 8,
+                }}>
+                  Detail
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                  {subcategoryDetails.map(d => (
+                    <FilterRow
+                      key={d.name} label={d.name} count={d.count} small
+                      active={filters.subcategory_detail === d.name}
+                      onClick={() => onChange({
+                        subcategory_detail: filters.subcategory_detail === d.name ? null : d.name,
+                      })}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+          </Col>
+
+          {/* ── COL 3: BRAND ────────────────────────────────── */}
+          <Col title="Brand">
+            <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              {(facets.brands ?? []).slice(0, 30).map(b => (
+                <FilterRow
+                  key={b.name} label={b.name} count={b.count}
+                  active={filters.brand === b.name}
+                  onClick={() => onChange({ brand: filters.brand === b.name ? null : b.name })}
+                />
+              ))}
+            </div>
+          </Col>
+
+          {/* ── COL 4: REFINE ───────────────────────────────── */}
+          <Col title="Refine">
+            {/* In Stock toggle */}
+            <button
+              onClick={() => onChange({ in_stock: !filters.in_stock })}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                width: "100%", padding: "8px 0", marginBottom: 16,
+                background: "none", border: "none", cursor: "pointer",
+              }}
+            >
+              <span style={{
+                fontFamily: "var(--font-body), sans-serif",
+                fontSize: 14, fontWeight: 500,
+                color: filters.in_stock ? GOLD : SILVER,
+                transition: "color 0.15s",
+              }}>
+                In Stock Only
+              </span>
+              {/* Toggle track */}
+              <span style={{
+                width: 36, height: 20, flexShrink: 0,
+                background: filters.in_stock ? GOLD : "rgba(112,104,96,0.25)",
+                border: `1px solid ${filters.in_stock ? GOLD : GOLD_DIM}`,
+                position: "relative", display: "inline-block",
+                transition: "background 0.2s, border-color 0.2s",
+              }}>
+                <span style={{
+                  position: "absolute", top: 2,
+                  left: filters.in_stock ? 16 : 2,
+                  width: 14, height: 14,
+                  background: filters.in_stock ? COAL : CHROME,
+                  transition: "left 0.2s",
+                }} />
+              </span>
+            </button>
+
+            {/* Price range */}
+            <div style={{
+              fontFamily: "var(--font-stencil), monospace",
+              fontSize: 10, letterSpacing: "2.5px", color: SILVER,
+              textTransform: "uppercase", marginBottom: 8,
+            }}>
+              Price Range
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 24 }}>
+              <input
+                type="number" placeholder="Min"
+                value={priceMin}
+                onChange={e => setPriceMin(e.target.value)}
+                style={{
+                  flex: 1, background: COAL,
+                  border: `1px solid ${GOLD_DIM}`,
+                  color: CREAM, fontFamily: "var(--font-body), sans-serif",
+                  fontSize: 13, fontWeight: 500,
+                  padding: "9px 10px", outline: "none",
+                  width: 0, borderRadius: 0,
+                }}
+              />
+              <span style={{ fontFamily: "var(--font-stencil), monospace", fontSize: 12, color: SILVER }}>—</span>
+              <input
+                type="number" placeholder="Max"
+                value={priceMax}
+                onChange={e => setPriceMax(e.target.value)}
+                style={{
+                  flex: 1, background: COAL,
+                  border: `1px solid ${GOLD_DIM}`,
+                  color: CREAM, fontFamily: "var(--font-body), sans-serif",
+                  fontSize: 13, fontWeight: 500,
+                  padding: "9px 10px", outline: "none",
+                  width: 0, borderRadius: 0,
+                }}
+              />
+            </div>
+
+            {/* Fitment coverage hint */}
+            {(filters.family || filters.model) && (
+              <div style={{
+                display: "flex", alignItems: "center", gap: 6,
+                marginBottom: 20, padding: "6px 0",
+                borderTop: `1px solid rgba(197,167,34,0.10)`,
+                borderBottom: `1px solid rgba(197,167,34,0.10)`,
+              }}>
+                <span style={{ width: 5, height: 5, background: GOLD, flexShrink: 0, opacity: 0.6 }} />
+                <span style={{
+                  fontFamily: "var(--font-stencil), monospace",
+                  fontSize: 9, color: CHROME,
+                  letterSpacing: "0.5px", textTransform: "uppercase",
+                }}>
+                  Fitment-matched + universal
+                </span>
+              </div>
+            )}
+
+            {/* Clear all */}
+            {activeCount > 0 && (
+              <button
+                onClick={clearAll}
+                style={{
+                  width: "100%", padding: "9px 0",
+                  background: "none",
+                  border: `1px solid ${GOLD_DIM}`,
+                  color: GOLD,
+                  fontFamily: "var(--font-body), sans-serif",
+                  fontSize: 13, fontWeight: 600,
+                  cursor: "pointer",
+                  transition: "border-color 0.15s, color 0.15s",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = GOLD; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = GOLD_DIM; }}
+              >
+                Clear All ({activeCount})
+              </button>
+            )}
+          </Col>
+
+        </div>
+      </div>
+
+      {/* ── Collapsed pill row — always visible ─────────────── */}
+      <div style={{
+        height: PILL_H,
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "0 10px",
+      }}>
+
+        {/* Toggle button */}
+        <button
+          onClick={toggle}
+          aria-expanded={isOpen}
+          aria-label={isOpen ? "Close filters" : "Open filters"}
+          style={{
+            display: "flex", alignItems: "center", gap: 9,
+            flexShrink: 0,
+            padding: "0 16px",
+            height: 36,
+            background: isOpen ? GOLD_MUT : "rgba(255,255,255,0.03)",
+            border: `1px solid ${isOpen ? GOLD_DIM : STEEL}`,
+            color: isOpen ? GOLD : SILVER,
+            fontFamily: "var(--font-body), sans-serif",
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+            transition: "background 0.15s, border-color 0.15s, color 0.15s",
+          }}
+        >
+          {/* Hamburger / X icon */}
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+            {isOpen ? (
+              <>
+                <line x1="2" y1="2" x2="12" y2="12"/>
+                <line x1="12" y1="2" x2="2" y2="12"/>
+              </>
+            ) : (
+              <>
+                <line x1="1" y1="3.5" x2="13" y2="3.5"/>
+                <line x1="1" y1="7"   x2="13" y2="7"/>
+                <line x1="1" y1="10.5" x2="13" y2="10.5"/>
+              </>
+            )}
+          </svg>
+          <span>Filters</span>
+          {activeCount > 0 && (
+            <span style={{
+              background: GOLD, color: COAL,
+              fontFamily: "var(--font-stencil), monospace",
+              fontSize: 10, padding: "2px 6px",
+              letterSpacing: "0.5px", lineHeight: 1.5,
+            }}>
+              {activeCount}
+            </span>
+          )}
+        </button>
+
+        {/* Active chips — scrollable strip */}
+        <div style={{
+          flex: 1, display: "flex", alignItems: "center",
+          gap: 6, overflowX: "auto", scrollbarWidth: "none",
+          minWidth: 0,
+        }}>
+          {chips.length === 0 ? (
+            <span style={{
+              fontFamily: "var(--font-body), sans-serif",
+              fontSize: 13, color: CHROME,
+              fontWeight: 400,
+            }}>
+              No filters active
+            </span>
+          ) : chips.map(chip => (
+            <Chip key={chip.key} label={chip.label} onRemove={chip.clear} />
+          ))}
+        </div>
+
+        {/* Result count — right side */}
+        <div style={{
+          flexShrink: 0,
+          display: "flex", alignItems: "center", gap: 6,
+          padding: "0 12px",
+          borderLeft: `1px solid ${STEEL}`,
+          height: 36,
+        }}>
           <span style={{
-            fontFamily: "var(--font-stencil, monospace)", fontSize: 10,
-            letterSpacing: "2px", color: "#bbb", textTransform: "uppercase",
+            fontFamily: "var(--font-tanker), sans-serif",
+            fontSize: 18, color: GOLD, lineHeight: 1,
+            letterSpacing: "0.02em",
           }}>
-            Collapse
+            {total.toLocaleString()}
           </span>
-        )}
-      </button>
-    </motion.nav>
+          <span style={{
+            fontFamily: "var(--font-stencil), monospace",
+            fontSize: 8, color: CHROME,
+            letterSpacing: "2px", textTransform: "uppercase",
+            lineHeight: 1.3,
+          }}>
+            parts
+          </span>
+        </div>
+
+      </div>
+    </nav>
   );
 }

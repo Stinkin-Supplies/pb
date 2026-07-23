@@ -3,15 +3,33 @@ import { useState } from 'react';
 
 const TABS = ['DETAILS', 'OEM', 'FITMENT'];
 
+// ── Colour tokens (dark coal theme) ──────────────────────────────────────────
+const C = {
+  surface:    '#0c0a06',
+  iron:       '#161209',
+  border:     'rgba(197,167,34,0.14)',
+  borderGold: 'rgba(197,167,34,0.45)',
+  textPrime:  '#f0e8d8',
+  textDim:    '#a09890',
+  textMuted:  '#706860',
+  gold:       '#c9a84c',
+  goldDim:    '#8a7040',
+};
+
 export default function PDPTabs({ fitment, oemRows, details }) {
   const defaultTab = details ? 'DETAILS' : fitment?.length ? 'FITMENT' : 'OEM';
   const [active, setActive] = useState(defaultTab);
 
   return (
-    <div style={{ padding: '28px 28px 0' }}>
+    <div style={{ padding: '0', borderTop: `1px solid ${C.border}` }}>
 
       {/* ── Tab bar ── */}
-      <div style={{ display: 'flex', borderBottom: '2px solid #e6dcc0' }}>
+      <div style={{
+        display: 'flex',
+        borderBottom: `1px solid ${C.border}`,
+        background: C.surface,
+        padding: '0 28px',
+      }}>
         {TABS.map(tab => {
           const isActive = active === tab;
           return (
@@ -19,18 +37,18 @@ export default function PDPTabs({ fitment, oemRows, details }) {
               key={tab}
               onClick={() => setActive(tab)}
               style={{
-                padding: '9px 20px',
+                padding: '12px 20px',
                 fontFamily: 'var(--font-stencil)',
                 fontSize: 10,
-                letterSpacing: '0.12em',
-                color: isActive ? '#1a1208' : '#a89878',
-                background: isActive ? '#ffffff' : 'transparent',
-                border: '1px solid',
-                borderColor: isActive ? '#e6dcc0' : 'transparent',
-                borderBottom: isActive ? '2px solid #ffffff' : '1px solid transparent',
-                marginBottom: -2,
+                letterSpacing: '0.14em',
+                color: isActive ? C.gold : C.textMuted,
+                background: 'transparent',
+                border: 'none',
+                borderBottom: isActive ? `2px solid ${C.gold}` : '2px solid transparent',
+                marginBottom: -1,
                 cursor: 'pointer',
-                borderRadius: '6px 6px 0 0',
+                borderRadius: 0,
+                textTransform: 'uppercase',
                 transition: 'color 0.15s',
               }}
             >
@@ -42,11 +60,9 @@ export default function PDPTabs({ fitment, oemRows, details }) {
 
       {/* ── Tab content ── */}
       <div style={{
-        background: '#ffffff',
-        border: '1px solid #e6dcc0',
-        borderTop: 'none',
-        borderRadius: '0 6px 6px 6px',
-        padding: '20px 24px',
+        background: C.iron,
+        borderBottom: `1px solid ${C.border}`,
+        padding: '24px 28px',
         minHeight: 180,
       }}>
         {active === 'DETAILS'  && <DetailsContent details={details} />}
@@ -71,7 +87,7 @@ function DetailsContent({ details }) {
     <div style={{
       display: 'grid',
       gridTemplateColumns: hasAttrs ? '1fr auto' : '1fr',
-      gap: 24,
+      gap: 28,
       alignItems: 'start',
     }}>
 
@@ -81,20 +97,20 @@ function DetailsContent({ details }) {
           <p style={{
             fontFamily: 'var(--font-bespoke)',
             fontSize: 14,
-            color: '#2a2010',
+            color: C.textPrime,
             lineHeight: 1.65,
-            margin: '0 0 16px',
+            margin: '0 0 18px',
           }}>
             {description}
           </p>
         )}
 
         {features?.length > 0 && (
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 7 }}>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
             {features.map((f, i) => (
               <li key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                <span style={{ color: '#c9a84c', fontSize: 12, lineHeight: '1.6', flexShrink: 0 }}>›</span>
-                <span style={{ fontFamily: 'var(--font-bespoke)', fontSize: 13, color: '#3a2e1a', lineHeight: 1.55 }}>
+                <span style={{ color: C.gold, fontSize: 12, lineHeight: '1.6', flexShrink: 0 }}>›</span>
+                <span style={{ fontFamily: 'var(--font-bespoke)', fontSize: 13, color: C.textPrime, lineHeight: 1.55 }}>
                   {f}
                 </span>
               </li>
@@ -104,57 +120,61 @@ function DetailsContent({ details }) {
 
         {tech_note && (
           <div style={{
-            marginTop: (description || features?.length) ? 16 : 0,
+            marginTop: (description || features?.length) ? 18 : 0,
             padding: '10px 14px',
-            background: '#fdf6e3',
-            border: '1px solid #e6dcc0',
-            borderLeft: '3px solid #c9a84c',
-            borderRadius: 6,
+            background: 'rgba(197,167,34,0.05)',
+            border: `1px solid ${C.border}`,
+            borderLeft: `3px solid ${C.gold}`,
           }}>
             <div style={{
               fontFamily: 'var(--font-stencil)',
-              fontSize: 9,
-              color: '#8a7040',
-              letterSpacing: '0.1em',
+              fontSize: 8,
+              color: C.goldDim,
+              letterSpacing: '0.12em',
               textTransform: 'uppercase',
-              marginBottom: 5,
+              marginBottom: 6,
             }}>
               Tech Note
             </div>
-            <div style={{ fontFamily: 'var(--font-bespoke)', fontSize: 13, color: '#2a2010', lineHeight: 1.55 }}>
+            <div style={{ fontFamily: 'var(--font-bespoke)', fontSize: 13, color: C.textPrime, lineHeight: 1.55 }}>
               {tech_note}
             </div>
           </div>
         )}
       </div>
 
-      {/* Right: attributes */}
+      {/* Right: specifications */}
       {hasAttrs && (
-        <div style={{ minWidth: 180, borderLeft: '1px solid #e6dcc0', paddingLeft: 24 }}>
+        <div style={{ minWidth: 200, borderLeft: `1px solid ${C.border}`, paddingLeft: 28 }}>
           <div style={{
             fontFamily: 'var(--font-stencil)',
-            fontSize: 9,
-            color: '#8a7040',
-            letterSpacing: '0.1em',
+            fontSize: 8,
+            color: C.goldDim,
+            letterSpacing: '0.12em',
             textTransform: 'uppercase',
-            marginBottom: 10,
+            marginBottom: 12,
           }}>
             Specifications
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {Object.entries(attributes).map(([key, val]) => (
               <div key={key}>
                 <div style={{
                   fontFamily: 'var(--font-stencil)',
-                  fontSize: 9,
-                  color: '#a89878',
-                  letterSpacing: '0.06em',
+                  fontSize: 8,
+                  color: C.textMuted,
+                  letterSpacing: '0.08em',
                   textTransform: 'uppercase',
-                  marginBottom: 2,
+                  marginBottom: 3,
                 }}>
                   {key}
                 </div>
-                <div style={{ fontFamily: 'var(--font-bespoke)', fontSize: 13, color: '#2a2010', fontWeight: 600 }}>
+                <div style={{
+                  fontFamily: 'var(--font-bespoke)',
+                  fontSize: 13,
+                  color: C.textPrime,
+                  fontWeight: 600,
+                }}>
                   {String(val)}
                 </div>
               </div>
@@ -177,28 +197,28 @@ function OemContent({ oemRows }) {
   return (
     <div>
       {primary.length > 0 && (
-        <div style={{ marginBottom: secondary.length ? 16 : 0 }}>
+        <div style={{ marginBottom: secondary.length ? 20 : 0 }}>
           <div style={{
             fontFamily: 'var(--font-stencil)',
-            fontSize: 9,
-            color: '#8a7040',
-            letterSpacing: '0.1em',
+            fontSize: 8,
+            color: C.goldDim,
+            letterSpacing: '0.12em',
             textTransform: 'uppercase',
-            marginBottom: 8,
+            marginBottom: 10,
           }}>
             HD OEM Numbers
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {primary.map((r, i) => (
               <span key={i} style={{
                 fontFamily: 'var(--font-stencil)',
                 fontSize: 12,
-                color: '#7a5810',
-                background: '#fdf6e3',
-                border: '1px solid #c9a84c',
-                borderRadius: 4,
-                padding: '4px 10px',
-                letterSpacing: '0.05em',
+                color: C.gold,
+                background: 'rgba(201,168,76,0.08)',
+                border: `1px solid rgba(201,168,76,0.40)`,
+                borderRadius: 0,
+                padding: '5px 12px',
+                letterSpacing: '0.06em',
               }}>
                 {r.oem_number}
               </span>
@@ -211,11 +231,11 @@ function OemContent({ oemRows }) {
         <div>
           <div style={{
             fontFamily: 'var(--font-stencil)',
-            fontSize: 9,
-            color: '#8a7040',
-            letterSpacing: '0.1em',
+            fontSize: 8,
+            color: C.goldDim,
+            letterSpacing: '0.12em',
             textTransform: 'uppercase',
-            marginBottom: 8,
+            marginBottom: 10,
           }}>
             Cross Reference
           </div>
@@ -224,11 +244,11 @@ function OemContent({ oemRows }) {
               <span key={i} style={{
                 fontFamily: 'var(--font-stencil)',
                 fontSize: 11,
-                color: '#8a7040',
-                background: '#f5f0e8',
-                border: '1px solid #e6dcc0',
-                borderRadius: 4,
-                padding: '3px 8px',
+                color: C.textDim,
+                background: 'rgba(255,255,255,0.03)',
+                border: `1px solid ${C.border}`,
+                borderRadius: 0,
+                padding: '4px 10px',
                 letterSpacing: '0.04em',
               }}>
                 {r.oem_number}
@@ -246,10 +266,6 @@ function OemContent({ oemRows }) {
 function FitmentContent({ fitment }) {
   if (!fitment?.length) return <Empty>No fitment data on file.</Empty>;
 
-  // Rows already arrive one-per-model (year_from/year_to already collapsed
-  // server-side, see getFitmentRows in app/browse/[slug]/page.jsx) and
-  // pre-ordered by family_name — group them for display rather than
-  // re-fetching or re-sorting.
   const groups = [];
   const indexByFamily = new Map();
   for (const row of fitment) {
@@ -291,60 +307,92 @@ function FitmentContent({ fitment }) {
           onChange={e => setQuery(e.target.value)}
           placeholder="Filter by model, family, or year…"
           style={{
-            width: '100%', boxSizing: 'border-box', marginBottom: 10,
-            padding: '7px 10px', fontFamily: 'var(--font-stencil)', fontSize: 11,
-            color: '#2a2010', background: '#fdfaf2', border: '1px solid #e6dcc0',
-            borderRadius: 5, outline: 'none',
+            width: '100%', boxSizing: 'border-box', marginBottom: 12,
+            padding: '8px 12px',
+            fontFamily: 'var(--font-body)',
+            fontSize: 13,
+            color: C.textPrime,
+            background: C.surface,
+            border: `1px solid ${C.border}`,
+            borderRadius: 0,
+            outline: 'none',
           }}
         />
       )}
 
-      <div style={{ maxHeight: 340, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ maxHeight: 380, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
         {visibleGroups.length === 0 && <Empty>No matching fitment.</Empty>}
         {visibleGroups.map(group => {
           const isOpen = q ? true : openFamily === group.family;
           return (
-            <div key={group.family} style={{ border: '1px solid #e6dcc0', borderRadius: 6, overflow: 'hidden' }}>
+            <div key={group.family} style={{ border: `1px solid ${C.border}`, overflow: 'hidden' }}>
               <button
                 onClick={() => !q && setOpenFamily(isOpen ? null : group.family)}
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  width: '100%', padding: '8px 12px', cursor: q ? 'default' : 'pointer',
-                  background: isOpen ? '#fdf6e3' : '#fffdf8', border: 'none',
+                  width: '100%', padding: '9px 12px',
+                  cursor: q ? 'default' : 'pointer',
+                  background: isOpen ? 'rgba(197,167,34,0.06)' : 'rgba(255,255,255,0.02)',
+                  border: 'none',
+                  borderBottom: isOpen ? `1px solid ${C.border}` : 'none',
                   textAlign: 'left',
                 }}
               >
                 <span style={{
-                  fontFamily: 'var(--font-stencil)', fontSize: 11, color: '#7a5810',
-                  letterSpacing: '0.08em', textTransform: 'uppercase',
+                  fontFamily: 'var(--font-stencil)',
+                  fontSize: 10,
+                  color: isOpen ? C.gold : C.textDim,
+                  letterSpacing: '0.10em',
+                  textTransform: 'uppercase',
                 }}>
-                  {group.family} <span style={{ color: '#a89878' }}>({group.rows.length})</span>
+                  {group.family}{' '}
+                  <span style={{ color: C.textMuted }}>({group.rows.length})</span>
                 </span>
                 {!q && (
                   <span style={{
-                    color: '#a89878', fontSize: 10, transition: 'transform 0.15s',
+                    color: C.textMuted,
+                    fontSize: 10,
+                    transition: 'transform 0.15s',
                     transform: isOpen ? 'rotate(180deg)' : 'none',
+                    display: 'inline-block',
                   }}>▾</span>
                 )}
               </button>
 
               {isOpen && (
-                <div style={{ padding: '2px 12px 6px' }}>
+                <div style={{ padding: '4px 12px 8px' }}>
                   {group.rows.map((row, i) => (
                     <div key={i} style={{
-                      display: 'flex', alignItems: 'center', gap: 10,
-                      padding: '5px 0', borderBottom: i < group.rows.length - 1 ? '1px solid #f0e8d4' : 'none',
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      padding: '5px 0',
+                      borderBottom: i < group.rows.length - 1
+                        ? `1px solid rgba(197,167,34,0.07)`
+                        : 'none',
                     }}>
                       <span style={{
-                        fontFamily: 'var(--font-stencil)', fontSize: 11, color: '#2a2010',
-                        letterSpacing: '0.04em', flex: '0 0 auto',
+                        fontFamily: 'var(--font-stencil)',
+                        fontSize: 11,
+                        color: C.textPrime,
+                        letterSpacing: '0.04em',
+                        flex: '0 0 auto',
                       }}>
                         {row.model_name ? `${row.model_name} (${row.model_code})` : row.model_code}
                       </span>
-                      <span style={{ fontFamily: 'var(--font-stencil)', fontSize: 11, color: '#8a7040' }}>
-                        {row.year_from === row.year_to ? row.year_from : `${row.year_from}–${row.year_to}`}
+                      <span style={{
+                        fontFamily: 'var(--font-stencil)',
+                        fontSize: 11,
+                        color: C.textDim,
+                      }}>
+                        {row.year_from === row.year_to
+                          ? row.year_from
+                          : `${row.year_from}–${row.year_to}`}
                       </span>
-                      <span style={{ fontFamily: 'var(--font-stencil)', fontSize: 10, color: '#5a7a5a', marginLeft: 'auto' }}>
+                      <span style={{
+                        fontFamily: 'var(--font-stencil)',
+                        fontSize: 10,
+                        color: '#5a9a5a',
+                        marginLeft: 'auto',
+                      }}>
                         ✓
                       </span>
                     </div>
@@ -365,9 +413,9 @@ function Empty({ children }) {
   return (
     <div style={{
       fontFamily: 'var(--font-stencil)',
-      fontSize: 11,
-      color: '#a89878',
-      letterSpacing: '0.06em',
+      fontSize: 10,
+      color: C.textMuted,
+      letterSpacing: '0.08em',
     }}>
       {children}
     </div>

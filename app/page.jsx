@@ -4,16 +4,18 @@
  * app/page.jsx — Stinkin' Supplies Homepage
  *
  * Section order:
- *   1. VideoHero
- *   2. ModelFinder (era → year → model code)
- *   3. ScrollVelocity band
- *   4. BrandRolodex
+ *   1. VideoHero       — full-bleed video with hero copy + CTAs
+ *   2. ModelFinder     — era → browse, technical blueprint panel
+ *   3. ScrollVelocity  — kinetic marquee band
+ *   4. CategoryIndex   — parts catalog table of contents (paper)
+ *   5. BrandRolodex    — vendor brand showcase
  */
 
 import dynamic from 'next/dynamic';
 import VideoHero      from '@/components/home/VideoHero';
 import ScrollVelocity from '@/components/home/ScrollVelocity';
 import ModelFinder    from '@/components/home/ModelFinder';
+import CategoryIndex  from '@/components/home/CategoryIndex';
 import { BrandRolodex } from '@/components/home/BrandRolodex';
 
 // SmokeBackground is canvas-heavy — lazy load it
@@ -29,33 +31,109 @@ export default function HomePage() {
 
       <main style={{ position: 'relative', zIndex: 1 }}>
 
-        {/* ── 1. Video Hero ───────────────────────────────────────── */}
+        {/* ── 1. Video Hero ───────────────────────────────────────────── */}
         <VideoHero />
 
-        {/* ── 2. Model Finder ────────────────────────────────────── */}
-        <section
-          style={{
-            width: '100%',
-            background: '#080704',
-            padding: 'clamp(24px, 4vw, 48px) clamp(12px, 3vw, 32px)',
-            boxSizing: 'border-box',
-          }}
-        >
-          <ModelFinder />
+        {/* ── 2. Model Finder ─────────────────────────────────────────── */}
+        <section className="hp-model-section">
+
+          {/* Blueprint grid texture behind the section */}
+          <div className="hp-blueprint-bg" aria-hidden="true" />
+
+          {/* Section identifier — above the card */}
+          <div className="hp-section-ident-row">
+            <span className="hp-section-rule" />
+            <span className="hp-section-ident">WHAT BIKE ARE YOU WORKING ON?</span>
+            <span className="hp-section-rule" />
+          </div>
+
+          <div className="hp-model-inner">
+            <ModelFinder />
+          </div>
+
         </section>
 
-        {/* ── 3. ScrollVelocity band ─────────────────────────────── */}
-        <div style={{ background: '#050403', overflow: 'hidden' }}>
+        {/* ── 3. ScrollVelocity band ──────────────────────────────────── */}
+        <div className="hp-velocity-band">
           <ScrollVelocity
             text="THE RIGHT STINKIN PARTS · "
             defaultVelocity={1.5}
           />
         </div>
 
-        {/* ── 4. Brand Rolodex ───────────────────────────────────── */}
+        {/* ── 4. Category Index ───────────────────────────────────────── */}
+        <CategoryIndex />
+
+        {/* ── 5. Brand Rolodex ────────────────────────────────────────── */}
         <BrandRolodex />
 
       </main>
+
+      <style>{`
+
+        /* ── Model Finder section ─────────────────────────────────────── */
+        .hp-model-section {
+          position: relative;
+          background: var(--black);
+          padding: clamp(40px, 5vw, 72px) clamp(16px, 3vw, 40px) clamp(40px, 5vw, 64px);
+          overflow: hidden;
+        }
+
+        /* Blueprint grid overlay */
+        .hp-blueprint-bg {
+          position: absolute;
+          inset: 0;
+          background-image:
+            linear-gradient(rgba(61,90,122,0.05) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(61,90,122,0.05) 1px, transparent 1px);
+          background-size: 48px 48px;
+          pointer-events: none;
+        }
+
+        /* Section identifier row */
+        .hp-section-ident-row {
+          position: relative;
+          z-index: 1;
+          display: flex;
+          align-items: center;
+          gap: 20px;
+          margin-bottom: 28px;
+          max-width: 1400px;
+          margin-left: auto;
+          margin-right: auto;
+        }
+        .hp-section-rule {
+          flex: 1;
+          height: 1px;
+          background: var(--gold-rule);
+        }
+        .hp-section-ident {
+          font-family: var(--font-stencil), monospace;
+          font-size: var(--text-2xs);
+          letter-spacing: var(--tracking-stamp);
+          color: var(--gold-dim);
+          text-transform: uppercase;
+          white-space: nowrap;
+          flex-shrink: 0;
+        }
+
+        /* Inner wrapper — constrains ModelFinder card width */
+        .hp-model-inner {
+          position: relative;
+          z-index: 1;
+          max-width: 1400px;
+          margin: 0 auto;
+        }
+
+        /* ── ScrollVelocity band ──────────────────────────────────────── */
+        .hp-velocity-band {
+          background: var(--coal);
+          overflow: hidden;
+          border-top: 1px solid var(--gold-rule);
+          border-bottom: 1px solid var(--gold-rule);
+        }
+
+      `}</style>
     </>
   );
 }

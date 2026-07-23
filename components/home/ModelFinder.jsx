@@ -323,7 +323,7 @@ export default function ModelFinder({ compact = false, onSelect }) {
         .mf-era-btn {
           background:#111009;
           border:1px solid rgba(255,255,255,0.07);
-          border-radius:12px;
+          border-radius:0;
           padding:0;
           cursor:pointer;
           text-align:left;
@@ -377,7 +377,7 @@ export default function ModelFinder({ compact = false, onSelect }) {
           position:absolute; top:10px; right:10px;
           width:16px; height:16px;
           border-top:1.5px solid ${GOLD}; border-right:1.5px solid ${GOLD};
-          border-radius:0 4px 0 0;
+          border-radius:0;
           opacity:0; transition:opacity 0.25s;
         }
         .mf-era-btn.sel .era-corner { opacity:1; }

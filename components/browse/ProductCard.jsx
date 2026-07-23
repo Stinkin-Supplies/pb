@@ -4,20 +4,23 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 /**
- * ProductCard — extracted from browse/page.jsx (session 50).
+ * ProductCard — specification sheet tile
  *
- * New props:
- *   selected  — warm bg + 2px gold border + glow
- *   onSelect  — if provided, card click calls this instead of navigating to PDP
- *               the + button always navigates to PDP (via stopPropagation)
+ * Grid border style: thin 1px ruled lines + crosshair registration marks
+ * at each corner (technical drawing / engineering blueprint aesthetic).
  *
- * OEM chain badge (bottom-right) shown when product.oem_chain_match === true.
+ * The crosshair marks bleed 8px outside the card boundary, so the outer
+ * wrapper must NOT use overflow:hidden — only the image div does.
+ *
+ * Props:
+ *   product   — product row from browse API
+ *   selected  — highlight state (warm gold border)
+ *   onSelect  — if provided, card click calls this instead of navigating
  */
 
 // PU's image_url values point at asset.lemansnet.com's /z/ endpoint, which
 // serves a zip archive rather than a direct image. Route those through the
-// server-side proxy that extracts the real photo; every other vendor's URL
-// (WPS, VTwin) renders directly as before — that path was never broken.
+// server-side proxy that extracts the real photo.
 function resolveImageSrc(url) {
   if (!url) return url;
   try {
@@ -31,16 +34,45 @@ function resolveImageSrc(url) {
   return url;
 }
 
+// ── Registration mark corner crosshair ───────────────────────────────────────
+// A single 16×16px element centered on the card corner.
+// Two overlapping linear-gradients draw a 1px horizontal + 1px vertical line.
+function RegMark({ pos, color }) {
+  const style = {
+    position: 'absolute',
+    width: 20,
+    height: 20,
+    zIndex: 10,
+    pointerEvents: 'none',
+    backgroundImage: [
+      `linear-gradient(to right,
+        transparent 0,
+        transparent calc(50% - 0.5px),
+        ${color} calc(50% - 0.5px),
+        ${color} calc(50% + 0.5px),
+        transparent calc(50% + 0.5px))`,
+      `linear-gradient(to bottom,
+        transparent 0,
+        transparent calc(50% - 0.5px),
+        ${color} calc(50% - 0.5px),
+        ${color} calc(50% + 0.5px),
+        transparent calc(50% + 0.5px))`,
+    ].join(', '),
+  };
+  if (pos === 'tl') { style.top = -10;    style.left   = -10; }
+  if (pos === 'tr') { style.top = -10;    style.right  = -10; }
+  if (pos === 'bl') { style.bottom = -10; style.left   = -10; }
+  if (pos === 'br') { style.bottom = -10; style.right  = -10; }
+  return <span aria-hidden="true" style={style} />;
+}
+
 export default function ProductCard({ product, selected = false, onSelect }) {
   const router = useRouter();
   const [imageFailed, setImageFailed] = useState(false);
 
   const handleCardClick = () => {
-    if (onSelect) {
-      onSelect();
-    } else {
-      router.push(`/browse/${product.slug}`);
-    }
+    if (onSelect) onSelect();
+    else router.push(`/browse/${product.slug}`);
   };
 
   const handlePdpClick = (e) => {
@@ -51,17 +83,12 @@ export default function ProductCard({ product, selected = false, onSelect }) {
   const variantCount = product.variant_count ?? 0;
   const hasVariants  = variantCount > 1;
 
-  // ── Cream palette (light card, gold-bordered when selected) ──────────────
-  const bg          = selected ? '#fffbf0' : '#fdfbf4';
-  const border      = selected ? '2px solid #c9a84c' : '1px solid #e6dcc0';
-  const glow        = selected ? '0 0 0 3px rgba(201,168,76,0.22)' : 'none';
-  const imageBg     = '#ffffff';
-  const brandColor  = '#8a7040';
-  const nameColor   = '#241a08';
-  const priceColor  = selected ? '#7a5810' : '#a8842c';
-  const btnBg       = '#c9a84c';
-  const btnBorder   = '#b8963a';
-  const btnColor    = '#1a1208';
+  // ── Tokens ───────────────────────────────────────────────────────────────
+  const bg     = selected ? '#fffbf0' : '#fdfbf4';
+  const regClr = selected ? 'rgba(197,167,34,0.85)' : 'rgba(139,110,44,0.50)';
+  const nameColor  = '#241a08';
+  const brandColor = '#8a7040';
+  const priceColor = selected ? '#7a5810' : '#a8842c';
 
   return (
     <div
@@ -72,19 +99,27 @@ export default function ProductCard({ product, selected = false, onSelect }) {
       style={{
         position: 'relative',
         background: bg,
-        border,
-        borderRadius: 10,
-        overflow: 'hidden',
+        /* No border — the 1px grid gap is the line */
+        /* Selected state uses an inset box-shadow to highlight */
+        boxShadow: selected ? `inset 0 0 0 2px rgba(197,167,34,0.80)` : 'none',
+        borderRadius: 0,
+        /* overflow MUST be visible — crosshair marks extend 10px beyond edges */
+        overflow: 'visible',
         cursor: 'pointer',
-        transition: 'border-color 0.15s, background 0.15s, box-shadow 0.15s',
-        boxShadow: glow,
+        transition: 'box-shadow 0.15s, background 0.15s',
       }}
     >
-      {/* ── Image ── */}
+      {/* ── Registration mark crosshairs — 1 per corner ── */}
+      <RegMark pos="tl" color={regClr} />
+      <RegMark pos="tr" color={regClr} />
+      <RegMark pos="bl" color={regClr} />
+      <RegMark pos="br" color={regClr} />
+
+      {/* ── Image — overflow:hidden lives HERE, not on the outer card ── */}
       <div style={{
         position: 'relative',
         aspectRatio: '1 / 1',
-        background: imageBg,
+        background: '#ffffff',
         overflow: 'hidden',
       }}>
         {product.image_url && !imageFailed ? (
@@ -114,7 +149,7 @@ export default function ProductCard({ product, selected = false, onSelect }) {
             position: 'absolute', bottom: 8, left: 8,
             background: 'rgba(14,11,6,0.85)',
             border: '1px solid #2e2415',
-            borderRadius: 4,
+            borderRadius: 0,
             padding: '2px 7px',
             fontFamily: 'var(--font-stencil)',
             fontSize: 9,
@@ -133,7 +168,7 @@ export default function ProductCard({ product, selected = false, onSelect }) {
             position: 'absolute', bottom: 8, right: 8,
             background: 'rgba(14,11,6,0.9)',
             border: '1px solid #c9a84c',
-            borderRadius: 4,
+            borderRadius: 0,
             padding: '2px 6px',
             display: 'flex',
             alignItems: 'center',
@@ -159,8 +194,10 @@ export default function ProductCard({ product, selected = false, onSelect }) {
         )}
       </div>
 
-      {/* ── Info ── */}
-      <div style={{ padding: '10px 12px 12px' }}>
+      {/* ── Info block ── */}
+      <div style={{ padding: '10px 12px 14px' }}>
+
+        {/* Brand */}
         <div style={{
           fontFamily: 'var(--font-stencil)',
           fontSize: 9,
@@ -175,6 +212,7 @@ export default function ProductCard({ product, selected = false, onSelect }) {
           {product.brand}
         </div>
 
+        {/* Product name */}
         <div style={{
           fontFamily: 'var(--font-bespoke)',
           fontSize: 13,
@@ -190,6 +228,7 @@ export default function ProductCard({ product, selected = false, onSelect }) {
           {product.name}
         </div>
 
+        {/* Price + View button */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -204,26 +243,26 @@ export default function ProductCard({ product, selected = false, onSelect }) {
             ${Number(product.price ?? 0).toFixed(2)}
           </div>
 
-          {/* + always goes to PDP regardless of onSelect */}
+          {/* Always navigates to PDP regardless of onSelect */}
           <button
             onClick={handlePdpClick}
             aria-label={`View ${product.name}`}
             style={{
-              background: btnBg,
-              border: `1px solid ${btnBorder}`,
-              borderRadius: 6,
+              background: '#c9a84c',
+              border: '1px solid #b8963a',
+              borderRadius: 0,
               width: 28,
               height: 28,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              color: btnColor,
+              color: '#1a1208',
               fontSize: 17,
               fontWeight: 600,
               lineHeight: 1,
               flexShrink: 0,
-              transition: 'background 0.12s, color 0.12s',
+              transition: 'background 0.12s',
             }}
           >
             +

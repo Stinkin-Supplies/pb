@@ -29,8 +29,7 @@ export default function CheckoutPage() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
 
-  // Routing engine — resolves vendor + shipping without exposing vendor to customer
-  const [shippingOption, setShippingOption] = useState("standard"); // "standard" | "express"
+  const [shippingOption, setShippingOption] = useState("standard");
   const [routingResult, setRoutingResult] = useState(null);
   const [routingLoading, setRoutingLoading] = useState(false);
 
@@ -38,7 +37,6 @@ export default function CheckoutPage() {
     let mounted = true;
     const load = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      const customerEmail = user?.email ?? null;
       if (!user) return;
       const { data } = await supabase
         .from("user_addresses")
@@ -66,7 +64,6 @@ export default function CheckoutPage() {
     return () => { mounted = false; };
   }, []);
 
-  // Fetch routing results whenever the cart changes
   useEffect(() => {
     if (!cartItems.length) return;
     let cancelled = false;
@@ -124,33 +121,20 @@ export default function CheckoutPage() {
     setShipmentBusy(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        window.location.href = "/auth";
-        return;
-      }
+      if (!user) { window.location.href = "/auth"; return; }
       const { first, last } = splitName(ship.full_name);
       const payload = {
         user_id: user.id,
-        first_name: first,
-        last_name: last,
-        address1: ship.address1,
-        address2: ship.address2,
-        city: ship.city,
-        state: ship.state,
-        zip: ship.zip,
+        first_name: first, last_name: last,
+        address1: ship.address1, address2: ship.address2,
+        city: ship.city, state: ship.state, zip: ship.zip,
         country: ship.country || "US",
       };
       const { error } = await supabase.from("user_addresses").insert(payload);
-      if (error) {
-        console.warn("Save address failed:", error.message);
-        showShipmentToast("Could not save");
-        return;
-      }
+      if (error) { showShipmentToast("Could not save"); return; }
       await refreshAddresses(user.id);
       showShipmentToast("Saved to account");
-    } finally {
-      setShipmentBusy(false);
-    }
+    } finally { setShipmentBusy(false); }
   };
 
   const handleUseAddress = async () => {
@@ -158,11 +142,7 @@ export default function CheckoutPage() {
     setShipmentBusy(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        window.location.href = "/auth";
-        return;
-      }
-
+      if (!user) { window.location.href = "/auth"; return; }
       let addressId = selectedAddressId;
       if (!addressId) {
         const { first, last } = splitName(ship.full_name);
@@ -170,55 +150,32 @@ export default function CheckoutPage() {
           .from("user_addresses")
           .insert({
             user_id: user.id,
-            first_name: first,
-            last_name: last,
-            address1: ship.address1,
-            address2: ship.address2,
-            city: ship.city,
-            state: ship.state,
-            zip: ship.zip,
+            first_name: first, last_name: last,
+            address1: ship.address1, address2: ship.address2,
+            city: ship.city, state: ship.state, zip: ship.zip,
             country: ship.country || "US",
             is_default: true,
           })
           .select("id")
           .single();
-        if (createErr || !created?.id) {
-          console.warn("Use address failed:", createErr?.message);
-          showShipmentToast("Could not apply");
-          return;
-        }
+        if (createErr || !created?.id) { showShipmentToast("Could not apply"); return; }
         addressId = created.id;
         setSelectedAddressId(addressId);
       }
-
-      await supabase
-        .from("user_addresses")
-        .update({ is_default: false })
-        .eq("user_id", user.id);
+      await supabase.from("user_addresses").update({ is_default: false }).eq("user_id", user.id);
       const { error: defErr } = await supabase
-        .from("user_addresses")
-        .update({ is_default: true })
-        .eq("id", addressId);
-      if (defErr) {
-        console.warn("Set default failed:", defErr.message);
-        showShipmentToast("Could not apply");
-        return;
-      }
+        .from("user_addresses").update({ is_default: true }).eq("id", addressId);
+      if (defErr) { showShipmentToast("Could not apply"); return; }
       await refreshAddresses(user.id);
       showShipmentToast("Applied to order");
-    } finally {
-      setShipmentBusy(false);
-    }
+    } finally { setShipmentBusy(false); }
   };
 
-  // 🔹 Calculations
+  // ── Calculations ──────────────────────────────────────────────────────────
   const pointsValue = points * 0.01;
   const mapResult = applyMapPricing(
     cartItems.map(item => ({
-      id: item.id,
-      price: item.price,
-      qty: item.qty,
-      map_floor: item.map_floor,
+      id: item.id, price: item.price, qty: item.qty, map_floor: item.map_floor,
     })),
     pointsValue
   );
@@ -229,7 +186,7 @@ export default function CheckoutPage() {
   const shipping = shippingOption === "express" ? standardShipping + expressUpsell : standardShipping;
   const tax = subtotal * 0.07;
   const total = Math.max(mapResult.finalTotal + shipping + tax, 0);
-  const toCents = (value) => Math.round(value * 100);
+  const toCents = (v) => Math.round(v * 100);
 
   const handleCheckout = async () => {
     if (checkoutLoading) return;
@@ -239,403 +196,222 @@ export default function CheckoutPage() {
       const { data: { user } } = await supabase.auth.getUser();
       const customerEmail = user?.email ?? null;
       const { data: profile } = await supabase
-        .from("user_profiles")
-        .select("first_name, last_name")
-        .eq("id", user?.id ?? "")
-        .single();
-      const profileName =
-        [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
-        null;
+        .from("user_profiles").select("first_name, last_name").eq("id", user?.id ?? "").single();
+      const profileName = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || null;
       const shippingAddress = {
-        line1: ship.address1,
-        line2: ship.address2 || null,
-        city: ship.city,
-        state: ship.state,
-        postal_code: ship.zip,
-        country: ship.country || "US",
+        line1: ship.address1, line2: ship.address2 || null,
+        city: ship.city, state: ship.state, postal_code: ship.zip, country: ship.country || "US",
       };
       const payload = {
         customer_email: customerEmail,
         customer_name: profileName || ship.full_name || null,
-        shipping_address: shippingAddress,
-        billing_address: shippingAddress,
-        subtotal: toCents(subtotal),
-        shipping: toCents(shipping),
-        shipping_option: shippingOption,             // "standard" | "express"
-        routing_vendor: routingResult?.cartVendor ?? null, // internal — never shown to customer
+        shipping_address: shippingAddress, billing_address: shippingAddress,
+        subtotal: toCents(subtotal), shipping: toCents(shipping),
+        shipping_option: shippingOption,
+        routing_vendor: routingResult?.cartVendor ?? null,
         split_required: routingResult?.splitRequired ?? false,
-        tax: toCents(tax),
-        discount: toCents(pointsDiscount),
-        points_redeemed: points,
-        points_redeemed_value: toCents(pointsValue),
+        tax: toCents(tax), discount: toCents(pointsDiscount),
+        points_redeemed: points, points_redeemed_value: toCents(pointsValue),
         total: toCents(total),
         items: cartItems.map((item) => ({
-          product_id: item.id,
-          name: item.name,
-          price: toCents(item.price),
-          qty: item.qty,
+          product_id: item.id, name: item.name, price: toCents(item.price), qty: item.qty,
         })),
       };
 
       const orderRes = await fetch("/api/checkout/create-order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
       });
       const orderText = await orderRes.text();
-
       let orderJson = null;
-      try {
-        orderJson = JSON.parse(orderText);
-      } catch (e) {
-        // not JSON
-      }
-
+      try { orderJson = JSON.parse(orderText); } catch (e) {}
       if (!orderRes.ok || !orderJson?.order_id) {
-        console.error("Create order failed:");
-        console.error("STATUS:", orderRes.status);
-        console.error("RAW RESPONSE:", orderText);
-        console.error("PARSED:", orderJson);
-        const orderErrMsg =
-          orderJson?.error || orderText || "Unknown error";
-        setCheckoutError(
-          `Checkout failed while creating your order: ${orderErrMsg}`
-        );
+        setCheckoutError(orderJson?.error || orderText || "Unknown error");
         setCheckoutLoading(false);
         return;
       }
 
       const sessionRes = await fetch("/api/checkout/create-session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          order_id: orderJson.order_id,
-          amount_cents: Math.round(total * 100),
-        }),
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order_id: orderJson.order_id, amount_cents: Math.round(total * 100) }),
       });
       const sessionJson = await sessionRes.json();
       if (!sessionRes.ok || !sessionJson?.url) {
-        console.error("Create session failed:", sessionJson);
-        const sessionErrMsg =
-          sessionJson?.error || "Unknown error";
-        setCheckoutError(
-          `Checkout failed while starting payment: ${sessionErrMsg}`
-        );
+        setCheckoutError(sessionJson?.error || "Unknown error");
         setCheckoutLoading(false);
         return;
       }
-
       window.location.href = sessionJson.url;
     } catch (err) {
-      console.error("Checkout error:", err);
-      const message =
-        err && typeof err === "object" && "message" in err
-          ? err.message
-          : "Unknown error";
+      const message = err && typeof err === "object" && "message" in err ? err.message : "Unknown error";
       setCheckoutError(`Checkout failed: ${message}`);
     } finally {
       setCheckoutLoading(false);
     }
   };
 
-  const css = `
-    *, *::before, *::after { box-sizing: border-box; }
-    .checkout-wrap {
-      min-height: 100vh;
-      background: #0a0909;
-      color: #f0ebe3;
-      font-family: var(--font-stencil), sans-serif;
-      position: relative;
-      overflow: hidden;
-    }
-    .checkout-wrap::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background-image:
-        linear-gradient(rgba(232,98,26,0.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(232,98,26,0.04) 1px, transparent 1px);
-      background-size: 32px 32px;
-      pointer-events: none;
-    }
-    .checkout-inner {
-      max-width: 1240px;
-      margin: 0 auto;
-      padding: 28px 24px 60px;
-      display: grid;
-      grid-template-columns: 480px 1fr;
-      gap: 24px;
-      position: relative;
-      z-index: 1;
-    }
-    .checkout-title {
-      font-family: var(--font-caesar), sans-serif;
-      font-size: 38px;
-      letter-spacing: 0.06em;
-      margin-bottom: 16px;
-    }
-    .card {
-      background: #111010;
-      border: 1px solid #2a2828;
-      border-radius: 3px;
-      padding: 22px;
-      box-shadow: 0 14px 32px rgba(0,0,0,0.35);
-    }
-    .card.summary {
-      border-color: rgba(232,98,26,0.35);
-      box-shadow: 0 18px 40px rgba(0,0,0,0.45);
-    }
-    .card-title {
-      font-family: var(--font-caesar), sans-serif;
-      font-size: 22px;
-      letter-spacing: 0.05em;
-      margin-bottom: 12px;
-    }
-    .summary-title {
-      font-size: 26px;
-      letter-spacing: 0.08em;
-    }
-    .label {
-      font-family: var(--font-stencil), monospace;
-      font-size: 9px;
-      letter-spacing: 0.14em;
-      color: #8a8784;
-      margin-bottom: 6px;
-    }
-    .input {
-      width: 100%;
-      height: 44px;
-      background: #1a1919;
-      border: 1px solid #2a2828;
-      color: #f0ebe3;
-      font-family: var(--font-stencil), sans-serif;
-      font-size: 16px;
-      padding: 0 12px;
-      border-radius: 2px;
-      outline: none;
-    }
-    .input:focus { border-color: #e8621a; }
-    .select {
-      width: 100%;
-      height: 44px;
-      background: #1a1919;
-      border: 1px solid #2a2828;
-      color: #f0ebe3;
-      font-family: var(--font-stencil), sans-serif;
-      font-size: 16px;
-      padding: 0 10px;
-      border-radius: 2px;
-      outline: none;
-      appearance: none;
-    }
-    .select:focus { border-color: #e8621a; }
-    .muted {
-      font-family: var(--font-stencil), monospace;
-      font-size: 9px;
-      letter-spacing: 0.12em;
-      color: #8a8784;
-      margin-top: 8px;
-    }
-    .summary-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 10px;
-      font-family: var(--font-stencil), monospace;
-      font-size: 11px;
-      letter-spacing: 0.1em;
-      color: #f0ebe3;
-    }
-    .summary-row.muted { color: #8a8784; }
-    .summary-divider {
-      border: none;
-      border-top: 1px solid #2a2828;
-      margin: 12px 0;
-    }
-    .summary-total {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      font-family: var(--font-caesar), sans-serif;
-      font-size: 28px;
-      letter-spacing: 0.05em;
-      margin-top: 6px;
-    }
-    .order-total-val {
-      font-size: 32px;
-      color: #e8621a;
-    }
-    .checkout-btn {
-      width: 100%;
-      height: 50px;
-      background: #e8621a;
-      border: none;
-      color: #0a0909;
-      font-family: var(--font-caesar), sans-serif;
-      font-size: 20px;
-      letter-spacing: 0.1em;
-      border-radius: 2px;
-      cursor: pointer;
-      margin-top: 12px;
-      box-shadow: 0 4px 24px rgba(232,98,26,0.3);
-      transition: all 0.2s;
-    }
-    .checkout-btn:hover { background: #c94f0f; transform: translateY(-1px); }
-    .checkout-btn.ghost {
-      background: #1a1919;
-      color: #f0ebe3;
-      border: 1px solid #2a2828;
-      box-shadow: none;
-    }
-    .empty {
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 40px 24px;
-      text-align: center;
-      color: #8a8784;
-    }
-    /* ── Shipping option picker ── */
-    .ship-opts { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
-    .ship-opt {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      padding: 14px 16px;
-      background: #1a1919;
-      border: 1px solid #2a2828;
-      border-radius: 2px;
-      cursor: pointer;
-      transition: border-color 0.15s, background 0.15s;
-      user-select: none;
-    }
-    .ship-opt:hover { border-color: #4a4848; }
-    .ship-opt.selected { border-color: #e8621a; background: #1f1513; }
-    .ship-opt-dot {
-      width: 16px; height: 16px; flex-shrink: 0;
-      border-radius: 50%;
-      border: 2px solid #3a3838;
-      display: flex; align-items: center; justify-content: center;
-      transition: border-color 0.15s;
-    }
-    .ship-opt.selected .ship-opt-dot { border-color: #e8621a; }
-    .ship-opt-dot-inner {
-      width: 7px; height: 7px;
-      border-radius: 50%;
-      background: #e8621a;
-      display: none;
-    }
-    .ship-opt.selected .ship-opt-dot-inner { display: block; }
-    .ship-opt-body { flex: 1; min-width: 0; }
-    .ship-opt-name {
-      font-family: var(--font-stencil), monospace;
-      font-size: 12px;
-      letter-spacing: 0.1em;
-      color: #f0ebe3;
-    }
-    .ship-opt-eta {
-      font-family: var(--font-stencil), monospace;
-      font-size: 9px;
-      letter-spacing: 0.1em;
-      color: #8a8784;
-      margin-top: 3px;
-    }
-    .ship-opt-price {
-      font-family: var(--font-caesar), sans-serif;
-      font-size: 18px;
-      letter-spacing: 0.04em;
-      color: #8a8784;
-      flex-shrink: 0;
-    }
-    .ship-opt.selected .ship-opt-price { color: #e8621a; }
-    .ship-free-badge {
-      font-family: var(--font-stencil), monospace;
-      font-size: 9px;
-      letter-spacing: 0.12em;
-      color: #4caf7d;
-      padding: 2px 6px;
-      border: 1px solid #4caf7d;
-      border-radius: 2px;
-    }
-    @media (max-width: 980px) {
-      .checkout-inner { grid-template-columns: 1fr; }
-    }
-  `;
+  // ── Today's date for the receipt ─────────────────────────────────────────
+  const today = new Date().toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" });
 
   if (!cartItems.length) {
     return (
-      <div className="checkout-wrap">
-        <style>{css}</style>
-        <div className="empty">YOUR CART IS EMPTY</div>
+      <div style={{ background: 'var(--coal)', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontFamily: 'var(--font-tanker)', fontSize: 48, color: '#f5f0e8', textTransform: 'uppercase', marginBottom: 12 }}>
+            Cart is empty
+          </div>
+          <a href="/browse" style={{ fontFamily: 'var(--font-stencil)', fontSize: 10, color: '#c9a84c', letterSpacing: '0.12em', textDecoration: 'none', textTransform: 'uppercase' }}>
+            ← Browse Parts
+          </a>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="checkout-wrap">
-      <style>{css}</style>
-      <div className="checkout-inner">
-        {/* LEFT — Order Summary */}
-        <div>
-          <div className="checkout-title">CHECKOUT</div>
-          <div className="card summary">
-            <div className="card-title summary-title">ORDER <span style={{color:"#e8621a"}}>SUMMARY</span></div>
-            {cartItems.map((item) => (
-              <div key={item.id} className="summary-row">
-                <span>{item.name} × {item.qty}</span>
-                <span>${(item.price * item.qty).toFixed(2)}</span>
+    <div style={{ background: 'var(--coal)', minHeight: '100vh', padding: 'clamp(24px, 4vw, 56px) clamp(16px, 3vw, 32px) 80px' }}>
+
+      {/* ── Page ident row ── */}
+      <div style={{ maxWidth: 1160, margin: '0 auto 36px', display: 'flex', alignItems: 'center', gap: 20 }}>
+        <span style={{ fontFamily: 'var(--font-stencil)', fontSize: 9, letterSpacing: '0.16em', color: 'rgba(197,167,34,0.55)', textTransform: 'uppercase', flexShrink: 0 }}>
+          STINKIN&apos; SUPPLIES
+        </span>
+        <span style={{ flex: 1, height: 1, background: 'rgba(197,167,34,0.18)' }} />
+        <span style={{ fontFamily: 'var(--font-tanker)', fontSize: 'clamp(24px, 3vw, 40px)', color: '#f5f0e8', textTransform: 'uppercase', letterSpacing: '0.02em', flexShrink: 0 }}>
+          Checkout
+        </span>
+        <span style={{ flex: 1, height: 1, background: 'rgba(197,167,34,0.18)' }} />
+        <span style={{ fontFamily: 'var(--font-stencil)', fontSize: 9, letterSpacing: '0.16em', color: 'rgba(197,167,34,0.35)', textTransform: 'uppercase', flexShrink: 0 }}>
+          PARTS ORDER
+        </span>
+      </div>
+
+      <div className="co-grid">
+
+        {/* ══ LEFT: Carbon copy receipt ══ */}
+        <div className="co-receipt-wrap">
+          <div className="co-receipt">
+
+            {/* Perforated top edge */}
+            <div className="co-perf co-perf-top" />
+
+            {/* Receipt header */}
+            <div className="co-receipt-header">
+              <div className="co-receipt-logo">STINKIN&apos; SUPPLIES</div>
+              <div className="co-receipt-addr">AUTHORIZED H-D AFTERMARKET PARTS</div>
+              <div className="co-receipt-addr">DAYTONA BEACH, FL  ·  (386) 555-0148</div>
+            </div>
+
+            <div className="co-receipt-rule" />
+
+            {/* Work order meta */}
+            <div className="co-receipt-meta">
+              <div>
+                <span className="co-meta-label">PARTS WORK ORDER</span>
               </div>
-            ))}
-
-            <hr className="summary-divider" />
-
-            <div className="summary-row muted">
-              <span>SUBTOTAL</span>
-              <span>${subtotal.toFixed(2)}</span>
-            </div>
-            <div className="summary-row muted">
-              <span>SHIPPING{shippingOption === "express" ? " (EXPRESS)" : ""}</span>
-              <span>{shipping === 0 ? "FREE" : `$${shipping.toFixed(2)}`}</span>
-            </div>
-            <div className="summary-row muted">
-              <span>TAX</span>
-              <span>${tax.toFixed(2)}</span>
-            </div>
-            <div className="summary-row" style={{color:"#c9a84c"}}>
-              <span>POINTS DISCOUNT</span>
-              <span>- ${pointsDiscount.toFixed(2)}</span>
+              <div>
+                <span className="co-meta-label">DATE:</span>
+                <span className="co-meta-value"> {today}</span>
+              </div>
             </div>
 
-            <hr className="summary-divider" />
+            <div className="co-receipt-rule" />
 
-            <div className="summary-total">
-              <span>ORDER TOTAL</span>
-              <span className="order-total-val">${total.toFixed(2)}</span>
+            {/* Column headers */}
+            <div className="co-line-head">
+              <span style={{ flex: '0 0 28px' }}>QTY</span>
+              <span style={{ flex: 1 }}>DESCRIPTION</span>
+              <span style={{ flex: '0 0 68px', textAlign: 'right' }}>UNIT</span>
+              <span style={{ flex: '0 0 72px', textAlign: 'right' }}>TOTAL</span>
             </div>
 
-          <button
-            className="checkout-btn"
-            type="button"
-            onClick={handleCheckout}
-          >
-            {checkoutLoading ? "REDIRECTING..." : "CONTINUE →"}
-          </button>
-          {checkoutError && (
-            <div style={{ marginTop: 8, color: "#c9a84c", fontSize: 12, letterSpacing: "0.08em" }}>
-              {checkoutError}
+            <div className="co-receipt-rule" />
+
+            {/* Line items */}
+            <div className="co-items">
+              {cartItems.map((item) => (
+                <div key={item.id} className="co-line-item">
+                  <span style={{ flex: '0 0 28px' }}>{item.qty}</span>
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {item.name}
+                  </span>
+                  <span style={{ flex: '0 0 68px', textAlign: 'right' }}>${item.price.toFixed(2)}</span>
+                  <span style={{ flex: '0 0 72px', textAlign: 'right' }}>${(item.price * item.qty).toFixed(2)}</span>
+                </div>
+              ))}
             </div>
-          )}
+
+            <div className="co-receipt-rule" />
+
+            {/* Totals */}
+            <div className="co-totals">
+              <div className="co-total-row">
+                <span className="co-total-label">SUBTOTAL</span>
+                <span className="co-total-val">${subtotal.toFixed(2)}</span>
+              </div>
+              <div className="co-total-row">
+                <span className="co-total-label">
+                  SHIPPING{shippingOption === "express" ? " (EXPRESS)" : ""}
+                </span>
+                <span className="co-total-val">
+                  {shipping === 0 ? "FREE" : `$${shipping.toFixed(2)}`}
+                </span>
+              </div>
+              <div className="co-total-row">
+                <span className="co-total-label">TAX (7%)</span>
+                <span className="co-total-val">${tax.toFixed(2)}</span>
+              </div>
+              {pointsDiscount > 0 && (
+                <div className="co-total-row co-total-row--discount">
+                  <span className="co-total-label">POINTS DISCOUNT</span>
+                  <span className="co-total-val">−${pointsDiscount.toFixed(2)}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Grand total box */}
+            <div className="co-grand-total">
+              <span className="co-grand-label">ORDER TOTAL</span>
+              <span className="co-grand-val">${total.toFixed(2)}</span>
+            </div>
+
+            {/* CTA */}
+            <button
+              className="co-pay-btn"
+              onClick={handleCheckout}
+              disabled={checkoutLoading}
+            >
+              {checkoutLoading ? "REDIRECTING..." : "PROCEED TO PAYMENT →"}
+            </button>
+
+            {checkoutError && (
+              <div className="co-error">{checkoutError}</div>
+            )}
+
+            <div className="co-receipt-rule" style={{ marginTop: 20 }} />
+
+            {/* Receipt footer */}
+            <div className="co-receipt-footer">
+              <div>● RETAIN THIS COPY FOR YOUR RECORDS</div>
+              <div style={{ marginTop: 4 }}>THANK YOU FOR YOUR BUSINESS</div>
+            </div>
+
+            {/* Perforated bottom edge */}
+            <div className="co-perf co-perf-bottom" />
+          </div>
         </div>
-        </div>
 
-        {/* RIGHT — Details */}
-        <div>
-          <div className="card" style={{marginBottom:16}}>
-            <div className="card-title">SHIPMENT <span style={{color:"#e8621a"}}>INFO</span></div>
+        {/* ══ RIGHT: Dark form panels ══ */}
+        <div className="co-forms">
+
+          {/* ── Shipment info ── */}
+          <div className="co-card">
+            <div className="co-card-title">SHIPMENT INFO</div>
+
             {addresses.length > 0 && (
               <>
-                <div className="label">SAVED ADDRESSES</div>
+                <div className="co-label">SAVED ADDRESSES</div>
                 <select
-                  className="select"
+                  className="co-select"
                   value={selectedAddressId}
                   onChange={(e) => {
                     const id = e.target.value;
@@ -645,181 +421,509 @@ export default function CheckoutPage() {
                       setShip(s => ({
                         ...s,
                         full_name: `${addr.first_name ?? ""} ${addr.last_name ?? ""}`.trim(),
-                        address1: addr.address1 ?? "",
-                        address2: addr.address2 ?? "",
-                        city: addr.city ?? "",
-                        state: addr.state ?? "",
-                        zip: addr.zip ?? "",
-                        country: addr.country ?? "US",
+                        address1: addr.address1 ?? "", address2: addr.address2 ?? "",
+                        city: addr.city ?? "", state: addr.state ?? "",
+                        zip: addr.zip ?? "", country: addr.country ?? "US",
                       }));
                     }
                   }}
                 >
                   {addresses.map(a => (
                     <option key={a.id} value={a.id}>
-                      {(a.address1 ?? "Address")} — {(a.city ?? "")} {(a.state ?? "")}
+                      {a.address1 ?? "Address"} — {a.city ?? ""} {a.state ?? ""}
                     </option>
                   ))}
                 </select>
-                <div style={{height:12}}/>
+                <div style={{ height: 12 }} />
+                <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                  <button className="co-btn" onClick={handleUseAddress} style={{ flex: 1 }}>
+                    {shipmentBusy ? "WORKING..." : "USE THIS →"}
+                  </button>
+                  <button className="co-btn co-btn-ghost" onClick={handleSaveAddress} style={{ flex: 1 }}>
+                    {shipmentBusy ? "WORKING..." : "SAVE TO ACCOUNT"}
+                  </button>
+                </div>
               </>
             )}
-            <div style={{display:"flex", gap:8, marginBottom:12}}>
-              <button
-                className="checkout-btn"
-                style={{height:42, fontSize:16, marginTop:0, flex:1}}
-                onClick={handleUseAddress}
-              >
-                {shipmentBusy ? "WORKING..." : "USE THIS ADDRESS →"}
-              </button>
-              <button
-                className="checkout-btn ghost"
-                style={{height:42, fontSize:14, marginTop:0, flex:1}}
-                onClick={handleSaveAddress}
-              >
-                {shipmentBusy ? "WORKING..." : "SAVE TO ACCOUNT"}
-              </button>
-            </div>
-            <div className="label">FULL NAME</div>
+
+            <div className="co-label">FULL NAME</div>
             <input
-              className="input"
+              className="co-input"
               placeholder="John Doe"
               value={ship.full_name}
               onChange={(e) => setShip(s => ({ ...s, full_name: e.target.value }))}
             />
-            <div style={{height:10}}/>
-            <div className="label">ADDRESS</div>
+            <div style={{ height: 10 }} />
+
+            <div className="co-label">STREET ADDRESS</div>
             <AddressAutocomplete
               placeholder="123 Main St"
               onSelect={(parsed) => setShip(s => ({
-                ...s,
-                address1: parsed.address_line1,
-                city: parsed.city,
-                state: parsed.state,
-                zip: parsed.zip,
-                country: parsed.country || "US",
+                ...s, address1: parsed.address_line1, city: parsed.city,
+                state: parsed.state, zip: parsed.zip, country: parsed.country || "US",
               }))}
               onChange={(val) => setShip(s => ({ ...s, address1: val }))}
             />
-            <div style={{height:10}}/>
-            <div className="label">CITY</div>
+            <div style={{ height: 10 }} />
+
+            <div className="co-label">APT / SUITE</div>
             <input
-              className="input"
+              className="co-input"
+              placeholder="Apt 4B (optional)"
+              value={ship.address2}
+              onChange={(e) => setShip(s => ({ ...s, address2: e.target.value }))}
+            />
+            <div style={{ height: 10 }} />
+
+            <div className="co-label">CITY</div>
+            <input
+              className="co-input"
               placeholder="Palm Coast"
               value={ship.city}
               onChange={(e) => setShip(s => ({ ...s, city: e.target.value }))}
             />
-            <div style={{height:10}}/>
-            <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10}}>
+            <div style={{ height: 10 }} />
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <div>
-                <div className="label">STATE</div>
+                <div className="co-label">STATE</div>
                 <input
-                  className="input"
+                  className="co-input"
                   placeholder="FL"
                   maxLength={2}
                   value={ship.state}
-                  onChange={(e) => setShip(s => ({ ...s, state: e.target.value }))}
+                  onChange={(e) => setShip(s => ({ ...s, state: e.target.value.toUpperCase() }))}
                 />
               </div>
               <div>
-                <div className="label">ZIP</div>
+                <div className="co-label">ZIP</div>
                 <input
-                  className="input"
+                  className="co-input"
                   placeholder="32137"
                   value={ship.zip}
                   onChange={(e) => setShip(s => ({ ...s, zip: e.target.value }))}
                 />
               </div>
             </div>
-            <div style={{height:10}}/>
-            <div className="label">APT / SUITE (OPTIONAL)</div>
-            <input
-              className="input"
-              placeholder="Apt 4B"
-              value={ship.address2}
-              onChange={(e) => setShip(s => ({ ...s, address2: e.target.value }))}
-            />
           </div>
 
-          {/* Shipping option selector — vendor-blind, customer sees Standard / Express only */}
-          <div className="card" style={{marginBottom:16}}>
-            <div className="card-title">SHIPPING <span style={{color:"#e8621a"}}>METHOD</span></div>
+          {/* ── Shipping method ── */}
+          <div className="co-card">
+            <div className="co-card-title">SHIPPING METHOD</div>
             {routingLoading && (
-              <div className="muted" style={{marginBottom:10, letterSpacing:"0.12em"}}>
+              <div className="co-muted" style={{ marginBottom: 10 }}>
                 CHECKING AVAILABILITY...
               </div>
             )}
-            <div className="ship-opts">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {/* Standard */}
               <div
-                className={`ship-opt${shippingOption === "standard" ? " selected" : ""}`}
+                className={`co-ship-opt${shippingOption === "standard" ? " co-ship-opt--on" : ""}`}
                 onClick={() => setShippingOption("standard")}
                 role="radio"
                 aria-checked={shippingOption === "standard"}
               >
-                <div className="ship-opt-dot"><div className="ship-opt-dot-inner" /></div>
-                <div className="ship-opt-body">
-                  <div className="ship-opt-name">STANDARD GROUND</div>
-                  <div className="ship-opt-eta">3 – 5 BUSINESS DAYS</div>
+                <div className="co-ship-dot">
+                  {shippingOption === "standard" && <div className="co-ship-dot-fill" />}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div className="co-ship-name">STANDARD GROUND</div>
+                  <div className="co-ship-eta">3 – 5 BUSINESS DAYS</div>
                 </div>
                 {standardShipping === 0
-                  ? <span className="ship-free-badge">FREE</span>
-                  : <div className="ship-opt-price">${standardShipping.toFixed(2)}</div>
+                  ? <span className="co-free-badge">FREE</span>
+                  : <div className="co-ship-price">${standardShipping.toFixed(2)}</div>
                 }
               </div>
 
               {/* Express */}
               <div
-                className={`ship-opt${shippingOption === "express" ? " selected" : ""}`}
+                className={`co-ship-opt${shippingOption === "express" ? " co-ship-opt--on" : ""}`}
                 onClick={() => setShippingOption("express")}
                 role="radio"
                 aria-checked={shippingOption === "express"}
               >
-                <div className="ship-opt-dot"><div className="ship-opt-dot-inner" /></div>
-                <div className="ship-opt-body">
-                  <div className="ship-opt-name">EXPRESS</div>
-                  <div className="ship-opt-eta">1 – 2 BUSINESS DAYS</div>
+                <div className="co-ship-dot">
+                  {shippingOption === "express" && <div className="co-ship-dot-fill" />}
                 </div>
-                <div className="ship-opt-price">
-                  ${(standardShipping + expressUpsell).toFixed(2)}
+                <div style={{ flex: 1 }}>
+                  <div className="co-ship-name">EXPRESS</div>
+                  <div className="co-ship-eta">1 – 2 BUSINESS DAYS</div>
                 </div>
+                <div className="co-ship-price">${(standardShipping + expressUpsell).toFixed(2)}</div>
               </div>
             </div>
             {routingResult?.splitRequired && (
-              <div className="muted" style={{marginTop:10, color:"#c9a84c"}}>
+              <div className="co-muted" style={{ marginTop: 10, color: '#c9a84c' }}>
                 YOUR ORDER SHIPS FROM MULTIPLE LOCATIONS
               </div>
             )}
           </div>
 
-          <div className="card">
-            <div className="card-title">REDEEM <span style={{color:"#e8621a"}}>POINTS</span></div>
-            <div className="label">AVAILABLE POINTS</div>
-            <div className="muted">{availablePoints.toLocaleString()} PTS</div>
-            <div style={{height:8}}/>
-            <div className="label">POINTS TO APPLY</div>
+          {/* ── Points ── */}
+          <div className="co-card">
+            <div className="co-card-title">REDEEM POINTS</div>
+            <div className="co-label">AVAILABLE BALANCE</div>
+            <div className="co-muted" style={{ marginBottom: 10 }}>
+              {availablePoints.toLocaleString()} PTS
+            </div>
+            <div className="co-label">POINTS TO APPLY</div>
             <input
               type="number"
               value={points}
               onChange={(e) => setPoints(Number(e.target.value))}
-              className="input"
+              className="co-input"
+              min={0}
+              max={availablePoints}
             />
-            <div className="muted">
-              {points} PTS = ${pointsValue.toFixed(2)}
+            <div className="co-muted" style={{ marginTop: 6 }}>
+              {points} PTS = ${pointsValue.toFixed(2)} DISCOUNT
             </div>
             {mapResult.appliedDiscount < pointsValue && (
-              <div className="muted" style={{color:"#c9a84c"}}>
-                DISCOUNT LIMITED DUE TO PRICING RULES
+              <div className="co-muted" style={{ marginTop: 4, color: '#c9a84c' }}>
+                DISCOUNT LIMITED BY MAP PRICING RULES
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* ── Toast ── */}
       {shipmentToast && (
-        <div className="toast" style={{background:"#e8621a"}}>
+        <div style={{
+          position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+          background: '#c9a84c', color: '#1a1208',
+          fontFamily: 'var(--font-stencil)', fontSize: 10, letterSpacing: '0.12em',
+          padding: '10px 20px', zIndex: 999,
+        }}>
           {shipmentToast.toUpperCase()}
         </div>
       )}
+
+      <style>{`
+        .co-grid {
+          max-width: 1160px;
+          margin: 0 auto;
+          display: grid;
+          grid-template-columns: 420px 1fr;
+          gap: 32px;
+          align-items: start;
+        }
+
+        /* ── Receipt ── */
+        .co-receipt-wrap {
+          position: sticky;
+          top: 32px;
+        }
+        .co-receipt {
+          background: #faf7ee;
+          position: relative;
+          box-shadow:
+            0 2px 0 rgba(0,0,0,0.06),
+            0 8px 32px rgba(0,0,0,0.28),
+            0 1px 0 rgba(139,110,44,0.15);
+          /* Subtle ruled-line texture — like lined paper */
+          background-image:
+            linear-gradient(
+              transparent,
+              transparent 23px,
+              rgba(0,0,80,0.04) 23px,
+              rgba(0,0,80,0.04) 24px
+            );
+          background-size: 100% 24px;
+        }
+        .co-perf {
+          height: 16px;
+          background:
+            radial-gradient(circle at 50% 0%, var(--coal) 6px, transparent 6px) top center / 18px 9px repeat-x,
+            #faf7ee;
+          position: relative;
+        }
+        .co-perf-bottom {
+          background:
+            radial-gradient(circle at 50% 100%, var(--coal) 6px, transparent 6px) bottom center / 18px 9px repeat-x,
+            #faf7ee;
+        }
+        .co-receipt-header {
+          text-align: center;
+          padding: 4px 28px 16px;
+        }
+        .co-receipt-logo {
+          font-family: var(--font-tanker), sans-serif;
+          font-size: 22px;
+          letter-spacing: 0.06em;
+          color: #1a1208;
+          text-transform: uppercase;
+          line-height: 1;
+          margin-bottom: 6px;
+        }
+        .co-receipt-addr {
+          font-family: var(--font-stencil), monospace;
+          font-size: 9px;
+          letter-spacing: 0.10em;
+          color: #6a5a3a;
+          text-transform: uppercase;
+          line-height: 1.6;
+        }
+        .co-receipt-rule {
+          border: none;
+          border-top: 1px dashed rgba(139,110,44,0.35);
+          margin: 0 28px;
+        }
+        .co-receipt-meta {
+          display: flex;
+          justify-content: space-between;
+          padding: 10px 28px;
+        }
+        .co-meta-label {
+          font-family: var(--font-stencil), monospace;
+          font-size: 9px;
+          letter-spacing: 0.12em;
+          color: #6a5a3a;
+          text-transform: uppercase;
+        }
+        .co-meta-value {
+          font-family: var(--font-stencil), monospace;
+          font-size: 9px;
+          letter-spacing: 0.08em;
+          color: #2a2010;
+        }
+        .co-line-head {
+          display: flex;
+          gap: 8px;
+          padding: 8px 28px;
+          font-family: var(--font-stencil), monospace;
+          font-size: 8px;
+          letter-spacing: 0.12em;
+          color: #8a7050;
+          text-transform: uppercase;
+        }
+        .co-items {
+          padding: 4px 28px 4px;
+        }
+        .co-line-item {
+          display: flex;
+          gap: 8px;
+          padding: 5px 0;
+          font-family: var(--font-stencil), monospace;
+          font-size: 11px;
+          letter-spacing: 0.04em;
+          color: #2a2010;
+          border-bottom: 1px solid rgba(139,110,44,0.10);
+        }
+        .co-line-item:last-child { border-bottom: none; }
+        .co-totals {
+          padding: 10px 28px 6px;
+        }
+        .co-total-row {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 5px;
+          font-family: var(--font-stencil), monospace;
+          font-size: 10px;
+          letter-spacing: 0.08em;
+          color: #5a4a2a;
+        }
+        .co-total-row--discount { color: #7a5810; }
+        .co-total-label {}
+        .co-total-val { font-variant-numeric: tabular-nums; }
+        .co-grand-total {
+          display: flex;
+          justify-content: space-between;
+          align-items: baseline;
+          margin: 12px 28px 16px;
+          padding: 10px 14px;
+          border: 2px solid #c9a84c;
+          background: rgba(201,168,76,0.06);
+        }
+        .co-grand-label {
+          font-family: var(--font-stencil), monospace;
+          font-size: 11px;
+          letter-spacing: 0.12em;
+          color: #3a2a10;
+          text-transform: uppercase;
+        }
+        .co-grand-val {
+          font-family: var(--font-tanker), sans-serif;
+          font-size: 28px;
+          color: #1a1208;
+          letter-spacing: 0.03em;
+          font-variant-numeric: tabular-nums;
+        }
+        .co-pay-btn {
+          display: block;
+          width: calc(100% - 56px);
+          margin: 0 28px;
+          padding: 14px;
+          background: #1a1208;
+          border: 2px solid #1a1208;
+          color: #c9a84c;
+          font-family: var(--font-stencil), monospace;
+          font-size: 12px;
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+          cursor: pointer;
+          transition: background 0.15s, color 0.15s;
+        }
+        .co-pay-btn:hover:not(:disabled) {
+          background: #c9a84c;
+          border-color: #c9a84c;
+          color: #1a1208;
+        }
+        .co-pay-btn:disabled { opacity: 0.7; cursor: not-allowed; }
+        .co-error {
+          margin: 8px 28px 0;
+          font-family: var(--font-stencil), monospace;
+          font-size: 9px;
+          letter-spacing: 0.08em;
+          color: #c05050;
+        }
+        .co-receipt-footer {
+          padding: 10px 28px 4px;
+          font-family: var(--font-stencil), monospace;
+          font-size: 8px;
+          letter-spacing: 0.10em;
+          color: #8a7050;
+          text-transform: uppercase;
+          text-align: center;
+          line-height: 1.7;
+        }
+
+        /* ── Form panels (right side, dark) ── */
+        .co-forms {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+        .co-card {
+          background: #0e0b06;
+          border: 1px solid rgba(197,167,34,0.16);
+          padding: 22px 24px;
+        }
+        .co-card-title {
+          font-family: var(--font-tanker), sans-serif;
+          font-size: 18px;
+          letter-spacing: 0.06em;
+          color: #f5f0e8;
+          text-transform: uppercase;
+          margin-bottom: 16px;
+          padding-bottom: 12px;
+          border-bottom: 1px solid rgba(197,167,34,0.12);
+        }
+        .co-label {
+          font-family: var(--font-stencil), monospace;
+          font-size: 8px;
+          letter-spacing: 0.14em;
+          color: rgba(197,167,34,0.45);
+          text-transform: uppercase;
+          margin-bottom: 6px;
+        }
+        .co-input {
+          width: 100%;
+          height: 42px;
+          background: #080604;
+          border: 1px solid rgba(197,167,34,0.18);
+          color: #f5f0e8;
+          font-family: var(--font-body), sans-serif;
+          font-size: 14px;
+          padding: 0 12px;
+          border-radius: 0;
+          outline: none;
+          box-sizing: border-box;
+          margin-bottom: 0;
+          transition: border-color 0.15s;
+        }
+        .co-input:focus { border-color: #c9a84c; }
+        .co-select {
+          width: 100%;
+          height: 42px;
+          background: #080604;
+          border: 1px solid rgba(197,167,34,0.18);
+          color: #f5f0e8;
+          font-family: var(--font-body), sans-serif;
+          font-size: 14px;
+          padding: 0 12px;
+          border-radius: 0;
+          outline: none;
+          appearance: none;
+          box-sizing: border-box;
+        }
+        .co-muted {
+          font-family: var(--font-stencil), monospace;
+          font-size: 9px;
+          letter-spacing: 0.10em;
+          color: #706860;
+        }
+        .co-btn {
+          height: 40px;
+          background: #c9a84c;
+          border: 1px solid #b8963a;
+          color: #1a1208;
+          font-family: var(--font-stencil), monospace;
+          font-size: 10px;
+          letter-spacing: 0.12em;
+          cursor: pointer;
+          border-radius: 0;
+          text-transform: uppercase;
+          transition: background 0.15s;
+        }
+        .co-btn:hover { background: #b8963a; }
+        .co-btn-ghost {
+          background: transparent;
+          border-color: rgba(197,167,34,0.35);
+          color: #a09890;
+        }
+        .co-btn-ghost:hover { background: rgba(197,167,34,0.06); border-color: #c9a84c; color: #c9a84c; }
+
+        /* Shipping option tiles */
+        .co-ship-opt {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          padding: 14px 16px;
+          background: #080604;
+          border: 1px solid rgba(197,167,34,0.14);
+          cursor: pointer;
+          transition: border-color 0.15s, background 0.15s;
+          user-select: none;
+        }
+        .co-ship-opt:hover { border-color: rgba(197,167,34,0.35); }
+        .co-ship-opt--on { border-color: #c9a84c; background: rgba(201,168,76,0.05); }
+        .co-ship-dot {
+          width: 14px; height: 14px; flex-shrink: 0;
+          border: 2px solid rgba(197,167,34,0.30);
+          display: flex; align-items: center; justify-content: center;
+          transition: border-color 0.15s;
+        }
+        .co-ship-opt--on .co-ship-dot { border-color: #c9a84c; }
+        .co-ship-dot-fill {
+          width: 6px; height: 6px;
+          background: #c9a84c;
+        }
+        .co-ship-name {
+          font-family: var(--font-stencil), monospace;
+          font-size: 11px; letter-spacing: 0.10em; color: #f5f0e8;
+        }
+        .co-ship-eta {
+          font-family: var(--font-stencil), monospace;
+          font-size: 8px; letter-spacing: 0.10em; color: #706860; margin-top: 3px;
+        }
+        .co-ship-price {
+          font-family: var(--font-tanker), sans-serif;
+          font-size: 16px; letter-spacing: 0.03em; color: #a09890; flex-shrink: 0;
+        }
+        .co-ship-opt--on .co-ship-price { color: #c9a84c; }
+        .co-free-badge {
+          font-family: var(--font-stencil), monospace;
+          font-size: 8px; letter-spacing: 0.12em; color: #5a9a5a;
+          padding: 2px 7px; border: 1px solid #5a9a5a;
+        }
+
+        @media (max-width: 900px) {
+          .co-grid { grid-template-columns: 1fr; }
+          .co-receipt-wrap { position: static; }
+        }
+      `}</style>
     </div>
   );
 }

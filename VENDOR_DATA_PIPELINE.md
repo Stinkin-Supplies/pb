@@ -264,7 +264,8 @@ VTwin via a new script, `promote_vtwin_scrape_fitment.mjs`, sourced from
 CSV script also upserts new bare-bones `catalog_unified` products for
 unmatched SKUs — not wanted here). See `CATALOG_RECOVERY_PLAN.md` Phase 6
 for the full writeup, including a real per-row-`UPDATE` performance bug
-found and fixed in `build_fitment_year_ranges.cjs`.
+found and fixed in `build_fitment_year_ranges.cjs`. Now 3,426,836 rows as of
+session 93 (2026-07-22) — see below.
 
 ### `catalog_oem_crossref` — OEM part number cross-referencing
 
@@ -274,7 +275,21 @@ WPS Harley crossref CSV, and VTwin scrape OEM numbers. Several of the
 CONFLICT` target, a broken relative `.env.local` path) fixed in place — see
 `CATALOG_RECOVERY_PLAN.md` Phase 7 for specifics on each. `import_oem_crossref.js`
 is confirmed unsafe (unguarded `TRUNCATE` against a legacy table) and should
-never be run.
+never be run. Now 48,817 rows as of session 93.
+
+### Staging/validation gate (new, session 93) — reads before both of the above
+
+As of session 93, **no new OEM/fitment source writes to either table
+above directly.** New source documents land first in `oem_crossref_staging`
+/ `fitment_staging` (`catalog-migrations/115`, `116`), get flagged by
+`validate_oem_crossref_staging.mjs` / `validate_fitment_staging.mjs` (no
+product match, OEM# already linked elsewhere, unresolved/ambiguous model
+code), get human review via `/admin/review-queue` for anything flagged, and
+only then get promoted by `promote_oem_crossref_staging.mjs` /
+`promote_fitment_staging.mjs`. Full architecture, confidence-score
+convention, and the vendor join-key rules in `OEM_FITMENT_DATA_MODEL.md`.
+Any future ingest script for these two tables should follow this pattern,
+not write to `catalog_oem_crossref`/`catalog_fitment_v2` directly.
 
 ---
 

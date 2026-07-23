@@ -7,6 +7,153 @@
 
 # ——— NEXT SESSION: START HERE ———
 
+## Session 93 (July 21–22 2026) — OEM/fitment validation pipeline built, four new source docs ingested, FatBook orientation bug found and fixed, scraper reliability fixed, review-queue bulk actions shipped
+
+Started from a user request for "checks and balances" before any more OEM/fitment
+data touches the live site, given session 92's recovery work had no systematic
+conflict detection. Planned and built a staging-first pipeline rather than another
+one-off import script — this is the architecture going forward for any future
+OEM/fitment source.
+
+**Staging/validation gate built**: two new tables, `oem_crossref_staging` and
+`fitment_staging` (`catalog-migrations/115`, `116`), each with
+`status`/`conflict_type`/`source_batch` columns. New source documents land here
+first via `scripts/ingest/import_*` scripts, get flagged by
+`validate_oem_crossref_staging.mjs` / `validate_fitment_staging.mjs` (checks:
+no product match, OEM# already linked to a different product, unresolved/ambiguous
+model code), get human review via `/admin/review-queue` for anything flagged, and
+only then get promoted by `promote_oem_crossref_staging.mjs` /
+`promote_fitment_staging.mjs`. Nothing writes to `catalog_oem_crossref` /
+`catalog_fitment_v2` directly anymore. Full architecture documented in the new
+`OEM_FITMENT_DATA_MODEL.md` (table relationships, confidence-score policy,
+vendor join-key footgun, source-to-table mapping table).
+
+**Performance lesson learned the hard way, twice**: the first versions of the
+validator/promoter scripts did one round-trip per row (or per row-in-a-transaction-
+batch) against the remote Hetzner DB — fine at hundreds of rows, catastrophic at
+hundreds of thousands (one run was on pace for ~5.6 hours). Fixed by preloading
+lookup tables into memory (no per-row SELECT) and writing via `unnest()` array
+UPDATEs / bulk multi-row INSERTs instead — cut a 5+ hour run to under a minute.
+Anything touching `fitment_staging`/`oem_crossref_staging` at scale should follow
+that pattern, not the naive per-row one.
+
+**`catalog_unified` column trim**: dropped `display_category_v2`,
+`display_subcategory_v2`, `enrichment_sku` (migration 114) after grep-verifying
+zero live references — caught 4 false positives in the same audit before dropping
+anything: `product_details` is read live by two PDP pages, `sku_normalized`/
+`brand_code` are written by `sync_catalog_unified.mjs` on every vendor sync,
+`display_subcategory_detail_v2` is an active shadow-column for
+`rebuild_subcategory_detail.mjs`. Left all four alone.
+
+**FatBook OEM crossref orientation bug found and fixed**: diffing a newly-provided
+Numbers-export cross-reference file against already-imported data (100% redundant,
+no new rows) surfaced a real bug in the session-92 import: `structured_fatbook_oem_cross`
+source rows (4,720 of them) had `sku`/`oem_number` backwards relative to every other
+source, including the Oldbook rows from the *same* source file. Confirmed via
+pattern-matching against the real HD OEM number format (89% Oldbook match, only 1%
+FatBook match) before touching anything. Root cause was in the source spreadsheet
+itself, not the import script (which mapped both sources identically). Fixed: 2,097
+rows that were pure duplicates of already-correct pairs deleted, 2,623 rows corrected
+in place (`sku` resolve-to-product rate went 0.02% → 2.9%, matching the healthy
+baseline).
+
+**Four new/updated source documents processed**, all through the staging gate:
+- Oldbook/FatBook PDFs (267 + 19 pages) — extracted via `pdftotext -layout`
+  (far more reliable than the vision-based PDF reader for dense tabular data),
+  ~97% already present, ~200 genuinely net-new rows imported.
+- `VTwin-OEM.pdf` (267 pages) — same extraction approach, 12,127 rows, 5,948
+  promoted clean, 2,491 flagged as likely legitimate multi-vendor equivalents
+  (same OEM part, different vendor SKU across VT-/WPS-/DS- catalogs), left for
+  review rather than auto-resolved.
+- `wps-cross-fitment.csv` — 2,273 rows, 15 net-new promoted.
+- A user-run **DS-fitment-scraper** (`/Users/home/Desktop/ds-fitment-scraper/`,
+  external to this repo) producing `catalog_fitment_enriched.csv` — processed
+  in two passes as the scraper itself got fixed (see below). Combined:
+  **170,439 `catalog_fitment_v2` rows** now attributed to `fitment_source='ds_fitment_scraper'`.
+  Along the way found and fixed a word-order parsing bug in the source text
+  (`"Harley-Davidson ModelName MODELCODE"` instead of the expected
+  `"...MODELCODE ModelName"` order) via `recover_fitment_word_order.mjs` — recovered
+  ~50K rows that would otherwise have been permanently flagged `no_model_match`.
+- A VTwin re-scrape (`vtwin_fitment.csv`) — 1,833 genuinely new SKUs upserted into
+  `vtwin_scrape_data`, +32,924 new `catalog_fitment_v2` rows via the existing
+  `promote_vtwin_scrape_fitment.mjs`.
+- `pu_fitment_review_needed.csv` (year range only, no model code) — **not**
+  auto-imported. A conservative "does the text contain one unambiguous model
+  code" check found candidates, but sampling them caught real negation language
+  (`"NOT FOR 16-17 FXDLS"`, `"N/F 15-20 FLTRX/U/K"`) that a naive match reads
+  backwards as a positive fit. All 1,777 resolvable rows flagged
+  `fitment_needs_manual_review` instead.
+- `hd_year_model_master.csv` — compared against `harley_models`/`harley_model_years`,
+  93.8% already aligned, nothing worth importing.
+
+**VTwin product-detail backfill**: `vendor.vtwinmtc_products` (a separate Postgres
+schema, informational-only discovery this session) had `description`/`tech_note`/
+`extra_attributes` sitting completely unused — `catalog_unified.product_details`
+was 0% filled for all 38,140 VTwin products even though `PDPTabs.jsx`'s Details tab
+already renders exactly that shape. Backfilled 15,390 products.
+
+**DS-fitment-scraper (`scraper_final.js`, external tool) — three real bugs found
+and fixed, all verified against the live site, not guessed from reading code**:
+1. Fitment-table detection required header text literally containing "year"/
+   "make"/"model" — parts-unlimited.com's actual table leaves those three header
+   cells blank (only "Position"/"Notes" are labeled). Fixed to detect via that
+   pattern, falling back to column position.
+2. `puppeteer-extra`'s automatic peer-dependency auto-detection hung forever at
+   `launch()`, independent of puppeteer version (tried 25/21/19 — 19's own bundled
+   `yargs` turned out incompatible with this machine's Node v26). Fixed by using
+   `puppeteer-extra`'s documented `addExtra(require('puppeteer'))` API instead,
+   keeping modern puppeteer.
+3. The actual "fitment always comes back empty" bug: `findProductUrlOnce` returned
+   a *relative* URL (raw `href` attribute) instead of the resolved absolute `a.href`.
+   It "worked" by accident when the page happened to already be on the right
+   origin, but produced a same-document hash-only navigation that never re-triggered
+   the site's panel-expansion logic. Fixed to use the resolved absolute URL.
+4. Later found a fourth, distinct reliability bug from a real overnight wifi outage:
+   the scraper's 5-page pool has no recovery when a page's frame detaches (network
+   drop mid-navigation) — one broken pool page silently fails 1/5 of every
+   subsequent row for the rest of the run (13,382 of 19,700 rows in one run, all
+   from 5 distinct detached frames). Fixed: detect the detached-frame error
+   specifically, close and replace just that pool page before the next batch.
+   Built `retry_wifi_outage_errors.csv` (13,382 SKUs, cross-referenced back to
+   original name/brand/category) so the user can re-run just the affected rows.
+
+**Review-queue bulk actions shipped** (`app/admin/review-queue/page.tsx` +
+two new routes, `app/api/admin/review-flags/bulk/route.ts` and
+`.../bulk-category/route.ts`): checkbox multi-select following the existing
+`canonical-matches` pattern, split into category-family (bulk display_category/
+subcategory set, reusing `AdminEditPanel`'s picker) and staging-family
+(bulk resolve + reject the underlying staging row — deliberately no bulk
+"approve/promote", since doing that at scale without per-row review defeats
+the point of the staging gate just built). Caught a real Turbopack parse bug
+before it shipped: a JSDoc comment containing `oem_*/fitment_*` closed the
+block comment early (`*/`) — fixed by rewording.
+
+**Verified end state (relational fitment, not the flag-based measure —
+see correction below)**: `catalog_fitment_v2` 3,426,836 rows; `catalog_oem_crossref`
+48,817 rows. Coverage by vendor (has real `catalog_fitment_v2` row, not
+`is_harley_fitment` flag): PU 14,745/36,370 (40.5%), VTWIN 17,263/38,140 (45.3%,
++2,980 universal), WPS 5,255/16,034 (32.8%). **Important correction to
+`FITMENT_MASTER_REF.md`**: its "PU: 0 gap" figure was based on the flag, which
+this session found is unreliable — traced a sample where `is_harley_fitment=true`
+with every actual fitment column (year range, HD families/models) NULL and zero
+backing `catalog_fitment_v2` rows. Real relational gap is larger than previously
+documented; `FITMENT_MASTER_REF.md` refreshed to match.
+
+**Remaining, in priority order**:
+1. Re-run the DS-fitment-scraper against `retry_wifi_outage_errors.csv` once the
+   user's wifi is stable, then run it through the same staging pipeline.
+2. Review-queue backlog: ~2,491 `oem_conflict` (VTwin, likely mostly legitimate
+   multi-vendor equivalents), ~4,658 `fitment_ambiguous_model`, ~491
+   `fitment_no_model_match`, 1,777 `fitment_needs_manual_review` — all sitting
+   in the queue with the new bulk actions available to work through them.
+3. Two pre-existing, unrelated 401 auth bugs noticed in passing while testing
+   (not yet investigated): `/admin/variant-candidates` sends an empty `token=`
+   param; a PATCH save on `/api/admin/products/{id}` failed auth once observed.
+4. `SKU_CODING_SCHEME_PROPOSAL.md` — proposal only, intentionally not executed;
+   gated on the general/misc taxonomy cleanup (tracked separately) finishing first.
+
+---
+
 ## Session 92 (July 20 2026) — Recovery Phases 6/7 finished (relational fitment, OEM crossref) + PU brand-XML enrichment gap found and closed
 
 Continued directly from session 91's paused state (uncommitted batch-write

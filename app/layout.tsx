@@ -90,6 +90,20 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         `}</style>
       </head>
       <body>
+        {/* SVG filter used by GlowButton — rendered once globally so it's
+            available to every button instance without duplicate IDs.       */}
+        <svg
+          aria-hidden="true"
+          focusable="false"
+          style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}
+        >
+          <defs>
+            <filter width="3000%" x="-1000%" height="3000%" y="-1000%" id="glow-unopaq">
+              <feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 3 0" />
+            </filter>
+          </defs>
+        </svg>
+
         <CartRoot>
           <NotchNavbar />
           {children}

@@ -8,9 +8,19 @@
  * category/subcategory, no clean system to route it to, etc), instead of
  * being silently left in a probably-wrong bucket or force-classified.
  * Access via /admin/review-queue?token=YOUR_ADMIN_SECRET
+ *
+ * Flags split into two families that need different bulk actions:
+ *   - category-family (wrong_category, wrong_subcategory, etc.) is backed
+ *     directly by catalog_unified -- bulk action can set display_category/
+ *     display_subcategory for the whole selection.
+ *   - staging-family (flag_type prefixed with oem_ or fitment_) is backed by
+ *     oem_crossref_staging / fitment_staging -- bulk action can resolve + reject the underlying
+ *     staging row. There's deliberately no bulk "approve" here; promoting
+ *     OEM/fitment data at scale without per-row review defeats the point
+ *     of the staging/validation gate built this session.
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 
 interface Flag {
@@ -29,6 +39,11 @@ interface Flag {
   source_vendor: string;
 }
 
+interface CategoryOption {
+  name: string;
+  subcategories: { name: string; count: number }[];
+}
+
 const FLAG_LABELS: Record<string, string> = {
   wrong_category: 'Wrong category',
   wrong_subcategory: 'Wrong subcategory',
@@ -44,6 +59,10 @@ const FLAG_LABELS: Record<string, string> = {
   other: 'Other issue',
 };
 
+function isStagingFamily(flagType: string) {
+  return flagType.startsWith('oem_') || flagType.startsWith('fitment_');
+}
+
 export default function ReviewQueuePage() {
   const params = useSearchParams();
   const token = params.get('token') ?? '';
@@ -53,6 +72,13 @@ export default function ReviewQueuePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<Set<number>>(new Set());
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkError, setBulkError] = useState<string | null>(null);
+
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [pickCategory, setPickCategory] = useState('');
+  const [pickSubcategory, setPickSubcategory] = useState('');
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -70,10 +96,18 @@ export default function ReviewQueuePage() {
       setError(String(e));
     } finally {
       setLoading(false);
+      setSelected(new Set());
     }
   }, [token, status]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    fetch('/api/admin/catalog/categories')
+      .then((r) => r.json())
+      .then((data) => setCategories(Array.isArray(data.categories) ? data.categories : []))
+      .catch(() => setCategories([]));
+  }, []);
 
   async function toggleResolved(flag: Flag) {
     setBusy(prev => new Set(prev).add(flag.id));
@@ -86,6 +120,94 @@ export default function ReviewQueuePage() {
       setFlags(prev => prev.filter(f => f.id !== flag.id));
     } finally {
       setBusy(prev => { const next = new Set(prev); next.delete(flag.id); return next; });
+    }
+  }
+
+  function toggleSelected(id: number) {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelected(prev => (prev.size === flags.length ? new Set() : new Set(flags.map(f => f.id))));
+  }
+
+  const selectedFlags = useMemo(() => flags.filter(f => selected.has(f.id)), [flags, selected]);
+  const selectedStaging = useMemo(() => selectedFlags.filter(f => isStagingFamily(f.flag_type)), [selectedFlags]);
+  const selectedCategoryFamily = useMemo(() => selectedFlags.filter(f => !isStagingFamily(f.flag_type)), [selectedFlags]);
+
+  const subcategoryHints = useMemo(() => {
+    const match = categories.find(c => c.name === pickCategory);
+    return match ? match.subcategories.map(s => s.name) : [];
+  }, [categories, pickCategory]);
+
+  async function bulkResolve() {
+    if (selected.size === 0) return;
+    setBulkBusy(true);
+    setBulkError(null);
+    try {
+      const res = await fetch(`/api/admin/review-flags/bulk?token=${encodeURIComponent(token)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ flag_ids: [...selected], action: 'resolve' }),
+      });
+      const data = await res.json();
+      if (data.error) { setBulkError(data.error); return; }
+      setFlags(prev => prev.filter(f => !selected.has(f.id)));
+      setSelected(new Set());
+    } catch (e) {
+      setBulkError(String(e));
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  async function bulkRejectStaging() {
+    if (selectedStaging.length === 0) return;
+    setBulkBusy(true);
+    setBulkError(null);
+    try {
+      const ids = selectedStaging.map(f => f.id);
+      const res = await fetch(`/api/admin/review-flags/bulk?token=${encodeURIComponent(token)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ flag_ids: ids, action: 'reject_staging' }),
+      });
+      const data = await res.json();
+      if (data.error) { setBulkError(data.error); return; }
+      setFlags(prev => prev.filter(f => !ids.includes(f.id)));
+      setSelected(prev => { const next = new Set(prev); ids.forEach(id => next.delete(id)); return next; });
+    } catch (e) {
+      setBulkError(String(e));
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  async function bulkSetCategory() {
+    if (selectedCategoryFamily.length === 0 || !pickCategory) return;
+    setBulkBusy(true);
+    setBulkError(null);
+    try {
+      const ids = selectedCategoryFamily.map(f => f.id);
+      const res = await fetch(`/api/admin/review-flags/bulk-category?token=${encodeURIComponent(token)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ flag_ids: ids, display_category: pickCategory, display_subcategory: pickSubcategory || null }),
+      });
+      const data = await res.json();
+      if (data.error) { setBulkError(data.error); return; }
+      setFlags(prev => prev.filter(f => !ids.includes(f.id)));
+      setSelected(prev => { const next = new Set(prev); ids.forEach(id => next.delete(id)); return next; });
+      setPickCategory('');
+      setPickSubcategory('');
+    } catch (e) {
+      setBulkError(String(e));
+    } finally {
+      setBulkBusy(false);
     }
   }
 
@@ -133,12 +255,112 @@ export default function ReviewQueuePage() {
         <div style={{ color: '#666' }}>Nothing here — queue is empty.</div>
       )}
 
+      {!loading && !error && flags.length > 0 && status === 'unresolved' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={selected.size > 0 && selected.size === flags.length}
+              onChange={toggleSelectAll}
+            />
+            Select all visible ({flags.length})
+          </label>
+        </div>
+      )}
+
+      {selected.size > 0 && (
+        <div
+          style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 10,
+            background: '#1a1a1a',
+            color: '#fff',
+            padding: '12px 16px',
+            marginBottom: 16,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 10,
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 13 }}>
+              {selected.size} selected
+              {selectedStaging.length > 0 && selectedCategoryFamily.length > 0
+                ? ` (${selectedStaging.length} staging-backed, ${selectedCategoryFamily.length} category-type)`
+                : ''}
+            </span>
+            <button
+              onClick={() => setSelected(new Set())}
+              style={{ background: 'none', border: 'none', color: '#ccc', fontSize: 12, cursor: 'pointer' }}
+            >
+              Clear
+            </button>
+          </div>
+
+          {bulkError && <div style={{ color: '#ff8080', fontSize: 12 }}>{bulkError}</div>}
+
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+            <button
+              onClick={bulkResolve}
+              disabled={bulkBusy}
+              style={{ padding: '6px 12px', fontSize: 12, border: '1px solid #666', background: '#333', color: '#fff', cursor: bulkBusy ? 'not-allowed' : 'pointer' }}
+            >
+              Mark resolved ({selected.size})
+            </button>
+
+            {selectedStaging.length > 0 && (
+              <button
+                onClick={bulkRejectStaging}
+                disabled={bulkBusy}
+                style={{ padding: '6px 12px', fontSize: 12, border: '1px solid #a05050', background: '#5a2c2c', color: '#fff', cursor: bulkBusy ? 'not-allowed' : 'pointer' }}
+                title="Marks the flag resolved AND rejects the underlying staged OEM#/fitment row so it stops lingering as 'flagged'. Never promotes/approves data."
+              >
+                Resolve + reject staging ({selectedStaging.length})
+              </button>
+            )}
+
+            {selectedCategoryFamily.length > 0 && (
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <select
+                  value={pickCategory}
+                  onChange={(e) => { setPickCategory(e.target.value); setPickSubcategory(''); }}
+                  style={{ padding: '5px 8px', fontSize: 12, fontFamily: 'monospace' }}
+                >
+                  <option value="">— set category —</option>
+                  {categories.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+                </select>
+                <input
+                  list="bulk-subcat-hints"
+                  value={pickSubcategory}
+                  onChange={(e) => setPickSubcategory(e.target.value)}
+                  placeholder="subcategory…"
+                  disabled={!pickCategory}
+                  style={{ padding: '5px 8px', fontSize: 12, fontFamily: 'monospace', width: 160 }}
+                />
+                <datalist id="bulk-subcat-hints">
+                  {subcategoryHints.map(h => <option key={h} value={h} />)}
+                </datalist>
+                <button
+                  onClick={bulkSetCategory}
+                  disabled={bulkBusy || !pickCategory}
+                  style={{ padding: '6px 12px', fontSize: 12, border: '1px solid #4a7a4a', background: '#2c4a2c', color: '#fff', cursor: (bulkBusy || !pickCategory) ? 'not-allowed' : 'pointer' }}
+                >
+                  Apply to {selectedCategoryFamily.length}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {flags.map(f => (
           <div
             key={f.id}
             style={{
-              border: '1px solid #ddd',
+              border: selected.has(f.id) ? '1px solid #1a1a1a' : '1px solid #ddd',
+              background: selected.has(f.id) ? '#faf8f0' : '#fff',
               padding: '12px 14px',
               display: 'flex',
               justifyContent: 'space-between',
@@ -146,6 +368,14 @@ export default function ReviewQueuePage() {
               gap: 16,
             }}
           >
+            {status === 'unresolved' && (
+              <input
+                type="checkbox"
+                checked={selected.has(f.id)}
+                onChange={() => toggleSelected(f.id)}
+                style={{ marginTop: 3 }}
+              />
+            )}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
                 <span style={{
