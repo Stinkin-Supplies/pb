@@ -378,39 +378,6 @@ export default function FilterSidebar({ facets, filters, onChange, total = 0 }) 
           position: "relative",
         }}
       >
-        {/* Close button — top right corner */}
-        <button
-          onClick={toggle}
-          aria-label="Close filters"
-          style={{
-            position: "absolute",
-            top: 14,
-            right: 14,
-            zIndex: 10,
-            display: "flex",
-            alignItems: "center",
-            gap: 7,
-            padding: "5px 12px",
-            background: "rgba(197,167,34,0.08)",
-            border: `1px solid ${GOLD_DIM}`,
-            color: SILVER,
-            fontFamily: "var(--font-stencil), monospace",
-            fontSize: 9,
-            letterSpacing: "0.12em",
-            textTransform: "uppercase",
-            cursor: "pointer",
-            transition: "border-color 0.15s, color 0.15s",
-          }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = GOLD; e.currentTarget.style.color = GOLD; }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = GOLD_DIM; e.currentTarget.style.color = SILVER; }}
-        >
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-            <line x1="1" y1="1" x2="9" y2="9"/>
-            <line x1="9" y1="1" x2="1" y2="9"/>
-          </svg>
-          Close
-        </button>
-
         {/* ── MOBILE: tab interface ─────────────────────────── */}
         {isMobile ? (
           <div style={{
@@ -422,7 +389,7 @@ export default function FilterSidebar({ facets, filters, onChange, total = 0 }) 
             flexDirection: "column",
             overflow: "hidden",
           }}>
-            {/* Tab bar */}
+            {/* Tab bar + close button in one row */}
             <div style={{
               display: "flex",
               flexShrink: 0,
@@ -450,6 +417,29 @@ export default function FilterSidebar({ facets, filters, onChange, total = 0 }) 
                   {tab}
                 </button>
               ))}
+              {/* Close — lives in the tab row, no overlap */}
+              <button
+                onClick={toggle}
+                aria-label="Close filters"
+                style={{
+                  flexShrink: 0,
+                  width: 48,
+                  padding: "12px 0",
+                  background: "transparent",
+                  border: "none",
+                  borderLeft: `1px solid rgba(197,167,34,0.18)`,
+                  borderBottom: "2px solid transparent",
+                  color: CHROME,
+                  fontSize: 18,
+                  lineHeight: 1,
+                  cursor: "pointer",
+                  transition: "color 0.12s",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.color = GOLD; }}
+                onMouseLeave={e => { e.currentTarget.style.color = CHROME; }}
+              >
+                ✕
+              </button>
             </div>
 
             {/* Tab content — scrollable single column */}
