@@ -219,6 +219,15 @@ export default function FilterSidebar({ facets, filters, onChange, total = 0 }) 
   const openRef    = useRef(false);
   const animRef    = useRef(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileTab, setMobileTab] = useState("FITMENT");
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check, { passive: true });
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   // Cascading fitment state
   const [familyModels, setFamilyModels] = useState([]);
@@ -246,6 +255,15 @@ export default function FilterSidebar({ facets, filters, onChange, total = 0 }) 
     return () => { cancelled = true; };
   }, [selectedModelObj?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Compute expanded height: on mobile, use most of viewport height
+  const getExpandedH = () => {
+    if (typeof window === "undefined") return EXPANDED_H;
+    if (window.innerWidth < 768) {
+      return Math.min(Math.round(window.innerHeight * 0.84), window.innerHeight - 60);
+    }
+    return EXPANDED_H;
+  };
+
   // Establish collapsed baseline
   useEffect(() => {
     if (!panelRef.current || !expandedRef.current) return;
@@ -257,14 +275,19 @@ export default function FilterSidebar({ facets, filters, onChange, total = 0 }) 
   }, []);
 
   const toggle = () => {
-    if (animRef.current || !panelRef.current || !expandedRef.current) return;
+    if (!panelRef.current || !expandedRef.current) return;
+    // Kill any in-progress tween and reset the lock so a second click always works
+    gsap.killTweensOf([panelRef.current, expandedRef.current]);
+    animRef.current = false;
     animRef.current = true;
     const opening = !openRef.current;
     openRef.current = opening;
     setIsOpen(opening);
 
+    const expandH = getExpandedH();
+
     if (opening) {
-      gsap.to(panelRef.current, { height: EXPANDED_H, duration: 0.72, ease: "power4.inOut" });
+      gsap.to(panelRef.current, { height: expandH, duration: 0.72, ease: "power4.inOut" });
       gsap.to(expandedRef.current, {
         opacity: 1, y: 0, duration: 0.28, delay: 0.48,
         onStart: () => gsap.set(expandedRef.current, { display: "block" }),
@@ -352,9 +375,229 @@ export default function FilterSidebar({ facets, filters, onChange, total = 0 }) 
           height: EXPANDED_H - PILL_H,
           borderBottom: `1px solid ${GOLD_DIM}`,
           overflow: "hidden",
+          position: "relative",
         }}
       >
-        {/* Inner border frame */}
+        {/* Close button — top right corner */}
+        <button
+          onClick={toggle}
+          aria-label="Close filters"
+          style={{
+            position: "absolute",
+            top: 14,
+            right: 14,
+            zIndex: 10,
+            display: "flex",
+            alignItems: "center",
+            gap: 7,
+            padding: "5px 12px",
+            background: "rgba(197,167,34,0.08)",
+            border: `1px solid ${GOLD_DIM}`,
+            color: SILVER,
+            fontFamily: "var(--font-stencil), monospace",
+            fontSize: 9,
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
+            cursor: "pointer",
+            transition: "border-color 0.15s, color 0.15s",
+          }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = GOLD; e.currentTarget.style.color = GOLD; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = GOLD_DIM; e.currentTarget.style.color = SILVER; }}
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+            <line x1="1" y1="1" x2="9" y2="9"/>
+            <line x1="9" y1="1" x2="1" y2="9"/>
+          </svg>
+          Close
+        </button>
+
+        {/* ── MOBILE: tab interface ─────────────────────────── */}
+        {isMobile ? (
+          <div style={{
+            margin: 10,
+            height: "calc(100% - 20px)",
+            border: `1px solid rgba(197,167,34,0.08)`,
+            background: COAL,
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+          }}>
+            {/* Tab bar */}
+            <div style={{
+              display: "flex",
+              flexShrink: 0,
+              borderBottom: `1px solid ${GOLD_DIM}`,
+            }}>
+              {["FITMENT", "CATEGORY", "BRAND", "REFINE"].map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setMobileTab(tab)}
+                  style={{
+                    flex: 1,
+                    padding: "12px 4px",
+                    background: mobileTab === tab ? GOLD_ACT : "transparent",
+                    border: "none",
+                    borderBottom: mobileTab === tab ? `2px solid ${GOLD}` : "2px solid transparent",
+                    color: mobileTab === tab ? GOLD : SILVER,
+                    fontFamily: "var(--font-stencil), monospace",
+                    fontSize: 10,
+                    letterSpacing: "0.10em",
+                    textTransform: "uppercase",
+                    cursor: "pointer",
+                    transition: "color 0.12s, background 0.12s",
+                  }}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+
+            {/* Tab content — scrollable single column */}
+            <div style={{ flex: 1, overflowY: "auto", padding: "18px 16px" }}>
+
+              {mobileTab === "FITMENT" && (
+                <div>
+                  <StyledSelect
+                    value={filters.family ?? ""}
+                    onChange={e => onChange({ family: e.target.value || null, model: null, modelCodes: null, year: null })}
+                  >
+                    <option value="">Any Family</option>
+                    {HD_FAMILIES.map(f => <option key={f} value={f}>{f}</option>)}
+                  </StyledSelect>
+                  {filters.family && (
+                    <StyledSelect
+                      value={filters.model ?? ""}
+                      onChange={e => onChange({ model: e.target.value || null, modelCodes: null, year: null })}
+                    >
+                      <option value="">Any Model</option>
+                      {familyModels.map(m => (
+                        <option key={m.model_code} value={m.model_code}>
+                          {m.name} ({m.model_code})
+                        </option>
+                      ))}
+                    </StyledSelect>
+                  )}
+                  {filters.model && (
+                    <StyledSelect
+                      value={filters.year ?? ""}
+                      onChange={e => onChange({ year: e.target.value ? parseInt(e.target.value) : null })}
+                    >
+                      <option value="">Any Year</option>
+                      {modelYears.map(y => <option key={y} value={y}>{y}</option>)}
+                    </StyledSelect>
+                  )}
+                  <div style={{ height: 1, background: GOLD_DIM, margin: "14px 0", opacity: 0.5 }} />
+                  <div style={{ fontFamily: "var(--font-stencil), monospace", fontSize: 11, letterSpacing: "2px", color: SILVER, textTransform: "uppercase", marginBottom: 12 }}>
+                    Engine Era
+                  </div>
+                  {HD_ERAS.map(era => (
+                    <button key={era.slug}
+                      onClick={() => onChange({ era: filters.era === era.slug ? null : era.slug })}
+                      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 10, padding: "10px 0", background: "none", border: "none", cursor: "pointer", borderBottom: `1px solid rgba(197,167,34,0.07)` }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <Checkbox active={filters.era === era.slug} />
+                        <span style={{ fontFamily: "var(--font-body), sans-serif", fontSize: 15, fontWeight: 500, color: filters.era === era.slug ? CREAM : SILVER }}>
+                          {era.label}
+                        </span>
+                      </div>
+                      <span style={{ fontFamily: "var(--font-stencil), monospace", fontSize: 11, color: CHROME }}>{era.years}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {mobileTab === "CATEGORY" && (
+                <div>
+                  {(facets.categories ?? []).slice(0, 24).map(cat => (
+                    <button key={cat.name}
+                      onClick={() => onChange({ display_category: filters.display_category === cat.name ? null : cat.name, display_subcategory: null, subcategory_detail: null })}
+                      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 10, padding: "10px 0", background: "none", border: "none", cursor: "pointer", borderBottom: `1px solid rgba(197,167,34,0.07)` }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
+                        <Checkbox active={filters.display_category === cat.name} />
+                        <span style={{ fontFamily: "var(--font-body), sans-serif", fontSize: 15, fontWeight: 500, color: filters.display_category === cat.name ? CREAM : SILVER, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {cat.name}
+                        </span>
+                      </div>
+                      <span style={{ fontFamily: "var(--font-stencil), monospace", fontSize: 11, color: CHROME, flexShrink: 0 }}>{cat.count?.toLocaleString()}</span>
+                    </button>
+                  ))}
+                  {filters.display_category && subcategories.length > 0 && (
+                    <>
+                      <div style={{ height: 1, background: GOLD_DIM, margin: "14px 0", opacity: 0.4 }} />
+                      <div style={{ fontFamily: "var(--font-stencil), monospace", fontSize: 11, letterSpacing: "2px", color: SILVER, textTransform: "uppercase", marginBottom: 10 }}>Subcategory</div>
+                      {subcategories.map(sub => (
+                        <button key={sub.name}
+                          onClick={() => onChange({ display_subcategory: filters.display_subcategory === sub.name ? null : sub.name, subcategory_detail: null })}
+                          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 10, padding: "9px 0", background: "none", border: "none", cursor: "pointer", borderBottom: `1px solid rgba(197,167,34,0.06)` }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
+                            <Checkbox active={filters.display_subcategory === sub.name} />
+                            <span style={{ fontFamily: "var(--font-body), sans-serif", fontSize: 14, fontWeight: 500, color: filters.display_subcategory === sub.name ? CREAM : SILVER, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub.name}</span>
+                          </div>
+                          <span style={{ fontFamily: "var(--font-stencil), monospace", fontSize: 11, color: CHROME, flexShrink: 0 }}>{sub.count?.toLocaleString()}</span>
+                        </button>
+                      ))}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {mobileTab === "BRAND" && (
+                <div>
+                  {(facets.brands ?? []).slice(0, 30).map(b => (
+                    <button key={b.name}
+                      onClick={() => onChange({ brand: filters.brand === b.name ? null : b.name })}
+                      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 10, padding: "10px 0", background: "none", border: "none", cursor: "pointer", borderBottom: `1px solid rgba(197,167,34,0.07)` }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
+                        <Checkbox active={filters.brand === b.name} />
+                        <span style={{ fontFamily: "var(--font-body), sans-serif", fontSize: 15, fontWeight: 500, color: filters.brand === b.name ? CREAM : SILVER, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.name}</span>
+                      </div>
+                      <span style={{ fontFamily: "var(--font-stencil), monospace", fontSize: 11, color: CHROME, flexShrink: 0 }}>{b.count?.toLocaleString()}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {mobileTab === "REFINE" && (
+                <div>
+                  {/* In Stock */}
+                  <button
+                    onClick={() => onChange({ in_stock: !filters.in_stock })}
+                    style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "12px 0", marginBottom: 20, background: "none", border: "none", cursor: "pointer", borderBottom: `1px solid rgba(197,167,34,0.10)` }}
+                  >
+                    <span style={{ fontFamily: "var(--font-body), sans-serif", fontSize: 16, fontWeight: 500, color: filters.in_stock ? GOLD : SILVER }}>In Stock Only</span>
+                    <span style={{ width: 40, height: 22, flexShrink: 0, background: filters.in_stock ? GOLD : "rgba(112,104,96,0.25)", border: `1px solid ${filters.in_stock ? GOLD : GOLD_DIM}`, position: "relative", display: "inline-block", transition: "background 0.2s" }}>
+                      <span style={{ position: "absolute", top: 2, left: filters.in_stock ? 18 : 2, width: 16, height: 16, background: filters.in_stock ? COAL : CHROME, transition: "left 0.2s" }} />
+                    </span>
+                  </button>
+
+                  {/* Price range */}
+                  <div style={{ fontFamily: "var(--font-stencil), monospace", fontSize: 11, letterSpacing: "2px", color: SILVER, textTransform: "uppercase", marginBottom: 10 }}>Price Range</div>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 28 }}>
+                    <input type="number" placeholder="Min" value={priceMin} onChange={e => setPriceMin(e.target.value)}
+                      style={{ flex: 1, background: COAL, border: `1px solid ${GOLD_DIM}`, color: CREAM, fontFamily: "var(--font-body), sans-serif", fontSize: 16, fontWeight: 500, padding: "11px 12px", outline: "none", width: 0, borderRadius: 0 }} />
+                    <span style={{ fontFamily: "var(--font-stencil), monospace", fontSize: 14, color: SILVER }}>—</span>
+                    <input type="number" placeholder="Max" value={priceMax} onChange={e => setPriceMax(e.target.value)}
+                      style={{ flex: 1, background: COAL, border: `1px solid ${GOLD_DIM}`, color: CREAM, fontFamily: "var(--font-body), sans-serif", fontSize: 16, fontWeight: 500, padding: "11px 12px", outline: "none", width: 0, borderRadius: 0 }} />
+                  </div>
+
+                  {/* Clear all */}
+                  {activeCount > 0 && (
+                    <button onClick={clearAll} style={{ width: "100%", padding: "13px 0", background: "none", border: `1px solid ${GOLD_DIM}`, color: GOLD, fontFamily: "var(--font-body), sans-serif", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
+                      Clear All ({activeCount})
+                    </button>
+                  )}
+                </div>
+              )}
+
+            </div>
+          </div>
+        ) : (
+
+        /* ── DESKTOP: 4-column grid ───────────────────────── */
         <div style={{
           margin: 10,
           height: "calc(100% - 20px)",
@@ -643,6 +886,7 @@ export default function FilterSidebar({ facets, filters, onChange, total = 0 }) 
           </Col>
 
         </div>
+        )} {/* end desktop conditional */}
       </div>
 
       {/* ── Collapsed pill row — always visible ─────────────── */}
