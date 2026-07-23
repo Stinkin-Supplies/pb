@@ -51,8 +51,8 @@ function buildSubcatHref(categoryLabel, subcatName) {
   return `/browse?${params.toString()}`;
 }
 
-// ── LayeredStack ───────────────────────────────────────────────────────────
-function LayeredStack({ children }) {
+// ── LayeredStack — click to spread, click again to stack ──────────────────
+function LayeredStack({ children, isSpread, onSpread }) {
   const containerRef = useRef(null);
 
   const stackCards = useCallback(() => {
@@ -89,18 +89,23 @@ function LayeredStack({ children }) {
     });
   }, []);
 
+  // Stack on mount, spread/stack when isSpread changes
   useEffect(() => {
-    // Let the DOM settle before measuring positions
     const t = setTimeout(stackCards, 60);
     return () => clearTimeout(t);
   }, [children, stackCards]);
 
+  useEffect(() => {
+    if (isSpread) resetCards();
+    else stackCards();
+  }, [isSpread, resetCards, stackCards]);
+
   return (
     <div
       ref={containerRef}
-      className="ls-container"
-      onMouseEnter={resetCards}
-      onMouseLeave={stackCards}
+      className={`ls-container${isSpread ? ' ls-spread' : ''}`}
+      onClick={!isSpread ? onSpread : undefined}
+      style={{ cursor: isSpread ? 'default' : 'pointer' }}
     >
       {children}
     </div>
@@ -146,11 +151,13 @@ export default function CategoryPhotoGrid() {
   const [active, setActive]       = useState(null); // { label, href }
   const [subcats, setSubcats]     = useState([]);
   const [loading, setLoading]     = useState(false);
+  const [isSpread, setIsSpread]   = useState(false);
 
   const openCategory = useCallback((cat) => {
     setActive(cat);
     setSubcats([]);
     setLoading(true);
+    setIsSpread(false);
     fetch(`/api/browse/subcategories?category=${encodeURIComponent(cat.label)}`)
       .then(r => r.json())
       .then(d => { setSubcats(d.subcategories || []); setLoading(false); })
@@ -238,14 +245,22 @@ export default function CategoryPhotoGrid() {
 
                 {!loading && subcats.length > 0 && (
                   <>
-                    <div className="cpg-stack-hint">HOVER TO SPREAD · CLICK TO BROWSE</div>
-                    <LayeredStack key={active.label}>
+                    <div className="cpg-stack-hint">
+                      {isSpread ? 'TAP A CARD TO BROWSE' : 'TAP THE STACK TO REVEAL'}
+                    </div>
+                    <LayeredStack
+                      key={active.label}
+                      isSpread={isSpread}
+                      onSpread={() => setIsSpread(true)}
+                    >
                       {subcats.map(sub => (
                         <Link
                           key={sub.name}
                           href={buildSubcatHref(active.label, sub.name)}
                           className="cpg-subcat-card"
                           onClick={close}
+                          tabIndex={isSpread ? 0 : -1}
+                          style={{ pointerEvents: isSpread ? 'auto' : 'none' }}
                         >
                           <div className="cpg-subcat-corner" aria-hidden="true" />
                           <div className="cpg-subcat-name">{sub.name}</div>
@@ -538,6 +553,9 @@ export default function CategoryPhotoGrid() {
           display: grid;
           grid-template-columns: repeat(4, 1fr);
           gap: 10px;
+          cursor: pointer;
+        }
+        .ls-spread .cpg-subcat-card {
           cursor: pointer;
         }
 
