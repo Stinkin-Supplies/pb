@@ -19,7 +19,7 @@ import gsap from 'gsap';
 const CATEGORIES = [
   { label: 'Engine',                        href: '/browse?display_category=Engine',                                      img: '/images/categories/engine.png' },
   { label: 'Foot Controls & Pegs',          href: '/browse?display_category=Foot+Controls+%26+Pegs',                     img: '/images/categories/foot-controls.png' },
-  { label: 'Transmission & Clutch',         href: '/browse?display_category=Transmission+%26+Clutch',                    img: null },
+  { label: 'Transmission & Clutch',         href: '/browse?display_category=Transmission+%26+Clutch',                    img: '/images/categories/transmission.png' },
   { label: 'Handlebars & Hand Controls',    href: '/browse?display_category=Handlebars+%26+Hand+Controls',               img: null },
   { label: 'Brakes',                        href: '/browse?display_category=Brakes',                                      img: null },
   { label: 'Riding Gear & Apparel',         href: '/browse?display_category=Riding+Gear+%26+Apparel',                    img: null },
@@ -38,7 +38,7 @@ const CATEGORIES = [
   { label: 'Tools & Chemicals',             href: '/browse?display_category=Tools+%26+Chemicals',                        img: null },
   { label: 'Saddlebags, Sissy Bars & Luggage', href: '/browse?display_category=Saddlebags%2C+Sissy+Bars+%26+Luggage',   img: null },
   { label: 'Windshields & Fairings',        href: '/browse?display_category=Windshields+%26+Fairings',                   img: null },
-  { label: 'Dashes & Gauges',               href: '/browse?display_category=Dashes+%26+Gauges',                          img: null },
+  { label: 'Dashes & Gauges',               href: '/browse?display_category=Dashes+%26+Gauges',                          img: '/images/categories/dashes-gauges.png' },
 ];
 
 const col1 = CATEGORIES.slice(0, 8);
