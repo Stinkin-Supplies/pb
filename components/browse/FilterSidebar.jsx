@@ -238,7 +238,17 @@ export default function FilterSidebar({ facets, filters, onChange, total = 0 }) 
     let cancelled = false;
     fetch(`/api/fitment/models?family=${encodeURIComponent(filters.family)}`)
       .then(r => r.json())
-      .then(d => { if (!cancelled) setFamilyModels(d.models ?? []); })
+      .then(d => {
+        if (!cancelled) {
+          const seen = new Set();
+          const unique = (d.models ?? []).filter(m => {
+            if (seen.has(m.model_code)) return false;
+            seen.add(m.model_code);
+            return true;
+          });
+          setFamilyModels(unique);
+        }
+      })
       .catch(() => { if (!cancelled) setFamilyModels([]); });
     return () => { cancelled = true; };
   }, [filters.family]);
