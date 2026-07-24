@@ -134,10 +134,7 @@ async function main() {
     SELECT cu.id, cu.sku
     FROM catalog_unified cu
     WHERE cu.is_active AND cu.source_vendor = 'PU'
-      AND cu.is_harley_fitment = false AND cu.is_universal = false AND cu.fits_all_models = false
-      AND (cu.fitment_hd_models IS NULL OR array_length(cu.fitment_hd_models,1) IS NULL)
-      AND (cu.fitment_hd_families IS NULL OR array_length(cu.fitment_hd_families,1) IS NULL)
-      AND cu.fitment_year_start IS NULL
+      AND cu.is_universal = false AND cu.fits_all_models = false
       AND NOT EXISTS (SELECT 1 FROM catalog_fitment_v2 cfv WHERE cfv.product_id = cu.id)
   `);
   const gapBySku = new Map();
