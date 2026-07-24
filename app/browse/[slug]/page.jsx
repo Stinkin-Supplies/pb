@@ -219,7 +219,7 @@ export default async function ProductDetailPage({ params }) {
       productRow.display_subcategory ?? null,
     ),
     getOemAlternatives(unifiedId),
-    getOemPartTimeline(unifiedId),
+    getOemPartTimeline(unifiedId).catch(() => null),
   ]);
 
   const hasSidebar = oemAlternatives.length > 0;

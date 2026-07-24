@@ -307,8 +307,8 @@ function FitmentContent({ fitment }) {
           onChange={e => setQuery(e.target.value)}
           placeholder="Filter by model, family, or year…"
           style={{
-            width: '100%', boxSizing: 'border-box', marginBottom: 12,
-            padding: '8px 12px',
+            width: '100%', boxSizing: 'border-box', marginBottom: 14,
+            padding: '10px 14px',
             fontFamily: 'var(--font-body)',
             fontSize: 13,
             color: C.textPrime,
@@ -320,38 +320,59 @@ function FitmentContent({ fitment }) {
         />
       )}
 
-      <div style={{ maxHeight: 380, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div style={{ maxHeight: 420, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
         {visibleGroups.length === 0 && <Empty>No matching fitment.</Empty>}
         {visibleGroups.map(group => {
           const isOpen = q ? true : openFamily === group.family;
           return (
             <div key={group.family} style={{ border: `1px solid ${C.border}`, overflow: 'hidden' }}>
+
+              {/* Family header */}
               <button
                 onClick={() => !q && setOpenFamily(isOpen ? null : group.family)}
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  width: '100%', padding: '9px 12px',
+                  width: '100%', padding: '12px 16px',
                   cursor: q ? 'default' : 'pointer',
-                  background: isOpen ? 'rgba(197,167,34,0.06)' : 'rgba(255,255,255,0.02)',
+                  background: isOpen ? 'rgba(197,167,34,0.08)' : 'rgba(255,255,255,0.02)',
                   border: 'none',
                   borderBottom: isOpen ? `1px solid ${C.border}` : 'none',
                   textAlign: 'left',
                 }}
               >
-                <span style={{
-                  fontFamily: 'var(--font-stencil)',
-                  fontSize: 10,
-                  color: isOpen ? C.gold : C.textDim,
-                  letterSpacing: '0.10em',
-                  textTransform: 'uppercase',
-                }}>
-                  {group.family}{' '}
-                  <span style={{ color: C.textMuted }}>({group.rows.length})</span>
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {/* Color bar */}
+                  <span style={{
+                    width: 3, height: 16, flexShrink: 0,
+                    background: isOpen ? C.gold : C.textMuted,
+                    display: 'inline-block',
+                    transition: 'background 0.15s',
+                  }} />
+                  <span style={{
+                    fontFamily: 'var(--font-stencil)',
+                    fontSize: 11,
+                    color: isOpen ? C.gold : C.textDim,
+                    letterSpacing: '0.14em',
+                    textTransform: 'uppercase',
+                  }}>
+                    {group.family}
+                  </span>
+                  <span style={{
+                    fontFamily: 'var(--font-stencil)',
+                    fontSize: 9,
+                    color: C.textMuted,
+                    letterSpacing: '0.08em',
+                    background: 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${C.border}`,
+                    padding: '2px 7px',
+                  }}>
+                    {group.rows.length}
+                  </span>
+                </div>
                 {!q && (
                   <span style={{
-                    color: C.textMuted,
-                    fontSize: 10,
+                    color: isOpen ? C.gold : C.textMuted,
+                    fontSize: 12,
                     transition: 'transform 0.15s',
                     transform: isOpen ? 'rotate(180deg)' : 'none',
                     display: 'inline-block',
@@ -359,42 +380,69 @@ function FitmentContent({ fitment }) {
                 )}
               </button>
 
+              {/* Model rows */}
               {isOpen && (
-                <div style={{ padding: '4px 12px 8px' }}>
+                <div style={{ padding: '8px 0' }}>
                   {group.rows.map((row, i) => (
                     <div key={i} style={{
-                      display: 'flex', alignItems: 'center', gap: 12,
-                      padding: '5px 0',
-                      borderBottom: i < group.rows.length - 1
-                        ? `1px solid rgba(197,167,34,0.07)`
-                        : 'none',
+                      display: 'grid',
+                      gridTemplateColumns: '1fr auto',
+                      alignItems: 'center',
+                      gap: 16,
+                      padding: '10px 16px',
+                      background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)',
                     }}>
-                      <span style={{
-                        fontFamily: 'var(--font-stencil)',
-                        fontSize: 11,
-                        color: C.textPrime,
-                        letterSpacing: '0.04em',
-                        flex: '0 0 auto',
-                      }}>
-                        {row.model_name ? `${row.model_name} (${row.model_code})` : row.model_code}
-                      </span>
-                      <span style={{
+                      {/* Left: name + code */}
+                      <div>
+                        {row.model_name && (
+                          <div style={{
+                            fontFamily: 'var(--font-stencil)',
+                            fontSize: 12,
+                            color: C.textPrime,
+                            letterSpacing: '0.06em',
+                            textTransform: 'uppercase',
+                            marginBottom: row.model_code ? 3 : 0,
+                          }}>
+                            {row.model_name}
+                          </div>
+                        )}
+                        {row.model_code && (
+                          <div style={{
+                            fontFamily: 'var(--font-stencil)',
+                            fontSize: 10,
+                            color: C.goldDim,
+                            letterSpacing: '0.08em',
+                          }}>
+                            {row.model_code}
+                          </div>
+                        )}
+                        {!row.model_name && row.model_code && (
+                          <div style={{
+                            fontFamily: 'var(--font-stencil)',
+                            fontSize: 12,
+                            color: C.textPrime,
+                            letterSpacing: '0.06em',
+                          }}>
+                            {row.model_code}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Right: year badge */}
+                      <div style={{
                         fontFamily: 'var(--font-stencil)',
                         fontSize: 11,
                         color: C.textDim,
+                        letterSpacing: '0.06em',
+                        background: 'rgba(197,167,34,0.06)',
+                        border: `1px solid rgba(197,167,34,0.18)`,
+                        padding: '4px 10px',
+                        whiteSpace: 'nowrap',
                       }}>
                         {row.year_from === row.year_to
                           ? row.year_from
-                          : `${row.year_from}–${row.year_to}`}
-                      </span>
-                      <span style={{
-                        fontFamily: 'var(--font-stencil)',
-                        fontSize: 10,
-                        color: '#5a9a5a',
-                        marginLeft: 'auto',
-                      }}>
-                        ✓
-                      </span>
+                          : `${row.year_from} – ${row.year_to}`}
+                      </div>
                     </div>
                   ))}
                 </div>
