@@ -695,7 +695,7 @@ export default async function ProductDetailPage({ params }) {
 
             {/* Badges */}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {productRow.is_universal && (
+              {productRow.is_universal && !fitment?.length && (
                 <span style={badge('rgba(58,122,58,0.12)', '#5a9a5a')}>UNIVERSAL FIT</span>
               )}
               {productRow.is_kit && (
