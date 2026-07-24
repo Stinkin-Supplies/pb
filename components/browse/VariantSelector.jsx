@@ -124,7 +124,15 @@ function getRenderMode(variants, siblingGroups, groupDisplayName) {
     !/\d+\s*gauge/i.test(groupDisplayName ?? '')
   ) return 'style+finish';
 
-  if (hasOptions && hasFitment) return 'fitment+color';
+  if (hasOptions && hasFitment) {
+    // Only show fitment group headers when variants actually fit DIFFERENT families.
+    // If all variants share one fitment family (e.g. both BLACK and CHROME fit Dyna),
+    // the family label adds no information — fall through to plain 'options' mode.
+    const familyKeys = new Set(
+      variants.map(v => v.fitment_by_family?.[0]?.family ?? '__universal__')
+    );
+    if (familyKeys.size > 1) return 'fitment+color';
+  }
   if (!hasOptions && hasFitment) return 'fitment';
   if (hasOptions) {
     const colors = new Set(variants.map(v => v.option_1_value).filter(Boolean));
