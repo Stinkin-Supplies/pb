@@ -131,7 +131,7 @@ export async function GET(req: NextRequest) {
     "name_asc":   "name_sort:asc",
     "name-asc":   "name_sort:asc",
     "newest":     "stock_quantity:desc",
-    "relevance":  "sort_priority:desc,stock_quantity:desc,_text_match:desc",
+    "relevance":  "_text_match:desc,sort_priority:desc,stock_quantity:desc",
   };
   const sortBy = sortMap[sortRaw] || DEFAULT_SEARCH_PARAMS.sort_by;
 

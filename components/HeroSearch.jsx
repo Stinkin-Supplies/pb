@@ -190,7 +190,7 @@ export default function HeroSearch() {
     setLoading(true);
     try {
       const res = await fetch(
-        `/api/search?q=${encodeURIComponent(q.trim())}&per_page=7&query_by=name,brand,oem_numbers,oem_part_number,features&sort_by=sort_priority:desc,_text_match:desc`
+        `/api/search?q=${encodeURIComponent(q.trim())}&per_page=7&query_by=name,brand,oem_numbers,oem_part_number,features&sort_by=_text_match:desc,sort_priority:desc`
       );
       const data = await res.json();
       setResults(data.hits || []);
