@@ -1734,6 +1734,7 @@ export type Database = {
           id: string
           make: string
           model: string
+          model_code: string | null
           submodel: string | null
           type: string
           year: number
@@ -1746,6 +1747,7 @@ export type Database = {
           id?: string
           make: string
           model: string
+          model_code?: string | null
           submodel?: string | null
           type?: string
           year: number
@@ -1758,6 +1760,7 @@ export type Database = {
           id?: string
           make?: string
           model?: string
+          model_code?: string | null
           submodel?: string | null
           type?: string
           year?: number

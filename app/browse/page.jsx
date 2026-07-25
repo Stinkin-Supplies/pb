@@ -19,6 +19,8 @@ import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import FilterSidebar from "@/components/browse/FilterSidebar";
 import ProductCard   from "@/components/browse/ProductCard";
+import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { getPrimaryVehicle } from "@/lib/supabase/garage";
 
 const PER_PAGE = 48;
 
@@ -115,6 +117,30 @@ function BrowsePageInner() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchProducts(filters, page); }, [filters, page, fetchProducts]);
   useEffect(() => { setPage(1); }, [filters]);
+
+  // My Garage: ambiently apply the signed-in user's primary vehicle when the
+  // page loads with no explicit fitment/category filters in the URL.
+  const [garageVehicle, setGarageVehicle] = useState(null);
+  useEffect(() => {
+    const hasExplicitFilter = ["era", "family", "model", "model_code", "year"]
+      .some(k => searchParams.has(k));
+    if (hasExplicitFilter) return;
+    let cancelled = false;
+    (async () => {
+      const supabase = createBrowserSupabaseClient();
+      const vehicle = await getPrimaryVehicle(supabase);
+      if (cancelled || !vehicle?.modelCode || !vehicle?.year) return;
+      setGarageVehicle(vehicle);
+      handleFilterChange({ modelCodes: [vehicle.modelCode], year: vehicle.year });
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function clearGarageFilter() {
+    setGarageVehicle(null);
+    handleFilterChange({ modelCodes: null, year: null });
+  }
 
   function handleFilterChange(updates) {
     const next = { ...filters, ...updates };
@@ -213,6 +239,14 @@ function BrowsePageInner() {
         <div className="bp-sort-row">
           <div className="bp-sort-left">
             <span className="bp-result-count">{total.toLocaleString()} results</span>
+            {garageVehicle && (
+              <div className="bp-context-chip" style={{ borderColor: "rgba(184,146,42,0.5)" }}>
+                <span className="bp-context-chip-label">
+                  Filtering for your {garageVehicle.year} {garageVehicle.nickname || garageVehicle.model}
+                </span>
+                <button className="bp-context-chip-clear" onClick={clearGarageFilter}>×</button>
+              </div>
+            )}
             {activeCount > 0 && (
               <div className="bp-context-chip">
                 <span className="bp-context-chip-label">{contextLabel}</span>

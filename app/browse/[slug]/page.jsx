@@ -10,6 +10,18 @@ import VariantSelector from '@/components/browse/VariantSelector';
 import AdminEditPanel from '@/components/admin/AdminEditPanel';
 import { getOemPartTimeline } from '@/lib/getOemPartTimeline';
 import OemPartTimeline from '@/components/pdp/OemPartTimeline';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { getPrimaryVehicle } from '@/lib/supabase/garage';
+
+/** Does any fitment row match the given model_code + year? */
+function fitsVehicle(fitment, vehicle) {
+  if (!vehicle?.modelCode || !vehicle?.year || !fitment?.length) return false;
+  return fitment.some(row =>
+    row.model_code === vehicle.modelCode &&
+    Number(row.year_from) <= vehicle.year &&
+    vehicle.year <= Number(row.year_to)
+  );
+}
 
 // Routes LeMans/PU images through local proxy
 function resolveImageSrc(url) {
@@ -205,7 +217,7 @@ export default async function ProductDetailPage({ params }) {
   const unifiedId = productRow.id;
 
   // Parallel fetches
-  const [fitment, oemRows, related, timeline, oemAlternatives, oemTimeline] = await Promise.all([
+  const [fitment, oemRows, related, timeline, oemAlternatives, oemTimeline, garageVehicle] = await Promise.all([
     getFitmentRows(unifiedId),
     getOemRows(unifiedId),
     getRelatedProducts(
@@ -220,8 +232,10 @@ export default async function ProductDetailPage({ params }) {
     ),
     getOemAlternatives(unifiedId),
     getOemPartTimeline(unifiedId).catch(() => null),
+    createServerSupabaseClient().then(getPrimaryVehicle).catch(() => null),
   ]);
 
+  const fitsMyBike = fitsVehicle(fitment, garageVehicle);
   const hasSidebar = oemAlternatives.length > 0;
   const firstOem = oemRows.find(r => r.oem_format?.startsWith('hd_oem') && !r.expanded_from)?.oem_number ?? null;
   const primaryOems = oemRows.filter(r => r.oem_format?.startsWith('hd_oem') && !r.expanded_from);
@@ -695,6 +709,11 @@ export default async function ProductDetailPage({ params }) {
 
             {/* Badges */}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {fitsMyBike && (
+                <span style={badge('rgba(184,146,42,0.15)', '#c9a84c')}>
+                  ✓ FITS YOUR {garageVehicle.year} {garageVehicle.nickname || garageVehicle.model}
+                </span>
+              )}
               {productRow.is_universal && !fitment?.length && (
                 <span style={badge('rgba(58,122,58,0.12)', '#5a9a5a')}>UNIVERSAL FIT</span>
               )}
