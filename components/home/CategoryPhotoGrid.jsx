@@ -13,7 +13,6 @@
 import Link from 'next/link';
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
-import gsap from 'gsap';
 
 // ── Category data — verified against live display_category values ──────────
 const CATEGORIES = [
@@ -27,17 +26,17 @@ const CATEGORIES = [
   { label: 'Gaskets & Seals',               href: '/browse?display_category=Gaskets+%26+Seals',                          img: null },
   { label: 'Fuel, Air & Carburetors',       href: '/browse?display_category=Fuel%2C+Air+%26+Carburetors',                img: '/images/categories/fuel-air-carburetors.png' },
   { label: 'Tanks & Body',                  href: '/browse?display_category=Tanks+%26+Body',                             img: '/images/categories/tanks-body.png' },
-  { label: 'Lighting',                      href: '/browse?display_category=Lighting',                                    img: null },
-  { label: 'Frames & Suspension',           href: '/browse?display_category=Frames+%26+Suspension',                      img: null },
-  { label: 'Wheels & Tires',                href: '/browse?display_category=Wheels+%26+Tires',                           img: null },
+  { label: 'Lighting',                      href: '/browse?display_category=Lighting',                                    img: '/images/categories/lighting.png' },
+  { label: 'Frames & Suspension',           href: '/browse?display_category=Frames+%26+Suspension',                      img: '/images/categories/frames-suspension.png' },
+  { label: 'Wheels & Tires',                href: '/browse?display_category=Wheels+%26+Tires',                           img: '/images/categories/wheels-tires.png' },
   { label: 'Seating',                       href: '/browse?display_category=Seating',                                     img: null },
   { label: 'Electrical',                    href: '/browse?display_category=Electrical',                                  img: '/images/categories/electrical.png' },
   { label: 'Exhaust',                       href: '/browse?display_category=Exhaust',                                     img: '/images/categories/exhaust.png' },
-  { label: 'Hardware',                      href: '/browse?display_category=Hardware',                                    img: null },
+  { label: 'Hardware',                      href: '/browse?display_category=Hardware',                                    img: '/images/categories/hardware.png' },
   { label: 'Accessories & Gear',            href: '/browse?display_category=Accessories+%26+Gear',                       img: null },
   { label: 'Tools & Chemicals',             href: '/browse?display_category=Tools+%26+Chemicals',                        img: null },
   { label: 'Saddlebags, Sissy Bars & Luggage', href: '/browse?display_category=Saddlebags%2C+Sissy+Bars+%26+Luggage',   img: null },
-  { label: 'Windshields & Fairings',        href: '/browse?display_category=Windshields+%26+Fairings',                   img: null },
+  { label: 'Windshields & Fairings',        href: '/browse?display_category=Windshields+%26+Fairings',                   img: '/images/categories/windshields-fairings.png' },
   { label: 'Dashes & Gauges',               href: '/browse?display_category=Dashes+%26+Gauges',                          img: '/images/categories/dashes-gauges.png' },
 ];
 
@@ -51,71 +50,46 @@ function buildSubcatHref(categoryLabel, subcatName) {
   return `/browse?${params.toString()}`;
 }
 
-// ── LayeredStack — click to spread, click again to stack ──────────────────
-function LayeredStack({ children, isSpread, onSpread }) {
-  const containerRef = useRef(null);
+// ── SubcatGrid — stagger-animated card grid, always clickable ─────────────
+const cardVariants = {
+  hidden: { opacity: 0, y: 28, scale: 0.92, rotate: -2 },
+  show:   (i) => ({
+    opacity: 1, y: 0, scale: 1, rotate: 0,
+    transition: { delay: i * 0.055, duration: 0.38, ease: [0.22, 0.61, 0.36, 1] },
+  }),
+};
 
-  const stackCards = useCallback(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const cards = Array.from(container.children);
-    cards.forEach((card, i) => {
-      const offsetX = container.clientWidth  / 2 - card.offsetWidth  / 2 - card.offsetLeft;
-      const offsetY = container.clientHeight / 2 - card.offsetHeight / 2 - card.offsetTop;
-      gsap.to(card, {
-        x: offsetX,
-        y: offsetY,
-        rotate: 'random(-18,18)',
-        zIndex: 100 - i,
-        duration: 0.5,
-        ease: 'power2.out',
-        overwrite: true,
-      });
-    });
-  }, []);
-
-  const resetCards = useCallback(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    gsap.to(Array.from(container.children), {
-      x: 0,
-      y: 0,
-      zIndex: 1,
-      rotate: 0,
-      duration: 0.6,
-      ease: 'power3.out',
-      stagger: { amount: 0.08, from: 'start' },
-      overwrite: true,
-    });
-  }, []);
-
-  // Stack on mount, spread/stack when isSpread changes
-  useEffect(() => {
-    const t = setTimeout(stackCards, 60);
-    return () => clearTimeout(t);
-  }, [children, stackCards]);
-
-  useEffect(() => {
-    if (isSpread) resetCards();
-    else stackCards();
-  }, [isSpread, resetCards, stackCards]);
-
+function SubcatGrid({ subcats, categoryLabel, onClose }) {
   return (
-    <div
-      ref={containerRef}
-      className={`ls-container${isSpread ? ' ls-spread' : ''}`}
-      onClick={!isSpread ? onSpread : undefined}
-      style={{ cursor: isSpread ? 'default' : 'pointer' }}
-    >
-      {children}
+    <div className="ls-container">
+      {subcats.map((sub, i) => (
+        <motion.div
+          key={sub.name}
+          custom={i}
+          variants={cardVariants}
+          initial="hidden"
+          animate="show"
+        >
+          <Link
+            href={buildSubcatHref(categoryLabel, sub.name)}
+            className="cpg-subcat-card"
+            onClick={onClose}
+          >
+            <div className="cpg-subcat-corner" aria-hidden="true" />
+            <div className="cpg-subcat-name">{sub.name}</div>
+            <div className="cpg-subcat-count">{sub.count.toLocaleString()} parts</div>
+          </Link>
+        </motion.div>
+      ))}
     </div>
   );
 }
 
 // ── Category tile (button, opens modal) ───────────────────────────────────
-function CategoryTile({ label, href, img, onClick }) {
+function CategoryTile({ label, href, img, variant, onClick }) {
+  const tileClass = variant === 'light' ? 'cpg-tile cpg-tile-light' : 'cpg-tile';
   return (
-    <button type="button" className="cpg-tile" onClick={onClick} aria-label={`Browse ${label}`}>
+    <button type="button" className={tileClass} onClick={onClick} aria-label={`Browse ${label}`}>
       {img ? (
         <img src={img} alt="" aria-hidden="true" className="cpg-img" />
       ) : (
@@ -148,19 +122,21 @@ export default function CategoryPhotoGrid() {
   const y3 = useTransform(scrollYProgress, [0, 1], [100, -700]);
 
   // ── Modal state ──────────────────────────────────────────────────────────
-  const [active, setActive]       = useState(null); // { label, href }
-  const [subcats, setSubcats]     = useState([]);
-  const [loading, setLoading]     = useState(false);
-  const [isSpread, setIsSpread]   = useState(false);
+  const [active, setActive]   = useState(null); // { label, href }
+  const [subcats, setSubcats] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const openCategory = useCallback((cat) => {
     setActive(cat);
     setSubcats([]);
     setLoading(true);
-    setIsSpread(false);
     fetch(`/api/browse/subcategories?category=${encodeURIComponent(cat.label)}`)
       .then(r => r.json())
-      .then(d => { setSubcats(d.subcategories || []); setLoading(false); })
+      .then(d => {
+        const sorted = [...(d.subcategories || [])].sort((a, b) => a.name.localeCompare(b.name));
+        setSubcats(sorted);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
   }, []);
 
@@ -187,13 +163,13 @@ export default function CategoryPhotoGrid() {
         {/* 3-column parallax grid */}
         <div className="cpg-grid">
           <motion.div className="cpg-col" style={{ y: y1 }}>
-            {col1.map(cat => <CategoryTile key={cat.label} {...cat} onClick={() => openCategory(cat)} />)}
+            {col1.map((cat, i) => <CategoryTile key={cat.label} {...cat} variant={i % 2 === 0 ? 'dark' : 'light'} onClick={() => openCategory(cat)} />)}
           </motion.div>
           <motion.div className="cpg-col" style={{ y: y2 }}>
-            {col2.map(cat => <CategoryTile key={cat.label} {...cat} onClick={() => openCategory(cat)} />)}
+            {col2.map((cat, i) => <CategoryTile key={cat.label} {...cat} variant={i % 2 === 0 ? 'light' : 'dark'} onClick={() => openCategory(cat)} />)}
           </motion.div>
           <motion.div className="cpg-col" style={{ y: y3 }}>
-            {col3.map(cat => <CategoryTile key={cat.label} {...cat} onClick={() => openCategory(cat)} />)}
+            {col3.map((cat, i) => <CategoryTile key={cat.label} {...cat} variant={i % 2 === 0 ? 'dark' : 'light'} onClick={() => openCategory(cat)} />)}
           </motion.div>
         </div>
 
@@ -245,29 +221,13 @@ export default function CategoryPhotoGrid() {
 
                 {!loading && subcats.length > 0 && (
                   <>
-                    <div className="cpg-stack-hint">
-                      {isSpread ? 'TAP A CARD TO BROWSE' : 'TAP THE STACK TO REVEAL'}
-                    </div>
-                    <LayeredStack
+                    <div className="cpg-stack-hint">SELECT A SUBCATEGORY</div>
+                    <SubcatGrid
                       key={active.label}
-                      isSpread={isSpread}
-                      onSpread={() => setIsSpread(true)}
-                    >
-                      {subcats.map(sub => (
-                        <Link
-                          key={sub.name}
-                          href={buildSubcatHref(active.label, sub.name)}
-                          className="cpg-subcat-card"
-                          onClick={close}
-                          tabIndex={isSpread ? 0 : -1}
-                          style={{ pointerEvents: isSpread ? 'auto' : 'none' }}
-                        >
-                          <div className="cpg-subcat-corner" aria-hidden="true" />
-                          <div className="cpg-subcat-name">{sub.name}</div>
-                          <div className="cpg-subcat-count">{sub.count.toLocaleString()} parts</div>
-                        </Link>
-                      ))}
-                    </LayeredStack>
+                      subcats={subcats}
+                      categoryLabel={active.label}
+                      onClose={close}
+                    />
                   </>
                 )}
 
@@ -327,14 +287,14 @@ export default function CategoryPhotoGrid() {
         .cpg-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: 0 1px;
-          background: rgba(197,167,34,0.14);
-          padding: 0 1px 1px;
+          gap: 14px;
+          background: transparent;
+          padding: 0;
         }
         .cpg-col {
           display: flex;
           flex-direction: column;
-          gap: 1px;
+          gap: 14px;
         }
 
         /* ── Category tile ────────────────────────────────────────────── */
@@ -346,13 +306,27 @@ export default function CategoryPhotoGrid() {
           overflow: hidden;
           background: #0c0a06;
           border: none;
-          border-bottom: 4px solid rgba(255,255,255,0.85);
           padding: 0;
           cursor: pointer;
-          transition: border-color 0.25s;
         }
-        .cpg-tile:hover {
-          border-bottom-color: #c9a84c;
+        .cpg-tile::after {
+          content: '';
+          position: absolute;
+          left: 0; right: 0; bottom: 0;
+          height: 7px;
+          background: rgba(255,255,255,0.85);
+          clip-path: polygon(
+            0% 55%, 3% 20%, 6% 70%, 9% 10%, 12% 60%, 16% 30%, 19% 85%,
+            23% 15%, 27% 65%, 31% 5%, 35% 55%, 39% 25%, 43% 75%, 47% 10%,
+            51% 60%, 55% 30%, 59% 80%, 63% 15%, 67% 65%, 71% 5%, 75% 50%,
+            79% 20%, 83% 70%, 87% 10%, 91% 60%, 95% 25%, 100% 55%,
+            100% 100%, 0% 100%
+          );
+          transition: background 0.25s;
+          pointer-events: none;
+        }
+        .cpg-tile:hover::after {
+          background: #c9a84c;
         }
         .cpg-img {
           position: absolute;
@@ -384,11 +358,11 @@ export default function CategoryPhotoGrid() {
         .cpg-overlay {
           position: absolute;
           inset: 0;
-          background: linear-gradient(to bottom, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.30) 45%, rgba(0,0,0,0.78) 100%);
+          background: linear-gradient(to bottom, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.22) 40%, rgba(0,0,0,0.80) 100%);
           transition: background 0.4s ease;
         }
         .cpg-tile:hover .cpg-overlay {
-          background: linear-gradient(to bottom, rgba(0,0,0,0.16) 0%, rgba(0,0,0,0.42) 45%, rgba(0,0,0,0.86) 100%);
+          background: linear-gradient(to bottom, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0.32) 40%, rgba(0,0,0,0.88) 100%);
         }
         .cpg-corner {
           position: absolute;
@@ -403,19 +377,23 @@ export default function CategoryPhotoGrid() {
         .cpg-content {
           position: absolute;
           bottom: 0; left: 0; right: 0;
+          min-height: 50%;
+          display: flex;
+          flex-direction: column;
+          justify-content: flex-end;
           padding: 0 18px 16px;
           text-align: left;
         }
         .cpg-label {
           font-family: var(--font-tanker), sans-serif;
-          font-size: clamp(28px, 3.2vw, 48px);
+          font-size: clamp(34px, 5.2vw, 72px);
           font-weight: 400;
-          line-height: 0.92;
+          line-height: 0.90;
           letter-spacing: -0.01em;
           text-transform: uppercase;
           color: #ffffff;
           text-shadow: 0 2px 16px rgba(0,0,0,0.8);
-          margin-bottom: 10px;
+          margin-bottom: 14px;
           transition: color 0.2s;
         }
         .cpg-tile:hover .cpg-label { color: #ffffff; }
@@ -441,6 +419,50 @@ export default function CategoryPhotoGrid() {
           transition: transform 0.2s ease;
         }
         .cpg-tile:hover .cpg-cta-arrow { transform: translateX(3px); }
+
+        /* ── Light tile variant (alternating checkerboard) ──────────────── */
+        .cpg-tile-light .cpg-placeholder {
+          background: linear-gradient(135deg, #ded0a4 0%, #cbb98a 55%, #b8a473 100%);
+        }
+        .cpg-tile-light .cpg-placeholder::after {
+          background-image:
+            linear-gradient(rgba(74,56,16,0.08) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(74,56,16,0.08) 1px, transparent 1px);
+        }
+        .cpg-tile-light .cpg-img {
+          filter: grayscale(10%) brightness(1.02) sepia(8%);
+        }
+        .cpg-tile-light:hover .cpg-img {
+          filter: grayscale(0%) brightness(1.05) sepia(4%);
+        }
+        .cpg-tile-light .cpg-overlay {
+          background: linear-gradient(to bottom, rgba(245,240,232,0.05) 0%, rgba(245,240,232,0.45) 40%, rgba(238,229,206,0.92) 100%);
+        }
+        .cpg-tile-light:hover .cpg-overlay {
+          background: linear-gradient(to bottom, rgba(245,240,232,0.10) 0%, rgba(245,240,232,0.55) 40%, rgba(238,229,206,0.96) 100%);
+        }
+        .cpg-tile-light .cpg-corner {
+          border-top-color: rgba(26,18,8,0.30);
+          border-left-color: rgba(26,18,8,0.30);
+        }
+        .cpg-tile-light:hover .cpg-corner {
+          border-color: rgba(26,18,8,0.55);
+        }
+        .cpg-tile-light .cpg-label {
+          color: #1a1208;
+          text-shadow: 0 1px 10px rgba(245,240,232,0.6);
+        }
+        .cpg-tile-light:hover .cpg-label { color: #1a1208; }
+        .cpg-tile-light .cpg-cta-text,
+        .cpg-tile-light .cpg-cta-arrow {
+          color: #8a6a22;
+        }
+        .cpg-tile-light::after {
+          background: rgba(26,18,8,0.45);
+        }
+        .cpg-tile-light:hover::after {
+          background: #8a6a22;
+        }
 
         /* ── Modal backdrop ───────────────────────────────────────────── */
         .cpg-backdrop {
@@ -546,17 +568,12 @@ export default function CategoryPhotoGrid() {
           text-transform: uppercase;
         }
 
-        /* ── LayeredStack container ───────────────────────────────────── */
+        /* ── Subcategory grid ─────────────────────────────────────────── */
         .ls-container {
-          position: relative;
           width: 100%;
           display: grid;
           grid-template-columns: repeat(4, 1fr);
           gap: 10px;
-          cursor: pointer;
-        }
-        .ls-spread .cpg-subcat-card {
-          cursor: pointer;
         }
 
         /* ── Subcategory card ─────────────────────────────────────────── */

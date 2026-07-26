@@ -57,20 +57,10 @@ function buildShopUrl(vehicle) {
 }
 
 // ── YMM Data ─────────────────────────────────────────────────
+// Harley-Davidson only — this is an H-D aftermarket parts catalog, and only
+// H-D fitment data exists to filter against.
 const YEARS = Array.from({ length: 35 }, (_, i) => 2025 - i);
-const MAKES = ["Harley-Davidson","Indian","Honda","Yamaha","Kawasaki","Suzuki","BMW","KTM","Ducati","Triumph","Victory","Can-Am","Polaris","Arctic Cat","Ski-Doo"];
-const MODELS = {
-  "Harley-Davidson":["Road King","Road King Special","Street Glide","Street Glide Special","Road Glide","Road Glide Special","Fat Boy","Fat Boy 114","Softail Slim","Low Rider","Low Rider S","Fat Bob","Heritage Classic","Breakout","Sport Glide","Iron 883","Iron 1200","Forty-Eight","Sportster S","Nightster","Pan America 1250"],
-  "Indian":["Chief","Chief Bobber","Scout","Scout Bobber","Scout Rogue","Challenger","Challenger Dark Horse","Springfield","Pursuit"],
-  "Honda":["Gold Wing","Gold Wing Tour","Shadow Aero","Rebel 300","Rebel 500","Rebel 1100","CBR600RR","CBR1000RR-R","Africa Twin","CB650R"],
-  "Yamaha":["V-Star 650","V-Star 950","V-Star 1300","Bolt","YZF-R1","MT-07","MT-09","MT-10","Ténéré 700"],
-  "Kawasaki":["Vulcan 900","Vulcan 1700","Vulcan S","Ninja 400","Ninja 650","Ninja ZX-6R","Ninja ZX-10R","Z900","Versys 650"],
-  "Suzuki":["Boulevard C50","Boulevard M50","Boulevard M109R","GSX-R600","GSX-R1000","V-Strom 650","V-Strom 1050"],
-  "BMW":["R 1250 GS","R 1250 GS Adventure","R 1250 RT","R 18","S 1000 RR","F 850 GS","F 900 R"],
-  "KTM":["390 Duke","690 Duke","890 Duke","1290 Super Duke","890 Adventure","1290 Super Adventure","450 SX-F"],
-  "Ducati":["Panigale V2","Panigale V4","Monster","Multistrada V4","Scrambler Icon"],
-  "Triumph":["Bonneville T100","Bonneville T120","Scrambler 1200","Tiger 900","Tiger 1200","Speed Triple","Speed Twin","Rocket 3"],
-};
+const HD_MAKE = "Harley-Davidson";
 
 const POINTS_TO_DOLLAR = 0.01;
 const FREE_SHIPPING    = 99;
@@ -314,37 +304,40 @@ export default function GarageHub({ user, initialAddresses, initialVehicles, led
   };
   const [savingAddr,   setSavingAddr]   = useState(false);
 
-  // Bikes state
+  // Bikes state — Harley-Davidson only (see HD_MAKE above).
   const [vehicles,  setVehicles]  = useState(initialVehicles);
   const [showAddBike, setShowAddBike] = useState(false);
   const [bikeYear,  setBikeYear]  = useState("");
-  const [bikeMake,  setBikeMake]  = useState("");
   const [bikeModel, setBikeModel] = useState("");
   const [bikeModelCode, setBikeModelCode] = useState(null);
   const [bikeNick,  setBikeNick]  = useState("");
   const [savingBike, setSavingBike] = useState(false);
-  const isHD = bikeMake === "Harley-Davidson";
 
-  // For Harley-Davidson, fetch the real models that existed in the chosen
-  // year so we always capture an exact model_code (needed for fitment
-  // filtering) instead of a free-text marketing name.
+  // Fetch the real models that existed in the chosen year so we always
+  // capture an exact model_code (needed for fitment filtering) instead of a
+  // free-text marketing name.
   const [hdModelsRaw, setHdModelsRaw] = useState([]);
   const [loadingHdModels, setLoadingHdModels] = useState(false);
   useEffect(() => {
-    if (!isHD || !bikeYear) return; // stale hdModelsRaw is simply unused while not HD
+    if (!bikeYear) return; // stale hdModelsRaw is simply unused while no year is picked
     let cancelled = false;
-    setLoadingHdModels(true);
-    fetch(`/api/hd-models?year=${bikeYear}`)
-      .then(r => r.json())
-      .then(data => { if (!cancelled) setHdModelsRaw(data.models ?? []); })
-      .catch(() => { if (!cancelled) setHdModelsRaw([]); })
-      .finally(() => { if (!cancelled) setLoadingHdModels(false); });
+    (async () => {
+      setLoadingHdModels(true);
+      try {
+        const res = await fetch(`/api/hd-models?year=${bikeYear}`);
+        const data = await res.json();
+        if (!cancelled) setHdModelsRaw(data.models ?? []);
+      } catch {
+        if (!cancelled) setHdModelsRaw([]);
+      } finally {
+        if (!cancelled) setLoadingHdModels(false);
+      }
+    })();
     return () => { cancelled = true; };
-  }, [isHD, bikeYear]);
-  const hdModels = (isHD && bikeYear) ? hdModelsRaw : [];
+  }, [bikeYear]);
+  const hdModels = bikeYear ? hdModelsRaw : [];
 
   const titleCase = (s) => s.replace(/\w\S*/g, w => w[0].toUpperCase() + w.slice(1).toLowerCase());
-  const bikeModels = isHD ? [] : (bikeMake ? (MODELS[bikeMake] ?? []) : []);
 
   // Wishlist state
   const [wishlistItems, setWishlistItems] = useState(wishlist);
@@ -398,27 +391,26 @@ export default function GarageHub({ user, initialAddresses, initialVehicles, led
 
   // ── Bike handlers ───────────────────────────────────────────
   const handleAddBike = async () => {
-    if (!bikeYear || !bikeMake || !bikeModel) return;
+    if (!bikeYear || !bikeModel) return;
     setSavingBike(true);
     const isPrimary = vehicles.length === 0;
-    const modelCode = isHD ? bikeModelCode : null;
 
     let vehicleRow = null;
     const { data: existing } = await supabase.from("vehicles")
       .select("id, year, make, model, model_code, submodel, type")
-      .eq("year", parseInt(bikeYear)).eq("make", bikeMake).eq("model", bikeModel)
+      .eq("year", parseInt(bikeYear)).eq("make", HD_MAKE).eq("model", bikeModel)
       .limit(1).maybeSingle();
 
     if (existing) {
       vehicleRow = existing;
       // Backfill model_code on older rows saved before this was captured.
-      if (!existing.model_code && modelCode) {
-        await supabase.from("vehicles").update({ model_code: modelCode }).eq("id", existing.id);
-        vehicleRow = { ...existing, model_code: modelCode };
+      if (!existing.model_code && bikeModelCode) {
+        await supabase.from("vehicles").update({ model_code: bikeModelCode }).eq("id", existing.id);
+        vehicleRow = { ...existing, model_code: bikeModelCode };
       }
     } else {
       const { data: created, error: cErr } = await supabase.from("vehicles")
-        .insert({ year: parseInt(bikeYear), make: bikeMake, model: bikeModel, model_code: modelCode, type: "motorcycle" })
+        .insert({ year: parseInt(bikeYear), make: HD_MAKE, model: bikeModel, model_code: bikeModelCode, type: "motorcycle" })
         .select("id, year, make, model, model_code, submodel, type").single();
       if (cErr) { setSavingBike(false); showToast(cErr.message); return; }
       vehicleRow = created;
@@ -435,8 +427,8 @@ export default function GarageHub({ user, initialAddresses, initialVehicles, led
     const entry = { id: garageRow.id, vehicleId: vehicleRow.id, year: vehicleRow.year, make: vehicleRow.make, model: vehicleRow.model, modelCode: vehicleRow.model_code ?? null, submodel: vehicleRow.submodel, type: vehicleRow.type ?? "motorcycle", nickname: garageRow.nickname, is_primary: isPrimary };
     setVehicles(v => isPrimary ? [entry, ...v] : [...v, entry]);
     setShowAddBike(false);
-    setBikeYear(""); setBikeMake(""); setBikeModel(""); setBikeModelCode(null); setBikeNick("");
-    showToast(`${bikeYear} ${bikeMake} ${bikeModel} added`);
+    setBikeYear(""); setBikeModel(""); setBikeModelCode(null); setBikeNick("");
+    showToast(`${bikeYear} ${HD_MAKE} ${bikeModel} added`);
   };
 
   const handleSetPrimary = async (id) => {
@@ -880,36 +872,24 @@ export default function GarageHub({ user, initialAddresses, initialVehicles, led
               ADD <span>VEHICLE</span>
               <button className="gh-modal-close" onClick={() => setShowAddBike(false)}>✕</button>
             </div>
-            <div className="gh-grid-3" style={{gap:12, marginBottom:12}}>
+            <div className="gh-grid-2" style={{gap:12, marginBottom:12}}>
               <div className="gh-field">
                 <label className="gh-label">YEAR</label>
-                <select className="gh-select" value={bikeYear} onChange={e=>{setBikeYear(e.target.value);setBikeMake("");setBikeModel("");setBikeModelCode(null);}}>
+                <select className="gh-select" value={bikeYear} onChange={e=>{setBikeYear(e.target.value);setBikeModel("");setBikeModelCode(null);}}>
                   <option value="">Year</option>{YEARS.map(y=><option key={y}>{y}</option>)}
                 </select>
               </div>
               <div className="gh-field">
-                <label className="gh-label">MAKE</label>
-                <select className="gh-select" value={bikeMake} onChange={e=>{setBikeMake(e.target.value);setBikeModel("");setBikeModelCode(null);}} disabled={!bikeYear}>
-                  <option value="">Make</option>{MAKES.map(m=><option key={m}>{m}</option>)}
-                </select>
-              </div>
-              <div className="gh-field">
                 <label className="gh-label">MODEL</label>
-                {isHD ? (
-                  <select className="gh-select" value={bikeModelCode || ""} onChange={e=>{
-                    const code = e.target.value;
-                    const found = hdModels.find(x => x.model_code === code);
-                    setBikeModelCode(code || null);
-                    setBikeModel(found ? titleCase(found.name) : "");
-                  }} disabled={!bikeMake || loadingHdModels}>
-                    <option value="">{loadingHdModels ? "Loading models..." : "Model"}</option>
-                    {hdModels.map(m => <option key={m.model_code} value={m.model_code}>{titleCase(m.name)}</option>)}
-                  </select>
-                ) : (
-                  <select className="gh-select" value={bikeModel} onChange={e=>setBikeModel(e.target.value)} disabled={!bikeMake}>
-                    <option value="">Model</option>{bikeModels.map(m=><option key={m}>{m}</option>)}
-                  </select>
-                )}
+                <select className="gh-select" value={bikeModelCode || ""} onChange={e=>{
+                  const code = e.target.value;
+                  const found = hdModels.find(x => x.model_code === code);
+                  setBikeModelCode(code || null);
+                  setBikeModel(found ? titleCase(found.name) : "");
+                }} disabled={!bikeYear || loadingHdModels}>
+                  <option value="">{loadingHdModels ? "Loading models..." : "Model"}</option>
+                  {hdModels.map(m => <option key={m.model_code} value={m.model_code}>{m.model_code} — {titleCase(m.name)}</option>)}
+                </select>
               </div>
             </div>
             <div className="gh-field" style={{marginBottom:16}}>
@@ -918,7 +898,7 @@ export default function GarageHub({ user, initialAddresses, initialVehicles, led
             </div>
             <div style={{display:"flex", gap:10}}>
               <button className="btn-ghost" style={{flex:1}} onClick={() => setShowAddBike(false)}>CANCEL</button>
-              <button className="btn-orange" style={{flex:2}} onClick={handleAddBike} disabled={!bikeYear||!bikeMake||!bikeModel||savingBike}>
+              <button className="btn-orange" style={{flex:2}} onClick={handleAddBike} disabled={!bikeYear||!bikeModel||savingBike}>
                 {savingBike ? "SAVING..." : "SAVE TO GARAGE"}
               </button>
             </div>

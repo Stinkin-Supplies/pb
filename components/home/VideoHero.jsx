@@ -41,7 +41,7 @@ export default function VideoHero() {
       {/* ── Video ──────────────────────────────────────────────────────────── */}
       <video
         ref={videoRef}
-        src="https://pub-87823a6eaf5f4ed4aebf7415f970458e.r2.dev/triovideo.mp4"
+        src="https://8xpstxcqsrkjpxhe.public.blob.vercel-storage.com/homevideo-GV4kH1trjPu96LCJQXSeiASXn9FMHL.mp4"
         autoPlay
         muted
         loop

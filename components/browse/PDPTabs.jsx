@@ -266,6 +266,7 @@ function OemContent({ oemRows }) {
 function FitmentContent({ fitment }) {
   const [query, setQuery] = useState('');
   const [openFamilies, setOpenFamilies] = useState(new Set());
+  const [activePills, setActivePills] = useState(new Set());
 
   if (!fitment?.length) return <Panel><Empty>No fitment data on file.</Empty></Panel>;
 
@@ -281,7 +282,6 @@ function FitmentContent({ fitment }) {
   // Default first family open
   const firstFamily = groups[0]?.family;
   if (firstFamily && openFamilies.size === 0) {
-    // Use a ref-less trick: add to set inline (safe because this is deterministic)
     openFamilies.add(firstFamily);
   }
 
@@ -293,9 +293,29 @@ function FitmentContent({ fitment }) {
     });
   }
 
+  function togglePill(family) {
+    setActivePills(prev => {
+      const next = new Set(prev);
+      if (next.has(family)) {
+        next.delete(family);
+      } else {
+        next.add(family);
+        // auto-open the accordion for this family
+        setOpenFamilies(o => new Set([...o, family]));
+      }
+      return next;
+    });
+  }
+
   const q = query.trim().toLowerCase();
+
+  // Apply pill filter first, then text search
+  const pillFiltered = activePills.size > 0
+    ? groups.filter(g => activePills.has(g.family))
+    : groups;
+
   const filteredGroups = q
-    ? groups
+    ? pillFiltered
         .map(g => ({
           ...g,
           rows: g.rows.filter(r =>
@@ -307,15 +327,105 @@ function FitmentContent({ fitment }) {
           ),
         }))
         .filter(g => g.rows.length > 0)
-    : groups;
+    : pillFiltered;
 
   const totalModels = filteredGroups.reduce((n, g) => n + g.rows.length, 0);
 
+  // Cream parchment colour palette for fitment panel
+  const P = {
+    bg:       '#ede4cc',
+    bgAlt:    '#e6dbbf',
+    header:   '#ddd3b2',
+    headerOn: '#cfc09a',
+    text:     '#1a1408',
+    textDim:  '#5a4828',
+    textMuted:'#8a7244',
+    gold:     '#7a5e14',
+    goldDim:  '#a07c30',
+    border:   'rgba(100,78,20,0.20)',
+    borderOn: 'rgba(100,78,20,0.45)',
+    pillOn:   '#7a5e14',
+  };
+
   return (
-    <Panel>
+    <div style={{
+      background: P.bg,
+      border: `1px solid ${P.border}`,
+      borderTop: 'none',
+      padding: '20px 20px',
+      minHeight: 180,
+    }}>
+
+      {/* Family pills */}
+      {groups.length > 1 && (
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 7,
+          marginBottom: 16,
+          paddingBottom: 16,
+          borderBottom: `1px solid ${P.border}`,
+        }}>
+          {groups.map(g => {
+            const on = activePills.has(g.family);
+            return (
+              <button
+                key={g.family}
+                onClick={() => togglePill(g.family)}
+                style={{
+                  fontFamily: 'var(--font-stencil)',
+                  fontSize: 11,
+                  letterSpacing: '0.14em',
+                  textTransform: 'uppercase',
+                  color: on ? '#f0e8d8' : P.textDim,
+                  background: on ? P.pillOn : 'rgba(0,0,0,0.05)',
+                  border: `1px solid ${on ? P.pillOn : P.border}`,
+                  padding: '7px 14px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  transition: 'all 0.15s',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {g.family}
+                <span style={{
+                  fontSize: 9,
+                  color: on ? 'rgba(240,232,216,0.7)' : P.textMuted,
+                  background: on ? 'rgba(0,0,0,0.18)' : 'rgba(0,0,0,0.07)',
+                  border: `1px solid ${on ? 'rgba(0,0,0,0.15)' : P.border}`,
+                  padding: '1px 6px',
+                  lineHeight: 1.6,
+                }}>
+                  {g.rows.length}
+                </span>
+              </button>
+            );
+          })}
+          {activePills.size > 0 && (
+            <button
+              onClick={() => setActivePills(new Set())}
+              style={{
+                fontFamily: 'var(--font-stencil)',
+                fontSize: 10,
+                letterSpacing: '0.10em',
+                color: P.textMuted,
+                background: 'transparent',
+                border: `1px solid ${P.border}`,
+                padding: '7px 12px',
+                cursor: 'pointer',
+                transition: 'color 0.15s',
+              }}
+            >
+              × Clear
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Search + summary row */}
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16 }}>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 14 }}>
         <input
           type="text"
           value={query}
@@ -326,20 +436,20 @@ function FitmentContent({ fitment }) {
             padding: '9px 14px',
             fontFamily: 'var(--font-bespoke)',
             fontSize: 13,
-            color: C.textPrime,
-            background: C.surface,
-            border: `1px solid ${C.border}`,
+            color: P.text,
+            background: 'rgba(0,0,0,0.06)',
+            border: `1px solid ${P.border}`,
             borderRadius: 0,
             outline: 'none',
             transition: 'border-color 0.15s',
           }}
-          onFocus={e => e.target.style.borderColor = C.borderGold}
-          onBlur={e => e.target.style.borderColor = C.border}
+          onFocus={e => e.target.style.borderColor = P.borderOn}
+          onBlur={e => e.target.style.borderColor = P.border}
         />
         <div style={{
           fontFamily: 'var(--font-stencil)',
           fontSize: 9,
-          color: C.textMuted,
+          color: P.textMuted,
           letterSpacing: '0.08em',
           whiteSpace: 'nowrap',
         }}>
@@ -348,14 +458,18 @@ function FitmentContent({ fitment }) {
       </div>
 
       {/* Family accordion list */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 460, overflowY: 'auto' }}>
-        {filteredGroups.length === 0 && <Empty>No matching fitment.</Empty>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 480, overflowY: 'auto' }}>
+        {filteredGroups.length === 0 && (
+          <div style={{ fontFamily: 'var(--font-stencil)', fontSize: 10, color: P.textMuted, letterSpacing: '0.08em', padding: '16px 0' }}>
+            No matching fitment.
+          </div>
+        )}
 
         {filteredGroups.map(group => {
           const isOpen = q ? true : openFamilies.has(group.family);
           return (
             <div key={group.family} style={{
-              border: `1px solid ${isOpen ? C.borderGold : C.border}`,
+              border: `1px solid ${isOpen ? P.borderOn : P.border}`,
               transition: 'border-color 0.15s',
               overflow: 'hidden',
             }}>
@@ -368,52 +482,53 @@ function FitmentContent({ fitment }) {
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   width: '100%',
-                  padding: '11px 16px',
+                  padding: '13px 16px',
                   cursor: q ? 'default' : 'pointer',
-                  background: isOpen ? 'rgba(197,167,34,0.07)' : 'transparent',
+                  background: isOpen ? P.headerOn : P.header,
                   border: 'none',
-                  borderBottom: isOpen ? `1px solid ${C.border}` : 'none',
+                  borderBottom: isOpen ? `1px solid ${P.border}` : 'none',
                   textAlign: 'left',
                   gap: 12,
+                  transition: 'background 0.15s',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{
                     width: 3,
-                    height: 14,
+                    height: 16,
                     flexShrink: 0,
-                    background: isOpen ? C.gold : C.textMuted,
+                    background: isOpen ? P.gold : P.textMuted,
                     display: 'inline-block',
                     transition: 'background 0.15s',
                   }} />
                   <span style={{
                     fontFamily: 'var(--font-stencil)',
-                    fontSize: 11,
-                    color: isOpen ? C.gold : C.textDim,
+                    fontSize: 13,
+                    color: isOpen ? P.gold : P.textDim,
                     letterSpacing: '0.14em',
                     textTransform: 'uppercase',
+                    fontWeight: 600,
                   }}>
                     {group.family}
                   </span>
                   <span style={{
                     fontFamily: 'var(--font-stencil)',
-                    fontSize: 8,
-                    color: C.textMuted,
+                    fontSize: 9,
+                    color: P.textMuted,
                     letterSpacing: '0.06em',
-                    background: 'rgba(255,255,255,0.04)',
-                    border: `1px solid ${C.border}`,
+                    background: 'rgba(0,0,0,0.07)',
+                    border: `1px solid ${P.border}`,
                     padding: '2px 7px',
                   }}>
                     {group.rows.length}
                   </span>
                 </div>
 
-                {/* Year range summary for family */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{
                     fontFamily: 'var(--font-stencil)',
-                    fontSize: 9,
-                    color: C.textMuted,
+                    fontSize: 10,
+                    color: P.textMuted,
                     letterSpacing: '0.06em',
                   }}>
                     {Math.min(...group.rows.map(r => r.year_from))}
@@ -422,8 +537,8 @@ function FitmentContent({ fitment }) {
                   </span>
                   {!q && (
                     <span style={{
-                      color: isOpen ? C.gold : C.textMuted,
-                      fontSize: 11,
+                      color: isOpen ? P.gold : P.textMuted,
+                      fontSize: 12,
                       lineHeight: 1,
                       transition: 'transform 0.2s',
                       display: 'inline-block',
@@ -438,54 +553,55 @@ function FitmentContent({ fitment }) {
                 <div>
                   {group.rows.map((row, i) => (
                     <div key={i} style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr auto',
+                      display: 'flex',
                       alignItems: 'center',
+                      justifyContent: 'space-between',
                       gap: 16,
-                      padding: '10px 16px 10px 25px',
-                      background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)',
-                      borderTop: i > 0 ? `1px solid rgba(197,167,34,0.06)` : 'none',
+                      padding: '11px 16px 11px 25px',
+                      background: i % 2 === 0 ? P.bg : P.bgAlt,
+                      borderTop: i > 0 ? `1px solid ${P.border}` : 'none',
                     }}>
 
-                      {/* Model name + code */}
-                      <div>
-                        <div style={{
+                      {/* Model name inline with year */}
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+                        <span style={{
                           fontFamily: 'var(--font-stencil)',
-                          fontSize: 11,
-                          color: C.textPrime,
-                          letterSpacing: '0.06em',
+                          fontSize: 13,
+                          color: P.text,
+                          letterSpacing: '0.08em',
                           textTransform: 'uppercase',
+                          fontWeight: 600,
                         }}>
                           {row.model_name || row.model_code}
-                        </div>
-                        {row.model_name && row.model_code && (
-                          <div style={{
-                            fontFamily: 'var(--font-stencil)',
-                            fontSize: 9,
-                            color: C.goldDim,
-                            letterSpacing: '0.08em',
-                            marginTop: 2,
-                          }}>
-                            {row.model_code}
-                          </div>
-                        )}
+                        </span>
+                        <span style={{
+                          fontFamily: 'var(--font-stencil)',
+                          fontSize: 11,
+                          color: P.gold,
+                          letterSpacing: '0.06em',
+                          background: 'rgba(122,94,20,0.10)',
+                          border: `1px solid rgba(122,94,20,0.22)`,
+                          padding: '3px 10px',
+                          whiteSpace: 'nowrap',
+                        }}>
+                          {row.year_from === row.year_to
+                            ? row.year_from
+                            : `${row.year_from} – ${row.year_to}`}
+                        </span>
                       </div>
 
-                      {/* Year badge */}
-                      <div style={{
-                        fontFamily: 'var(--font-stencil)',
-                        fontSize: 11,
-                        color: C.textDim,
-                        letterSpacing: '0.06em',
-                        background: 'rgba(197,167,34,0.06)',
-                        border: `1px solid rgba(197,167,34,0.18)`,
-                        padding: '5px 12px',
-                        whiteSpace: 'nowrap',
-                      }}>
-                        {row.year_from === row.year_to
-                          ? row.year_from
-                          : `${row.year_from} – ${row.year_to}`}
-                      </div>
+                      {/* Model code below name */}
+                      {row.model_name && row.model_code && (
+                        <span style={{
+                          fontFamily: 'var(--font-stencil)',
+                          fontSize: 9,
+                          color: P.goldDim,
+                          letterSpacing: '0.10em',
+                          whiteSpace: 'nowrap',
+                        }}>
+                          {row.model_code}
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -494,7 +610,7 @@ function FitmentContent({ fitment }) {
           );
         })}
       </div>
-    </Panel>
+    </div>
   );
 }
 
