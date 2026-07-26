@@ -151,7 +151,7 @@ export default function VideoHero() {
           object-fit: cover;
           object-position: center;
           display: block;
-          opacity: 0.55;
+          opacity: 0.85;
         }
 
         /* ── Dark gradient overlay ────────────────────────────────────── */
@@ -161,16 +161,16 @@ export default function VideoHero() {
           background:
             linear-gradient(
               to bottom,
-              rgba(8,7,6,0.70)  0%,
-              rgba(8,7,6,0.35) 30%,
-              rgba(8,7,6,0.20) 55%,
-              rgba(8,7,6,0.80) 100%
+              rgba(8,7,6,0.55)  0%,
+              rgba(8,7,6,0.15) 30%,
+              rgba(8,7,6,0.05) 55%,
+              rgba(8,7,6,0.65) 100%
             ),
             linear-gradient(
               to right,
-              rgba(8,7,6,0.75) 0%,
-              rgba(8,7,6,0.10) 60%,
-              rgba(8,7,6,0.10) 100%
+              rgba(8,7,6,0.55) 0%,
+              rgba(8,7,6,0.05) 60%,
+              rgba(8,7,6,0.05) 100%
             );
           pointer-events: none;
           z-index: 1;

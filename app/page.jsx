@@ -5,7 +5,7 @@
  *
  * Section order:
  *   1. VideoHero          — full-bleed video with hero copy + CTAs
- *   2. ScrollVelocity     — kinetic marquee band
+ *   2. SearchFilterBar    — full-width paper band, search/model filter (placeholder)
  *   3. CategoryPhotoGrid  — image-backed category browse buttons
  *   4. ModelFinder        — era → browse, technical blueprint panel
  *   5. CategoryIndex      — parts catalog table of contents (paper)
@@ -13,8 +13,8 @@
  */
 
 import dynamic from 'next/dynamic';
-import VideoHero      from '@/components/home/VideoHero';
-import ScrollVelocity from '@/components/home/ScrollVelocity';
+import VideoHero       from '@/components/home/VideoHero';
+import SearchFilterBar from '@/components/home/SearchFilterBar';
 import ModelFinder    from '@/components/home/ModelFinder';
 import CategoryIndex     from '@/components/home/CategoryIndex';
 import CategoryPhotoGrid from '@/components/home/CategoryPhotoGrid';
@@ -36,13 +36,8 @@ export default function HomePage() {
         {/* ── 1. Video Hero ───────────────────────────────────────────── */}
         <VideoHero />
 
-        {/* ── 2. ScrollVelocity band ──────────────────────────────────── */}
-        <div className="hp-velocity-band">
-          <ScrollVelocity
-            text="THE RIGHT STINKIN PARTS · "
-            defaultVelocity={1.5}
-          />
-        </div>
+        {/* ── 2. Search / Model Filter placeholder ─────────────────────── */}
+        <SearchFilterBar />
 
         {/* ── 3. Category Photo Grid ──────────────────────────────────── */}
         <CategoryPhotoGrid />
@@ -128,14 +123,6 @@ export default function HomePage() {
           z-index: 1;
           max-width: 1400px;
           margin: 0 auto;
-        }
-
-        /* ── ScrollVelocity band ──────────────────────────────────────── */
-        .hp-velocity-band {
-          background: var(--coal);
-          overflow: hidden;
-          border-top: 1px solid var(--gold-rule);
-          border-bottom: 1px solid var(--gold-rule);
         }
 
       `}</style>

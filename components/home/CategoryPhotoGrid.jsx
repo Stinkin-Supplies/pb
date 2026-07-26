@@ -10,14 +10,16 @@
  *   Drop files into /public/images/categories/ and set the `img` field below.
  */
 
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
+import OptionWheel from './OptionWheel';
+import SmokeBlob from './SmokeBlob';
 
 // ── Category data — verified against live display_category values ──────────
 const CATEGORIES = [
   { label: 'Engine',                        href: '/browse?display_category=Engine',                                      img: '/images/categories/engine.png' },
-  { label: 'Foot Controls & Pegs',          href: '/browse?display_category=Foot+Controls+%26+Pegs',                     img: '/images/categories/foot-controls.png' },
+  { label: 'Foot Controls & Pegs',          href: '/browse?display_category=Foot+Controls+%26+Pegs',                     img: '/images/categories/foot-controls.png', imgPosition: 'center 15%' },
   { label: 'Transmission & Clutch',         href: '/browse?display_category=Transmission+%26+Clutch',                    img: '/images/categories/transmission.png' },
   { label: 'Handlebars & Hand Controls',    href: '/browse?display_category=Handlebars+%26+Hand+Controls',               img: '/images/categories/handlebars.png' },
   { label: 'Brakes',                        href: '/browse?display_category=Brakes',                                      img: '/images/categories/brakes.png' },
@@ -50,52 +52,33 @@ function buildSubcatHref(categoryLabel, subcatName) {
   return `/browse?${params.toString()}`;
 }
 
-// ── SubcatGrid — stagger-animated card grid, always clickable ─────────────
-const cardVariants = {
-  hidden: { opacity: 0, y: 28, scale: 0.92, rotate: -2 },
-  show:   (i) => ({
-    opacity: 1, y: 0, scale: 1, rotate: 0,
-    transition: { delay: i * 0.055, duration: 0.38, ease: [0.22, 0.61, 0.36, 1] },
-  }),
-};
-
-function SubcatGrid({ subcats, categoryLabel, onClose }) {
-  return (
-    <div className="ls-container">
-      {subcats.map((sub, i) => (
-        <motion.div
-          key={sub.name}
-          custom={i}
-          variants={cardVariants}
-          initial="hidden"
-          animate="show"
-        >
-          <Link
-            href={buildSubcatHref(categoryLabel, sub.name)}
-            className="cpg-subcat-card"
-            onClick={onClose}
-          >
-            <div className="cpg-subcat-corner" aria-hidden="true" />
-            <div className="cpg-subcat-name">{sub.name}</div>
-            <div className="cpg-subcat-count">{sub.count.toLocaleString()} parts</div>
-          </Link>
-        </motion.div>
-      ))}
-    </div>
-  );
-}
-
-// ── Category tile (button, opens modal) ───────────────────────────────────
-function CategoryTile({ label, href, img, variant, onClick }) {
+// ── Category tile (button, opens modal) ────────────────────────────────────
+// Rendered as a stamped brass "data plate" button. The category art is used
+// as a CSS mask so it can be tinted to match the nav bar's brass gold,
+// scaled up to fill the icon area — the tile's rounded, overflow-hidden
+// edge clips anything that runs past the button.
+function CategoryTile({ label, href, img, imgPosition, variant, onClick }) {
   const tileClass = variant === 'light' ? 'cpg-tile cpg-tile-light' : 'cpg-tile';
   return (
     <button type="button" className={tileClass} onClick={onClick} aria-label={`Browse ${label}`}>
-      {img ? (
-        <img src={img} alt="" aria-hidden="true" className="cpg-img" />
-      ) : (
-        <div className="cpg-placeholder" aria-hidden="true" />
-      )}
-      <div className="cpg-overlay" aria-hidden="true" />
+      <div className="cpg-plate" aria-hidden="true" />
+      <div className="cpg-icon-wrap">
+        {img ? (
+          <div
+            className="cpg-icon"
+            style={{
+              WebkitMaskImage: `url(${img})`,
+              maskImage: `url(${img})`,
+              WebkitMaskPosition: imgPosition,
+              maskPosition: imgPosition,
+            }}
+            aria-hidden="true"
+          />
+        ) : (
+          <div className="cpg-icon-placeholder" aria-hidden="true" />
+        )}
+      </div>
+      <div className="cpg-scrim" aria-hidden="true" />
       <div className="cpg-corner" aria-hidden="true" />
       <div className="cpg-content">
         <div className="cpg-label">{label}</div>
@@ -111,6 +94,7 @@ function CategoryTile({ label, href, img, variant, onClick }) {
 // ── Main export ────────────────────────────────────────────────────────────
 export default function CategoryPhotoGrid() {
   const ref = useRef(null);
+  const router = useRouter();
 
   const { scrollYProgress } = useScroll({
     target: ref,
@@ -141,6 +125,17 @@ export default function CategoryPhotoGrid() {
   }, []);
 
   const close = useCallback(() => setActive(null), []);
+
+  // Clicking a word in the option wheel navigates immediately — no need to
+  // scroll it to center first.
+  const goToSubcat = useCallback(
+    (_index, name) => {
+      if (!active) return;
+      router.push(buildSubcatHref(active.label, name));
+      close();
+    },
+    [active, router, close]
+  );
 
   // Close on Escape
   useEffect(() => {
@@ -173,6 +168,9 @@ export default function CategoryPhotoGrid() {
           </motion.div>
         </div>
 
+        {/* Paper grain texture — sits behind ident row + grid */}
+        <div className="cpg-paper-grain" aria-hidden="true" />
+
       </section>
 
       {/* ── Subcategory modal ──────────────────────────────────────────── */}
@@ -194,41 +192,48 @@ export default function CategoryPhotoGrid() {
               transition={{ duration: 0.28, ease: [0.22, 0.61, 0.36, 1] }}
               onClick={e => e.stopPropagation()}
             >
-              {/* Modal header */}
+              {/* Minimal header — just the category name + close */}
               <div className="cpg-modal-header">
-                <div className="cpg-modal-title-block">
-                  <div className="cpg-modal-eyebrow">SELECT SUBCATEGORY</div>
-                  <div className="cpg-modal-title">{active.label}</div>
-                </div>
+                <div className="cpg-modal-title">{active.label}</div>
                 <button type="button" className="cpg-modal-close" onClick={close} aria-label="Close">
-                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                  <svg width="16" height="16" viewBox="0 0 18 18" fill="none">
                     <line x1="2" y1="2" x2="16" y2="16" stroke="currentColor" strokeWidth="1.5"/>
                     <line x1="16" y1="2" x2="2" y2="16" stroke="currentColor" strokeWidth="1.5"/>
                   </svg>
                 </button>
               </div>
 
-              {/* Divider */}
-              <div className="cpg-modal-rule" />
-
-              {/* LayeredStack of subcategory cards */}
+              {/* Subcategory option wheel — dark smoke behind it, click a
+                  word to go straight there */}
               <div className="cpg-modal-stack-area">
+                <SmokeBlob className="cpg-smoke-blob" />
+
                 {loading && (
                   <div className="cpg-modal-loading">
-                    <span className="cpg-modal-loading-text">LOADING PARTS DATA…</span>
+                    <span className="cpg-modal-loading-text">LOADING…</span>
                   </div>
                 )}
 
                 {!loading && subcats.length > 0 && (
-                  <>
-                    <div className="cpg-stack-hint">SELECT A SUBCATEGORY</div>
-                    <SubcatGrid
-                      key={active.label}
-                      subcats={subcats}
-                      categoryLabel={active.label}
-                      onClose={close}
-                    />
-                  </>
+                  <OptionWheel
+                    key={active.label}
+                    className="cpg-subcat-wheel"
+                    items={subcats.map(sub => sub.name)}
+                    defaultSelected={0}
+                    onItemClick={goToSubcat}
+                    textColor="rgba(240,232,216,0.40)"
+                    activeColor="var(--gold-bright)"
+                    side="left"
+                    fontSize={2.4}
+                    spacing={1.3}
+                    curve={1}
+                    tilt={9}
+                    blur={1.5}
+                    fade={0.32}
+                    minOpacity={0.18}
+                    inset={20}
+                    loop={false}
+                  />
                 )}
 
                 {!loading && subcats.length === 0 && (
@@ -238,16 +243,6 @@ export default function CategoryPhotoGrid() {
                 )}
               </div>
 
-              {/* Divider */}
-              <div className="cpg-modal-rule" />
-
-              {/* Footer — browse all link */}
-              <div className="cpg-modal-footer">
-                <Link href={active.href} className="cpg-browse-all" onClick={close}>
-                  BROWSE ALL {active.label.toUpperCase()} →
-                </Link>
-              </div>
-
             </motion.div>
           </motion.div>
         )}
@@ -255,14 +250,28 @@ export default function CategoryPhotoGrid() {
 
       <style>{`
 
-        /* ── Section wrapper ──────────────────────────────────────────── */
+        /* ── Section wrapper — aged paper background ──────────────────── */
         .cpg-wrap {
-          background: var(--coal);
+          position: relative;
+          background: var(--cream);
           overflow: hidden;
+        }
+
+        /* Subtle paper grain texture — behind ident row + grid */
+        .cpg-paper-grain {
+          position: absolute;
+          inset: 0;
+          background-image:
+            url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+          pointer-events: none;
+          z-index: 0;
+          opacity: 0.6;
         }
 
         /* ── Section ident row ────────────────────────────────────────── */
         .cpg-ident-row {
+          position: relative;
+          z-index: 1;
           display: flex;
           align-items: center;
           gap: 20px;
@@ -285,11 +294,13 @@ export default function CategoryPhotoGrid() {
 
         /* ── Grid ─────────────────────────────────────────────────────── */
         .cpg-grid {
+          position: relative;
+          z-index: 1;
           display: grid;
           grid-template-columns: repeat(3, 1fr);
           gap: 14px;
           background: transparent;
-          padding: 0;
+          padding: 0 clamp(20px, 4vw, 56px) 40px;
         }
         .cpg-col {
           display: flex;
@@ -297,7 +308,7 @@ export default function CategoryPhotoGrid() {
           gap: 14px;
         }
 
-        /* ── Category tile ────────────────────────────────────────────── */
+        /* ── Category tile — stamped brass button ─────────────────────── */
         .cpg-tile {
           position: relative;
           display: block;
@@ -306,64 +317,127 @@ export default function CategoryPhotoGrid() {
           overflow: hidden;
           background: #0c0a06;
           border: none;
+          border-radius: 18px;
           padding: 0;
           cursor: pointer;
+          box-shadow:
+            0 10px 22px rgba(0,0,0,0.45),
+            0 2px 6px rgba(0,0,0,0.35);
+          transform: translateY(0);
+          transition: box-shadow 0.25s ease, transform 0.25s ease;
+        }
+        .cpg-tile:hover {
+          box-shadow:
+            0 16px 32px rgba(0,0,0,0.50),
+            0 3px 8px rgba(0,0,0,0.40);
+          transform: translateY(-3px);
+        }
+        .cpg-tile:active {
+          box-shadow:
+            0 4px 10px rgba(0,0,0,0.40),
+            0 1px 2px rgba(0,0,0,0.35);
+          transform: translateY(1px);
         }
         .cpg-tile::after {
           content: '';
           position: absolute;
           left: 0; right: 0; bottom: 0;
-          height: 7px;
+          height: 3px;
           background: rgba(255,255,255,0.85);
-          clip-path: polygon(
-            0% 55%, 3% 20%, 6% 70%, 9% 10%, 12% 60%, 16% 30%, 19% 85%,
-            23% 15%, 27% 65%, 31% 5%, 35% 55%, 39% 25%, 43% 75%, 47% 10%,
-            51% 60%, 55% 30%, 59% 80%, 63% 15%, 67% 65%, 71% 5%, 75% 50%,
-            79% 20%, 83% 70%, 87% 10%, 91% 60%, 95% 25%, 100% 55%,
-            100% 100%, 0% 100%
-          );
           transition: background 0.25s;
           pointer-events: none;
+          z-index: 3;
         }
         .cpg-tile:hover::after {
           background: #c9a84c;
         }
-        .cpg-img {
+
+        /* Plate surface — dark antique brass, with a raised-button bevel:
+           light catch along the top edge, dark falloff along the bottom */
+        .cpg-plate {
           position: absolute;
           inset: 0;
+          z-index: 0;
+          background:
+            repeating-linear-gradient(
+              98deg,
+              rgba(255,255,255,0.03) 0px,
+              transparent 1px,
+              transparent 3px
+            ),
+            linear-gradient(150deg, #4a3a18 0%, #2e2410 55%, #1c160a 100%);
+          box-shadow:
+            inset 0 1.5px 0 rgba(255,220,150,0.20),
+            inset 0 -14px 24px rgba(0,0,0,0.45),
+            inset 0 10px 18px rgba(0,0,0,0.20);
+          transition: box-shadow 0.3s;
+        }
+        .cpg-tile:hover .cpg-plate {
+          box-shadow:
+            inset 0 1.5px 0 rgba(255,220,150,0.28),
+            inset 0 -14px 24px rgba(0,0,0,0.36),
+            inset 0 10px 18px rgba(0,0,0,0.16);
+        }
+        .cpg-tile:active .cpg-plate {
+          box-shadow:
+            inset 0 2px 10px rgba(0,0,0,0.45),
+            inset 0 -2px 0 rgba(255,220,150,0.12);
+        }
+
+        /* Icon area — fills the whole plate; label overlays on top of it
+           at the bottom, lifted by the scrim below rather than pushed into
+           its own panel. overflow hidden so the zoomed icon clips at the
+           button's own edge rather than spilling past it. */
+        .cpg-icon-wrap {
+          position: absolute;
+          inset: 0;
+          z-index: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
+        }
+
+        /* Artwork used as a CSS mask, tinted a light brass gold (lighter
+           version of the nav bar's --gold) instead of its raw yellow.
+           Source PNGs carry a lot of built-in transparent margin, so a
+           zoom is needed for the part illustration itself to actually fill
+           the button — excess is clipped by cpg-icon-wrap/cpg-tile, never
+           overflowing the button's rounded edge. */
+        .cpg-icon {
           width: 100%;
           height: 100%;
-          object-fit: cover;
-          filter: grayscale(15%) brightness(0.70);
-          transition: transform 0.55s cubic-bezier(0.22,0.61,0.36,1), filter 0.55s ease;
+          -webkit-mask-repeat: no-repeat;
+          mask-repeat: no-repeat;
+          -webkit-mask-position: center;
+          mask-position: center;
+          -webkit-mask-size: cover;
+          mask-size: cover;
+          transform: scale(1.125);
+          background: linear-gradient(155deg, #e6cf6e 0%, var(--gold-bright) 100%);
+          filter: drop-shadow(1.5px 2px 2px rgba(0,0,0,0.55));
+          transition: transform 0.5s cubic-bezier(0.22,0.61,0.36,1);
         }
-        .cpg-tile:hover .cpg-img {
-          transform: scale(1.06);
-          filter: grayscale(0%) brightness(0.58);
+        .cpg-tile:hover .cpg-icon {
+          transform: scale(1.18);
         }
-        .cpg-placeholder {
+        .cpg-icon-placeholder {
+          width: 60%;
+          height: 60%;
+          border: 1px dashed rgba(197,167,34,0.20);
+        }
+
+        /* Scrim — soft dark shadow rising from the bottom edge, standing in
+           for a solid text panel so the label reads over the artwork */
+        .cpg-scrim {
           position: absolute;
-          inset: 0;
-          background: linear-gradient(135deg, #28200a 0%, #161209 55%, #0d0a05 100%);
+          left: 0; right: 0; bottom: 0;
+          height: 62%;
+          z-index: 1;
+          background: linear-gradient(to top, rgba(8,7,6,0.88) 0%, rgba(8,7,6,0.50) 35%, rgba(8,7,6,0) 100%);
+          pointer-events: none;
         }
-        .cpg-placeholder::after {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background-image:
-            linear-gradient(rgba(61,90,122,0.07) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(61,90,122,0.07) 1px, transparent 1px);
-          background-size: 36px 36px;
-        }
-        .cpg-overlay {
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(to bottom, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.22) 40%, rgba(0,0,0,0.80) 100%);
-          transition: background 0.4s ease;
-        }
-        .cpg-tile:hover .cpg-overlay {
-          background: linear-gradient(to bottom, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0.32) 40%, rgba(0,0,0,0.88) 100%);
-        }
+
         .cpg-corner {
           position: absolute;
           top: 14px; left: 14px;
@@ -372,31 +446,28 @@ export default function CategoryPhotoGrid() {
           border-left: 1.5px solid rgba(197,167,34,0.35);
           pointer-events: none;
           transition: border-color 0.3s;
+          z-index: 2;
         }
         .cpg-tile:hover .cpg-corner { border-color: rgba(197,167,34,0.70); }
         .cpg-content {
           position: absolute;
-          bottom: 0; left: 0; right: 0;
-          min-height: 50%;
-          display: flex;
-          flex-direction: column;
-          justify-content: flex-end;
+          z-index: 2;
+          left: 0; right: 0; bottom: 0;
           padding: 0 18px 16px;
           text-align: left;
         }
         .cpg-label {
           font-family: var(--font-tanker), sans-serif;
-          font-size: clamp(34px, 5.2vw, 72px);
+          font-size: clamp(30px, 4.2vw, 52px);
           font-weight: 400;
-          line-height: 0.90;
-          letter-spacing: -0.01em;
+          line-height: 0.92;
+          letter-spacing: -0.005em;
           text-transform: uppercase;
-          color: #ffffff;
-          text-shadow: 0 2px 16px rgba(0,0,0,0.8);
-          margin-bottom: 14px;
+          color: #f0e8d8;
+          text-shadow: 0 2px 14px rgba(0,0,0,0.7);
+          margin-bottom: 8px;
           transition: color 0.2s;
         }
-        .cpg-tile:hover .cpg-label { color: #ffffff; }
         .cpg-cta {
           display: flex;
           align-items: center;
@@ -420,48 +491,34 @@ export default function CategoryPhotoGrid() {
         }
         .cpg-tile:hover .cpg-cta-arrow { transform: translateX(3px); }
 
-        /* ── Light tile variant (alternating checkerboard) ──────────────── */
-        .cpg-tile-light .cpg-placeholder {
-          background: linear-gradient(135deg, #ded0a4 0%, #cbb98a 55%, #b8a473 100%);
+        /* ── Light tile variant — slightly lighter dark brass (checkerboard
+           partner to the main plate — still a darker gold/brass, not pale) */
+        .cpg-tile-light .cpg-plate {
+          background:
+            repeating-linear-gradient(
+              98deg,
+              rgba(255,255,255,0.05) 0px,
+              transparent 1px,
+              transparent 3px
+            ),
+            linear-gradient(150deg, #6b5220 0%, #47350f 55%, #2e2109 100%);
+          box-shadow:
+            inset 0 1.5px 0 rgba(255,220,150,0.22),
+            inset 0 -14px 24px rgba(0,0,0,0.40),
+            inset 0 10px 18px rgba(0,0,0,0.16);
         }
-        .cpg-tile-light .cpg-placeholder::after {
-          background-image:
-            linear-gradient(rgba(74,56,16,0.08) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(74,56,16,0.08) 1px, transparent 1px);
+        .cpg-tile-light:hover .cpg-plate {
+          box-shadow:
+            inset 0 1.5px 0 rgba(255,220,150,0.30),
+            inset 0 -14px 24px rgba(0,0,0,0.32),
+            inset 0 10px 18px rgba(0,0,0,0.12);
         }
-        .cpg-tile-light .cpg-img {
-          filter: grayscale(10%) brightness(1.02) sepia(8%);
+        .cpg-tile-light .cpg-icon-placeholder {
+          border-color: rgba(197,167,34,0.25);
         }
-        .cpg-tile-light:hover .cpg-img {
-          filter: grayscale(0%) brightness(1.05) sepia(4%);
-        }
-        .cpg-tile-light .cpg-overlay {
-          background: linear-gradient(to bottom, rgba(245,240,232,0.05) 0%, rgba(245,240,232,0.45) 40%, rgba(238,229,206,0.92) 100%);
-        }
-        .cpg-tile-light:hover .cpg-overlay {
-          background: linear-gradient(to bottom, rgba(245,240,232,0.10) 0%, rgba(245,240,232,0.55) 40%, rgba(238,229,206,0.96) 100%);
-        }
-        .cpg-tile-light .cpg-corner {
-          border-top-color: rgba(26,18,8,0.30);
-          border-left-color: rgba(26,18,8,0.30);
-        }
-        .cpg-tile-light:hover .cpg-corner {
-          border-color: rgba(26,18,8,0.55);
-        }
-        .cpg-tile-light .cpg-label {
-          color: #1a1208;
-          text-shadow: 0 1px 10px rgba(245,240,232,0.6);
-        }
-        .cpg-tile-light:hover .cpg-label { color: #1a1208; }
         .cpg-tile-light .cpg-cta-text,
         .cpg-tile-light .cpg-cta-arrow {
-          color: #8a6a22;
-        }
-        .cpg-tile-light::after {
-          background: rgba(26,18,8,0.45);
-        }
-        .cpg-tile-light:hover::after {
-          background: #8a6a22;
+          color: #d4b860;
         }
 
         /* ── Modal backdrop ───────────────────────────────────────────── */
@@ -477,36 +534,29 @@ export default function CategoryPhotoGrid() {
           padding: 24px;
         }
 
-        /* ── Modal panel ──────────────────────────────────────────────── */
+        /* ── Modal panel — minimal, no border/eyebrow/dividers ──────────── */
         .cpg-modal {
           position: relative;
           width: 100%;
           max-width: 780px;
           background: #100e09;
-          border: 1px solid rgba(197,167,34,0.22);
-          box-shadow: 0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(197,167,34,0.06);
+          box-shadow: 0 24px 64px rgba(0,0,0,0.55);
           overflow: hidden;
         }
 
-        /* Modal header */
+        /* Minimal header — just the category name + close */
         .cpg-modal-header {
+          position: relative;
+          z-index: 1;
           display: flex;
           align-items: flex-start;
           justify-content: space-between;
           gap: 16px;
-          padding: 28px 28px 0;
-        }
-        .cpg-modal-eyebrow {
-          font-family: var(--font-stencil), monospace;
-          font-size: 8px;
-          letter-spacing: 0.20em;
-          color: rgba(197,167,34,0.50);
-          text-transform: uppercase;
-          margin-bottom: 6px;
+          padding: 24px 24px 0;
         }
         .cpg-modal-title {
           font-family: var(--font-tanker), sans-serif;
-          font-size: clamp(32px, 5vw, 52px);
+          font-size: clamp(28px, 4.4vw, 44px);
           font-weight: 400;
           line-height: 0.92;
           text-transform: uppercase;
@@ -517,48 +567,47 @@ export default function CategoryPhotoGrid() {
           display: flex;
           align-items: center;
           justify-content: center;
-          width: 36px;
-          height: 36px;
-          background: rgba(197,167,34,0.06);
-          border: 1px solid rgba(197,167,34,0.16);
-          color: rgba(197,167,34,0.55);
+          width: 30px;
+          height: 30px;
+          color: rgba(197,167,34,0.50);
           cursor: pointer;
-          transition: background 0.15s, color 0.15s;
-          margin-top: 4px;
+          transition: color 0.15s;
         }
         .cpg-modal-close:hover {
-          background: rgba(197,167,34,0.14);
           color: rgba(197,167,34,0.90);
         }
-        .cpg-modal-rule {
-          height: 1px;
-          background: rgba(197,167,34,0.12);
-          margin: 20px 0 0;
-        }
 
-        /* ── Stack area ───────────────────────────────────────────────── */
+        /* ── Stack area — dark smoke behind the subcategory option wheel ── */
         .cpg-modal-stack-area {
-          padding: 24px 28px;
-          min-height: 320px;
+          position: relative;
+          padding: 8px 0 16px;
+          height: 340px;
+          flex-shrink: 0;
           display: flex;
           flex-direction: column;
-          align-items: center;
-          justify-content: center;
+          overflow: hidden;
         }
-        .cpg-stack-hint {
-          font-family: var(--font-stencil), monospace;
-          font-size: 8px;
-          letter-spacing: 0.16em;
-          color: rgba(197,167,34,0.35);
+        .cpg-smoke-blob {
+          z-index: 0;
+        }
+        .cpg-subcat-wheel {
+          position: relative;
+          z-index: 1;
+          flex: 1;
+          min-height: 0;
+        }
+        .cpg-subcat-wheel .option-wheel__item {
+          font-family: var(--font-tanker), sans-serif;
           text-transform: uppercase;
-          margin-bottom: 20px;
-          text-align: center;
+          letter-spacing: -0.005em;
         }
         .cpg-modal-loading {
+          position: relative;
+          z-index: 1;
           display: flex;
           align-items: center;
           justify-content: center;
-          height: 200px;
+          height: 100%;
         }
         .cpg-modal-loading-text {
           font-family: var(--font-stencil), monospace;
@@ -568,84 +617,13 @@ export default function CategoryPhotoGrid() {
           text-transform: uppercase;
         }
 
-        /* ── Subcategory grid ─────────────────────────────────────────── */
-        .ls-container {
-          width: 100%;
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 10px;
-        }
-
-        /* ── Subcategory card ─────────────────────────────────────────── */
-        .cpg-subcat-card {
-          position: relative;
-          display: flex;
-          flex-direction: column;
-          justify-content: flex-end;
-          gap: 4px;
-          padding: 14px 14px 12px;
-          background: #f5f0e8;
-          border: 1px solid rgba(139,110,44,0.20);
-          text-decoration: none;
-          min-height: 96px;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.20);
-          transition: box-shadow 0.2s, border-color 0.2s;
-        }
-        .cpg-subcat-card:hover {
-          box-shadow: 0 4px 20px rgba(0,0,0,0.30);
-          border-color: rgba(197,167,34,0.55);
-          z-index: 200 !important;
-        }
-        .cpg-subcat-corner {
-          position: absolute;
-          top: 8px; left: 8px;
-          width: 10px; height: 10px;
-          border-top: 1px solid rgba(139,110,44,0.35);
-          border-left: 1px solid rgba(139,110,44,0.35);
-          pointer-events: none;
-        }
-        .cpg-subcat-name {
-          font-family: var(--font-tanker), sans-serif;
-          font-size: 15px;
-          font-weight: 400;
-          line-height: 1;
-          text-transform: uppercase;
-          color: #1a1208;
-        }
-        .cpg-subcat-count {
-          font-family: var(--font-stencil), monospace;
-          font-size: 8px;
-          letter-spacing: 0.12em;
-          text-transform: uppercase;
-          color: rgba(139,110,44,0.65);
-        }
-
-        /* ── Modal footer ─────────────────────────────────────────────── */
-        .cpg-modal-footer {
-          padding: 16px 28px 24px;
-          display: flex;
-          justify-content: flex-end;
-        }
-        .cpg-browse-all {
-          font-family: var(--font-stencil), monospace;
-          font-size: 9px;
-          letter-spacing: 0.18em;
-          text-transform: uppercase;
-          color: rgba(197,167,34,0.60);
-          text-decoration: none;
-          transition: color 0.15s;
-        }
-        .cpg-browse-all:hover { color: rgba(197,167,34,0.90); }
-
         /* ── Responsive ───────────────────────────────────────────────── */
         @media (max-width: 768px) {
           .cpg-grid { grid-template-columns: repeat(2, 1fr); }
-          .ls-container { grid-template-columns: repeat(3, 1fr); }
         }
         @media (max-width: 480px) {
           .cpg-tile { height: 160px; }
           .cpg-label { font-size: 16px; }
-          .ls-container { grid-template-columns: repeat(2, 1fr); }
         }
       `}</style>
     </>
