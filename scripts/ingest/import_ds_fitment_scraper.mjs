@@ -15,12 +15,13 @@
  *
  * oem_numbers is NOT trustworthy as-is: 81.7% of 'found' rows have
  * year-range junk mixed in (the scraper's OEM selector appears to have
- * picked up fitment-table year cells too). This script filters out any
- * token matching a plausible year-range pattern before staging the rest in
- * oem_crossref_staging -- everything else still goes through the existing
- * validate_oem_crossref_staging.mjs gate, so a bad token that slips through
- * this filter still gets caught downstream (no_product_match / conflict
- * checks), not trusted blindly.
+ * picked up fitment-table year cells too), and PU's own site restates the
+ * SKU as "XXXX-XXXX" (e.g. sku 09101918 -> "0910-1918") inside that same
+ * cell -- never a real cross-referenced part number. This script filters
+ * out both before staging the rest in oem_crossref_staging -- everything
+ * else still goes through the existing validate_oem_crossref_staging.mjs
+ * gate, so a bad token that slips through this filter still gets caught
+ * downstream (no_product_match / conflict checks), not trusted blindly.
  *
  * Join key: sku (this file's skus resolve against catalog_unified.sku after
  * normalizing dashes/DS- prefix -- these are PU/Drag Specialties part
@@ -50,6 +51,10 @@ const pool = new pg.Pool({ connectionString: process.env.CATALOG_DATABASE_URL })
 const FITMENT_ENTRY_RE = /^(\d{4})(?:-(\d{4}))?\s+Harley[\s-]Davidson\s+(\S+)(?:\s+(.+))?$/;
 const YEAR_RANGE_JUNK_RE = /^(19|20)\d{2}-(19|20)\d{2}$/;
 const BARE_YEAR_JUNK_RE = /^(19|20)\d{2}$/;
+// PU restates its own SKU as XXXX-XXXX (e.g. sku 09101918 -> "0910-1918")
+// inside the OEM cell on its site; this is never a real cross-referenced
+// part number, just the vendor's own SKU with a dash inserted.
+const PU_SKU_FORMAT_JUNK_RE = /^\d{4}-\d{4}$/;
 
 function normalizeSkuKey(s) {
   return s.trim().replace(/^DS-?/, 'DS').replace(/-/g, '');
@@ -74,7 +79,12 @@ function cleanOemNumbers(raw) {
   return raw
     .split(';')
     .map((t) => t.trim())
-    .filter((t) => t && !YEAR_RANGE_JUNK_RE.test(t) && !BARE_YEAR_JUNK_RE.test(t));
+    .filter((t) =>
+      t &&
+      !YEAR_RANGE_JUNK_RE.test(t) &&
+      !BARE_YEAR_JUNK_RE.test(t) &&
+      !PU_SKU_FORMAT_JUNK_RE.test(t)
+    );
 }
 
 function chunks(arr, n) {
