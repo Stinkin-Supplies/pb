@@ -100,7 +100,9 @@ function parseUsedOnClause(clause) {
 }
 
 async function run() {
-  const raw = fs.readFileSync(txtPath, 'utf-8').replace(/\f/g, '');
+  // OCR'd catalogs (Tesseract) consistently render the hyphen before
+  // "USED ON" model lists as an em-dash rather than a plain hyphen.
+  const raw = fs.readFileSync(txtPath, 'utf-8').replace(/\f/g, '').replace(/—/g, '-');
   const lines = raw.split('\n');
 
   let cols = null; // { part, name, usedOn }

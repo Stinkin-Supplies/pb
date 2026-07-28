@@ -59,7 +59,8 @@ const CATALOG_YEAR_END = parseInt(yearEndArg, 10);
 
 const pool = new pg.Pool({ connectionString: process.env.CATALOG_DATABASE_URL });
 
-const HEADER_LINE_RE = /INDEX\s*(NO\.)?\s{2,}PART\s*(NO\.)?\s{2,}DESCRIPTION\s{2,}MODEL\(S\)/i;
+// OCR'd catalogs sometimes drop the parens: "MODELS" instead of "MODEL(S)".
+const HEADER_LINE_RE = /INDEX\s*(NO\.)?\s{2,}PART\s*(NO\.)?\s{2,}DESCRIPTION\s{2,}MODEL(\(S\)|S)?\b/i;
 const CATEGORY_RE = /^[A-Z][A-Z0-9 \/,.…'\-]{2,50}$/;
 const BLOCKED_SECTIONS = new Set([
   "READER'S COMMENTS", 'PLEASE ADD ANY OTHER COMMENTS HERE', 'GENERAL INFORMATION',
@@ -105,7 +106,7 @@ async function run() {
       finalize();
       const partIdx = line.search(/PART/i);
       const descIdx = line.search(/DESCRIPTION/i);
-      const modelIdx = line.search(/MODEL\(S\)/i);
+      const modelIdx = line.search(/MODEL(\(S\)|S)?\b/i);
       cols = { part: partIdx, desc: descIdx, model: modelIdx };
       continue;
     }

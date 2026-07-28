@@ -50,12 +50,15 @@ const ROW_RE = /^\s*(\S+)\s{2,}(.+?)\.{2,}\s*(.+?)\s*$/;
 const ROW_RE_NODOTS = /^\s*(\S+)\s{3,}(.+?)\s{3,}(\S.*?)\s*$/;
 
 function parseUsedOn(raw) {
-  const toStar = raw.match(/^(\d{2})\s*to\s*\*$/i);
+  // Not anchored at the start: OCR'd catalogs can prefix this with noise from
+  // misread table borders/checkmarks (e.g. ": SS   72 to *"). Still anchored
+  // at the end to avoid matching a stray year-like substring mid-garbage.
+  const toStar = raw.match(/(\d{2})\s*to\s*\*$/i);
   if (toStar) {
     const y = parseInt(toStar[1], 10);
     return { year_start: y >= 30 ? 1900 + y : 2000 + y, year_end: null };
   }
-  const thru = raw.match(/^(\d{2})\s*thru\s*(\d{2})$/i);
+  const thru = raw.match(/(\d{2})\s*thru\s*(\d{2})$/i);
   if (thru) {
     const y1 = parseInt(thru[1], 10), y2 = parseInt(thru[2], 10);
     return {
