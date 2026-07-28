@@ -66,9 +66,27 @@ function parseUsedOn(raw) {
   return { year_start: null, year_end: null };
 }
 
+// Real H-D part numbers in these catalogs are always >=3 chars (e.g. '721',
+// '858A', '9028R') -- some generic hardware (plugs, dowels) legitimately use
+// bare 3-digit numbers. This also rejects single/double-digit "position"
+// numbers from non-parts tables (VIN decoder breakdowns, etc.) without needing
+// to enumerate every such table by name.
 function isPartNumberToken(t) {
-  return /^[A-Za-z0-9][A-Za-z0-9\-]*$/.test(t) && /\d/.test(t);
+  return t.length >= 3 && /^[A-Za-z0-9][A-Za-z0-9\-]*$/.test(t) && /\d/.test(t);
 }
+
+// Sections that are never parts tables, even though they read like ALL-CAPS
+// headers. Rows appearing under one of these get skipped entirely (category
+// set to a blocking sentinel) rather than risk being misparsed -- confirmed
+// on the 2023 Touring catalog, where a VIN breakdown table under "VEHICLE
+// IDENTIFICATION NUMBER" / "VIEW INTERACTIVE IMAGE" produced garbage rows
+// like part_number='1', description='World manufacturer'.
+const BLOCKED_SECTIONS = new Set([
+  "READER'S COMMENTS", 'PLEASE ADD ANY OTHER COMMENTS HERE', 'GENERAL INFORMATION',
+  'VEHICLE IDENTIFICATION NUMBER', 'VIEW INTERACTIVE IMAGE', 'NOTES',
+  'SIP (SERVICE INFORMATION PORTAL)', 'NUMERICAL INDEX',
+  'COMPONENT TYPES AND INTRODUCTION DATES', 'COMMON SERVICE PARTS',
+]);
 
 async function run() {
   const raw = fs.readFileSync(txtPath, 'utf-8');
@@ -83,13 +101,15 @@ async function run() {
     if (!trimmed) continue;
     if (/^\d+$/.test(trimmed) && trimmed.length <= 3) { currentPage = parseInt(trimmed, 10); continue; } // page-number-only line
     if (HEADER_RE.test(trimmed) && !/\d{2}-\d/.test(trimmed)) {
-      currentCategory = trimmed;
+      currentCategory = BLOCKED_SECTIONS.has(trimmed) ? null : trimmed;
       continue;
     }
+    if (currentCategory === null) continue;
     let m = line.match(ROW_RE) || line.match(ROW_RE_NODOTS);
     if (!m) continue;
     const [, partNo, name, usedOnRaw] = m;
     if (!isPartNumberToken(partNo)) continue;
+    if (!name.trim()) continue; // empty description -> misaligned columns, not a real row
     const { year_start, year_end } = parseUsedOn(usedOnRaw.trim());
     records.push({
       part_number: partNo,
@@ -102,8 +122,23 @@ async function run() {
     });
   }
 
+  const withYear = records.filter((r) => r.year_start !== null).length;
+  const yearResolvedPct = records.length ? Math.round((withYear / records.length) * 100) : 0;
+
   console.log(`Parsed ${records.length} part rows from ${txtPath}`);
+  console.log(`Year-range resolved on ${withYear}/${records.length} rows (${yearResolvedPct}%)`);
   console.log('Sample:', records.slice(0, 5));
+
+  // This catalog's "used on" column isn't a year range at all (e.g. modern
+  // single-model-year catalogs list trim/model codes instead, a genuinely
+  // different table shape needing its own parser -- see the 2023 Touring
+  // catalog investigation). Refuse to write data whose year_start is mostly
+  // unresolved rather than silently store wrong-shaped rows.
+  if (APPLY && yearResolvedPct < 50) {
+    console.log(`\nRefusing to apply: only ${yearResolvedPct}% of rows resolved a year range -- this catalog likely uses a different table format. Skipping.`);
+    await pool.end();
+    return;
+  }
 
   if (!APPLY) {
     console.log('\nDry run -- no writes made. Re-run with --apply to persist.');
