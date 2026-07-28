@@ -59,8 +59,12 @@ const CATALOG_YEAR_END = parseInt(yearEndArg, 10);
 
 const pool = new pg.Pool({ connectionString: process.env.CATALOG_DATABASE_URL });
 
-// OCR'd catalogs sometimes drop the parens: "MODELS" instead of "MODEL(S)".
+// OCR'd catalogs sometimes drop the parens ("MODELS" instead of "MODEL(S)")
+// and/or split the header across two lines ("INDEX  PART" then "NO.  NO.
+// DESCRIPTION  MODEL(S)") rather than one -- both are handled below.
 const HEADER_LINE_RE = /INDEX\s*(NO\.)?\s{2,}PART\s*(NO\.)?\s{2,}DESCRIPTION\s{2,}MODEL(\(S\)|S)?\b/i;
+const HEADER_LINE1_RE = /^\s*INDEX\s+PART\s*$/i;
+const HEADER_LINE2_RE = /^\s*NO\.\s+(?:NO\.\s+)?(?:NAME|DESCRIPTION)\s+MODEL(\(S\)|S)?\b/i;
 const CATEGORY_RE = /^[A-Z][A-Z0-9 \/,.…'\-]{2,50}$/;
 const BLOCKED_SECTIONS = new Set([
   "READER'S COMMENTS", 'PLEASE ADD ANY OTHER COMMENTS HERE', 'GENERAL INFORMATION',
@@ -100,7 +104,20 @@ async function run() {
     acc = null;
   }
 
+  let pendingPartIdx = null;
   for (const line of lines) {
+    if (HEADER_LINE1_RE.test(line)) {
+      pendingPartIdx = line.search(/PART/i);
+      continue;
+    }
+    if (HEADER_LINE2_RE.test(line) && pendingPartIdx !== null) {
+      finalize();
+      const descIdx = line.search(/NAME|DESCRIPTION/i);
+      const modelIdx = line.search(/MODEL(\(S\)|S)?\b/i);
+      cols = { part: pendingPartIdx, desc: descIdx, model: modelIdx };
+      pendingPartIdx = null;
+      continue;
+    }
     const headerMatch = line.match(HEADER_LINE_RE);
     if (headerMatch) {
       finalize();

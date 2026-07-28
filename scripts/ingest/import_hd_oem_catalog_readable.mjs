@@ -56,13 +56,16 @@ const CATALOG_YEAR_END = parseInt(yearEndArg, 10);
 
 const pool = new pg.Pool({ connectionString: process.env.CATALOG_DATABASE_URL });
 
-const HEADER_LINE_RE = /NO\.\s+NO\.\s+NAME\s+USED ON/i;
-// The 2-word "NO." sub-labels on the header's 2nd line sit shifted right of
-// the true column edge (likely center/right-justified under the wider
-// label above them); the line-1 label 'PART' aligns exactly with where
-// data actually starts. Confirmed: 'PART'.indexOf on "RETAIL INDEX PART"
-// == '4721'.indexOf on a real data row, both at char 17.
-const HEADER_LINE1_RE = /RETAIL\s+INDEX\s+PART/i;
+// 5-column (RETAIL/INDEX/PART/NAME/USED ON) or simpler 3-column (PART/NAME/
+// USED ON) catalogs -- some smaller/older books skip the price+index columns.
+const HEADER_LINE_RE = /NO\.\s+(?:NO\.\s+)?NAME\s+USED\s*ON/i;
+// The "NO." sub-label on the header's 2nd line sits shifted right of the
+// true column edge (likely center/right-justified under the wider label
+// above it); the line-1 label 'PART' aligns exactly with where data
+// actually starts. Confirmed: 'PART'.indexOf on "RETAIL INDEX PART"
+// == '4721'.indexOf on a real data row, both at char 17. Also matches a
+// bare "PART" line-1 (no RETAIL/INDEX) for the simpler 3-column books.
+const HEADER_LINE1_RE = /(?:RETAIL\s+INDEX\s+)?\bPART\b/i;
 const CATEGORY_RE = /^[A-Z][A-Z0-9 \/,.…'\-]{2,50}$/;
 const BLOCKED_SECTIONS = new Set([
   "READER'S COMMENTS", 'PLEASE ADD ANY OTHER COMMENTS HERE', 'GENERAL INFORMATION', 'NOTES',
@@ -128,7 +131,7 @@ async function run() {
       finalize();
       const noMatches = [...line.matchAll(/NO\./gi)];
       const nameIdx = line.search(/NAME/i);
-      const usedOnIdx = line.search(/USED ON/i);
+      const usedOnIdx = line.search(/USED\s*ON/i);
       const partIdx = pendingPartIdx ?? (noMatches.length >= 2 ? noMatches[1].index : null);
       if (partIdx !== null) {
         cols = { part: partIdx, name: nameIdx, usedOn: usedOnIdx };
