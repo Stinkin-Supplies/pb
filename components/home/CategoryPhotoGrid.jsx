@@ -24,20 +24,20 @@ const CATEGORIES = [
   { label: 'Handlebars & Hand Controls',    href: '/browse?display_category=Handlebars+%26+Hand+Controls',               img: '/images/categories/handlebars.png' },
   { label: 'Brakes',                        href: '/browse?display_category=Brakes',                                      img: '/images/categories/brakes.png' },
   { label: 'Riding Gear & Apparel',         href: '/browse?display_category=Riding+Gear+%26+Apparel',                    img: null },
-  { label: 'Cables',                        href: '/browse?display_category=Cables',                                      img: null },
+  { label: 'Cables',                        href: '/browse?display_category=Cables',                                      img: '/images/categories/cables.png' },
   { label: 'Gaskets & Seals',               href: '/browse?display_category=Gaskets+%26+Seals',                          img: null },
   { label: 'Fuel, Air & Carburetors',       href: '/browse?display_category=Fuel%2C+Air+%26+Carburetors',                img: '/images/categories/fuel-air-carburetors.png' },
   { label: 'Tanks & Body',                  href: '/browse?display_category=Tanks+%26+Body',                             img: '/images/categories/tanks-body.png' },
   { label: 'Lighting',                      href: '/browse?display_category=Lighting',                                    img: '/images/categories/lighting.png' },
   { label: 'Frames & Suspension',           href: '/browse?display_category=Frames+%26+Suspension',                      img: '/images/categories/frames-suspension.png' },
-  { label: 'Wheels & Tires',                href: '/browse?display_category=Wheels+%26+Tires',                           img: '/images/categories/wheels-tires.png' },
-  { label: 'Seating',                       href: '/browse?display_category=Seating',                                     img: null },
+  { label: 'Wheels & Tires',                href: '/browse?display_category=Wheels+%26+Tires',                           img: '/images/categories/wheels-tires.png', imgScale: 1.35 },
+  { label: 'Seating',                       href: '/browse?display_category=Seating',                                     img: '/images/categories/seating.png' },
   { label: 'Electrical',                    href: '/browse?display_category=Electrical',                                  img: '/images/categories/electrical.png' },
   { label: 'Exhaust',                       href: '/browse?display_category=Exhaust',                                     img: '/images/categories/exhaust.png' },
   { label: 'Hardware',                      href: '/browse?display_category=Hardware',                                    img: '/images/categories/hardware.png' },
   { label: 'Accessories & Gear',            href: '/browse?display_category=Accessories+%26+Gear',                       img: null },
-  { label: 'Tools & Chemicals',             href: '/browse?display_category=Tools+%26+Chemicals',                        img: null },
-  { label: 'Saddlebags, Sissy Bars & Luggage', href: '/browse?display_category=Saddlebags%2C+Sissy+Bars+%26+Luggage',   img: null },
+  { label: 'Tools & Chemicals',             href: '/browse?display_category=Tools+%26+Chemicals',                        img: '/images/categories/tools.png' },
+  { label: 'Saddlebags, Sissy Bars & Luggage', href: '/browse?display_category=Saddlebags%2C+Sissy+Bars+%26+Luggage',   img: '/images/categories/luggage.png' },
   { label: 'Windshields & Fairings',        href: '/browse?display_category=Windshields+%26+Fairings',                   img: '/images/categories/windshields-fairings.png' },
   { label: 'Dashes & Gauges',               href: '/browse?display_category=Dashes+%26+Gauges',                          img: '/images/categories/dashes-gauges.png' },
 ];
@@ -57,7 +57,7 @@ function buildSubcatHref(categoryLabel, subcatName) {
 // as a CSS mask so it can be tinted to match the nav bar's brass gold,
 // scaled up to fill the icon area — the tile's rounded, overflow-hidden
 // edge clips anything that runs past the button.
-function CategoryTile({ label, href, img, imgPosition, variant, onClick }) {
+function CategoryTile({ label, href, img, imgPosition, imgScale, variant, onClick }) {
   const tileClass = variant === 'light' ? 'cpg-tile cpg-tile-light' : 'cpg-tile';
   return (
     <button type="button" className={tileClass} onClick={onClick} aria-label={`Browse ${label}`}>
@@ -71,6 +71,7 @@ function CategoryTile({ label, href, img, imgPosition, variant, onClick }) {
               maskImage: `url(${img})`,
               WebkitMaskPosition: imgPosition,
               maskPosition: imgPosition,
+              '--icon-scale': imgScale,
             }}
             aria-hidden="true"
           />
@@ -413,13 +414,13 @@ export default function CategoryPhotoGrid() {
           mask-position: center;
           -webkit-mask-size: cover;
           mask-size: cover;
-          transform: scale(1.125);
+          transform: scale(calc(1.125 * var(--icon-scale, 1)));
           background: linear-gradient(155deg, #e6cf6e 0%, var(--gold-bright) 100%);
           filter: drop-shadow(1.5px 2px 2px rgba(0,0,0,0.55));
           transition: transform 0.5s cubic-bezier(0.22,0.61,0.36,1);
         }
         .cpg-tile:hover .cpg-icon {
-          transform: scale(1.18);
+          transform: scale(calc(1.18 * var(--icon-scale, 1)));
         }
         .cpg-icon-placeholder {
           width: 60%;
