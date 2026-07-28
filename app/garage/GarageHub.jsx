@@ -59,7 +59,10 @@ function buildShopUrl(vehicle) {
 // ── YMM Data ─────────────────────────────────────────────────
 // Harley-Davidson only — this is an H-D aftermarket parts catalog, and only
 // H-D fitment data exists to filter against.
-const YEARS = Array.from({ length: 35 }, (_, i) => 2025 - i);
+// Range covers 1903 (H-D's founding) through next model year, matching how
+// far back harley_models.start_year actually goes in the catalog DB.
+const CURRENT_YEAR = new Date().getFullYear();
+const YEARS = Array.from({ length: CURRENT_YEAR - 1901 }, (_, i) => CURRENT_YEAR + 1 - i);
 const HD_MAKE = "Harley-Davidson";
 
 const POINTS_TO_DOLLAR = 0.01;

@@ -28,6 +28,11 @@ export async function GET(req: NextRequest) {
     JOIN harley_models hm ON hm.id = hmy.model_id
     JOIN harley_families hf ON hf.id = hm.family_id
     WHERE hmy.year = $1
+      -- harley_model_years has ~871 stray rows pointing models at years outside
+      -- their own start_year/end_year (e.g. a 1971-1980 FX Super Glide linked to
+      -- 2018) — guard against those directly rather than trusting the junction
+      -- table alone.
+      AND hm.start_year <= $1 AND hm.end_year >= $1
     ORDER BY hm.model_code, hm.name
     `,
     [year]
