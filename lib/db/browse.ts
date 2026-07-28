@@ -568,14 +568,21 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
     END
   `.trim();
 
+  // relevance: default landing sort for category/browse pages. Prioritizes
+  // products with a real photo (no image tends to correlate with low-value/
+  // junk catalog rows) then higher price (proxy for "substantial" items like
+  // seats/wheels/tanks over $3 washers/clips), instead of the old behavior
+  // of surfacing whatever last got synced into catalog_unified (see 'newest').
+  const HAS_IMAGE_CASE = `(d.image_url IS NOT NULL AND d.image_url <> '')`;
+
   const SORT_MAP: Record<string, string> = {
     price_asc:  'd.detail_priority ASC, d.price ASC',
     price_desc: 'd.detail_priority ASC, d.price DESC',
     name_asc:   'd.detail_priority ASC, d.name ASC',
     newest:     'd.detail_priority ASC, d.id DESC',
-    relevance:  'd.detail_priority ASC, d.price ASC',
+    relevance:  `d.detail_priority ASC, ${HAS_IMAGE_CASE} DESC, d.price DESC`,
   };
-  const outerSort = SORT_MAP[filters.sort ?? ''] ?? 'd.detail_priority ASC, d.price ASC';
+  const outerSort = SORT_MAP[filters.sort ?? ''] ?? SORT_MAP.relevance;
 
   // ── Product query ─────────────────────────────────────────────────────────
   const productSql = `
