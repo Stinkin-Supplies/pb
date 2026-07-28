@@ -577,10 +577,10 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
 
   const SORT_MAP: Record<string, string> = {
     price_asc:  'd.detail_priority ASC, d.price ASC',
-    price_desc: 'd.detail_priority ASC, d.price DESC',
+    price_desc: 'd.detail_priority ASC, d.price DESC NULLS LAST',
     name_asc:   'd.detail_priority ASC, d.name ASC',
     newest:     'd.detail_priority ASC, d.id DESC',
-    relevance:  `d.detail_priority ASC, ${HAS_IMAGE_CASE} DESC, d.price DESC`,
+    relevance:  `d.detail_priority ASC, ${HAS_IMAGE_CASE} DESC, d.price DESC NULLS LAST`,
   };
   const outerSort = SORT_MAP[filters.sort ?? ''] ?? SORT_MAP.relevance;
 
@@ -594,7 +594,7 @@ export async function browseProducts(filters: BrowseFilters): Promise<BrowseResu
         cu.slug,
         cu.name,
         cu.brand,
-        cu.computed_price                          AS price,
+        COALESCE(cu.computed_price, cu.msrp, cu.cost) AS price,
         COALESCE(cu.image_url, cm.url)             AS image_url,
         cu.vendor_sku,
         cu.source_vendor,
@@ -748,7 +748,7 @@ export async function getChronologicalNeighbors(
     )
     SELECT DISTINCT ON (cu.id)
       cu.id, cu.sku, cu.slug, cu.name, cu.brand,
-      cu.computed_price AS price,
+      COALESCE(cu.computed_price, cu.msrp, cu.cost) AS price,
       COALESCE(cu.image_url, cm.url) AS image_url,
       cu.vendor_sku, cu.source_vendor,
       cu.display_category, cu.display_subcategory, cu.category,
