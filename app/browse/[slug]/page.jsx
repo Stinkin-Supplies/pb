@@ -7,11 +7,26 @@ import ProductImage from '@/components/browse/ProductImage';
 import ProductImageGallery from '@/components/browse/ProductImageGallery';
 import PDPTabs from '@/components/browse/PDPTabs';
 import VariantSelector from '@/components/browse/VariantSelector';
+import AddToCartBar from '@/components/browse/AddToCartBar';
 import AdminEditPanel from '@/components/admin/AdminEditPanel';
 import { getOemPartTimeline } from '@/lib/getOemPartTimeline';
 import OemPartTimeline from '@/components/pdp/OemPartTimeline';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getPrimaryVehicle } from '@/lib/supabase/garage';
+
+// Light "paper" surface tokens — matches ProductImageGallery, VariantSelector,
+// and OemPartTimeline, which were already built against this palette.
+const PAPER = {
+  bg:          '#f5f0e8',
+  card:        '#fdfbf4',
+  ink:         '#1a1208',
+  inkMuted:    '#5a4828',
+  inkFaint:    '#8a7040',
+  gold:        '#c9a84c',
+  goldStrong:  '#b8922a',
+  border:      '#e6dcc0',
+  borderStrong:'rgba(122,94,20,0.35)',
+};
 
 /** Does any fitment row match the given model_code + year? */
 function fitsVehicle(fitment, vehicle) {
@@ -21,6 +36,20 @@ function fitsVehicle(fitment, vehicle) {
     Number(row.year_from) <= vehicle.year &&
     vehicle.year <= Number(row.year_to)
   );
+}
+
+/** Short "1984–1999 Evolution Big Twin"-style summary for the info bar.
+ *  Real fitment can span several families (unlike a mockup's single-family
+ *  example), so this only shows a year range when it's honest to do so. */
+function summarizeFitment(fitment) {
+  if (!fitment?.length) return null;
+  const families = [...new Set(fitment.map(r => r.family_name).filter(Boolean))];
+  const minYear = Math.min(...fitment.map(r => Number(r.year_from)));
+  const maxYear = Math.max(...fitment.map(r => Number(r.year_to)));
+  const yearRange = minYear === maxYear ? `${minYear}` : `${minYear}–${maxYear}`;
+  if (families.length === 1) return `${yearRange} ${families[0]}`;
+  if (families.length > 1) return `${yearRange} · ${families.length} families`;
+  return yearRange;
 }
 
 // Routes LeMans/PU images through local proxy
@@ -239,6 +268,7 @@ export default async function ProductDetailPage({ params }) {
   const hasSidebar = oemAlternatives.length > 0;
   const firstOem = oemRows.find(r => r.oem_format?.startsWith('hd_oem') && !r.expanded_from)?.oem_number ?? null;
   const primaryOems = oemRows.filter(r => r.oem_format?.startsWith('hd_oem') && !r.expanded_from);
+  const fitsSummary = summarizeFitment(fitment);
 
   return (
     <div style={{ background: 'var(--coal)', minHeight: '100vh', display: 'flex', color: '#f5f0e8' }}>
@@ -393,12 +423,13 @@ export default async function ProductDetailPage({ params }) {
         </aside>
       )}
 
-      {/* ── Main content ── */}
-      <div style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
+      {/* ── Main content — light "paper" surface, dark header/footer bookend it ── */}
+      <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', background: PAPER.bg }}>
 
-        {/* ── Page ident header ── */}
+        {/* ── Page ident header — dark bookend above the light content ── */}
         <div style={{
           padding: '18px 28px',
+          background: 'var(--coal)',
           borderBottom: '1px solid rgba(197,167,34,0.12)',
           display: 'flex',
           alignItems: 'center',
@@ -475,27 +506,28 @@ export default async function ProductDetailPage({ params }) {
           .pdp-mini-card:hover { border-color: rgba(201,168,76,0.45) !important; }
         `}</style>
 
-        {/* ── Product hero ── */}
+        {/* ── Product hero — light paper surface ── */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',
           gap: 0,
-          borderBottom: '1px solid rgba(197,167,34,0.12)',
+          borderBottom: `1px solid ${PAPER.border}`,
         }}>
 
           {/* Left: Image gallery */}
           <div style={{
             padding: '36px 32px',
-            borderRight: '1px solid rgba(197,167,34,0.12)',
+            borderRight: `1px solid ${PAPER.border}`,
             position: 'relative',
             overflow: 'hidden',
+            background: PAPER.card,
           }}>
             {/* Blueprint grid */}
             <div style={{
               position: 'absolute', inset: 0, pointerEvents: 'none',
               backgroundImage: [
-                'linear-gradient(rgba(61,90,122,0.04) 1px, transparent 1px)',
-                'linear-gradient(90deg, rgba(61,90,122,0.04) 1px, transparent 1px)',
+                'linear-gradient(rgba(61,90,122,0.05) 1px, transparent 1px)',
+                'linear-gradient(90deg, rgba(61,90,122,0.05) 1px, transparent 1px)',
               ].join(', '),
               backgroundSize: '48px 48px',
             }} />
@@ -515,7 +547,7 @@ export default async function ProductDetailPage({ params }) {
             <div style={{
               fontFamily: 'var(--font-stencil)',
               fontSize: 9,
-              color: 'rgba(197,167,34,0.45)',
+              color: PAPER.inkFaint,
               letterSpacing: '0.12em',
               textTransform: 'uppercase',
               marginBottom: 18,
@@ -541,7 +573,7 @@ export default async function ProductDetailPage({ params }) {
             <div style={{
               fontFamily: 'var(--font-stencil)',
               fontSize: 10,
-              color: '#8a7040',
+              color: PAPER.inkFaint,
               letterSpacing: '0.10em',
               textTransform: 'uppercase',
               marginBottom: 8,
@@ -554,7 +586,7 @@ export default async function ProductDetailPage({ params }) {
               fontFamily: 'var(--font-tanker)',
               fontSize: 'clamp(28px, 3vw, 52px)',
               fontWeight: 400,
-              color: '#f5f0e8',
+              color: PAPER.ink,
               lineHeight: 0.92,
               letterSpacing: '-0.01em',
               textTransform: 'uppercase',
@@ -563,52 +595,12 @@ export default async function ProductDetailPage({ params }) {
               {productRow.name}
             </h1>
 
-            {/* Gold rule */}
-            <div style={{
-              height: 2,
-              background: 'linear-gradient(90deg, #c9a84c 0%, rgba(201,168,76,0.10) 100%)',
-              marginBottom: 22,
-            }} />
-
-            {/* OEM number — large Tanker display */}
-            {primaryOems.slice(0, 1).map(oem => (
-              <div key={oem.oem_number} style={{
-                display: 'inline-flex',
-                alignItems: 'baseline',
-                gap: 10,
-                marginBottom: 18,
-                padding: '8px 14px',
-                border: '1px solid rgba(197,167,34,0.20)',
-                background: 'rgba(197,167,34,0.04)',
-              }}>
-                <span style={{
-                  fontFamily: 'var(--font-stencil)',
-                  fontSize: 8,
-                  color: 'rgba(197,167,34,0.45)',
-                  letterSpacing: '0.14em',
-                  textTransform: 'uppercase',
-                }}>
-                  OEM#
-                </span>
-                <span style={{
-                  fontFamily: 'var(--font-tanker)',
-                  fontSize: 28,
-                  color: '#c9a84c',
-                  letterSpacing: '0.05em',
-                  lineHeight: 1,
-                }}>
-                  {oem.oem_number}
-                </span>
-              </div>
-            ))}
-            {primaryOems.length === 0 && <div style={{ marginBottom: 18 }} />}
-
             {/* Price */}
             <div style={{
               fontFamily: 'var(--font-tanker)',
               fontSize: 'clamp(40px, 5vw, 64px)',
               fontWeight: 400,
-              color: '#c9a84c',
+              color: PAPER.goldStrong,
               letterSpacing: '0.02em',
               lineHeight: 1,
               marginBottom: 22,
@@ -616,109 +608,83 @@ export default async function ProductDetailPage({ params }) {
               ${Number(productRow.price).toFixed(2)}
             </div>
 
-            {/* SKU / Part# data row */}
-            <div style={{
-              display: 'flex',
-              gap: 24,
-              marginBottom: 20,
-              flexWrap: 'wrap',
-              paddingBottom: 20,
-              borderBottom: '1px solid rgba(197,167,34,0.10)',
-            }}>
-              <div>
-                <div style={{
-                  fontFamily: 'var(--font-stencil)',
-                  fontSize: 8,
-                  color: 'rgba(197,167,34,0.35)',
-                  letterSpacing: '0.14em',
-                  textTransform: 'uppercase',
-                  marginBottom: 3,
-                }}>SKU</div>
-                <div style={{
-                  fontFamily: 'var(--font-stencil)',
-                  fontSize: 11,
-                  color: '#a09890',
-                  letterSpacing: '0.06em',
-                }}>
-                  {productRow.internal_sku || productRow.sku}
-                </div>
-              </div>
-              {productRow.brand_part_number && (
-                <div>
-                  <div style={{
-                    fontFamily: 'var(--font-stencil)',
-                    fontSize: 8,
-                    color: 'rgba(197,167,34,0.35)',
-                    letterSpacing: '0.14em',
-                    textTransform: 'uppercase',
-                    marginBottom: 3,
-                  }}>PART#</div>
-                  <div style={{
-                    fontFamily: 'var(--font-stencil)',
-                    fontSize: 11,
-                    color: '#a09890',
-                    letterSpacing: '0.06em',
-                  }}>
-                    {productRow.brand_part_number}
-                  </div>
-                </div>
-              )}
-              {productRow.pack_qty > 1 && (
-                <div>
-                  <div style={{
-                    fontFamily: 'var(--font-stencil)',
-                    fontSize: 8,
-                    color: 'rgba(197,167,34,0.35)',
-                    letterSpacing: '0.14em',
-                    textTransform: 'uppercase',
-                    marginBottom: 3,
-                  }}>QTY</div>
-                  <div style={{
-                    fontFamily: 'var(--font-stencil)',
-                    fontSize: 11,
-                    color: '#a09890',
-                    letterSpacing: '0.06em',
-                  }}>
-                    {productRow.pack_qty} pack
-                  </div>
-                </div>
-              )}
-            </div>
-
             {/* Variant selector */}
             <VariantSelector productId={unifiedId} />
 
-            {/* Add to cart */}
-            <button style={{
-              width: '100%',
-              padding: '16px 24px',
-              background: '#c9a84c',
-              border: '2px solid #b8963a',
-              borderRadius: 0,
-              fontFamily: 'var(--font-tanker)',
-              fontSize: 20,
-              letterSpacing: '0.10em',
-              color: '#1a1208',
-              cursor: 'pointer',
-              marginBottom: 14,
-              textTransform: 'uppercase',
-              transition: 'background 0.15s',
-            }}>
-              ADD TO CART
-            </button>
+            {/* Qty + Add to cart */}
+            <AddToCartBar product={{
+              id: unifiedId,
+              slug: productRow.slug,
+              name: productRow.name,
+              brand: productRow.brand,
+              price: productRow.price,
+              canonical_sku: productRow.canonical_sku,
+              image: productRow.image_url,
+              images: productRow.image_urls ?? [],
+            }} />
+
+            {/* OEM# / SKU / Fits — consolidated info bar */}
+            {(primaryOems.length > 0 || fitsSummary) && (
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: 16,
+                padding: '10px 14px',
+                marginBottom: 18,
+                background: 'rgba(201,168,76,0.08)',
+                border: `1px solid ${PAPER.border}`,
+                flexWrap: 'wrap',
+              }}>
+                <span style={{
+                  fontFamily: 'var(--font-stencil)',
+                  fontSize: 10,
+                  color: PAPER.inkFaint,
+                  letterSpacing: '0.06em',
+                }}>
+                  {primaryOems[0] && <>OEM# {primaryOems[0].oem_number}</>}
+                  {primaryOems[0] && (productRow.internal_sku || productRow.sku) && ' · '}
+                  {(productRow.internal_sku || productRow.sku) && <>SKU {productRow.internal_sku || productRow.sku}</>}
+                </span>
+                {fitsSummary && (
+                  <span style={{
+                    fontFamily: 'var(--font-stencil)',
+                    fontSize: 10,
+                    color: PAPER.goldStrong,
+                    letterSpacing: '0.06em',
+                    textTransform: 'none',
+                  }}>
+                    {fitsSummary}
+                  </span>
+                )}
+              </div>
+            )}
+            {productRow.brand_part_number && (
+              <div style={{
+                fontFamily: 'var(--font-stencil)',
+                fontSize: 10,
+                color: PAPER.inkMuted,
+                letterSpacing: '0.06em',
+                marginTop: -10,
+                marginBottom: 18,
+              }}>
+                PART# {productRow.brand_part_number}
+                {productRow.pack_qty > 1 && <> · {productRow.pack_qty} pack</>}
+              </div>
+            )}
 
             {/* Badges */}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {fitsMyBike && (
-                <span style={badge('rgba(184,146,42,0.15)', '#c9a84c')}>
+                <span style={badge('rgba(184,146,42,0.15)', PAPER.goldStrong)}>
                   ✓ FITS YOUR {garageVehicle.year} {garageVehicle.nickname || garageVehicle.model}
                 </span>
               )}
               {productRow.is_universal && !fitment?.length && (
-                <span style={badge('rgba(58,122,58,0.12)', '#5a9a5a')}>UNIVERSAL FIT</span>
+                <span style={badge('rgba(58,122,58,0.12)', '#3f7a3f')}>UNIVERSAL FIT</span>
               )}
               {productRow.is_kit && (
-                <span style={badge('rgba(90,90,176,0.12)', '#8888cc')}>KIT</span>
+                <span style={badge('rgba(90,90,176,0.12)', '#6060a8')}>KIT</span>
               )}
             </div>
           </div>
@@ -760,16 +726,16 @@ export default async function ProductDetailPage({ params }) {
         {/* ── Chronological timeline ── */}
         {timeline.length > 0 && (
           <section style={{ margin: '48px 28px 0' }}>
-            <DarkSectionHeader>Part Timeline</DarkSectionHeader>
+            <PaperSectionHeader>Part Timeline</PaperSectionHeader>
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
               gap: 1,
-              background: 'rgba(197,167,34,0.15)',
-              outline: '1px solid rgba(197,167,34,0.15)',
+              background: PAPER.border,
+              outline: `1px solid ${PAPER.border}`,
             }}>
               {timeline.map(p => (
-                <DarkMiniProductCard key={p.id} product={p} />
+                <PaperMiniProductCard key={p.id} product={p} />
               ))}
             </div>
           </section>
@@ -778,18 +744,18 @@ export default async function ProductDetailPage({ params }) {
         {/* ── Related products ── */}
         {related.length > 0 && (
           <section style={{ margin: '48px 28px 72px' }}>
-            <DarkSectionHeader>
+            <PaperSectionHeader>
               {productRow.display_subcategory ?? productRow.display_category}
-            </DarkSectionHeader>
+            </PaperSectionHeader>
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
               gap: 1,
-              background: 'rgba(197,167,34,0.15)',
-              outline: '1px solid rgba(197,167,34,0.15)',
+              background: PAPER.border,
+              outline: `1px solid ${PAPER.border}`,
             }}>
               {related.map(p => (
-                <DarkMiniProductCard key={p.id} product={p} />
+                <PaperMiniProductCard key={p.id} product={p} />
               ))}
             </div>
           </section>
@@ -878,15 +844,15 @@ function SidebarProductRow({ product, isLast }) {
   );
 }
 
-function DarkMiniProductCard({ product }) {
+function PaperMiniProductCard({ product }) {
   return (
     <Link
       href={`/browse/${product.slug}`}
       className="pdp-mini-card"
       style={{
         display: 'block',
-        background: '#0e0b06',
-        border: '1px solid transparent',
+        background: PAPER.card,
+        border: `1px solid ${PAPER.border}`,
         overflow: 'hidden',
         textDecoration: 'none',
       }}
@@ -908,7 +874,7 @@ function DarkMiniProductCard({ product }) {
         <div style={{
           fontFamily: 'var(--font-bespoke)',
           fontSize: 11,
-          color: '#c8c0b0',
+          color: PAPER.ink,
           lineHeight: 1.3,
           marginBottom: 6,
           display: '-webkit-box',
@@ -921,7 +887,7 @@ function DarkMiniProductCard({ product }) {
         <div style={{
           fontFamily: 'var(--font-tanker)',
           fontSize: 13,
-          color: '#c9a84c',
+          color: PAPER.goldStrong,
           letterSpacing: '0.02em',
         }}>
           ${Number(product.price ?? 0).toFixed(2)}
@@ -931,7 +897,7 @@ function DarkMiniProductCard({ product }) {
   );
 }
 
-function DarkSectionHeader({ children }) {
+function PaperSectionHeader({ children }) {
   return (
     <div style={{
       display: 'flex',
@@ -943,13 +909,13 @@ function DarkSectionHeader({ children }) {
         fontFamily: 'var(--font-tanker)',
         fontSize: 'clamp(20px, 2.5vw, 32px)',
         letterSpacing: '0.03em',
-        color: '#f5f0e8',
+        color: PAPER.ink,
         textTransform: 'uppercase',
         flexShrink: 0,
       }}>
         {children}
       </div>
-      <div style={{ flex: 1, height: 1, background: 'rgba(197,167,34,0.18)' }} />
+      <div style={{ flex: 1, height: 1, background: PAPER.border }} />
     </div>
   );
 }

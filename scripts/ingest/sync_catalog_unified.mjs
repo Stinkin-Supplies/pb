@@ -30,8 +30,15 @@
  *     script does not act on it -- it's reported in the summary for a human
  *     to review, not auto-deactivated.
  *
- * The whole run is one transaction: any error rolls back everything, so a
- * partial failure can never leave catalog_unified in a half-written state.
+ * Commits in batches of BATCH_COMMIT_SIZE rows (not one giant transaction)
+ * -- a remote-DB connection drop partway through (this has happened several
+ * times against the Hetzner-hosted catalog DB on the full ~97K-row run) only
+ * loses the current batch, not every row already synced. This does trade
+ * away the previous "any error rolls back everything" all-or-nothing
+ * guarantee, but every write here is an idempotent upsert on the unique
+ * `sku` column (see the per-row SAVEPOINT/ROLLBACK TO SAVEPOINT below too),
+ * so simply re-running the script re-applies already-committed rows
+ * harmlessly and picks up wherever the last successful commit left off.
  *
  * Usage:
  *   node scripts/ingest/sync_catalog_unified.mjs            # dry run (default)
@@ -48,6 +55,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, '../../.env.local') });
 
 const APPLY = process.argv.includes('--apply');
+const BATCH_COMMIT_SIZE = 1000;
 
 const pool = new pg.Pool({ connectionString: process.env.CATALOG_DATABASE_URL });
 
@@ -273,6 +281,11 @@ const PU_DISPLAY_FIXTURE_SKU_RE = /^9903/;
 const DISPLAY_FIXTURE_NAME_RE =
   /\b(DISPLAY\s+RACK|COUNTER\s+DISPLAY|POP\s+DISPLAY|SLATWALL|CLIP\s+STRIP|FIXTURE\s+KIT|DISPLAY\s+SHELF|DISPLAY\s+STAND|DISPLAY\s+BOARD|HEADER\s+CARD)\b/i;
 
+// pu_catalog.part_status mixes single-letter codes ('D') and spelled-out
+// values ('DISCONTINUED') across different import batches -- both mean the
+// same thing. Verified live (2026-07-26): 833 'D' + 11 'DISCONTINUED' rows.
+const PU_DISCONTINUED_STATUSES = new Set(['D', 'DISCONTINUED']);
+
 // ─── SKU / slug generation (unchanged) ────────────────────────────────────────
 
 const usedSkus = new Set();
@@ -300,6 +313,16 @@ function progress(label, done, total) {
   const filled = Math.floor(pct / 2);
   const bar = '█'.repeat(filled) + '░'.repeat(50 - filled);
   process.stdout.write(`\r  ${label} [${bar}] ${pct}% — ${done}/${total}`);
+}
+
+// Commits the transaction so far and opens a fresh one -- called between rows
+// (never inside an open SAVEPOINT), so a connection drop only loses rows
+// processed since the last call, not the whole run. Every write is an
+// idempotent upsert, so re-running the script after a failure is always safe.
+async function commitBatch(client, processedInBatch) {
+  if (processedInBatch % BATCH_COMMIT_SIZE !== 0) return;
+  await client.query('COMMIT');
+  await client.query('BEGIN');
 }
 
 // Fields updated on an EXISTING row. Deliberately excludes name, description,
@@ -387,7 +410,7 @@ async function main() {
       return;
     }
 
-    console.log('\nApplying (single transaction -- any error rolls back everything)...');
+    console.log(`\nApplying (committing every ${BATCH_COMMIT_SIZE} rows -- a mid-run failure only loses the current batch)...`);
     await client.query('BEGIN');
 
     // ── PU ──
@@ -400,7 +423,7 @@ async function main() {
       const displayCategory = isNew ? mapDisplayCategory('PU', r.commodity_category) : undefined;
       const isDisplayFixture = PU_DISPLAY_FIXTURE_SKU_RE.test(r.sku || '') ||
         DISPLAY_FIXTURE_NAME_RE.test(r.name || '');
-      const isActive = r.part_status !== 'D' && !isDisplayFixture;
+      const isActive = !PU_DISCONTINUED_STATUSES.has(r.part_status) && !isDisplayFixture;
       const inStock = r.national_availability !== '0' && r.national_availability !== 'N/A';
 
       try {
@@ -449,7 +472,7 @@ async function main() {
         r.truck_only, r.no_ship_ca, r.pfas, r.harmonized_us,
         r.image_url,
         r.drag_part, r.closeout, r.in_oldbook, r.in_fatbook, false,
-        isActive, r.part_status === 'D',
+        isActive, PU_DISCONTINUED_STATUSES.has(r.part_status),
         r.oem_numbers, r.oem_part_number,
         r.part_add_date, r.special_instructions,
         r.product_code, slug, displayCategory,
@@ -462,6 +485,7 @@ async function main() {
         if (errors <= 5) console.error(`\n  Error on PU SKU ${r.sku}:`, e.message);
       }
       if ((done + errors) % 500 === 0) progress('PU', done, puRows.rows.length);
+      await commitBatch(client, done + errors);
     }
     progress('PU', done, puRows.rows.length);
     console.log(`\n  PU: ${done} synced, ${errors} errors`);
@@ -530,6 +554,7 @@ async function main() {
         if (errors <= 5) console.error(`\n  Error on WPS SKU ${r.sku}:`, e.message);
       }
       if ((done + errors) % 500 === 0) progress('WPS', done, wpsRows.rows.length);
+      await commitBatch(client, done + errors);
     }
     progress('WPS', done, wpsRows.rows.length);
     console.log(`\n  WPS: ${done} synced, ${errors} errors`);
@@ -592,6 +617,7 @@ async function main() {
         if (errors <= 5) console.error(`\n  Error on VTwin SKU ${r.sku}:`, e.message);
       }
       if ((done + errors) % 500 === 0) progress('VTwin', done, vtwinRows.rows.length);
+      await commitBatch(client, done + errors);
     }
     progress('VTwin', done, vtwinRows.rows.length);
     console.log(`\n  VTwin: ${done} synced, ${errors} errors`);
@@ -602,7 +628,7 @@ async function main() {
     console.log('Done.');
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
-    console.error('\nRolled back due to error -- catalog_unified is unchanged from before this run:', err);
+    console.error(`\nFailed -- only the current uncommitted batch (< ${BATCH_COMMIT_SIZE} rows) rolled back; everything committed in earlier batches this run is already saved. Re-run to pick up where this left off:`, err);
     process.exitCode = 1;
   } finally {
     client.release();

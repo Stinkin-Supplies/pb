@@ -43,7 +43,7 @@ export default function HomePage() {
         <CategoryPhotoGrid />
 
         {/* ── 4. Model Finder ─────────────────────────────────────────── */}
-        <section className="hp-model-section">
+        <section className="hp-model-section" id="model-finder">
 
           {/* Blueprint grid texture behind the section */}
           <div className="hp-blueprint-bg" aria-hidden="true" />
@@ -77,6 +77,7 @@ export default function HomePage() {
           background: var(--black);
           padding: clamp(40px, 5vw, 72px) clamp(16px, 3vw, 40px) clamp(40px, 5vw, 64px);
           overflow: hidden;
+          scroll-margin-top: 58px;
         }
 
         /* Blueprint grid overlay */

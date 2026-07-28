@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import GlowButton from '@/components/ui/GlowButton';
 
 function SoundOnIcon() {
@@ -27,12 +27,21 @@ function SoundOffIcon() {
 export default function VideoHero() {
   const videoRef = useRef(null);
   const [muted, setMuted] = useState(true);
+  const router = useRouter();
 
   const toggleSound = () => {
     if (!videoRef.current) return;
     const next = !muted;
     videoRef.current.muted = next;
     setMuted(next);
+  };
+
+  const goToCatalog = () => router.push('/browse');
+
+  // Scrolls to the ModelFinder section further down this same page, rather
+  // than duplicating the nav bar's /models link.
+  const scrollToModelFinder = () => {
+    document.getElementById('model-finder')?.scrollIntoView({ behavior: 'smooth' });
   };
 
   return (
@@ -90,10 +99,10 @@ export default function VideoHero() {
 
         {/* CTAs */}
         <div className="vh-ctas">
-          <GlowButton size="lg" variant="gold">
+          <GlowButton size="lg" variant="gold" onClick={goToCatalog}>
             Browse the Catalog
           </GlowButton>
-          <GlowButton size="lg" variant="steel">
+          <GlowButton size="lg" variant="steel" onClick={scrollToModelFinder}>
             Find By Model →
           </GlowButton>
         </div>

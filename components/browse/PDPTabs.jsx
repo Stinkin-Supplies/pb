@@ -1,24 +1,29 @@
 'use client';
 import { useState } from 'react';
-import { Tabs } from '@/components/ui/tabs';
+import { motion, AnimatePresence } from 'framer-motion';
 
-// ── Colour tokens (dark coal theme) ──────────────────────────────────────────
-const C = {
-  surface:    '#0c0a06',
-  iron:       '#161209',
-  panel:      '#111009',
-  border:     'rgba(197,167,34,0.14)',
-  borderGold: 'rgba(197,167,34,0.45)',
-  textPrime:  '#f0e8d8',
-  textDim:    '#a09890',
-  textMuted:  '#706860',
-  gold:       '#c9a84c',
-  goldDim:    '#8a7040',
+// ── Colour tokens — light "paper" surface, matches ProductImageGallery,
+// VariantSelector, and OemPartTimeline (already built against this palette). ──
+const P = {
+  bg:       '#f5f0e8',
+  bgAlt:    '#ede4cc',
+  card:     '#fdfbf4',
+  header:   '#ddd3b2',
+  headerOn: '#cfc09a',
+  ink:      '#1a1208',
+  inkDim:   '#5a4828',
+  inkMuted: '#8a7040',
+  gold:     '#7a5e14',
+  goldDim:  '#a07c30',
+  border:   'rgba(100,78,20,0.20)',
+  borderOn: 'rgba(100,78,20,0.45)',
+  pillOn:   '#7a5e14',
 };
 
 export default function PDPTabs({ fitment, oemRows, details }) {
   const fitmentCount = fitment?.length ?? 0;
   const oemCount     = oemRows?.length ?? 0;
+  const fitOemBadge  = fitmentCount + oemCount || null;
 
   const tabs = [
     {
@@ -27,30 +32,94 @@ export default function PDPTabs({ fitment, oemRows, details }) {
       content: <DetailsContent details={details} />,
     },
     {
-      title:   'OEM',
-      value:   'oem',
-      badge:   oemCount || null,
-      content: <OemContent oemRows={oemRows} />,
-    },
-    {
-      title:   'Fitment',
-      value:   'fitment',
-      badge:   fitmentCount || null,
-      content: <FitmentContent fitment={fitment} />,
+      title:   'Fitment & OEM',
+      value:   'fitment-oem',
+      badge:   fitOemBadge,
+      content: (
+        <>
+          <OemContent oemRows={oemRows} />
+          <FitmentContent fitment={fitment} />
+        </>
+      ),
     },
   ];
 
-  const defaultValue = details
-    ? 'details'
-    : fitmentCount ? 'fitment' : 'oem';
+  const defaultValue = details ? 'details' : 'fitment-oem';
+  const [active, setActive] = useState(defaultValue);
+  const activeTab = tabs.find(t => t.value === active) ?? tabs[0];
 
   return (
     <div style={{
-      borderTop: `1px solid ${C.border}`,
-      paddingTop: 24,
+      borderTop: `1px solid rgba(197,167,34,0.14)`,
+      padding: '24px 28px 28px',
     }}>
-      <div style={{ padding: '0 28px 28px' }}>
-        <Tabs tabs={tabs} defaultValue={defaultValue} />
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '190px 1fr',
+        gap: 16,
+        alignItems: 'start',
+      }}>
+        {/* Vertical pill rail */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {tabs.map(tab => {
+            const isActive = tab.value === active;
+            return (
+              <button
+                key={tab.value}
+                onClick={() => setActive(tab.value)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 8,
+                  padding: '11px 14px',
+                  border: `1px solid ${isActive ? P.pillOn : 'rgba(197,167,34,0.30)'}`,
+                  borderRadius: 999,
+                  background: isActive ? P.pillOn : 'transparent',
+                  color: isActive ? '#f0e8d8' : '#a09080',
+                  cursor: 'pointer',
+                  fontFamily: 'var(--font-stencil)',
+                  fontSize: 10.5,
+                  letterSpacing: '0.10em',
+                  textTransform: 'uppercase',
+                  transition: 'background 0.15s, color 0.15s, border-color 0.15s',
+                  textAlign: 'left',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {tab.title}
+                {tab.badge != null && (
+                  <span style={{
+                    fontSize: 9,
+                    color: isActive ? 'rgba(240,232,216,0.75)' : 'rgba(197,167,34,0.6)',
+                    background: isActive ? 'rgba(0,0,0,0.16)' : 'rgba(197,167,34,0.10)',
+                    padding: '2px 7px',
+                    borderRadius: 999,
+                    lineHeight: 1.5,
+                    flexShrink: 0,
+                  }}>
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Content panel */}
+        <div style={{ position: 'relative', minWidth: 0 }}>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab.value}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.18, ease: [0.25, 0.46, 0.45, 0.94] }}
+            >
+              {activeTab.content}
+            </motion.div>
+          </AnimatePresence>
+        </div>
       </div>
     </div>
   );
@@ -60,10 +129,9 @@ export default function PDPTabs({ fitment, oemRows, details }) {
 function Panel({ children }) {
   return (
     <div style={{
-      background: C.panel,
-      border: `1px solid ${C.border}`,
-      borderTop: 'none',
-      padding: '24px 24px',
+      background: P.bg,
+      border: `1px solid ${P.border}`,
+      padding: '20px 20px',
       minHeight: 180,
     }}>
       {children}
@@ -97,7 +165,7 @@ function DetailsContent({ details }) {
             <p style={{
               fontFamily: 'var(--font-bespoke)',
               fontSize: 14,
-              color: C.textPrime,
+              color: P.ink,
               lineHeight: 1.7,
               margin: 0,
             }}>
@@ -109,8 +177,8 @@ function DetailsContent({ details }) {
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 7 }}>
               {features.map((f, i) => (
                 <li key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                  <span style={{ color: C.gold, fontSize: 13, lineHeight: '1.55', flexShrink: 0, marginTop: 1 }}>›</span>
-                  <span style={{ fontFamily: 'var(--font-bespoke)', fontSize: 13, color: C.textPrime, lineHeight: 1.6 }}>
+                  <span style={{ color: P.gold, fontSize: 13, lineHeight: '1.55', flexShrink: 0, marginTop: 1 }}>›</span>
+                  <span style={{ fontFamily: 'var(--font-bespoke)', fontSize: 13, color: P.ink, lineHeight: 1.6 }}>
                     {f}
                   </span>
                 </li>
@@ -121,21 +189,21 @@ function DetailsContent({ details }) {
           {tech_note && (
             <div style={{
               padding: '12px 16px',
-              background: 'rgba(197,167,34,0.04)',
-              border: `1px solid ${C.border}`,
-              borderLeft: `3px solid ${C.gold}`,
+              background: 'rgba(122,94,20,0.05)',
+              border: `1px solid ${P.border}`,
+              borderLeft: `3px solid ${P.gold}`,
             }}>
               <div style={{
                 fontFamily: 'var(--font-stencil)',
                 fontSize: 8,
-                color: C.goldDim,
+                color: P.goldDim,
                 letterSpacing: '0.12em',
                 textTransform: 'uppercase',
                 marginBottom: 6,
               }}>
                 Tech Note
               </div>
-              <div style={{ fontFamily: 'var(--font-bespoke)', fontSize: 13, color: C.textPrime, lineHeight: 1.6 }}>
+              <div style={{ fontFamily: 'var(--font-bespoke)', fontSize: 13, color: P.ink, lineHeight: 1.6 }}>
                 {tech_note}
               </div>
             </div>
@@ -145,7 +213,7 @@ function DetailsContent({ details }) {
         {/* Right: specification table */}
         {attrs.length > 0 && (
           <div style={{
-            borderLeft: `1px solid ${C.border}`,
+            borderLeft: `1px solid ${P.border}`,
             paddingLeft: 24,
           }}>
             <SectionLabel>Specifications</SectionLabel>
@@ -157,12 +225,12 @@ function DetailsContent({ details }) {
                   alignItems: 'baseline',
                   gap: 12,
                   padding: '8px 0',
-                  borderBottom: i < attrs.length - 1 ? `1px solid ${C.border}` : 'none',
+                  borderBottom: i < attrs.length - 1 ? `1px solid ${P.border}` : 'none',
                 }}>
                   <span style={{
                     fontFamily: 'var(--font-stencil)',
                     fontSize: 9,
-                    color: C.textMuted,
+                    color: P.inkMuted,
                     letterSpacing: '0.08em',
                     textTransform: 'uppercase',
                     flexShrink: 0,
@@ -172,7 +240,7 @@ function DetailsContent({ details }) {
                   <span style={{
                     fontFamily: 'var(--font-bespoke)',
                     fontSize: 13,
-                    color: C.textPrime,
+                    color: P.ink,
                     fontWeight: 600,
                     textAlign: 'right',
                   }}>
@@ -193,10 +261,11 @@ function DetailsContent({ details }) {
 function OemContent({ oemRows }) {
   const [copied, setCopied] = useState(null);
 
-  if (!oemRows?.length) return <Panel><Empty>No OEM cross-reference data on file.</Empty></Panel>;
+  if (!oemRows?.length) return null;
 
   const primary   = oemRows.filter(r => r.oem_format?.startsWith('hd_oem') && !r.expanded_from);
   const secondary = oemRows.filter(r => !r.oem_format?.startsWith('hd_oem') || r.expanded_from);
+  if (primary.length === 0 && secondary.length === 0) return null;
 
   function copy(num) {
     navigator.clipboard?.writeText(num).then(() => {
@@ -212,11 +281,11 @@ function OemContent({ oemRows }) {
       style={{
         fontFamily: 'var(--font-stencil)',
         fontSize: prominent ? 12 : 11,
-        color: copied === num ? '#5cb85c' : (prominent ? C.gold : C.textDim),
+        color: copied === num ? '#3f7a3f' : (prominent ? P.gold : P.inkDim),
         background: copied === num
-          ? 'rgba(92,184,92,0.08)'
-          : prominent ? 'rgba(201,168,76,0.08)' : 'rgba(255,255,255,0.03)',
-        border: `1px solid ${copied === num ? 'rgba(92,184,92,0.35)' : prominent ? 'rgba(201,168,76,0.40)' : C.border}`,
+          ? 'rgba(63,122,63,0.08)'
+          : prominent ? 'rgba(122,94,20,0.08)' : 'rgba(0,0,0,0.03)',
+        border: `1px solid ${copied === num ? 'rgba(63,122,63,0.35)' : prominent ? 'rgba(122,94,20,0.35)' : P.border}`,
         borderRadius: 0,
         padding: prominent ? '6px 14px' : '4px 10px',
         letterSpacing: '0.06em',
@@ -232,9 +301,13 @@ function OemContent({ oemRows }) {
   );
 
   return (
-    <Panel>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-
+    <div style={{
+      background: P.bg,
+      border: `1px solid ${P.border}`,
+      borderBottom: 'none',
+      padding: '18px 20px',
+    }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         {primary.length > 0 && (
           <div>
             <SectionLabel>HD OEM Numbers</SectionLabel>
@@ -252,12 +325,8 @@ function OemContent({ oemRows }) {
             </div>
           </div>
         )}
-
-        {primary.length === 0 && secondary.length === 0 && (
-          <Empty>No OEM cross-reference data on file.</Empty>
-        )}
       </div>
-    </Panel>
+    </div>
   );
 }
 
@@ -268,7 +337,13 @@ function FitmentContent({ fitment }) {
   const [openFamilies, setOpenFamilies] = useState(new Set());
   const [activePills, setActivePills] = useState(new Set());
 
-  if (!fitment?.length) return <Panel><Empty>No fitment data on file.</Empty></Panel>;
+  if (!fitment?.length) {
+    return (
+      <div style={{ background: P.bg, border: `1px solid ${P.border}`, padding: '20px 20px', minHeight: 120 }}>
+        <Empty>No fitment data on file.</Empty>
+      </div>
+    );
+  }
 
   // Group by family
   const groupMap = new Map();
@@ -288,7 +363,7 @@ function FitmentContent({ fitment }) {
   function toggleFamily(name) {
     setOpenFamilies(prev => {
       const next = new Set(prev);
-      next.has(name) ? next.delete(name) : next.add(name);
+      if (next.has(name)) next.delete(name); else next.add(name);
       return next;
     });
   }
@@ -331,30 +406,14 @@ function FitmentContent({ fitment }) {
 
   const totalModels = filteredGroups.reduce((n, g) => n + g.rows.length, 0);
 
-  // Cream parchment colour palette for fitment panel
-  const P = {
-    bg:       '#ede4cc',
-    bgAlt:    '#e6dbbf',
-    header:   '#ddd3b2',
-    headerOn: '#cfc09a',
-    text:     '#1a1408',
-    textDim:  '#5a4828',
-    textMuted:'#8a7244',
-    gold:     '#7a5e14',
-    goldDim:  '#a07c30',
-    border:   'rgba(100,78,20,0.20)',
-    borderOn: 'rgba(100,78,20,0.45)',
-    pillOn:   '#7a5e14',
-  };
-
   return (
     <div style={{
       background: P.bg,
       border: `1px solid ${P.border}`,
-      borderTop: 'none',
       padding: '20px 20px',
-      minHeight: 180,
     }}>
+
+      <SectionLabel>Verified Fitment</SectionLabel>
 
       {/* Family pills */}
       {groups.length > 1 && (
@@ -362,7 +421,7 @@ function FitmentContent({ fitment }) {
           display: 'flex',
           flexWrap: 'wrap',
           gap: 7,
-          marginBottom: 16,
+          margin: '10px 0 16px',
           paddingBottom: 16,
           borderBottom: `1px solid ${P.border}`,
         }}>
@@ -377,7 +436,7 @@ function FitmentContent({ fitment }) {
                   fontSize: 11,
                   letterSpacing: '0.14em',
                   textTransform: 'uppercase',
-                  color: on ? '#f0e8d8' : P.textDim,
+                  color: on ? '#f0e8d8' : P.inkDim,
                   background: on ? P.pillOn : 'rgba(0,0,0,0.05)',
                   border: `1px solid ${on ? P.pillOn : P.border}`,
                   padding: '7px 14px',
@@ -392,7 +451,7 @@ function FitmentContent({ fitment }) {
                 {g.family}
                 <span style={{
                   fontSize: 9,
-                  color: on ? 'rgba(240,232,216,0.7)' : P.textMuted,
+                  color: on ? 'rgba(240,232,216,0.7)' : P.inkMuted,
                   background: on ? 'rgba(0,0,0,0.18)' : 'rgba(0,0,0,0.07)',
                   border: `1px solid ${on ? 'rgba(0,0,0,0.15)' : P.border}`,
                   padding: '1px 6px',
@@ -410,7 +469,7 @@ function FitmentContent({ fitment }) {
                 fontFamily: 'var(--font-stencil)',
                 fontSize: 10,
                 letterSpacing: '0.10em',
-                color: P.textMuted,
+                color: P.inkMuted,
                 background: 'transparent',
                 border: `1px solid ${P.border}`,
                 padding: '7px 12px',
@@ -425,7 +484,7 @@ function FitmentContent({ fitment }) {
       )}
 
       {/* Search + summary row */}
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 14 }}>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 14, marginTop: groups.length > 1 ? 0 : 10 }}>
         <input
           type="text"
           value={query}
@@ -436,7 +495,7 @@ function FitmentContent({ fitment }) {
             padding: '9px 14px',
             fontFamily: 'var(--font-bespoke)',
             fontSize: 13,
-            color: P.text,
+            color: P.ink,
             background: 'rgba(0,0,0,0.06)',
             border: `1px solid ${P.border}`,
             borderRadius: 0,
@@ -449,7 +508,7 @@ function FitmentContent({ fitment }) {
         <div style={{
           fontFamily: 'var(--font-stencil)',
           fontSize: 9,
-          color: P.textMuted,
+          color: P.inkMuted,
           letterSpacing: '0.08em',
           whiteSpace: 'nowrap',
         }}>
@@ -460,7 +519,7 @@ function FitmentContent({ fitment }) {
       {/* Family accordion list */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 480, overflowY: 'auto' }}>
         {filteredGroups.length === 0 && (
-          <div style={{ fontFamily: 'var(--font-stencil)', fontSize: 10, color: P.textMuted, letterSpacing: '0.08em', padding: '16px 0' }}>
+          <div style={{ fontFamily: 'var(--font-stencil)', fontSize: 10, color: P.inkMuted, letterSpacing: '0.08em', padding: '16px 0' }}>
             No matching fitment.
           </div>
         )}
@@ -497,14 +556,14 @@ function FitmentContent({ fitment }) {
                     width: 3,
                     height: 16,
                     flexShrink: 0,
-                    background: isOpen ? P.gold : P.textMuted,
+                    background: isOpen ? P.gold : P.inkMuted,
                     display: 'inline-block',
                     transition: 'background 0.15s',
                   }} />
                   <span style={{
                     fontFamily: 'var(--font-stencil)',
                     fontSize: 13,
-                    color: isOpen ? P.gold : P.textDim,
+                    color: isOpen ? P.gold : P.inkDim,
                     letterSpacing: '0.14em',
                     textTransform: 'uppercase',
                     fontWeight: 600,
@@ -514,7 +573,7 @@ function FitmentContent({ fitment }) {
                   <span style={{
                     fontFamily: 'var(--font-stencil)',
                     fontSize: 9,
-                    color: P.textMuted,
+                    color: P.inkMuted,
                     letterSpacing: '0.06em',
                     background: 'rgba(0,0,0,0.07)',
                     border: `1px solid ${P.border}`,
@@ -528,7 +587,7 @@ function FitmentContent({ fitment }) {
                   <span style={{
                     fontFamily: 'var(--font-stencil)',
                     fontSize: 10,
-                    color: P.textMuted,
+                    color: P.inkMuted,
                     letterSpacing: '0.06em',
                   }}>
                     {Math.min(...group.rows.map(r => r.year_from))}
@@ -537,7 +596,7 @@ function FitmentContent({ fitment }) {
                   </span>
                   {!q && (
                     <span style={{
-                      color: isOpen ? P.gold : P.textMuted,
+                      color: isOpen ? P.gold : P.inkMuted,
                       fontSize: 12,
                       lineHeight: 1,
                       transition: 'transform 0.2s',
@@ -567,7 +626,7 @@ function FitmentContent({ fitment }) {
                         <span style={{
                           fontFamily: 'var(--font-stencil)',
                           fontSize: 13,
-                          color: P.text,
+                          color: P.ink,
                           letterSpacing: '0.08em',
                           textTransform: 'uppercase',
                           fontWeight: 600,
@@ -621,7 +680,7 @@ function SectionLabel({ children }) {
     <div style={{
       fontFamily: 'var(--font-stencil)',
       fontSize: 8,
-      color: C.goldDim,
+      color: P.goldDim,
       letterSpacing: '0.14em',
       textTransform: 'uppercase',
     }}>
@@ -635,7 +694,7 @@ function Empty({ children }) {
     <div style={{
       fontFamily: 'var(--font-stencil)',
       fontSize: 10,
-      color: C.textMuted,
+      color: P.inkMuted,
       letterSpacing: '0.08em',
       padding: '16px 0',
     }}>

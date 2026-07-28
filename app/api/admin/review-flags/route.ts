@@ -57,6 +57,7 @@ export async function GET(req: NextRequest) {
       FROM catalog_review_flags f
       JOIN catalog_unified cu ON cu.id = f.product_id
       WHERE f.resolved = $1
+        AND cu.is_active = true
       ORDER BY f.flagged_at DESC
       LIMIT 500
       `,
