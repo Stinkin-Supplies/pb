@@ -253,8 +253,8 @@ function getLedgerClass(type = "") {
 }
 
 // ── MAIN COMPONENT ────────────────────────────────────────────
-export default function GarageHub({ user, initialAddresses, initialVehicles, ledger, wishlist, orders }) {
-  const [tab, setTab] = useState("PROFILE");
+export default function GarageHub({ user, initialAddresses, initialVehicles, ledger, wishlist, orders, initialTab }) {
+  const [tab, setTab] = useState(initialTab ?? "PROFILE");
 
   // Profile state
   const [editing,   setEditing]   = useState(false);
@@ -336,6 +336,15 @@ export default function GarageHub({ user, initialAddresses, initialVehicles, led
     return () => { cancelled = true; };
   }, [bikeYear]);
   const hdModels = bikeYear ? hdModelsRaw : [];
+
+  // hdModels arrives pre-sorted by family then model_code (see /api/hd-models) —
+  // group into consecutive runs so the picker can render one <optgroup> per family.
+  const hdModelGroups = hdModels.reduce((groups, m) => {
+    const last = groups[groups.length - 1];
+    if (last && last.family === m.family) last.models.push(m);
+    else groups.push({ family: m.family, models: [m] });
+    return groups;
+  }, []);
 
   const titleCase = (s) => s.replace(/\w\S*/g, w => w[0].toUpperCase() + w.slice(1).toLowerCase());
 
@@ -888,7 +897,13 @@ export default function GarageHub({ user, initialAddresses, initialVehicles, led
                   setBikeModel(found ? titleCase(found.name) : "");
                 }} disabled={!bikeYear || loadingHdModels}>
                   <option value="">{loadingHdModels ? "Loading models..." : "Model"}</option>
-                  {hdModels.map(m => <option key={m.model_code} value={m.model_code}>{m.model_code} — {titleCase(m.name)}</option>)}
+                  {hdModelGroups.map(g => (
+                    <optgroup key={g.family} label={g.family}>
+                      {g.models.map(m => (
+                        <option key={m.model_code} value={m.model_code}>{m.model_code} — {titleCase(m.name)}</option>
+                      ))}
+                    </optgroup>
+                  ))}
                 </select>
               </div>
             </div>

@@ -223,10 +223,10 @@ export default function Footer() {
           <FooterCol
             title="Account"
             links={[
-              { label: "My Orders",       href: "/account/orders" },
-              { label: "Points & Rewards",href: "/account/points" },
+              { label: "My Orders",       href: "/garage?tab=ORDERS" },
+              { label: "Points & Rewards",href: "/garage?tab=POINTS" },
               { label: "My Garage",       href: "/garage" },
-              { label: "Wishlist",        href: "/account/wishlist" },
+              { label: "Wishlist",        href: "/garage?tab=WISHLIST" },
               { label: "Sign In",         href: "/auth" },
             ]}
           />

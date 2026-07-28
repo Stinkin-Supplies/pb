@@ -172,7 +172,7 @@ export default function CheckoutSuccessPage() {
               CONTINUE SHOPPING →
             </Link>
             <Link
-              href="/account/orders"
+              href="/garage?tab=ORDERS"
               style={{
                 display: 'block',
                 textAlign: 'center',

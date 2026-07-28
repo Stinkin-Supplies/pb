@@ -8,11 +8,17 @@ import GarageHub               from "./GarageHub";
 
 export const metadata = { title: "My Garage | Stinkin' Supplies" };
 
-export default async function GaragePage() {
+const VALID_TABS = ["PROFILE", "BIKES", "POINTS", "WISHLIST", "ORDERS"];
+
+export default async function GaragePage({ searchParams }) {
   const supabase = await createServerSupabaseClient();
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/auth");
+
+  const sp = await searchParams;
+  const requestedTab = String(sp?.tab ?? "").toUpperCase();
+  const initialTab = VALID_TABS.includes(requestedTab) ? requestedTab : "PROFILE";
 
   const [
     { data: profile },
@@ -49,6 +55,7 @@ export default async function GaragePage() {
 
   return (
     <GarageHub
+      initialTab={initialTab}
       user={{
         id: user.id, email: user.email,
         firstName:    profile?.first_name     ?? "",

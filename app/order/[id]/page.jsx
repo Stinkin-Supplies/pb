@@ -380,7 +380,7 @@ export default async function OrderPage({ params }) {
           </div>
           <div style={{ display: "flex", gap: 10 }}>
             <a
-              href="/account/orders"
+              href="/garage?tab=ORDERS"
               style={{
                 ...M({ fontSize: 9, letterSpacing: "0.12em" }),
                 background: "#111010", border: "1px solid #2a2828",
@@ -582,7 +582,7 @@ export default async function OrderPage({ params }) {
             CONTINUE SHOPPING →
           </a>
           <a
-            href="/account/orders"
+            href="/garage?tab=ORDERS"
             style={{
               ...B({ fontSize: 16, letterSpacing: "0.1em" }),
               display: "inline-block",

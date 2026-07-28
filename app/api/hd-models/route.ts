@@ -22,9 +22,11 @@ export async function GET(req: NextRequest) {
     `
     SELECT DISTINCT ON (hm.model_code)
       hm.model_code,
-      hm.name
+      hm.name,
+      hf.name AS family
     FROM harley_model_years hmy
     JOIN harley_models hm ON hm.id = hmy.model_id
+    JOIN harley_families hf ON hf.id = hm.family_id
     WHERE hmy.year = $1
     ORDER BY hm.model_code, hm.name
     `,
@@ -32,8 +34,8 @@ export async function GET(req: NextRequest) {
   );
 
   const models = rows
-    .map((r) => ({ model_code: r.model_code, name: r.name }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .map((r) => ({ model_code: r.model_code, name: r.name, family: r.family }))
+    .sort((a, b) => a.family.localeCompare(b.family) || a.model_code.localeCompare(b.model_code));
 
   return NextResponse.json({ year, models });
 }
