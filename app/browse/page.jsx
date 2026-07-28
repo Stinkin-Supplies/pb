@@ -52,6 +52,11 @@ function BrowsePageInner() {
   const [page,        setPage]        = useState(1);
   const [searchInput, setSearchInput] = useState(searchParams.get("q") || "");
 
+  const goToPage = useCallback((pg) => {
+    setPage(pg);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
+
   const [filters, setFilters] = useState({
     era:                 searchParams.get("era")              || null,
     family:              searchParams.get("family")           || null,
@@ -324,15 +329,15 @@ function BrowsePageInner() {
               Page {page} of {totalPages.toLocaleString()}
             </span>
             <div className="bp-pag-buttons">
-              <PagBtn onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>← Prev</PagBtn>
+              <PagBtn onClick={() => goToPage(Math.max(1, page - 1))} disabled={page === 1}>← Prev</PagBtn>
               {Array.from({ length: Math.min(7, totalPages) }, (_, i) => {
                 const pg = page <= 4 ? i + 1
                   : page >= totalPages - 3 ? totalPages - 6 + i
                   : page - 3 + i;
                 if (pg < 1 || pg > totalPages) return null;
-                return <PagBtn key={pg} onClick={() => setPage(pg)} active={pg === page}>{pg}</PagBtn>;
+                return <PagBtn key={pg} onClick={() => goToPage(pg)} active={pg === page}>{pg}</PagBtn>;
               })}
-              <PagBtn onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next →</PagBtn>
+              <PagBtn onClick={() => goToPage(Math.min(totalPages, page + 1))} disabled={page === totalPages}>Next →</PagBtn>
             </div>
           </div>
         )}
