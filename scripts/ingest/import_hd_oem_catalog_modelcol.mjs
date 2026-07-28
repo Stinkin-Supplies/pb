@@ -64,7 +64,7 @@ const pool = new pg.Pool({ connectionString: process.env.CATALOG_DATABASE_URL })
 // DESCRIPTION  MODEL(S)") rather than one -- both are handled below.
 const HEADER_LINE_RE = /INDEX\s*(NO\.)?\s{2,}PART\s*(NO\.)?\s{2,}DESCRIPTION\s{2,}MODEL(\(S\)|S)?\b/i;
 const HEADER_LINE1_RE = /^\s*INDEX\s+PART\s*$/i;
-const HEADER_LINE2_RE = /^\s*NO\.\s+(?:NO\.\s+)?(?:NAME|DESCRIPTION)\s+MODEL(\(S\)|S)?\b/i;
+const HEADER_LINE2_RE = /^\s*NO\.?\s+(?:NO\.?\s+)?(?:NAME|DESCRIPTION)\s+MODEL(\(S\)|S)?\b/i;
 const CATEGORY_RE = /^[A-Z][A-Z0-9 \/,.…'\-]{2,50}$/;
 const BLOCKED_SECTIONS = new Set([
   "READER'S COMMENTS", 'PLEASE ADD ANY OTHER COMMENTS HERE', 'GENERAL INFORMATION',
@@ -78,13 +78,32 @@ function isPartNumberToken(t) {
   return t.length >= 3 && /^[A-Za-z0-9][A-Za-z0-9\-]*$/.test(t) && /\d/.test(t);
 }
 
+function twoDigitYear(yy) {
+  const n = parseInt(yy, 10);
+  return n >= 30 ? 1900 + n : 2000 + n;
+}
+
 function parseModelSegment(seg) {
   const s = seg.trim().replace(/[.,;]+$/, '');
   if (!s) return null;
-  if (/^ALL$/i.test(s)) return { code: 'ALL', year: null };
+  // Some catalogs flatten a multi-family layout into one MODEL(S) column as
+  // "FamilyName: YY to YY-CODE" per row (e.g. "Touring: 87 to 89-ALL")
+  // instead of separate side-by-side family columns -- confirmed in the
+  // 1987-90 Softail catalog. Family name is informational only here; the
+  // code/year range is the actual fitment signal.
+  const flat = s.match(/^\w+:\s*(\d{2})\s*to\s*(\d{2})-(.+)$/i);
+  if (flat) {
+    return {
+      code: /^ALL$/i.test(flat[3]) ? 'ALL' : flat[3].toUpperCase(),
+      year_start: twoDigitYear(flat[1]),
+      year_end: twoDigitYear(flat[2]),
+    };
+  }
+  if (/^ALL$/i.test(s)) return { code: 'ALL', year_start: null, year_end: null };
   const m = s.match(/^([A-Za-z0-9\-\/]+)(?:\s+(\d{4}))?$/);
   if (!m) return null;
-  return { code: m[1].toUpperCase(), year: m[2] ? parseInt(m[2], 10) : null };
+  const y = m[2] ? parseInt(m[2], 10) : null;
+  return { code: m[1].toUpperCase(), year_start: y, year_end: y };
 }
 
 async function run() {
@@ -110,7 +129,11 @@ async function run() {
       pendingPartIdx = line.search(/PART/i);
       continue;
     }
-    if (HEADER_LINE2_RE.test(line) && pendingPartIdx !== null) {
+    if (HEADER_LINE2_RE.test(line)) {
+      // Fall back to this line's own first "NO" position when there was no
+      // separate line-1 "INDEX PART" label to anchor on (some OCR output
+      // drops line 1 entirely) -- less precise but better than nothing.
+      if (pendingPartIdx === null) pendingPartIdx = line.search(/NO\.?/i);
       finalize();
       const descIdx = line.search(/NAME|DESCRIPTION/i);
       const modelIdx = line.search(/MODEL(\(S\)|S)?\b/i);
@@ -170,8 +193,8 @@ async function run() {
     for (const seg of segments) {
       const parsed = parseModelSegment(seg);
       if (!parsed) continue;
-      const year_start = parsed.year ?? CATALOG_YEAR_START;
-      const year_end = parsed.year ?? CATALOG_YEAR_END;
+      const year_start = parsed.year_start ?? CATALOG_YEAR_START;
+      const year_end = parsed.year_end ?? CATALOG_YEAR_END;
       records.push({
         part_number: r.part_number,
         description: r.description,
