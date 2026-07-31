@@ -59,24 +59,6 @@ npx dotenv -e .env.local -- node scripts/ingest/<script>.mjs
 | `harley_families`, `harley_models`, `harley_model_years` | HD model hierarchy for fitment resolution |
 | `oem_supersession` | HD OEM part number supersession chains (283 rows, survived TRUNCATE incident) |
 
-## Taxonomy / Category System
-
-**3-tier hierarchy**: `display_category` → `display_subcategory` → `display_subcategory_detail`
-
-**Filter sidebar ordering** is controlled by `SUBCATEGORY_DISPLAY_GROUPS` in `lib/db/browse.ts` (not in a separate config file). Categories listed there get "type group first, then alphabetical" ordering; unlisted categories use count-DESC. Add entries here when a category completes its taxonomy pass.
-
-**Policy**: subcategories with >150 products get detail groupings. Catch-all buckets ("General", "Misc", etc.) must be renamed or split on audit.
-
-**Authoritative taxonomy scripts** live directly in `scripts/ingest/` (e.g. `rebuild_engine_taxonomy.mjs`, `rebuild_fuel_air_carbs_taxonomy.mjs`). The `_retired/` subdirectory holds scripts archived after use — not deleted, may need re-running. The `_unverified/` subdirectory has lower-confidence scripts; read carefully before running.
-
-**`category_cleanup_20260714*.sql` / `20260715*.sql`** are refinement passes on top of already-classified subcategories, not initial classifiers — run the `rebuild_` script for a category first, then these SQL files in part-number order.
-
-## Admin Panel
-
-`app/admin/layout.jsx` — requires Supabase auth + `user_profiles.role = 'admin'`. Several admin routes (canonical-matches, parts-timeline, review-queue) require `?token=$ADMIN_SECRET` in the URL.
-
-Protected API routes check `lib/adminAuth.ts`.
-
 ## Routing / Fulfillment
 
 `lib/routing/` — offer scoring logic for multi-vendor fulfillment. `lib/fulfillment/optimizer.ts` selects vendor(s) for an order; `lib/fulfillment/triggerFulfillment.ts` fires the actual vendor order.
